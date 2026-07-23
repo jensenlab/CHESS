@@ -1,0 +1,24 @@
+name = "CHESS"
+uuid = "62dec9b8-6080-46d4-b979-4cedd2cd98ca"
+version = "0.1.0"
+authors = ["Ben David <66976120+bmdavid2@users.noreply.github.com>"]
+
+[deps]
+CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
+CHESSDatabase = "a378c3a1-3085-4ba8-9ece-5d836f51da24"
+CHESSLabConstants = "51347251-55e0-4e7d-9685-600600911616"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[compat]
+Reexport = "1.2.2"
+Unitful = "1.27.0"
+
+[sources]
+CHESSCore = {path = "CHESSCore"}
+CHESSDatabase = {path = "CHESSDatabase"}
+CHESSLabConstants = {path = "CHESSLabConstants"}
+
+[workspace]
+projects = ["CHESSCore", "CHESSDatabase", "CHESSLabConstants", "docs"]

@@ -1,0 +1,8 @@
+*.cov
+lcov.info
+.DS_Store
+*.db
+Manifest.toml
+Benjamin_David_PhD_Thesis.pdf
+docs/build/
+CHESSLabConstants/src/organisms/private/

@@ -1,0 +1,25 @@
+name = "CHESSLabConstants"
+uuid = "51347251-55e0-4e7d-9685-600600911616"
+version = "0.1.0"
+authors = ["Ben David <66976120+bmdavid2@users.noreply.github.com>"]
+
+[deps]
+CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
+DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[compat]
+DBInterface = "2.6.1"
+DataFrames = "1.8.1"
+HTTP = "1.10.19"
+JSON = "1.3.0"
+SQLite = "1.6.1"
+Unitful = "1.27.0"
+
+[sources]
+CHESSCore = {path = "../CHESSCore"}

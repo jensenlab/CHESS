@@ -1,0 +1,199 @@
+ERROR: SystemError: opening file "/Users/BDavid/Documents/GitHub/JLIMS/=": No such file or directory
+Stacktrace:
+  [1] systemerror(p::String, errno::Int32; extrainfo::Nothing)
+    @ Base ./error.jl:176
+  [2] #systemerror#80
+    @ ./error.jl:175 [inlined]
+  [3] systemerror
+    @ ./error.jl:175 [inlined]
+  [4] open(fname::String; lock::Bool, read::Nothing, write::Nothing, create::Nothing, truncate::Nothing, append::Nothing)
+    @ Base ./iostream.jl:293
+  [5] open
+    @ ./iostream.jl:275 [inlined]
+  [6] open(f::Base.var"#387#388"{String}, args::String; kwargs::Base.Pairs{Symbol, Union{}, Tuple{}, NamedTuple{(), Tuple{}}})
+    @ Base ./io.jl:382
+  [7] open
+    @ ./io.jl:381 [inlined]
+  [8] read
+    @ ./io.jl:462 [inlined]
+  [9] _include(mapexpr::Function, mod::Module, _path::String)
+    @ Base ./loading.jl:1484
+ [10] include(mod::Module, _path::String)
+    @ Base ./Base.jl:419
+ [11] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:303
+ [12] _start()
+    @ Base ./client.jl:522
+ERROR: SystemError: opening file "/Users/BDavid/Documents/GitHub/JLIMS/=.": No such file or directory
+Stacktrace:
+  [1] systemerror(p::String, errno::Int32; extrainfo::Nothing)
+    @ Base ./error.jl:176
+  [2] #systemerror#80
+    @ ./error.jl:175 [inlined]
+  [3] systemerror
+    @ ./error.jl:175 [inlined]
+  [4] open(fname::String; lock::Bool, read::Nothing, write::Nothing, create::Nothing, truncate::Nothing, append::Nothing)
+    @ Base ./iostream.jl:293
+  [5] open
+    @ ./iostream.jl:275 [inlined]
+  [6] open(f::Base.var"#387#388"{String}, args::String; kwargs::Base.Pairs{Symbol, Union{}, Tuple{}, NamedTuple{(), Tuple{}}})
+    @ Base ./io.jl:382
+  [7] open
+    @ ./io.jl:381 [inlined]
+  [8] read
+    @ ./io.jl:462 [inlined]
+  [9] _include(mapexpr::Function, mod::Module, _path::String)
+    @ Base ./loading.jl:1484
+ [10] include(mod::Module, _path::String)
+    @ Base ./Base.jl:419
+ [11] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:303
+ [12] _start()
+    @ Base ./client.jl:522
+ERROR: LoadError: ArgumentError: Package JLIMS not found in current path.
+- Run `import Pkg; Pkg.add("JLIMS")` to install the JLIMS package.
+Stacktrace:
+ [1] macro expansion
+   @ ./loading.jl:1163 [inlined]
+ [2] macro expansion
+   @ ./lock.jl:223 [inlined]
+ [3] require(into::Module, mod::Symbol)
+   @ Base ./loading.jl:1144
+in expression starting at /Users/BDavid/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:1
+ERROR: LoadError: UndefVarError: deps not defined
+Stacktrace:
+ [1] top-level scope
+   @ ~/Documents/GitHub/JLIMS/Project.toml:6
+in expression starting at /Users/BDavid/Documents/GitHub/JLIMS/Project.toml:6
+ERROR: LoadError: MethodError: no method matching zero(::Type{Any})
+Closest candidates are:
+  zero(::Type{Union{Missing, T}}) where T at missing.jl:105
+  zero(!Matched::Union{Type{P}, P}) where P<:Dates.Period at /Applications/Julia-1.8.app/Contents/Resources/julia/share/julia/stdlib/v1.8/Dates/src/periods.jl:53
+  zero(!Matched::SparseArrays.AbstractSparseArray) at /Applications/Julia-1.8.app/Contents/Resources/julia/share/julia/stdlib/v1.8/SparseArrays/src/SparseArrays.jl:42
+  ...
+Stacktrace:
+  [1] zero(#unused#::Type{Any})
+    @ Base ./missing.jl:106
+  [2] reduce_empty(#unused#::typeof(+), #unused#::Type{Any})
+    @ Base ./reduce.jl:338
+  [3] reduce_empty(#unused#::typeof(Base.add_sum), #unused#::Type{Any})
+    @ Base ./reduce.jl:347
+  [4] mapreduce_empty(#unused#::typeof(identity), op::Function, T::Type)
+    @ Base ./reduce.jl:367
+  [5] reduce_empty(op::Base.MappingRF{typeof(identity), typeof(Base.add_sum)}, #unused#::Type{Any})
+    @ Base ./reduce.jl:356
+  [6] reduce_empty_iter
+    @ ./reduce.jl:379 [inlined]
+  [7] mapreduce_empty_iter(f::Function, op::Function, itr::Vector{Any}, ItrEltype::Base.HasEltype)
+    @ Base ./reduce.jl:375
+  [8] _mapreduce(f::typeof(identity), op::typeof(Base.add_sum), #unused#::IndexLinear, A::Vector{Any})
+    @ Base ./reduce.jl:427
+  [9] _mapreduce_dim
+    @ ./reducedim.jl:365 [inlined]
+ [10] #mapreduce#765
+    @ ./reducedim.jl:357 [inlined]
+ [11] mapreduce
+    @ ./reducedim.jl:357 [inlined]
+ [12] #_sum#775
+    @ ./reducedim.jl:999 [inlined]
+ [13] _sum
+    @ ./reducedim.jl:999 [inlined]
+ [14] #_sum#774
+    @ ./reducedim.jl:998 [inlined]
+ [15] _sum
+    @ ./reducedim.jl:998 [inlined]
+ [16] #sum#772
+    @ ./reducedim.jl:994 [inlined]
+ [17] sum
+    @ ./reducedim.jl:994 [inlined]
+ [18] Mixture(ingredients::Dict{Any, Any})
+    @ JLIMS ~/Documents/GitHub/JLIMS/src/virtual_types/Mixtures.jl:3
+ [19] Composition(ingredients::Dict{Any, Any})
+    @ JLIMS ~/Documents/GitHub/JLIMS/src/JLIMS.jl:35
+ [20] build_composition(df::DataFrame)
+    @ Main ~/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:78
+ [21] _broadcast_getindex_evalf
+    @ ./broadcast.jl:670 [inlined]
+ [22] _broadcast_getindex
+    @ ./broadcast.jl:643 [inlined]
+ [23] _getindex
+    @ ./broadcast.jl:666 [inlined]
+ [24] _broadcast_getindex(bc::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Tuple{Base.OneTo{Int64}}, Type{Stock}, Tuple{Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(build_composition), Tuple{Base.Broadcast.Extruded{Vector{DataFrame}, Tuple{Bool}, Tuple{Int64}}}}, Base.Broadcast.Extruded{Vector{Quantity{Float64}}, Tuple{Bool}, Tuple{Int64}}, Base.Broadcast.Extruded{Vector{Well}, Tuple{Bool}, Tuple{Int64}}}}, I::Int64)
+    @ Base.Broadcast ./broadcast.jl:642
+ [25] getindex
+    @ ./broadcast.jl:597 [inlined]
+ [26] copy(bc::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Tuple{Base.OneTo{Int64}}, Type{Stock}, Tuple{Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(build_composition), Tuple{Vector{DataFrame}}}, Vector{Quantity{Float64}}, Vector{Well}}})
+    @ Base.Broadcast ./broadcast.jl:899
+ [27] materialize(bc::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, Type{Stock}, Tuple{Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(build_composition), Tuple{Vector{DataFrame}}}, Vector{Quantity{Float64}}, Vector{Well}}})
+    @ Base.Broadcast ./broadcast.jl:860
+ [28] reconstruct_stock(wellid::Int64)
+    @ Main ~/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:114
+ [29] top-level scope
+    @ ~/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:133
+in expression starting at /Users/BDavid/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:133
+ERROR: LoadError: MethodError: no method matching zero(::Type{Any})
+Closest candidates are:
+  zero(::Type{Union{Missing, T}}) where T at missing.jl:105
+  zero(!Matched::Union{Type{P}, P}) where P<:Dates.Period at /Applications/Julia-1.8.app/Contents/Resources/julia/share/julia/stdlib/v1.8/Dates/src/periods.jl:53
+  zero(!Matched::SparseArrays.AbstractSparseArray) at /Applications/Julia-1.8.app/Contents/Resources/julia/share/julia/stdlib/v1.8/SparseArrays/src/SparseArrays.jl:42
+  ...
+Stacktrace:
+  [1] zero(#unused#::Type{Any})
+    @ Base ./missing.jl:106
+  [2] reduce_empty(#unused#::typeof(+), #unused#::Type{Any})
+    @ Base ./reduce.jl:338
+  [3] reduce_empty(#unused#::typeof(Base.add_sum), #unused#::Type{Any})
+    @ Base ./reduce.jl:347
+  [4] mapreduce_empty(#unused#::typeof(identity), op::Function, T::Type)
+    @ Base ./reduce.jl:367
+  [5] reduce_empty(op::Base.MappingRF{typeof(identity), typeof(Base.add_sum)}, #unused#::Type{Any})
+    @ Base ./reduce.jl:356
+  [6] reduce_empty_iter
+    @ ./reduce.jl:379 [inlined]
+  [7] mapreduce_empty_iter(f::Function, op::Function, itr::Vector{Any}, ItrEltype::Base.HasEltype)
+    @ Base ./reduce.jl:375
+  [8] _mapreduce(f::typeof(identity), op::typeof(Base.add_sum), #unused#::IndexLinear, A::Vector{Any})
+    @ Base ./reduce.jl:427
+  [9] _mapreduce_dim
+    @ ./reducedim.jl:365 [inlined]
+ [10] #mapreduce#765
+    @ ./reducedim.jl:357 [inlined]
+ [11] mapreduce
+    @ ./reducedim.jl:357 [inlined]
+ [12] #_sum#775
+    @ ./reducedim.jl:999 [inlined]
+ [13] _sum
+    @ ./reducedim.jl:999 [inlined]
+ [14] #_sum#774
+    @ ./reducedim.jl:998 [inlined]
+ [15] _sum
+    @ ./reducedim.jl:998 [inlined]
+ [16] #sum#772
+    @ ./reducedim.jl:994 [inlined]
+ [17] sum
+    @ ./reducedim.jl:994 [inlined]
+ [18] Mixture(ingredients::Dict{Any, Any})
+    @ JLIMS ~/Documents/GitHub/JLIMS/src/virtual_types/Mixtures.jl:3
+ [19] Composition(ingredients::Dict{Any, Any})
+    @ JLIMS ~/Documents/GitHub/JLIMS/src/JLIMS.jl:35
+ [20] build_composition(df::DataFrame)
+    @ Main ~/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:78
+ [21] _broadcast_getindex_evalf
+    @ ./broadcast.jl:670 [inlined]
+ [22] _broadcast_getindex
+    @ ./broadcast.jl:643 [inlined]
+ [23] _getindex
+    @ ./broadcast.jl:666 [inlined]
+ [24] _broadcast_getindex(bc::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Tuple{Base.OneTo{Int64}}, Type{Stock}, Tuple{Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(build_composition), Tuple{Base.Broadcast.Extruded{Vector{DataFrame}, Tuple{Bool}, Tuple{Int64}}}}, Base.Broadcast.Extruded{Vector{Quantity{Float64}}, Tuple{Bool}, Tuple{Int64}}, Base.Broadcast.Extruded{Vector{Well}, Tuple{Bool}, Tuple{Int64}}}}, I::Int64)
+    @ Base.Broadcast ./broadcast.jl:642
+ [25] getindex
+    @ ./broadcast.jl:597 [inlined]
+ [26] copy(bc::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Tuple{Base.OneTo{Int64}}, Type{Stock}, Tuple{Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(build_composition), Tuple{Vector{DataFrame}}}, Vector{Quantity{Float64}}, Vector{Well}}})
+    @ Base.Broadcast ./broadcast.jl:899
+ [27] materialize(bc::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, Type{Stock}, Tuple{Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{1}, Nothing, typeof(build_composition), Tuple{Vector{DataFrame}}}, Vector{Quantity{Float64}}, Vector{Well}}})
+    @ Base.Broadcast ./broadcast.jl:860
+ [28] reconstruct_stock(wellid::Int64)
+    @ Main ~/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:114
+ [29] top-level scope
+    @ ~/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:133
+in expression starting at /Users/BDavid/Documents/GitHub/JLIMS/src/stock_reconstruction/reconstruction.jl:133
