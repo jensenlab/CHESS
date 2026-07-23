@@ -22,10 +22,24 @@ This mirrors the shape of the CHESS package family itself:
 
 ## Installation
 
+CHESS requires **Julia 1.12 or later** -- the repository ties its four packages together as a
+Julia `[workspace]`, a Pkg feature introduced in 1.12.
+
+To use CHESS as a dependency in your own project:
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/.../CHESS") # or Pkg.develop(path="...") for local development
+Pkg.add(url="https://github.com/jensenlab/CHESS")
 ```
+
+For local development (working on CHESS itself):
+```julia
+# git clone https://github.com/jensenlab/CHESS && cd CHESS
+using Pkg
+Pkg.instantiate()
+```
+`Pkg.instantiate()` resolves the whole workspace at once -- `CHESSCore`, `CHESSDatabase`, and
+`CHESSLabConstants` are all picked up from their local paths (see the root `Project.toml`'s
+`[sources]`/`[workspace]` sections), so no separate `Pkg.develop` step is needed per package.
 
 ## Quickstart
 
@@ -37,7 +51,7 @@ plate = build_location(WP96, "Plate 1")
 move_into!(room, plate)
 
 set_attribute!(room, Temperature(25u"°C"))
-deposit!(plate["A1"], 100u"µL" * water, 0)
+deposit!(plate["A1"], 100u"µL" * water)
 
 environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
 ```

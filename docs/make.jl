@@ -11,7 +11,12 @@ makedocs(
     checkdocs=:none, # the manual/API pages are being built up incrementally -- don't fail the
     # build over docstring coverage gaps (CHESSLabConstants in particular is mostly generated
     # data with few standalone docstrings by design, see manual/registering-lab-constants.md)
-    remotes=nothing, # no git remote configured yet -- disable source-links until CI/deploy is set up
+    repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
+    format=Documenter.HTML(size_threshold=300_000, size_threshold_warn=200_000), # api/core.md and
+    # api/labconstants.md are large by design (CHESSCore/CHESSLabConstants have hundreds of
+    # documented reagents/organisms/functions) -- raise the hard failure threshold rather than
+    # splitting those pages, now that real source links (added once `repo` was set above) push
+    # their generated size past Documenter's 200 KiB default.
     warnonly=[:cross_references], # several existing docstrings across CHESSCore/CHESSDatabase have
     # stale @ref cross-references (renamed/unexported functions, typos) -- pre-existing docstring
     # hygiene debt uncovered by this being the first-ever Documenter build, not introduced here, and
@@ -49,4 +54,10 @@ makedocs(
             "CHESSLabConstants" => "api/labconstants.md",
         ],
     ],
+)
+
+deploydocs(
+    repo="github.com/jensenlab/CHESS.git",
+    devbranch="main",
+    push_preview=true,
 )
