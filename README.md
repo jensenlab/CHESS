@@ -64,7 +64,7 @@ environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
 ## Documentation
 
 The full manual and API reference are published at
-**[jensenlab.github.io/CHESS](https://jensenlab.github.io/CHESS/stable)**. The manual works through
+**[http://jensenlab.net/CHESS](https://jensenlab.net/CHESS)**. The manual works through
 CHESS's core concepts in the order they build on one another, starting with
 [Locations](https://jensenlab.github.io/CHESS/stable/manual/core-concepts/).
 
