@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Wells: Depositing &amp; Transferring Material · CHESS.jl</title><meta name="title" content="Wells: Depositing &amp; Transferring Material · CHESS.jl"/><meta property="og:title" content="Wells: Depositing &amp; Transferring Material · CHESS.jl"/><meta property="twitter:title" content="Wells: Depositing &amp; Transferring Material · CHESS.jl"/><meta name="description" content="Documentation for CHESS.jl."/><meta property="og:description" content="Documentation for CHESS.jl."/><meta property="twitter:description" content="Documentation for CHESS.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img class="docs-light-only" src="../../assets/logo.png" alt="CHESS.jl logo"/><img class="docs-dark-only" src="../../assets/logo-dark.png" alt="CHESS.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">CHESS.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../core-concepts/">Locations</a></li><li><a class="tocitem" href="../movement/">Movement &amp; Occupancy</a></li><li><a class="tocitem" href="../attributes/">Environmental Attributes &amp; Inheritance</a></li><li><input class="collapse-toggle" id="menuitem-2-4" type="checkbox" checked/><label class="tocitem" for="menuitem-2-4"><span class="docs-label">Stocks &amp; Chemistry</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../reagents-chemicals/">Reagents &amp; Chemicals</a></li><li><a class="tocitem" href="../stocks/">Stocks</a></li><li><a class="tocitem" href="../organisms-cultures/">Organisms &amp; Cultures</a></li><li><a class="tocitem" href="../recipes/">Recipes &amp; Solution Chemistry</a></li><li class="is-active"><a class="tocitem" href>Wells: Depositing &amp; Transferring Material</a><ul class="internal"><li><a class="tocitem" href="#Depositing-and-withdrawing"><span>Depositing and withdrawing</span></a></li><li><a class="tocitem" href="#Transferring-between-wells"><span>Transferring between wells</span></a></li><li><a class="tocitem" href="#Clearing-a-well"><span>Clearing a well</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../reads/">Reads &amp; Instrument Measurements</a></li><li><a class="tocitem" href="../registering-lab-constants/">Registering Lab Constants</a></li><li><input class="collapse-toggle" id="menuitem-2-7" type="checkbox"/><label class="tocitem" for="menuitem-2-7"><span class="docs-label">CHESS Databases</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../db-architecture/">Database Architecture</a></li><li><a class="tocitem" href="../ledger/">The Ledger</a></li><li><a class="tocitem" href="../committing-uploading/">Committing &amp; Uploading</a></li><li><a class="tocitem" href="../reconstruction/">Reconstruction</a></li><li><a class="tocitem" href="../caching-repair/">Caching &amp; Repair</a></li><li><a class="tocitem" href="../encumbrances/">Encumbrances</a></li><li><a class="tocitem" href="../instrument-interfaces/">Instrument Interfaces</a></li></ul></li><li><a class="tocitem" href="../interop/">Interop</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../api/core/">CHESSCore</a></li><li><a class="tocitem" href="../../api/database/">CHESSDatabase</a></li><li><a class="tocitem" href="../../api/labconstants/">CHESSLabConstants</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li><a class="is-disabled">Stocks &amp; Chemistry</a></li><li class="is-active"><a href>Wells: Depositing &amp; Transferring Material</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Wells: Depositing &amp; Transferring Material</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/jensenlab/CHESS" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/jensenlab/CHESS/blob/main/docs/src/manual/wells.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Wells:-Depositing-and-Transferring-Material"><a class="docs-heading-anchor" href="#Wells:-Depositing-and-Transferring-Material">Wells: Depositing &amp; Transferring Material</a><a id="Wells:-Depositing-and-Transferring-Material-1"></a><a class="docs-heading-anchor-permalink" href="#Wells:-Depositing-and-Transferring-Material" title="Permalink"></a></h1><p>A <code>Well</code> holds exactly one <a href="../../api/core/#CHESSCore.Stock"><code>Stock</code></a>, accessed with <a href="../../api/core/#CHESSCore.stock-Tuple{Well}"><code>stock(w)</code></a>. Its capacity is fixed by its <code>LocationKind</code> (<a href="../../api/core/#CHESSCore.wellcapacity-Tuple{LocationKind}"><code>wellcapacity</code></a>):</p><pre><code class="language-julia-repl hljs">julia&gt; plate = build_location(loc&quot;WP96&quot;, &quot;Plate 1&quot;)
+Plate 1
+
+julia&gt; a1 = plate[&quot;A1&quot;]
+A1
+
+julia&gt; wellcapacity(a1)
+200 μL
+
+julia&gt; stock(a1)
+Empty Stock</code></pre><h2 id="Depositing-and-withdrawing"><a class="docs-heading-anchor" href="#Depositing-and-withdrawing">Depositing and withdrawing</a><a id="Depositing-and-withdrawing-1"></a><a class="docs-heading-anchor-permalink" href="#Depositing-and-withdrawing" title="Permalink"></a></h2><p><a href="../../api/core/#CHESSCore.deposit!"><code>deposit!</code></a>/<a href="@ref"><code>withdraw!</code></a> add to and remove from a well&#39;s stock, guarded by its capacity:</p><pre><code class="language-julia-repl hljs">julia&gt; deposit!(a1, saline)
+ERROR: Well Capacity Error: 1 mL is greater than the well&#39;s capacity (200 μL)
+
+julia&gt; small_saline = 100u&quot;µL&quot; * saline
+
+julia&gt; deposit!(a1, small_saline)
+
+julia&gt; stock(a1)
+0.1 mL Solution (2 reagent(s))
+ Solids  Name             Amount  Concentration
+────────────────────────────────────────────────
+ NaCl    sodium chloride   0.5 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  0.1 mL        100.0 %</code></pre><p><code>deposit!</code>&#39;s third argument is a <code>cost</code> – a plain tracked number (e.g. a reagent cost), apportioned proportionally whenever <code>withdraw!</code> pulls material back out. It defaults to <code>0</code>.</p><h2 id="Transferring-between-wells"><a class="docs-heading-anchor" href="#Transferring-between-wells">Transferring between wells</a><a id="Transferring-between-wells-1"></a><a class="docs-heading-anchor-permalink" href="#Transferring-between-wells" title="Permalink"></a></h2><p><a href="../../api/core/#CHESSCore.transfer!"><code>transfer!(donor, recipient, quantity)</code></a> is <code>withdraw!</code> then <code>deposit!</code> in one call:</p><pre><code class="language-julia-repl hljs">julia&gt; a2 = plate[&quot;A2&quot;]
+A2
+
+julia&gt; transfer!(a1, a2, 40u&quot;µL&quot;)
+
+julia&gt; stock(a1)
+0.06 mL Solution (2 reagent(s))
+ Solids  Name             Amount  Concentration
+────────────────────────────────────────────────
+ NaCl    sodium chloride   0.3 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  0.06 mL        100.0 %
+
+julia&gt; stock(a2)
+0.04 mL Solution (2 reagent(s))
+ Solids  Name             Amount  Concentration
+────────────────────────────────────────────────
+ NaCl    sodium chloride   0.2 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  0.04 mL        100.0 %</code></pre><h2 id="Clearing-a-well"><a class="docs-heading-anchor" href="#Clearing-a-well">Clearing a well</a><a id="Clearing-a-well-1"></a><a class="docs-heading-anchor-permalink" href="#Clearing-a-well" title="Permalink"></a></h2><p><a href="../../api/core/#Base.empty!-Tuple{Well}"><code>empty!</code></a> resets a well to <code>Empty()</code> outright. <a href="../../api/core/#CHESSCore.sterilize!-Tuple{Well}"><code>sterilize!</code></a> and <a href="../../api/core/#CHESSCore.drain!-Tuple{Well}"><code>drain!</code></a> are more selective – demonstrated on a fresh well holding a <code>Culture</code>:</p><pre><code class="language-julia-repl hljs">julia&gt; a3 = plate[&quot;A3&quot;]
+A3
+
+julia&gt; culture = small_saline + org&quot;SMU_UA159&quot;
+
+julia&gt; deposit!(a3, culture)</code></pre><p><code>sterilize!</code> keeps the chemicals, drops the organism:</p><pre><code class="language-julia-repl hljs">julia&gt; sterilize!(a3)
+
+julia&gt; stock(a3)
+0.1 mL Solution (2 reagent(s))
+ Solids  Name             Amount  Concentration
+────────────────────────────────────────────────
+ NaCl    sodium chloride   0.5 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  0.1 mL        100.0 %</code></pre><p><code>drain!</code> is the inverse – keeps the organism, drops the chemicals. Shown on a fresh well with its own deposit of <code>culture</code>, so it doesn&#39;t stack on top of <code>a3</code>&#39;s already-sterilized contents:</p><pre><code class="language-julia-repl hljs">julia&gt; a4 = plate[&quot;A4&quot;]
+A4
+
+julia&gt; deposit!(a4, culture)
+
+julia&gt; drain!(a4)
+
+julia&gt; stock(a4)
+0.0 mL Culture (0 reagent(s))
+ Organisms
+───────────
+ SMU_UA159</code></pre><script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+    startOnLoad: true,
+    theme: "neutral"
+});
+</script></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../recipes/">« Recipes &amp; Solution Chemistry</a><a class="docs-footer-nextpage" href="../reads/">Reads &amp; Instrument Measurements »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 23 July 2026 19:45">Thursday 23 July 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
