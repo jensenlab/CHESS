@@ -2,6 +2,16 @@
 function _organism_cache_db()
     db = SQLite.DB(chemical_cache_path)
     DBInterface.execute(db,"PRAGMA foreign_keys = ON;")
+    DBInterface.execute(db,"""
+        CREATE TABLE IF NOT EXISTS Organisms(
+            LabID TEXT PRIMARY KEY,
+            Genus TEXT,
+            Species TEXT,
+            Strain TEXT,
+            ATCCID TEXT,
+            Notes TEXT
+        );
+        """)
     return db
 end
 

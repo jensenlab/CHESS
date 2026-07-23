@@ -107,14 +107,17 @@ end
 end
 
 @testset "register_reagent!/register_organism! author-time tools (cache hits, no network)" begin
+    CHESSLabConstants._cache_reagent!("boric_acid","Boric Acid",CHESSCore.Solid,61.84,1.435,7628)
     line = CHESSLabConstants.register_reagent!(CHESSCore.Solid,"boric_acid","Boric Acid",7628)
     @test line == "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
 
+    CHESSLabConstants._cache_organism!("SMU_UA159","Streptococcus","mutans","UA159",missing,"")
     orgline = CHESSLabConstants.register_organism!("SMU_UA159","Streptococcus","mutans","UA159")
     @test orgline == "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""
 end
 
 @testset "register_chemical! author-time tool (cache hit, no network)" begin
+    CHESSLabConstants._cache_chemical!("Na⁺","Na+",1,22.9897693,923)
     line = CHESSLabConstants.register_chemical!("Na⁺","Na+",1,923)
     @test line == "@chemical Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
 end
