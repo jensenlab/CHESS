@@ -514,13 +514,18 @@ end
     @test nrow(old_settings[old_settings.Setting.=="Filter",:]) == 0 # Filter didn't exist yet at this point
 end
 
-@testset "Instrument reconstructs as Instrument (concretetype gap fix)" begin
+@testset "Instrument capability persists through reconstruction, independent of concrete type" begin
+    # PlateReaderModelX has no shape/capacity, so reader1 concretizes as a plain GenericLocation --
+    # there is no separate "Instrument" type to reconstruct as. Capability is data on the resolved
+    # LocationKind, not a distinct Julia type, so it survives reconstruction regardless.
     n,t = get_location_info(location_id(reader1))
-    @test t(location_id(reader1),n) isa Instrument
+    @test t(location_id(reader1),n) isa CHESSCore.GenericLocation
 
     reconstructed = reconstruct_location(location_id(reader1))
-    @test reconstructed isa Instrument
+    @test reconstructed isa CHESSCore.GenericLocation
     @test name(reconstructed) == "Plate Reader 1"
+    @test is_capable(reconstructed)
+    @test move_into! in performable_operations(reconstructed)
 end
 
 rm(file)

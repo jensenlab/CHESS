@@ -124,17 +124,38 @@ function net_hydrogen_ion_concentration(s::Stock)
 end
 
 """
-    pH(s::Stock)
+    pH(s::Stock; ionic_strength_correction=true)
 
-Estimate the pH of `s` from its [`net_hydrogen_ion_concentration`](@ref). Strong-base solids should
-register their real dissociation formula (e.g. `Na⁺ + OH⁻` for NaOH) via
-[`composition(::Reagent)`](@ref) — mixing an acid and a base then nets out through the explicit
-H⁺-vs-OH⁻ subtraction in `net_hydrogen_ion_concentration`, not through signed composition
-coefficients. Scope: complete/strong-electrolyte dissociation only.
+Estimate the pH of `s`. General case: partitions `s`'s [`recipe`](@ref) into any registered
+[`AcidBaseSystem`](@ref) families (see [`acid_base_system`](@ref)) plus every other charged species,
+and root-finds the generalized electroneutrality condition (see
+[`CHESSCore._charge_balance_residual`](@ref)) -- optionally corrected for ionic strength via the
+Davies equation (see [`activity_coefficient`](@ref)), which self-consistently iterates since `γ`
+depends on the very speciation it corrects. Set `ionic_strength_correction=false` for the ideal
+(infinite-dilution) estimate instead.
+
+Fast path: when no reagent in `s` has a registered `AcidBaseSystem` (the common
+complete/strong-electrolyte-only case -- e.g. a stock built only from NaCl, HCl, NaOH, ...), this
+computes the exact original closed-form formula directly from
+[`net_hydrogen_ion_concentration`](@ref) (`7.0` if net-neutral, `-log10` of the net H⁺ concentration
+if acidic, `14 - (-log10(...))` if basic) -- guaranteed bit-identical to CHESSCore's original
+strong-electrolyte-only `pH`, not merely expected to converge to the same place via the general
+solver. Strong bases should still register their real dissociation formula (e.g. `Na⁺ + OH⁻` for
+NaOH) via [`composition(::Reagent)`](@ref) -- mixing an acid and a base nets out through this same
+mechanism either way.
+
+If `s` has *no* registered `AcidBaseSystem` and *no* charged species at all (e.g. a `Mixture` of pure
+glucose, or an `Empty` stock) -- as opposed to charged species that happen to exactly cancel (e.g.
+equimolar HCl + NaOH, or plain NaCl) -- the returned `7.0` isn't a computed result, just the neutral
+default with nothing behind it; this case emits a `@warn` so it isn't mistaken for a real answer.
+
+See also [`speciation`](@ref) for a per-family breakdown at the solved pH.
 """
-function pH(s::Stock)
-    conc=ustrip(uconvert(u"mol/L",net_hydrogen_ion_concentration(s)))
-    iszero(conc) && return 7.0
-    conc>0 && return -log10(conc)
-    return 14 - (-log10(-conc))
+function pH(s::Stock;ionic_strength_correction::Bool=true)
+    families,strong_ions = _analytical_species(s)
+    if isempty(families)
+        isempty(strong_ions) && @warn "pH: no chemicals in this Stock participate in acid/base equilibrium (no registered AcidBaseSystem, no charged species) -- returning the neutral default (7.0), not a computed value"
+        return _pH_strong_electrolyte_only(net_hydrogen_ion_concentration(s))
+    end
+    return pH(families,strong_ions;ionic_strength_correction)
 end

@@ -5,7 +5,7 @@
 # Complements, rather than replaces, the tabular "vc"/"q" DataFrame interface (dataframe_interface.jl)
 # -- that one is still the right tool for bulk, flat batches of stock definitions (e.g. a wet-lab CSV
 # template); this one is for a whole Location (or tree of them) with full fidelity: attributes, reads,
-# cost, lock/active state, and (for GenericLocation/Instrument) nested children. Always uncommitted
+# cost, lock/active state, and (for GenericLocation) nested children. Always uncommitted
 # (via build_location) -- location_id/parent are omitted, mirroring df_to_labware's design boundary;
 # commit the result yourself (e.g. commit_location! in CHESSDatabase) if you want it tracked.
 
@@ -149,8 +149,9 @@ Convert `x` (and, recursively, its subtree) to a plain, JSON-safe `Dict`. Common
 keyed by attribute name, each an [`attribute_to_dict`](@ref) result), and `"reads"` (a `Vector` of
 [`read_to_dict`](@ref) results). `location_id`/parent are omitted -- see the module-level comment.
 
-Per-subtype: `GenericLocation`/`Instrument` add `"children"` (nested `location_to_dict` results,
-recursive); `Instrument` also adds informational (non-authoritative -- see [`dict_to_location`](@ref))
+Per-subtype: `GenericLocation` adds `"children"` (nested `location_to_dict` results, recursive). Any
+capability-bearing location ([`is_capable`](@ref), `GenericLocation` or `Labware` alike) also adds
+informational (non-authoritative -- see [`dict_to_location`](@ref))
 `"actuatable_attributes"`/`"performable_operations"`/`"readable_types"`. `Well` adds `"cost"` and
 `"stock"` ([`stock_to_dict`](@ref)). `Labware` adds `"wells"` -- a `shape[1]`-row, `shape[2]`-column
 nested array of per-slot `Well` dicts, in the same `(row,col)` order as `children(x)` -- plus
@@ -176,19 +177,16 @@ function location_to_dict(x::Location; kwargs...)
         "reads" => [read_to_dict(r) for r in reads(x)],
     )
     _location_to_dict!(d, x; kwargs...)
+    if is_capable(x)
+        d["actuatable_attributes"] = sort(string.(collect(actuatable_attributes(x))))
+        d["performable_operations"] = sort(string.(nameof.(performable_operations(x))))
+        d["readable_types"] = sort(string.(collect(readable_types(x))))
+    end
     return d
 end
 
 function _location_to_dict!(d::Dict, x::GenericLocation; kwargs...)
     d["children"] = [location_to_dict(c; kwargs...) for c in children(x)]
-    return nothing
-end
-
-function _location_to_dict!(d::Dict, x::Instrument; kwargs...)
-    d["children"] = [location_to_dict(c; kwargs...) for c in children(x)]
-    d["actuatable_attributes"] = sort(string.(collect(actuatable_attributes(x))))
-    d["performable_operations"] = sort(string.(nameof.(performable_operations(x))))
-    d["readable_types"] = sort(string.(collect(readable_types(x))))
     return nothing
 end
 
@@ -227,7 +225,7 @@ function _build_location_tree(d::Dict; kwargs...)
     return _build(concretetype(k), k, d; kwargs...)
 end
 
-function _build(::Type{T}, k::LocationKind, d::Dict; kwargs...) where {T<:Union{GenericLocation,Instrument}}
+function _build(::Type{GenericLocation}, k::LocationKind, d::Dict; kwargs...)
     loc = build_location(k, d["name"])
     _apply_common!(loc, d)
     for cd in d["children"]
@@ -279,11 +277,11 @@ end
     dict_to_location(d::Dict; reagent_context=CHESSCore, org_context=CHESSCore, kwargs...) -> Location
 
 Inverse of [`location_to_dict`](@ref). Reconstructs an uncommitted `Location` (`location_id ===
-nothing`, via [`build_location`](@ref)) and, recursively, its subtree. The `"kind"` name is resolved against the
-live [`location_kinds`](@ref) registry -- for `Instrument`, this means `"actuatable_attributes"`/
-`"performable_operations"`/`"readable_types"` in `d` are informational only and never consulted; the
-reconstructed `Instrument`'s real capabilities always come from its resolved `LocationKind`, exactly
-like `"vendor"`/`"catalog"` for a `Labware`.
+nothing`, via [`build_location`](@ref)) and, recursively, its subtree. The `"kind"` name is resolved
+against the live [`location_kinds`](@ref) registry -- for a capability-bearing location, this means
+`"actuatable_attributes"`/`"performable_operations"`/`"readable_types"` in `d` are informational only
+and never consulted; the reconstructed location's real capabilities always come from its resolved
+`LocationKind`, exactly like `"vendor"`/`"catalog"` for a `Labware`.
 """
 function dict_to_location(d::Dict; kwargs...)
     loc = _build_location_tree(d; kwargs...)

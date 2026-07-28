@@ -12,9 +12,11 @@ include("./locations/locations.jl")
 include("./locations/instruments.jl")
 include("./locations/occupancy_rules.jl")
 
+include("./chemicals/ions.jl")
 include("./chemicals/solids.jl")
 include("./chemicals/liquids.jl")
-include("./chemicals/dissociation.jl")
+include("./chemicals/electrolytes.jl")
+include("./chemicals/pKa_data.jl")
 
 include("./organisms/organism_utils.jl")
 include("./organisms/organisms.jl")
@@ -28,7 +30,8 @@ export get_mw_density, register_reagent!, register_organism!, register_chemical!
 function __init__()
     CHESSCore.register_lab(CHESSLabConstants)
     _register_occupancy_rules!()
-    _register_dissociation_rules!()
+    _register_electrolyte_compositions!()
+    _register_acid_base_systems!()
 end
 
 end # module CHESSLabConstants

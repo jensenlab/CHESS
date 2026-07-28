@@ -23,7 +23,10 @@ Fields:
   kinds.
 - `readable_types`: names of [`ReadKind`](@ref)s this kind's instrument can produce; empty for
   non-instrument kinds.
-- `is_instrument`: whether this kind's [`concretetype`](@ref) is [`Instrument`](@ref).
+- `is_instrument`: whether this kind is capability-bearing (see [`is_capable`](@ref)) -- independent
+  of its structural [`concretetype`](@ref), which is decided purely by `capacity`/`shape`. A kind can
+  be both capability-bearing and grid-shaped (e.g. a plate reader with a physical deck), in which case
+  it concretizes as [`Labware`](@ref) with capability data layered on top.
 
 See also: [`concretetype`](@ref), [`@location_kind`](@ref), [`@loc_str`](@ref)
 """
@@ -69,15 +72,27 @@ Base.deepcopy_internal(k::LocationKind,::IdDict) = k
 """
     concretetype(k::LocationKind)
 
-Return the concrete Julia type ([`Instrument`](@ref), [`Well`](@ref), [`Labware`](@ref), or
-[`GenericLocation`](@ref)) that a `LocationKind` produces: `Instrument` if `is_instrument` is set,
-`Well` if `capacity` is set, `Labware` if `shape` is set, `GenericLocation` otherwise.
+Return the concrete Julia type ([`Well`](@ref), [`Labware`](@ref), or [`GenericLocation`](@ref)) that
+a `LocationKind` produces: `Well` if `capacity` is set, `Labware` if `shape` is set, `GenericLocation`
+otherwise. Purely structural -- whether `k` is capability-bearing (`is_instrument`/[`is_capable`](@ref))
+is an orthogonal fact, checkable on any concrete `Location`, not a 4th type.
 """
 function concretetype(k::LocationKind)
-    k.is_instrument && return Instrument
     return !isnothing(k.capacity) ? Well :
            !isnothing(k.shape)    ? Labware : GenericLocation
 end
+
+"""
+    is_capable(k::LocationKind)
+    is_capable(x::Location)
+
+Return whether `k`/`x` is capability-bearing -- i.e. can perform operations on other locations (see
+[`performable_operations`](@ref)) and/or produce reads (see [`readable_types`](@ref)), as opposed to
+a plain location whose state only ever changes via direct calls, never its own action. Independent of
+[`concretetype`](@ref): a capability-bearing kind can be grid-shaped (`Labware`) or not
+(`GenericLocation`) alike.
+"""
+is_capable(k::LocationKind) = k.is_instrument
 
 # per-module registry, mirrors _chemprops/_orgprops (src/CHESSCore.jl)
 function _locationkinds(m::Module)

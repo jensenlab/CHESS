@@ -324,3 +324,34 @@ See also: [`labware_to_df(::Vector{<:Labware})`](@ref)
 function labware_to_df(lws::Labware,format="vc";kwargs...)
     return labware_to_df([lws],format;kwargs...)
 end
+
+"""
+    stocks(lw::Labware) -> Vector{Stock}
+    stocks(lws::Vector{<:Labware}) -> Vector{Stock}
+
+Collect the `Stock` held in every well of `lw` (or every well of every labware in `lws`), in well
+order.
+"""
+function stocks(lw::Labware)
+    return Stock[stock(w) for w in vec(children(lw))]
+end
+
+function stocks(lws::Vector{<:Labware})
+    return vcat(stocks.(lws)...)
+end
+
+"""
+    add_stock!(lw::Labware, stock::Stock, row::Integer, col::Integer) -> Labware
+
+Deposit `stock` into the well at `(row, col)` in `lw`. A convenience wrapper around
+[`deposit!`](@ref) for manually filling labware by grid position. If the selected well is not
+empty, a warning is emitted and the deposit is still attempted.
+"""
+function add_stock!(lw::Labware,stk::Stock,row::Integer,col::Integer)
+    well = lw[row,col]
+    if stock(well) != Empty()
+        @warn("selected well is not empty, attempting to add the stock to the well")
+    end
+    deposit!(well,stk)
+    return lw
+end

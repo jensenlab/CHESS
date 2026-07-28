@@ -1,11 +1,11 @@
-# CHESS
+# CHESS.jl
 
 [![Documentation (stable)](https://img.shields.io/badge/docs-stable-blue.svg)](https://jensenlab.github.io/CHESS/stable)
 [![Documentation (dev)](https://img.shields.io/badge/docs-dev-blue.svg)](https://jensenlab.github.io/CHESS/dev)
 [![CI](https://github.com/jensenlab/CHESS/actions/workflows/CI.yml/badge.svg)](https://github.com/jensenlab/CHESS/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-CHESS is a data framework for recording, reconstructing, and planning the operations of a
+CHESS.jl is a data framework for recording, reconstructing, and planning the operations of a
 laboratory -- automated or otherwise. Rather than storing the *state* of a lab (what's where,
 what's in it, how full it is) at each point in time, CHESS records the *operations* that produced
 that state -- movements, environmental changes, transfers, and reads -- as a permanent, append-only

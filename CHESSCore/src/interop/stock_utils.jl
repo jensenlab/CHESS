@@ -134,7 +134,12 @@ concentration.
 """
 function concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Solid)
     total = CHESSCore.quantity(stock)
-    ismissing(total) && return 0*u"percent" # e.g. an Empty stock
+    # e.g. an Empty stock -- 0 g/mL (not 0 percent) to stay dimensionally consistent with the
+    # Solution/Culture case (a solid's mass relative to a volume total, matching the common case
+    # this "vc" dataframe format is used for), since a Mixture-total (percent) can't be assumed for
+    # a stock with no total at all. Mixing 0-percent and 0-g/mL rows for the same reagent column
+    # breaks reagent_dict's row-1-only unit classification in get_vc_reagents/vc_to_stock.
+    ismissing(total) && return 0*u"g/mL"
     return _relative_amount(get(solids(stock),ingredient,0u"g"),total)
 end
 

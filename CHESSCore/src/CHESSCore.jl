@@ -57,7 +57,6 @@ include("./locations/LocationKind.jl")
 include("./locations/Location.jl")
 include("./locations/Occupancy.jl")
 include("./environments/Environment.jl")
-include("./locations/Instrument.jl")
 include("./operations/capability.jl")
 include("./locations/Labware.jl")
 include("./stocks/Chemicals.jl")
@@ -65,6 +64,7 @@ include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")
 include("./stocks/StockDisplay.jl")
 include("./stocks/Recipe.jl")
+include("./stocks/AcidBase.jl")
 include("./locations/Well.jl")
 include("./locations/LocationDisplay.jl")
 include("./locations/build_location.jl")
@@ -94,7 +94,7 @@ export charge, CompositionRule, composition, set_composition!, composition_rules
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types
-export Instrument, actuatable_attributes, performable_operations, readable_types
+export is_capable, actuatable_attributes, performable_operations, readable_types
 export @chemical, @reagent, @reagent_formula, @organism , @attribute, @chem_str, @rgt_str, @org_str, @attr_str # macros for constants
 export set_occupancy_cost!, occupancy_rules, kind, is_committed, build_location, plate_namer, childtype
 # chemicals/reagents
@@ -105,6 +105,9 @@ export genus, species, strain , orgparse
 export solids, liquids, reagents, organisms, volume_estimate, quantity, reagent_display
 export total_concentration, pH, net_hydrogen_ion_concentration
 export Recipe, recipe, mass, molar_amount, volume
+# acid/base equilibrium
+export AcidBaseSystem, set_acid_base_system!, acid_base_system, acid_base_systems
+export AnalyticalSpecies, SpeciationResult, speciation, activity_coefficient, Kw
 # locations
 export location_id, name, is_locked, unlock!,lock!,toggle_lock!, ancestors, get_all_within, environment,attributes , is_active, activate!, deactivate!, toggle_activity!
 export parent_cost, child_cost, occupancy, occupancy_cost , children, children_named
@@ -113,7 +116,7 @@ export parent_cost, child_cost, occupancy, occupancy_cost , children, children_n
 # `parent` generic (see the comment above Base.parent(x::Location) in Location.jl).
 export can_move_into, move_into!
 #labware
-export shape, vendor, catalog, wells
+export shape, vendor, catalog, wells, stocks, add_stock!
 #wells
 export wellcapacity, stock, cost,  sterilize!,transfer!, drain!,deposit!,withdraw!
 # dataframe interop

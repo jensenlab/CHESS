@@ -1,6 +1,7 @@
 # Static @reagent definitions for every Liquid, alphabetized by lab ID. Generated once from the
 # author-time cache (JLConstants_database.db) via register_reagent! -- see chemical_utils.jl.
 
+@reagent acetic_acid "Acetic Acid" Liquid 60.052u"g/mol" 1.049u"g/mL" 176
 @reagent dmso "dimethyl sulfoxide" Liquid 78.14u"g/mol" 1.101u"g/mL" 679
 @reagent ethanol "ethanol" Liquid 46.07u"g/mol" 0.79u"g/mL" 702
 @reagent glycerol "glycerol" Liquid 92.09u"g/mol" 1.261u"g/mL" 753

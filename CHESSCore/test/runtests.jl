@@ -215,6 +215,24 @@ end
     @test CHESSCore.concretetype(Room) === CHESSCore.GenericLocation
 end
 
+@location_kind ShapelessInstrumentKind Symbol[] nothing nothing nothing nothing nothing 0//1 0//1 Set{Symbol}() Set{Function}() Set{Symbol}() true
+@location_kind ShapedInstrumentKind Symbol[] (2,3) :Bench nothing nothing nothing 0//1 0//1 Set{Symbol}() Set{Function}() Set{Symbol}() true
+
+@testset "concretetype is purely structural -- is_instrument no longer overrides shape" begin
+    # a capability-bearing kind with no shape/capacity still concretizes as GenericLocation ...
+    @test CHESSCore.concretetype(ShapelessInstrumentKind) === CHESSCore.GenericLocation
+    @test CHESSCore.is_capable(ShapelessInstrumentKind)
+    # ... but a capability-bearing kind WITH shape now concretizes as Labware (grid-addressable
+    # children), not a 4th "Instrument" type -- this is the concrete regression test for the
+    # BioSpa/Cobra/Nimbus/etc. fix: their real shape data used to be silently discarded.
+    @test CHESSCore.concretetype(ShapedInstrumentKind) === Labware
+    @test CHESSCore.is_capable(ShapedInstrumentKind)
+    shaped_inst = build_location(ShapedInstrumentKind,"Shaped Instrument")
+    @test shaped_inst isa Labware
+    @test size(shaped_inst) == (2,3)
+    @test is_capable(shaped_inst)
+end
+
 @location_kind CatA [:Shared] nothing nothing nothing nothing nothing
 @location_kind CatB [:Shared] nothing nothing nothing nothing nothing
 @location_kind CatC Symbol[] nothing nothing nothing nothing nothing
@@ -328,7 +346,7 @@ end
 @location_kind IncubatorModelX Symbol[] nothing nothing nothing nothing nothing 0//1 0//1 Set([:Temperature]) Set{Function}() Set{Symbol}() true
 
 @testset "Instrument: set_attribute! via any Location; capability gate" begin
-    inc=CHESSCore.Instrument(nothing,"Inc X",IncubatorModelX)
+    inc=CHESSCore.GenericLocation(nothing,"Inc X",IncubatorModelX)
     set_attribute!(inc,Temperature(37u"°C")) # any Location can have attributes set -- no instrument-specific mechanism needed
     @test environment(inc)[:Temperature] == Temperature(37u"°C")
     set_attribute!(inc,Humidity(40u"percent")) # not in actuatable_attributes, but that's descriptive-only now -- still succeeds
@@ -342,8 +360,8 @@ end
 @location_kind IncapableInstrumentKind Symbol[] nothing nothing nothing nothing nothing 0//1 0//1 Set{Symbol}() Set{Function}() Set{Symbol}() true
 
 @testset "Capability gate: move_into!/transfer!/set_attribute!/record_read!" begin
-    capable=CHESSCore.Instrument(nothing,"Capable",CapableInstrumentKind)
-    incapable=CHESSCore.Instrument(nothing,"Incapable",IncapableInstrumentKind)
+    capable=CHESSCore.GenericLocation(nothing,"Capable",CapableInstrumentKind)
+    incapable=CHESSCore.GenericLocation(nothing,"Incapable",IncapableInstrumentKind)
 
     parent=GenericLocation(nothing,"gate parent",Room)
     child=GenericLocation(nothing,"gate child",Room)
@@ -364,8 +382,12 @@ end
     @test_nowarn transfer!(w1,w2,0.01u"g";instrument=capable)
     @test_throws ArgumentError transfer!(w1,w2,0.01u"g";instrument=incapable)
 
+    # a plain, non-capable Location (Room has no performable_operations) is a valid `instrument=`
+    # *type* now -- it's rejected by the capability check (ArgumentError), not by Julia dispatch
+    # (TypeError), regardless of concrete type.
     non_instrument=GenericLocation(nothing,"not an instrument",Room)
-    @test_throws TypeError set_attribute!(child,Temperature(22u"°C");instrument=non_instrument)
+    @test !is_capable(non_instrument)
+    @test_throws ArgumentError set_attribute!(child,Temperature(22u"°C");instrument=non_instrument)
 end
 
 @testset "Read/ReadKind: value contract, reads(), record_read!, per-kind filter" begin
@@ -498,6 +520,134 @@ set_composition!(LiquidHCl,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
     @test molar_amount(r,unknown_mw_chem) == 0.001u"mol"
     @test ismissing(mass(r,unknown_mw_chem))
     @test mass(r,H⁺) == 0u"g" # genuinely absent, not unknown -- stays 0, not missing
+end
+
+@testset "AcidBaseSystem construction" begin
+    HA = CHESSCore.Chemical("test-HA",0,60.0u"g/mol")
+    Am = CHESSCore.Chemical("test-A-",-1,59.0u"g/mol")
+    Am2 = CHESSCore.Chemical("test-A2-",-2,58.0u"g/mol")
+    @test AcidBaseSystem([HA,Am],[4.76]) isa AcidBaseSystem
+    @test_throws ArgumentError AcidBaseSystem([HA,Am],[4.76,7.0]) # length(pKa) must be length(species)-1
+    @test_throws ArgumentError AcidBaseSystem([HA,Am2],[4.76]) # charge must decrease by exactly 1 per step
+    @test_throws ArgumentError AcidBaseSystem([HA],Float64[]) # needs >= 2 species
+
+    sys1 = AcidBaseSystem([HA,Am],[4.76])
+    sys2 = AcidBaseSystem([HA,Am],[4.76])
+    @test sys1 == sys2 # value equality, for family deduplication across reagents
+    @test hash(sys1) == hash(sys2)
+end
+
+@testset "Acid/base equilibrium pH: strong-electrolyte equivalence" begin
+    # same stocks as "Ionic dissociation and pH" above -- no reagent here has a registered
+    # AcidBaseSystem, so pH(::Stock) must take the exact fast path, matching the original
+    # strong-electrolyte-only closed-form formula bit-for-bit (not merely converge to the same place)
+    neutral=(0.001u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
+    acidic=(0.002u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
+    basic=(0.001u"mol"*HydrochloricAcid)+(0.002u"mol"*SodiumHydroxide)
+
+    expected(s) = begin
+        conc = ustrip(uconvert(u"mol/L",net_hydrogen_ion_concentration(s)))
+        iszero(conc) ? 7.0 : conc>0 ? -log10(conc) : 14-(-log10(-conc))
+    end
+
+    @test pH(neutral) == expected(neutral)
+    @test pH(acidic) == expected(acidic)
+    @test pH(basic) == expected(basic)
+
+    families,strong_ions = CHESSCore._analytical_species(neutral)
+    @test isempty(families) # confirms this really is the fast path, not a coincidence
+end
+
+@testset "Acid/base equilibrium pH: warns only when nothing participates" begin
+    # b = 10u"g"*rgt"paba" (defined above) -- a pure Mixture of a reagent with no registered
+    # CompositionRule/AcidBaseSystem in this test context, so it has neither a family nor any charged
+    # species at all: pH's 7.0 here is a bare default, not a computed result, and should warn
+    families_b,strong_ions_b = CHESSCore._analytical_species(b)
+    @test isempty(families_b) && isempty(strong_ions_b)
+    @test_logs (:warn,r"no chemicals.*participate") match_mode=:any pH(b)
+
+    # neutral (equimolar HCl+NaOH, from the testset above) has real charged species that happen to
+    # cancel exactly -- a genuinely computed 7.0, so no warning should fire
+    neutral=(0.001u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
+    @test_logs pH(neutral) # no (:warn,...) pattern given -> fails if *any* log record is emitted
+
+    # acidic/basic cases (still the fast path, but non-neutral) shouldn't warn either
+    acidic=(0.002u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
+    @test_logs pH(acidic)
+end
+
+@reagent TestWeakAcid "test weak acid" Solid 60.0u"g/mol" missing missing
+@reagent TestWeakAcidNa "test sodium weak-acid salt" Solid missing missing missing
+const TestHA = CHESSCore.Chemical("TestHA",0,60.0u"g/mol")
+const TestAMinus = CHESSCore.Chemical("TestA-",-1,59.0u"g/mol")
+set_composition!(TestWeakAcid,CompositionRule(Dict(TestHA=>1)))
+set_composition!(TestWeakAcidNa,CompositionRule(Dict(Na⁺=>1,TestAMinus=>1)))
+const test_weak_acid_system = AcidBaseSystem([TestHA,TestAMinus],[4.76])
+set_acid_base_system!(TestWeakAcid,test_weak_acid_system)
+set_acid_base_system!(TestWeakAcidNa,test_weak_acid_system)
+
+@testset "Acid/base equilibrium pH: monoprotic weak acid (Henderson-Hasselbalch check)" begin
+    stock = (0.1u"mol"*TestWeakAcid) + (1.0u"L"*rgt"water")
+    Ka = 10.0^(-4.76)
+    C = 0.1
+    x = (-Ka+sqrt(Ka^2+4*Ka*C))/2 # independent closed-form quadratic solution
+    expected_pH = -log10(x)
+    @test pH(stock;ionic_strength_correction=false) ≈ expected_pH atol=1e-6
+
+    # families/strong_ions partitioning is correct
+    families,strong_ions = CHESSCore._analytical_species(stock)
+    @test length(families) == 1
+    @test isempty(strong_ions)
+
+    # a registered family is present -- real chemistry backs this result, so no warning fires even
+    # though the general solver path (not the strong-electrolyte fast path) is being exercised
+    @test_logs pH(stock;ionic_strength_correction=false)
+end
+
+@reagent TestH3A "test triprotic acid" Solid 98.0u"g/mol" missing missing
+@reagent TestKH2A "test monobasic salt" Solid missing missing missing
+@reagent TestK2HA "test dibasic salt" Solid missing missing missing
+const TestH3A_chem = CHESSCore.Chemical("TestH3A",0,98.0u"g/mol")
+const TestH2AMinus = CHESSCore.Chemical("TestH2A-",-1,97.0u"g/mol")
+const TestHAMinus2 = CHESSCore.Chemical("TestHA2-",-2,96.0u"g/mol")
+const TestAMinus3 = CHESSCore.Chemical("TestA3-",-3,95.0u"g/mol")
+set_composition!(TestKH2A,CompositionRule(Dict(K⁺=>1,TestH2AMinus=>1)))
+set_composition!(TestK2HA,CompositionRule(Dict(K⁺=>2,TestHAMinus2=>1)))
+const test_triprotic_system = AcidBaseSystem([TestH3A_chem,TestH2AMinus,TestHAMinus2,TestAMinus3],[2.148,7.198,12.375])
+set_acid_base_system!(TestKH2A,test_triprotic_system)
+set_acid_base_system!(TestK2HA,test_triprotic_system)
+
+@testset "Acid/base equilibrium pH: polyprotic buffer (equimolar -> pH ≈ pKa2)" begin
+    stock = (0.1u"mol"*TestKH2A) + (0.1u"mol"*TestK2HA) + (1.0u"L"*rgt"water")
+    @test pH(stock;ionic_strength_correction=false) ≈ 7.198 atol=1e-3
+
+    results = speciation(stock;ionic_strength_correction=false)
+    @test length(results) == 1
+    @test results[1].fractions[2] ≈ 0.5 atol=1e-3 # H2A- fraction
+    @test results[1].fractions[3] ≈ 0.5 atol=1e-3 # HA2- fraction
+
+    # ionic-strength correction shifts pH toward more dissociation (lower pH) for this
+    # doubly-charged-state-forming buffer -- direction check, not an exact literature target
+    @test pH(stock;ionic_strength_correction=true) < pH(stock;ionic_strength_correction=false)
+end
+
+@testset "Acid/base equilibrium pH: edge cases" begin
+    # dilute weak acid near neutral pH -- autoionization matters, a naive sqrt(Ka*C) approximation
+    # would be wrong here; the full charge-balance solver must still produce a sane result
+    dilute_acid_chem = CHESSCore.Chemical("TestDiluteHA",0,60.0u"g/mol")
+    dilute_base_chem = CHESSCore.Chemical("TestDiluteA-",-1,59.0u"g/mol")
+    dilute_sys = AcidBaseSystem([dilute_acid_chem,dilute_base_chem],[7.0])
+    dilute_fam = AnalyticalSpecies(dilute_sys,1e-7u"mol/L")
+    p = pH([dilute_fam],Tuple{Int,Unitful.Molarity}[];ionic_strength_correction=false)
+    @test 6.5 < p < 7.0 # between neutral and pKa, not naively at pKa/2+3.5-ish extremes
+
+    # high ionic strength (~1M): must not error, should warn-and-degrade at worst
+    conc_acid_chem = CHESSCore.Chemical("TestConcHA",0,60.0u"g/mol")
+    conc_base_chem = CHESSCore.Chemical("TestConcA-",-1,59.0u"g/mol")
+    conc_sys = AcidBaseSystem([conc_acid_chem,conc_base_chem],[4.76])
+    conc_fam = AnalyticalSpecies(conc_sys,1.0u"mol/L")
+    p2 = pH([conc_fam],Tuple{Int,Unitful.Molarity}[];ionic_strength_correction=true)
+    @test isfinite(p2)
 end
 
 @testset "Formula algebra" begin
@@ -892,7 +1042,7 @@ end
     @test occursin("water",well_report) # delegated Stock report shows its reagent table
 
     # Instrument: capability data from kind(x), plus a read grouped-by-kind/most-recent-few summary
-    inst = CHESSCore.Instrument(nothing,"Test Incubator",IncubatorModelX)
+    inst = CHESSCore.GenericLocation(nothing,"Test Incubator",IncubatorModelX)
     record_read!(inst,read"TestpH"("5.0",DateTime(2024,1,1)))
     record_read!(inst,read"TestpH"("6.0",DateTime(2024,1,2)))
     record_read!(inst,read"TestpH"("7.0",DateTime(2024,1,3)))
@@ -959,7 +1109,7 @@ end
     @test CHESSCore.softequal(root,root2)
 
     # Instrument, with a locked child to exercise the deferred is_locked application
-    inst2 = CHESSCore.Instrument(nothing,"interchange instrument",IncubatorModelX)
+    inst2 = CHESSCore.GenericLocation(nothing,"interchange instrument",IncubatorModelX)
     locked_child = CHESSCore.GenericLocation(nothing,"locked child",Room)
     move_into!(inst2,locked_child,true) # lock=true
     record_read!(inst2,r_qual)

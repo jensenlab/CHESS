@@ -3,23 +3,27 @@ uuid = "62dec9b8-6080-46d4-b979-4cedd2cd98ca"
 version = "0.1.0"
 authors = ["Ben David <66976120+bmdavid2@users.noreply.github.com>"]
 
+[workspace]
+projects = ["CHESSCore", "CHESSDatabase", "CHESSLabConstants", "Pourfecto", "docs"]
+
 [deps]
 CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
 CHESSDatabase = "a378c3a1-3085-4ba8-9ece-5d836f51da24"
 CHESSLabConstants = "51347251-55e0-4e7d-9685-600600911616"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Pourfecto = "82aece00-2e0a-4aa7-b3de-eea0746b1d2e"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
-
-[compat]
-Reexport = "1.2.2"
-Unitful = "1.27.0"
-julia = "1.12"
 
 [sources]
 CHESSCore = {path = "CHESSCore"}
 CHESSDatabase = {path = "CHESSDatabase"}
 CHESSLabConstants = {path = "CHESSLabConstants"}
+Pourfecto = {path = "Pourfecto"}
 
-[workspace]
-projects = ["CHESSCore", "CHESSDatabase", "CHESSLabConstants", "docs"]
+[compat]
+Plots = "1.41.6"
+Reexport = "1.2.2"
+Unitful = "1.27.0"
+julia = "1.12"

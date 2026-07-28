@@ -50,8 +50,8 @@ previewing a change to an already-committed location instead, see `reconstruct_l
 See also: `generate_location`, `reconstruct_location`, `commit_location!`, `release_location` (all
 CHESSDatabase).
 """
-function build_location(kind::LocationKind,name::String=string(UUIDs.uuid4()),child_namer::Vararg{Function}=plate_namer)
-    return _build_location(kind,name,_next_ephemeral_id,child_namer...)
+function build_location(kind::LocationKind,name::AbstractString=string(UUIDs.uuid4()),child_namer::Vararg{Function}=plate_namer)
+    return _build_location(kind,String(name),_next_ephemeral_id,child_namer...)
 end
 
 

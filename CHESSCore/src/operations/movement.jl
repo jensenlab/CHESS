@@ -107,7 +107,7 @@ Move `child` into `parent`, if allowed.
 if `lock=true`, then also lock the child after the movement. See [`_check_capability`](@ref) for
 `instrument`.
 """
-function move_into!(parent::Union{Location,Nothing},child::Location,lock::Bool=false;instrument::Union{Instrument,Nothing}=nothing)
+function move_into!(parent::Union{Location,Nothing},child::Location,lock::Bool=false;instrument::Union{Location,Nothing}=nothing)
     _check_capability(instrument,move_into!)
     oldparent=child.parent
     add_to!(parent,child)

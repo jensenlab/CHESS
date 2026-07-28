@@ -30,6 +30,7 @@
 @location_kind Well250000 Symbol[] nothing nothing 250000u"µL" nothing nothing
 @location_kind Well1400 Symbol[] nothing nothing 1400u"µL" nothing nothing
 @location_kind Well1000 Symbol[] nothing nothing 1000u"µL" nothing nothing
+@location_kind Well20000 Symbol[] nothing nothing 20000u"µL" nothing nothing
 
 # tip reservoir (manifolds)
 @location_kind TipReservior Symbol[] (1,1) :Well200 nothing "USA Scientific" "200 ul tip"
@@ -38,13 +39,16 @@
 @location_kind WP96 [:MicroPlate,:WellPlate] (8,12) :Well400 nothing "Thermo" "123456"
 @location_kind WP384 [:MicroPlate,:WellPlate] (16,24) :Well100 nothing "Thermo" "123457"
 @location_kind DeepWP96 [:DeepWell,:WellPlate] (8,12) :Well2000 nothing "VWR" "76329-998"
-@location_kind DeepReservior [:DeepWell,:WellPlate] (1,1) :Well150000 nothing "Thermo" "N/A"
+@location_kind DeepReservoir [:DeepWell,:WellPlate] (1,1) :Well150000 nothing "Thermo" "N/A"
+@location_kind DeepWellColumn [:DeepWell,:WellPlate] (1,12) :Well20000 nothing nothing nothing
+@location_kind DeepWellRow [:DeepWell,:WellPlate] (8,1) :Well20000 nothing nothing nothing
 
 # reservoir
 @location_kind Reservior25mL [:Reservior] (1,1) :Well25000 nothing "Thermo" "N/A"
 @location_kind Reservoir100mL [:Reservior] (1,1) :Well100000 nothing "Thermo" "N/A"
 
 # PCR
+@location_kind brPCR96 [:PCRLabware] (8,12) :Well200 nothing nothing nothing
 @location_kind PCRTube [:PCRLabware] (1,1) :Well200 nothing "Thermo" "N/A"
 @location_kind PCR8Strip [:PCRLabware] (8,1) :Well200 nothing "Thermo" "N/A"
 @location_kind BreakawayPCRWafer [:PCRLabware] (8,4) :Well200 nothing "Thermo" "N/A"

@@ -459,6 +459,18 @@ registered composition, so there's only ever one number, not a baked-in copy tha
 the formula. Use this when a reagent's real stoichiometry matters (e.g. an ionic solid); use
 [`@reagent`](@ref) for the simpler common case.
 
+Registers `composition` immediately (like [`@reagent`](@ref) does for its own default identity
+composition) -- safe for direct/interactive use in a single running session (a script, a notebook, a
+REPL), but **not** safe for reagents defined inside a precompiled package's top-level code: mutating
+`composition_rules` (owned by CHESSCore) as a side effect of a *dependent* package's own
+precompilation isn't guaranteed to survive into a fresh session loading that package's precompiled
+cache (Julia's module-initialization guidance is that such state belongs in `__init__`, which runs on
+every load, not just once at compile time). A lab-constants package with real, non-default
+[`Chemical`](@ref) formulas to register (e.g. ionic salts) should instead register them explicitly
+from its own `__init__()`, via [`set_composition!`](@ref) called on a [`Formula`](@ref)'s
+`.composition` -- see `CHESSLabConstants/src/chemicals/electrolytes.jl` for a worked example of this
+pattern.
+
 Example:
 ```julia
 julia> @reagent_formula NaCl "sodium chloride" Solid (chem"Na+"+chem"Cl-") missing missing
@@ -467,7 +479,7 @@ NaCl
 julia> molecular_weight(NaCl) # derived: sum of each Chemical's molecular_weight × its coefficient
 ```
 
-See also: [`@reagent`](@ref), [`Formula`](@ref)
+See also: [`@reagent`](@ref), [`Formula`](@ref), [`set_composition!`](@ref)
 """
 macro reagent_formula(labsymb,name,type,formula,density,pubchemid)
     ls = Symbol(labsymb)

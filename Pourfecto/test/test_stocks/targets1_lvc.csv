@@ -1,0 +1,8 @@
+﻿labware,name,well,volume,A,B,C,D,SolventA,SolventB
+DeepWP96,tgt1,A1,1,0.08,0.12,0.04,0.36,100,0
+DeepWP96,tgt1,B1,1,0.16,0.24,0.02,0.09,100,0
+DeepWP96,tgt1,C1,1,0.01,0.13,0.37,0.04,100,0
+DeepWP96,tgt1,D1,1,0.5,1,0.03,0.08,100,0
+DeepWP96,tgt1,A2,1,0.8,1.25,0,0,100,0
+DeepWP96,tgt1,A3,1,0,0,0,1,100,0
+DeepWP96,tgt1,H3,1,3,0,0,0,100,0

@@ -43,7 +43,7 @@ julia> upload(set_attribute!,locA,Temperature(10u"°C"))
 ```
 """
 function upload(fun::Function,args...;ledger_id::Union{Integer,Nothing}=nothing,time::DateTime=Dates.now(),
-        instrument::Union{Instrument,Nothing}=nothing,instrument_time::Union{DateTime,Nothing}=nothing)
+        instrument::Union{Location,Nothing}=nothing,instrument_time::Union{DateTime,Nothing}=nothing)
     CHESSCore.assert_all_committed(args...)
     instrument_id = isnothing(instrument) ? nothing : location_id(instrument)
     ledger_id = something(ledger_id, append_ledger())
@@ -311,7 +311,7 @@ function upload_read(loc::Location,read::Read;ledger_id=append_ledger(),time::Da
 end
 
 """
-    upload_instrument_setting(instrument::Instrument,setting::String,value; ledger_id, time, instrument_time)
+    upload_instrument_setting(instrument::Location,setting::String,value; ledger_id, time, instrument_time)
 
 Append a new revision of `instrument`'s `setting` to `InstrumentSettings` -- the ledger's "amend"
 operation for instrument settings, mirroring [`upload_environment_attribute`](@ref)'s shape.
@@ -320,7 +320,7 @@ Returns `ledger_id` -- since `SequenceID` can shift after the fact (`insert_ledg
 resolve this revision's *current* sequence position later via `get_sequence_id(ledger_id)` rather than
 caching a `SequenceID` directly.
 """
-function upload_instrument_setting(instrument::Instrument,setting::String,value;ledger_id::Integer=append_ledger(),time::DateTime=now(),
+function upload_instrument_setting(instrument::Location,setting::String,value;ledger_id::Integer=append_ledger(),time::DateTime=now(),
         instrument_time::Union{DateTime,Nothing}=nothing)
     upload_time=db_time(time)
     instrument_upload_time = isnothing(instrument_time) ? nothing : db_time(instrument_time)

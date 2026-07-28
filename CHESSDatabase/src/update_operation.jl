@@ -13,7 +13,7 @@ macro update(expr,ledger_id=append_ledger(),time=Dates.now())
 end 
 
 function update(fun::Function,args...;ledger_id::Integer=append_ledger(),time::DateTime=Dates.now(),
-        instrument::Union{Instrument,Nothing}=nothing,instrument_time::Union{DateTime,Nothing}=nothing)
+        instrument::Union{Location,Nothing}=nothing,instrument_time::Union{DateTime,Nothing}=nothing)
     instrument_id = isnothing(instrument) ? nothing : location_id(instrument)
     up_fun=upload_operation(fun)
     function update_transaction()

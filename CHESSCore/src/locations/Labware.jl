@@ -67,5 +67,7 @@ Base.getindex(lw::Labware, i, j) = children(lw)[i, j]
 Base.getindex(lw::Labware, i::Int) = children(lw)[i]
 Base.size(lw::Labware) = shape(lw)
 Base.length(lw::Labware) = prod(shape(lw))
+# stocks/add_stock! (Labware+Stock convenience helpers) live in interop/dataframe_interface.jl --
+# Stock isn't defined yet at this point in CHESSCore's include order (stocks/Stocks.jl loads later).
 Base.eachindex(lw::Labware) = eachindex(children(lw))
 Base.iterate(lw::Labware, state...) = iterate(children(lw), state...)

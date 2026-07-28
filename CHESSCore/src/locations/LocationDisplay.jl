@@ -6,11 +6,11 @@
 """
     _present_children(x::Location)
 
-Return `x`'s children as a plain `Vector{Location}`, skipping any unassigned slots. `GenericLocation`/
-`Instrument` store children in a `Vector` (always fully assigned); `Labware` stores them in a `Matrix`
-that can contain unassigned slots before every socket is populated.
+Return `x`'s children as a plain `Vector{Location}`, skipping any unassigned slots. `GenericLocation`
+stores children in a `Vector` (always fully assigned); `Labware` stores them in a `Matrix` that can
+contain unassigned slots before every socket is populated.
 """
-_present_children(x::Union{GenericLocation,Instrument}) = children(x)
+_present_children(x::GenericLocation) = children(x)
 function _present_children(x::Labware)
     ch = children(x)
     out = Location[]
@@ -106,8 +106,26 @@ function _reads_summary(io::IO,x::Location;nshow::Integer=3)
     return nothing
 end
 
+"""
+    _capabilities_summary(io::IO,x::Location)
+
+Print `x`'s capability data (performable operations, actuatable attributes, readable types) if
+`is_capable(x)` -- independent of `x`'s concrete `Location` subtype. Prints nothing otherwise.
+"""
+function _capabilities_summary(io::IO,x::Location)
+    is_capable(x) || return nothing
+    println(io)
+    printstyled(io,"Instrument capabilities:";bold=true)
+    println(io)
+    println(io,"  performable operations: ",join(sort(string.(nameof.(performable_operations(x)))),", "))
+    println(io,"  actuatable attributes: ",join(sort(string.(collect(actuatable_attributes(x)))),", "))
+    println(io,"  readable types: ",join(sort(string.(collect(readable_types(x)))),", "))
+    return nothing
+end
+
 function Base.show(io::IO,::MIME"text/plain",x::GenericLocation)
     _location_header(io,x)
+    _capabilities_summary(io,x)
     _children_summary(io,x)
     _attributes_summary(io,x)
     _reads_summary(io,x)
@@ -121,6 +139,7 @@ function Base.show(io::IO,::MIME"text/plain",x::Labware)
     isnothing(vendor(x)) || print(io,", vendor ",vendor(x))
     isnothing(catalog(x)) || print(io,", catalog ",catalog(x))
     println(io)
+    _capabilities_summary(io,x)
     _children_summary(io,x)
     _attributes_summary(io,x)
     _reads_summary(io,x)
@@ -139,15 +158,3 @@ function Base.show(io::IO,::MIME"text/plain",x::Well)
     _reads_summary(io,x)
 end
 
-function Base.show(io::IO,::MIME"text/plain",x::Instrument)
-    _location_header(io,x)
-    println(io)
-    printstyled(io,"Instrument capabilities:";bold=true)
-    println(io)
-    println(io,"  performable operations: ",join(sort(string.(nameof.(performable_operations(x)))),", "))
-    println(io,"  actuatable attributes: ",join(sort(string.(collect(actuatable_attributes(x)))),", "))
-    println(io,"  readable types: ",join(sort(string.(collect(readable_types(x)))),", "))
-    _children_summary(io,x)
-    _attributes_summary(io,x)
-    _reads_summary(io,x)
-end

@@ -75,6 +75,40 @@ Access the [`LocationKind`](@ref) of a location.
 kind(x::Location)=x.kind
 
 """
+    is_capable(x::Location)
+
+Return whether `x` is capability-bearing (see [`is_capable(::LocationKind)`](@ref)) -- carried as
+data on `x`'s [`LocationKind`](@ref), independent of `x`'s concrete `Location` subtype.
+"""
+is_capable(x::Location) = is_capable(kind(x))
+
+"""
+    actuatable_attributes(x::Location)
+
+Return the `Set{Symbol}` of [`AttributeKind`](@ref) names `x` is associated with — descriptive data
+carried on `x`'s [`LocationKind`](@ref), not enforced anywhere (reserved for a possible future
+planning/scheduling feature). Empty for a non-capable location.
+"""
+actuatable_attributes(x::Location) = kind(x).actuatable_attributes
+
+"""
+    performable_operations(x::Location)
+
+Return the `Set{Function}` of operation functions (e.g. `move_into!`, `transfer!`, `set_attribute!`)
+that `x` can perform on *other* locations — data carried on `x`'s [`LocationKind`](@ref). Empty for a
+non-capable location.
+"""
+performable_operations(x::Location) = kind(x).performable_operations
+
+"""
+    readable_types(x::Location)
+
+Return the `Set{Symbol}` of [`ReadKind`](@ref) names that `x` can produce — data carried on `x`'s
+[`LocationKind`](@ref). Empty for a non-capable location.
+"""
+readable_types(x::Location) = kind(x).readable_types
+
+"""
     shape(x::Location)
 Access the grid shape of a location's [`LocationKind`](@ref), if defined. `(0,0)` otherwise.
 """
@@ -315,7 +349,7 @@ Return every direct child of `loc` whose `name` matches, as a `Vector` (possibly
 is explicitly documented as non-unique, so unlike [`Base.getindex(::Location,::String)`](@ref) this
 never errors — use it when duplicate names are expected and you want to handle them yourself.
 """
-function children_named(loc::Location,name::String)
+function children_named(loc::Location,name::AbstractString)
     return filter(c -> CHESSCore.name(c)==name, children(loc))
 end
 
@@ -328,7 +362,7 @@ unique (see [`children_named`](@ref) for the non-throwing, plural alternative). 
 deliberately no integer `getindex` for a generic `Location`: unlike [`Labware`](@ref)'s fixed grid,
 `children` is a mutable `Vector` with no stable positional identity.
 """
-function Base.getindex(loc::Location,name::String)
+function Base.getindex(loc::Location,name::AbstractString)
     matches = children_named(loc,name)
     length(matches)==0 && throw(ChildNotFoundError(loc,name))
     length(matches)>1 && throw(AmbiguousChildNameError(loc,name,matches))

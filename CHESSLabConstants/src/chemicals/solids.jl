@@ -2,8 +2,8 @@
 # author-time cache (JLConstants_database.db) via register_reagent! -- see chemical_utils.jl. To add
 # a new compound, call register_reagent!, paste the returned line in below (alphabetically), commit.
 
-@reagent HCl "Hydrochloric Acid" Solid 36.46u"g/mol" 1.05u"g/mL" 313
-@reagent NaOH "Sodium Hydroxide" Solid 39.997u"g/mol" 1.5u"g/mL" 14798
+@reagent HCl "Hydrochloric Acid" Solid missing 1.05u"g/mL" 313
+@reagent NaOH "Sodium Hydroxide" Solid missing 1.5u"g/mL" 14798
 @reagent acetamide "Acetamide" Solid 59.07u"g/mol" 1.159u"g/mL" 178
 @reagent acid_red_1 "Acid Red 1" Solid 509.4u"g/mol" missing 19522
 @reagent adenine "adenine" Solid 135.13u"g/mol" missing 190
@@ -15,9 +15,9 @@
 @reagent alpha_cyclodextrin "Alpha-Cyclodextrin" Solid 972.8u"g/mol" missing 444913
 @reagent alpha_ketoglutaric_acid "Alpha Ketoglutaric Acid (2-Oxoglutaric Acid)" Solid 146.1u"g/mol" missing 51
 @reagent amitrole "amitrole (3-amino-1,2,4-triazole)" Solid 84.08u"g/mol" 1.138u"g/mL" 1639
-@reagent ammonium_chloride "Ammonium_chloride" Solid 53.49u"g/mol" 1.53u"g/mL" 25517
-@reagent ammonium_nitrate "Ammonium Nitrate" Solid 80.044u"g/mol" 1.72u"g/mL" 22985
-@reagent ammonium_sulfate "Ammonium Sulfate" Solid 132.14u"g/mol" 1.78u"g/mL" 6097028
+@reagent ammonium_chloride "Ammonium_chloride" Solid missing 1.53u"g/mL" 25517
+@reagent ammonium_nitrate "Ammonium Nitrate" Solid missing 1.72u"g/mL" 22985
+@reagent ammonium_sulfate "Ammonium Sulfate" Solid missing 1.78u"g/mL" 6097028
 @reagent amoxicillin "amoxicillin" Solid 365.4u"g/mol" missing 33613
 @reagent ampicillin "ampicllin" Solid 349.4u"g/mol" missing 6249
 @reagent arabinose "Arabinose" Solid 230.11u"g/mol" missing 188324
@@ -34,7 +34,7 @@
 @reagent bleomycin "bleomycin" Solid 1415.6u"g/mol" missing 5360373
 @reagent boric_acid "Boric Acid" Solid 61.84u"g/mol" 1.435u"g/mL" 7628
 @reagent butyrate "Butyrate" Solid 87.1u"g/mol" missing 104775
-@reagent calcium_chloride "calcium chloride dihydrate" Solid 147.01u"g/mol" 1.85u"g/mL" 6093260
+@reagent calcium_chloride "calcium chloride dihydrate" Solid missing 1.85u"g/mL" 6093260
 @reagent carbenicillin "carbenicillin" Solid 378.4u"g/mol" missing 20824
 @reagent carnitine "D,L-Carnitine" Solid 161.2u"g/mol" missing 288
 @reagent ceftriaxone "ceftriaxone" Solid 554.6u"g/mol" missing 5479530
@@ -45,11 +45,11 @@
 @reagent ciprofloxacin "ciprofloxacin" Solid 331.34u"g/mol" missing 2764
 @reagent citric_acid "Citric Acid" Solid 192.12u"g/mol" 1.54u"g/mL" 311
 @reagent citruline "L-citruline" Solid 175.19u"g/mol" missing 9750
-@reagent cobalt_chloride "Cobalt (II) Chloride" Solid 129.84u"g/mol" 1.924u"g/mL" 3032536
-@reagent cobalt_nitrate "Cobalt (II) nitrate" Solid 182.94u"g/mol" 1.54u"g/mL" 25000
+@reagent cobalt_chloride "Cobalt (II) Chloride" Solid missing 1.924u"g/mL" 3032536
+@reagent cobalt_nitrate "Cobalt (II) nitrate" Solid missing 1.54u"g/mL" 25000
 @reagent colistin "colistin" Solid 1155.4u"g/mol" missing 5311054
-@reagent copper_chloride "Copper (II) chloride" Solid 134.45u"g/mol" 2.54u"g/mL" 24014
-@reagent copper_sulfate "Copper (II) sulfate" Solid 159.61u"g/mol" 2.29u"g/mL" 24462
+@reagent copper_chloride "Copper (II) chloride" Solid missing 2.54u"g/mL" 24014
+@reagent copper_sulfate "Copper (II) sulfate" Solid missing 2.29u"g/mL" 24462
 @reagent cyclohexamide "cyclohexamide" Solid 281.35u"g/mol" missing 6197
 @reagent cycloserine "cycloserine" Solid 102.09u"g/mol" missing 6234
 @reagent cysteine "L-cysteine" Solid 121.16u"g/mol" missing 5862
@@ -79,9 +79,9 @@
 @reagent guanosine "guanosine" Solid 283.24u"g/mol" missing 135398635
 @reagent histidine "L-histidine" Solid 155.15u"g/mol" missing 6274
 @reagent inosine "inosine" Solid 268.23u"g/mol" missing 135398641
-@reagent iron_chloride "Iron Chloride (Ferric Chloride)" Solid 162.2u"g/mol" 2.8u"g/mL" 24380
-@reagent iron_nitrate "iron (III) nitrate" Solid 404.0u"g/mol" 1.68u"g/mL" 16211566
-@reagent iron_sulfate "iron (II) sulfate" Solid 278.02u"g/mol" 1.895u"g/mL" 62662
+@reagent iron_chloride "Iron Chloride (Ferric Chloride)" Solid missing 2.8u"g/mL" 24380
+@reagent iron_nitrate "iron (III) nitrate" Solid missing 1.68u"g/mL" 16211566
+@reagent iron_sulfate "iron (II) sulfate" Solid missing 1.895u"g/mL" 62662
 @reagent isoleucine "L-isoleucine" Solid 131.17u"g/mol" missing 6306
 @reagent kanamycin "kanamycin" Solid 484.5u"g/mol" missing 6032
 @reagent lactic_acid "Lactic Acid" Solid 90.08u"g/mol" 1.2u"g/mL" 612
@@ -91,11 +91,11 @@
 @reagent lincomycin "lincomycin" Solid 406.5u"g/mol" missing 3000540
 @reagent lipoic_acid "lipoic_acid" Solid 206.3u"g/mol" missing 6112
 @reagent lysine "L-lysine" Solid 146.19u"g/mol" missing 5962
-@reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid 246.48u"g/mol" 1.68u"g/mL" 24843
+@reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid missing 1.68u"g/mL" 24843
 @reagent malic_acid "Malic Acid" Solid 134.09u"g/mol" 1.601u"g/mL" 525
 @reagent maltodextrin "maltodextrin" Solid missing missing missing
-@reagent manganese_chloride "Manganese (II) Chloride" Solid 197.9u"g/mol" 2.01u"g/mL" 643989
-@reagent manganese_sulfate "manganese sulfate monohydrate" Solid 169.02u"g/mol" 2.95u"g/mL" 177577
+@reagent manganese_chloride "Manganese (II) Chloride" Solid missing 2.01u"g/mL" 643989
+@reagent manganese_sulfate "manganese sulfate monohydrate" Solid missing 2.95u"g/mL" 177577
 @reagent mannitol "D-mannitol" Solid 182.17u"g/mol" 1.489u"g/mL" 6251
 @reagent mannose "D-mannose" Solid 180.16u"g/mol" missing 18950
 @reagent marine_broth "Marine Broth" Solid missing missing missing
@@ -105,10 +105,11 @@
 @reagent miltefosine "miltefosine" Solid 407.6u"g/mol" missing 3599
 @reagent minocycline "minocycline hydrochloride" Solid 493.9u"g/mol" missing 54685925
 @reagent mrs_broth "MRS broth" Solid missing missing missing
+@reagent mops "MOPS" Solid 209.26u"g/mol" missing 70807
 @reagent myo_inositol "myo-inositol" Solid 180.16u"g/mol" missing 892
 @reagent neomycin "neomycin" Solid 146.18u"g/mol" 0.98u"g/mL" 8738
 @reagent niacinamide "niacinamide (nicotinamide)" Solid 122.12u"g/mol" 1.4u"g/mL" 936
-@reagent nickel_chloride "Nickel (II) Chloride)" Solid 129.6u"g/mol" 3.55u"g/mL" 24385
+@reagent nickel_chloride "Nickel (II) Chloride)" Solid missing 3.55u"g/mL" 24385
 @reagent nutrient_broth "Nutrient Broth" Solid missing missing missing
 @reagent ofloxacin "ofloxacin" Solid 361.4u"g/mol" missing 4583
 @reagent ornithine "L-Ornithine" Solid 132.16u"g/mol" missing 6262
@@ -121,9 +122,9 @@
 @reagent peptone "Peptone" Solid missing missing missing
 @reagent phenylalanine "L-phenylalanine" Solid 165.19u"g/mol" missing 6140
 @reagent polymyxin_b "polymyxin_b" Solid 1301.6u"g/mol" missing 5702105
-@reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate" Solid 258.21u"g/mol" 1.725u"g/mL" 24856
-@reagent potassium_phosphate_di "potassium phosphate dibasic" Solid 174.176u"g/mol" missing 24450
-@reagent potassium_phosphate_mono "potassium phosphate monobasic" Solid 136.086u"g/mol" 2.34u"g/mL" 516951
+@reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate" Solid missing 1.725u"g/mL" 24856
+@reagent potassium_phosphate_di "potassium phosphate dibasic" Solid missing missing 24450
+@reagent potassium_phosphate_mono "potassium phosphate monobasic" Solid missing 2.34u"g/mL" 516951
 @reagent proline "L-proline" Solid 115.13u"g/mol" 1.064u"g/mL" 145742
 @reagent promethazine "promethazine" Solid 284.4u"g/mol" missing 4927
 @reagent propionic_acid "Propionic Acid" Solid 74.08u"g/mol" 0.995u"g/mL" 1032
@@ -138,19 +139,19 @@
 @reagent salicin "Salacin" Solid 286.28u"g/mol" missing 439503
 @reagent serine "L-serine" Solid 105.09u"g/mol" 1.6u"g/mL" 5951
 @reagent shikimic_acid "Shikimic Acid" Solid 174.15u"g/mol" missing 8742
-@reagent silver_nitrate "silver_nitrate" Solid 169.873u"g/mol" 4.35u"g/mL" 24470
-@reagent sodium_acetate_anhydrous "sodium acetate" Solid 82.03u"g/mol" 1.528u"g/mL" 517045
-@reagent sodium_acetate_trihydrate "sodium acetate trihydrate" Solid 136.08u"g/mol" 1.528u"g/mL" 23665404
-@reagent sodium_bicarbonate "sodium bicarbonate" Solid 84.007u"g/mol" 2.159u"g/mL" 516892
-@reagent sodium_carbonate "Sodium Carbonate" Solid 105.988u"g/mol" 2.54u"g/mL" 10340
-@reagent sodium_chloride "Sodium Chloride" Solid 214.25u"g/mol" missing 5324
-@reagent sodium_dichromate "sodium_dichromate" Solid 261.97u"g/mol" 2.35u"g/mL" 25408
-@reagent sodium_molybdate "Sodium Molybdate" Solid 205.93u"g/mol" 3.78u"g/mL" 61424
-@reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid 268.07u"g/mol" missing 6096963
-@reagent sodium_phosphate_mono "sodium phosphate mononbasic monohydrate" Solid 137.99u"g/mol" missing 516949
-@reagent sodium_selenite "Sodium Selenite" Solid 172.95u"g/mol" 3.1u"g/mL" 24934
-@reagent sodium_succinate_hexahydrate "Sodium Succinate Hexahydrate" Solid 270.14u"g/mol" missing 3083938
-@reagent sodium_tungstate "Sodium Tungstate" Solid 293.82u"g/mol" 4.179u"g/mL" 26052
+@reagent silver_nitrate "silver_nitrate" Solid missing 4.35u"g/mL" 24470
+@reagent sodium_acetate_anhydrous "sodium acetate" Solid missing 1.528u"g/mL" 517045
+@reagent sodium_acetate_trihydrate "sodium acetate trihydrate" Solid missing 1.528u"g/mL" 23665404
+@reagent sodium_bicarbonate "sodium bicarbonate" Solid missing 2.159u"g/mL" 516892
+@reagent sodium_carbonate "Sodium Carbonate" Solid missing 2.54u"g/mL" 10340
+@reagent sodium_chloride "Sodium Chloride" Solid missing missing 5324
+@reagent sodium_dichromate "sodium_dichromate" Solid missing 2.35u"g/mL" 25408
+@reagent sodium_molybdate "Sodium Molybdate" Solid missing 3.78u"g/mL" 61424
+@reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid missing missing 6096963
+@reagent sodium_phosphate_mono "sodium phosphate mononbasic monohydrate" Solid missing missing 516949
+@reagent sodium_selenite "Sodium Selenite" Solid missing 3.1u"g/mL" 24934
+@reagent sodium_succinate_hexahydrate "Sodium Succinate Hexahydrate" Solid missing missing 3083938
+@reagent sodium_tungstate "Sodium Tungstate" Solid missing 4.179u"g/mL" 26052
 @reagent soluble_starch "Soluble Starch" Solid missing missing missing
 @reagent sorbitol "D-sorbitol" Solid 182.17u"g/mol" 1.49u"g/mL" 5780
 @reagent spectinomycin "spectinomycin" Solid 332.35u"g/mol" missing 15541
@@ -168,7 +169,7 @@
 @reagent thiourea "Thiourea" Solid 76.12u"g/mol" 1.405u"g/mL" 2723790
 @reagent threonine "L-threonine" Solid 119.12u"g/mol" missing 6288
 @reagent thymine "thymine" Solid 126.11u"g/mol" missing 1135
-@reagent tin_fluoride "Tin (II) Fluoride" Solid 156.71u"g/mol" 2.79u"g/mL" 24550
+@reagent tin_fluoride "Tin (II) Fluoride" Solid missing 2.79u"g/mL" 24550
 @reagent tobramycin "tobramycin" Solid 467.5u"g/mol" missing 36294
 @reagent trehalose "D-(+)-trehalose dydrate" Solid 378.33u"g/mol" missing 181978
 @reagent triclosan "triclosan" Solid 289.5u"g/mol" missing 5564
@@ -188,5 +189,5 @@
 @reagent xylitol "Xylitol" Solid 278.34u"g/mol" missing 581285
 @reagent xylose "xlyose" Solid 150.13u"g/mol" 1.525u"g/mL" 135191
 @reagent yeast_extract "yeast_extract" Solid missing missing missing
-@reagent zinc_chloride "Zinc (II) Chloride" Solid 136.3u"g/mol" 2.91u"g/mL" 5727
-@reagent zinc_sulfate "Zinc Sulphate" Solid 161.4u"g/mol" 1.96u"g/mL" 24424
+@reagent zinc_chloride "Zinc (II) Chloride" Solid missing 2.91u"g/mL" 5727
+@reagent zinc_sulfate "Zinc Sulphate" Solid missing 1.96u"g/mL" 24424

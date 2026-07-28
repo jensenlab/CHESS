@@ -162,20 +162,26 @@ organisms(c::Culture)=c.organisms
 
 a generic stock constructor that returns the appropriate stock subtype. 
 """
-function Stock(organisms,solids,liquids) 
+function Stock(organisms,solids,liquids)
+    # Drop any component present at exactly zero quantity before deciding the subtype, mirroring
+    # mix()'s existing convention (CHESSCore/src/operations/mixing.jl) -- otherwise a stock
+    # constructed directly from a zero quantity (e.g. 0u"mL"*rgt"water", or scaling an existing
+    # stock by 0) would be typed Solution/Mixture with an all-zero component instead of Empty().
+    solids = filter(kv -> ustrip(kv[2]) != 0, solids)
+    liquids = filter(kv -> ustrip(kv[2]) != 0, liquids)
     o=length(organisms)
     s=length(solids)
     l=length(liquids)
-    if o > 0 
+    if o > 0
         return Culture(organisms,solids,liquids)
-    elseif o==0 && l > 0 
+    elseif o==0 && l > 0
         return Solution(solids,liquids)
     elseif o==0 && l ==0 && s>0
         return Mixture(solids)
     else
         return Empty()
-    end 
-end 
+    end
+end
 
 
 
@@ -201,25 +207,25 @@ end
 
 Overload the `*` operator to construct a Mixture from a molar quantity of a solid. 
 """
-function *(quantity::Unitful.Amount,chemical::Solid) 
-    return Mixture(SolidDict(chemical => convert(prefquantunits(chemical),quantity,chemical)))
-end 
+function *(quantity::Unitful.Amount,chemical::Solid)
+    return Stock(Set{Organism}(),SolidDict(chemical => convert(prefquantunits(chemical),quantity,chemical)),LiquidDict())
+end
 
 """
     *(quantity::Unitful.Mass,chemical::Solid)
 
-Overload the `*` operator to construct a Mixture from a mass of a solid. 
+Overload the `*` operator to construct a Mixture from a mass of a solid.
 """
-function *(quantity::Unitful.Mass,chemical::Solid) 
-    return Mixture(SolidDict(chemical => uconvert(prefquantunits(chemical),quantity)))
+function *(quantity::Unitful.Mass,chemical::Solid)
+    return Stock(Set{Organism}(),SolidDict(chemical => uconvert(prefquantunits(chemical),quantity)),LiquidDict())
 end
 """
     *(quantity::Unitful.Mass,chemical::Solid)
 
-Overload the `*` operator to construct a Solution from a volume of a liquid. 
+Overload the `*` operator to construct a Solution from a volume of a liquid.
 """
-function *(quantity::Unitful.Volume,chemical::Liquid) 
-    return Solution(SolidDict(),LiquidDict(chemical=>uconvert(prefquantunits(chemical),quantity)))
+function *(quantity::Unitful.Volume,chemical::Liquid)
+    return Stock(Set{Organism}(),SolidDict(),LiquidDict(chemical=>uconvert(prefquantunits(chemical),quantity)))
 end 
 
 
@@ -261,9 +267,18 @@ Overload the `*` operator to divide a stock by a quantity. Returns a new stock s
 function *(q::Unitful.Quantity,stock::Stock)
     num = convert(Float64,q/quantity(stock)) # ensures that num is a scalar, and throws a dimensional compatibility error if not
     return num * stock # scalar multiplation defined above
-end 
+end
 
-*(stock::Stock,q::Unitful.Quantity) = *(q,stock) # enable commutative property 
+"""
+    *(q::Unitful.Quantity,stock::Empty)
+
+Any quantity of an `Empty` stock is still `Empty` -- unlike the general `Stock` method above, this
+never needs `quantity(stock)` (which is `missing` for `Empty`), so it can't hit the `missing`
+division/conversion that method would otherwise perform.
+"""
+*(q::Unitful.Quantity,stock::Empty) = stock
+
+*(stock::Stock,q::Unitful.Quantity) = *(q,stock) # enable commutative property
 
 
 
