@@ -139,6 +139,32 @@ end
     r = CHESSCore.recipe(stock)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Ca²⁺) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 2u"mol" atol=1e-6u"mol"
+
+    # potassium chloride: simple 1:1 strong electrolyte, no acid/base equilibrium
+    @test CHESSCore.molecular_weight(CHESSLabConstants.potassium_chloride) ≈ 74.555u"g/mol" atol=0.01u"g/mol"
+    kcl_stock = 1u"mol" * CHESSLabConstants.potassium_chloride
+    kcl_r = CHESSCore.recipe(kcl_stock)
+    @test CHESSCore.molar_amount(kcl_r,CHESSLabConstants.K⁺) ≈ 1u"mol" atol=1e-6u"mol"
+    @test CHESSCore.molar_amount(kcl_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
+    @test CHESSCore.acid_base_system(CHESSLabConstants.potassium_chloride) === nothing
+end
+
+@testset "Acid/base equilibrium: cysteine and lysine are HCl salts, not free zwitterions" begin
+    # cysteine: L-Cysteine hydrochloride monohydrate (Thermo Fisher BP376, PubChem CID 23462)
+    @test CHESSCore.molecular_weight(CHESSLabConstants.cysteine) ≈ 175.63u"g/mol" atol=0.01u"g/mol"
+    cys_r = CHESSCore.recipe(1u"mol"*CHESSLabConstants.cysteine)
+    @test CHESSCore.molar_amount(cys_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
+    @test CHESSCore.molar_amount(cys_r,CHESSLabConstants.H2O) ≈ 1u"mol" atol=1e-6u"mol"
+    cys_sys = CHESSCore.acid_base_system(CHESSLabConstants.cysteine)
+    @test cys_sys.pKa == [1.96,8.3,10.28] # unchanged acid/base chemistry
+
+    # lysine: L-Lysine monohydrochloride (Sigma/Thermo L5626, PubChem CID 69568), anhydrous
+    @test CHESSCore.molecular_weight(CHESSLabConstants.lysine) ≈ 182.65u"g/mol" atol=0.01u"g/mol"
+    lys_r = CHESSCore.recipe(1u"mol"*CHESSLabConstants.lysine)
+    @test CHESSCore.molar_amount(lys_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
+    @test CHESSCore.molar_amount(lys_r,CHESSLabConstants.H2O) == 0u"mol" # anhydrous, unlike cysteine's monohydrate
+    lys_sys = CHESSCore.acid_base_system(CHESSLabConstants.lysine)
+    @test lys_sys.pKa == [2.18,8.95,10.5]
 end
 
 @testset "Acid/base equilibrium: phosphate/carbonate pKa data" begin
@@ -257,4 +283,115 @@ end
     # folic_acid/fusidic_acid are deliberately unregistered (documented scope boundary)
     @test CHESSCore.acid_base_system(CHESSLabConstants.folic_acid) === nothing
     @test CHESSCore.acid_base_system(CHESSLabConstants.fusidic_acid) === nothing
+end
+
+@testset "Tier-1 audit pass: smoke test across all 52 newly-registered reagents" begin
+    tier1_reagents = [
+        :alanine,:valine,:leucine,:isoleucine,:glycine,:proline,:serine,:threonine,:methionine,
+        :phenylalanine,:tryptophan,:asparagine,:glutamine,:citruline,:histidine,:cysteine,:tyrosine,
+        :lysine,:arginine,:ornithine,:cystine,
+        :edta,:ascorbate,:pyruvate,:butyrate,:tartrate,:biotin,:lipoic_acid,
+        :sulfadiazine,:sulfamethazine,:sulfathiazole,:ciprofloxacin,:ofloxacin,
+        :penicillin_g,:ampicillin,:amoxicillin,:carbenicillin,:oxacillin,
+        :tetracycline,:doxycycline,:chlortetracycline,:minocycline,
+        :cycloserine,:erythromycin,:lincomycin,
+        :promethazine,:carnitine,:taurine,:agmatine,:amitrole,:benzamadine,:guanidine,
+    ]
+    @test length(tier1_reagents) == 52
+    for r in tier1_reagents
+        reagent = getfield(CHESSLabConstants,r)
+        sys = CHESSCore.acid_base_system(reagent)
+        @test sys isa AcidBaseSystem
+        stock = (0.01u"mol"*reagent) + (1.0u"L"*CHESSLabConstants.water)
+        p = pH(stock;ionic_strength_correction=false)
+        @test isfinite(p)
+        @test -2 < p < 16
+    end
+end
+
+@testset "Tier-1 audit pass: representative exact-value checks" begin
+    # simple amino acid: independent isoelectric-point check (net charge vanishes at pI)
+    sys = CHESSCore.acid_base_system(CHESSLabConstants.glycine)
+    pI = (sys.pKa[1]+sys.pKa[2])/2
+    alphas = CHESSCore._alpha_fractions(sys.pKa,pI)
+    z0 = CHESSCore.charge(sys.species[1])
+    net_charge = sum((z0-(j-1))*alphas[j] for j in eachindex(alphas))
+    @test net_charge ≈ 0.0 atol=1e-6
+
+    # basic amino acid: pI uses the average of the two *higher* pKa's (textbook convention)
+    lys_sys = CHESSCore.acid_base_system(CHESSLabConstants.lysine)
+    lys_pI = (lys_sys.pKa[2]+lys_sys.pKa[3])/2
+    lys_alphas = CHESSCore._alpha_fractions(lys_sys.pKa,lys_pI)
+    lys_z0 = CHESSCore.charge(lys_sys.species[1])
+    lys_net = sum((lys_z0-(j-1))*lys_alphas[j] for j in eachindex(lys_alphas))
+    @test lys_net ≈ 0.0 atol=1e-6
+
+    # histidine: same "extra basic side-chain" dication/cation/zwitterion/anion shape as lysine
+    # (imidazole is basic, not acidic -- regression check for a real bug: histidine was originally
+    # misclassified with the "extra acidic side-chain" shape, putting the zwitterion between the
+    # wrong pair of pKa's and predicting pH ~4.05 for a 0.14g/50mL stock instead of the correct ~7.68,
+    # against an empirically measured 7.86)
+    his_sys = CHESSCore.acid_base_system(CHESSLabConstants.histidine)
+    @test his_sys.pKa == [1.80,6.04,9.33]
+    @test CHESSCore.charge(his_sys.species[1]) == 2 # dication, not a simple cation
+    his_pI = (his_sys.pKa[2]+his_sys.pKa[3])/2
+    his_alphas = CHESSCore._alpha_fractions(his_sys.pKa,his_pI)
+    his_z0 = CHESSCore.charge(his_sys.species[1])
+    his_net = sum((his_z0-(j-1))*his_alphas[j] for j in eachindex(his_alphas))
+    @test his_net ≈ 0.0 atol=1e-6
+
+    his_stock = (0.14u"g"*CHESSLabConstants.histidine) + (50u"mL"*CHESSLabConstants.water)
+    @test CHESSCore.pH(his_stock;ionic_strength_correction=false) ≈ 7.68 atol=0.01
+
+    # pyruvate is real sodium pyruvate (confirmed against Reagent_StockList.xlsx, Sigma P5280) --
+    # its CompositionRule dissociates into Na+ and the correctly-charged anion, not a bare ion
+    pyr_products = CHESSCore.composition(CHESSLabConstants.pyruvate).products
+    @test pyr_products[CHESSLabConstants.PyruvateAnion] == 1
+    @test pyr_products[CHESSLabConstants.Na⁺] == 1
+    @test CHESSCore.molecular_weight(CHESSLabConstants.pyruvate) ≈ 110.04u"g/mol" atol=0.01u"g/mol"
+    # dissolving the real salt (Na+ + pyruvate-) is a base-hydrolysis problem, not the free acid's
+    # Henderson-Hasselbalch case -- the conjugate base of a moderately strong acid (pKa=2.5) hydrolyzes
+    # only weakly, giving a mildly basic solution; checked against the base-hydrolysis closed form
+    # (Kb=Kw/Ka) to a loose tolerance (the approximation itself isn't exact here) and a sanity range
+    pyr_stock = (0.1u"mol"*CHESSLabConstants.pyruvate) + (1.0u"L"*CHESSLabConstants.water)
+    Ka = 10.0^(-2.5)
+    Kb = 1e-14/Ka
+    C = ustrip(uconvert(u"mol/L",0.1u"mol"/CHESSCore.volume_estimate(pyr_stock)))
+    x = (-Kb+sqrt(Kb^2+4*Kb*C))/2
+    expected_pyr_pH = 14-(-log10(x))
+    @test pH(pyr_stock;ionic_strength_correction=false) ≈ expected_pyr_pH atol=0.01
+    @test 7.0 < pH(pyr_stock;ionic_strength_correction=false) < 8.0
+
+    # butyrate is real sodium butyrate (confirmed: Sigma 303410)
+    but_products = CHESSCore.composition(CHESSLabConstants.butyrate).products
+    @test but_products[CHESSLabConstants.ButyrateAnion] == 1
+    @test but_products[CHESSLabConstants.Na⁺] == 1
+    @test CHESSCore.molecular_weight(CHESSLabConstants.butyrate) ≈ 110.09u"g/mol" atol=0.01u"g/mol"
+
+    # tartrate is real sodium tartrate dihydrate (confirmed against Reagent_StockList.xlsx, catalog
+    # AAA1618730) -- 2 Na+ and 2 waters of hydration, not a bare dianion
+    tart_products = CHESSCore.composition(CHESSLabConstants.tartrate).products
+    @test tart_products[CHESSLabConstants.TartrateDianion] == 1
+    @test tart_products[CHESSLabConstants.Na⁺] == 2
+    @test tart_products[CHESSLabConstants.H2O] == 2
+    @test CHESSCore.molecular_weight(CHESSLabConstants.tartrate) ≈ 230.08u"g/mol" atol=0.01u"g/mol"
+
+    # ascorbate is the plain free acid (both Reagent_StockList.xlsx catalog lines are "L-ASCORBIC
+    # ACID") -- no CompositionRule needed, identity is neutral like citric_acid/lactic_acid
+    @test !haskey(CHESSCore.composition_rules,CHESSLabConstants.ascorbate)
+    @test CHESSCore.molecular_weight(CHESSLabConstants.ascorbate) ≈ 176.12u"g/mol" atol=0.01u"g/mol"
+
+    # tetracycline (HCl-salt case): CompositionRule correctly dissociates into Cl- and the cation,
+    # and molecular_weight is now derived (matching the stored HCl-salt mass), not the stale copy
+    r = CHESSCore.recipe(0.01u"mol"*CHESSLabConstants.tetracycline)
+    @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 0.01u"mol" atol=1e-6u"mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.tetracycline) ≈ 480.9u"g/mol" atol=0.02u"g/mol"
+
+    # EDTA: simplified 4-pKa hexaprotic system produces a sane, acidic pH for a dilute solution
+    edta_stock = (0.01u"mol"*CHESSLabConstants.edta) + (1.0u"L"*CHESSLabConstants.water)
+    @test CHESSCore.pH(edta_stock;ionic_strength_correction=false) < 4.0
+
+    # guanidine: a very strong base (pKa=13.6, near the solver's upper bracket) still solves cleanly
+    guan_stock = (0.01u"mol"*CHESSLabConstants.guanidine) + (1.0u"L"*CHESSLabConstants.water)
+    @test CHESSCore.pH(guan_stock;ionic_strength_correction=false) > 10.0
 end

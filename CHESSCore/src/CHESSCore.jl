@@ -107,7 +107,7 @@ export total_concentration, pH, net_hydrogen_ion_concentration
 export Recipe, recipe, mass, molar_amount, volume
 # acid/base equilibrium
 export AcidBaseSystem, set_acid_base_system!, acid_base_system, acid_base_systems
-export AnalyticalSpecies, SpeciationResult, speciation, activity_coefficient, Kw
+export AnalyticalSpecies, SpeciationResult, speciation, activity_coefficient, Kw, adjust_pH
 # locations
 export location_id, name, is_locked, unlock!,lock!,toggle_lock!, ancestors, get_all_within, environment,attributes , is_active, activate!, deactivate!, toggle_activity!
 export parent_cost, child_cost, occupancy, occupancy_cost , children, children_named

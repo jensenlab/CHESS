@@ -30,16 +30,13 @@ This mirrors the shape of the CHESS package family itself:
 
 ## Installation
 
-CHESS requires **Julia 1.12 or later** -- the repository ties its four packages together as a
-Julia `[workspace]`, a Pkg feature introduced in 1.12.
+CHESS requires **Julia 1.12 or later** -- the repository ties its packages together as a Julia
+`[workspace]`, a Pkg feature introduced in 1.12. The workspace members (`CHESSCore`,
+`CHESSDatabase`, `CHESSLabConstants`, `Pourfecto`) resolve each other via local paths, not a
+package registry, so **CHESS must be used from a local clone** -- `Pkg.add(url="...")` from another
+project will not work (Pkg does not carry a workspace's local path resolution to consumers that
+merely add it as a dependency), and none of these packages are published to a registry.
 
-To use CHESS as a dependency:
-```julia
-using Pkg
-Pkg.add(url="https://github.com/jensenlab/CHESS")
-```
-
-For local development:
 ```julia
 # git clone https://github.com/jensenlab/CHESS && cd CHESS
 using Pkg

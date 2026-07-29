@@ -19,6 +19,7 @@ function _register_electrolyte_compositions!()
     set_composition!(HCl,CompositionRule((CHESSCore.H⁺+Cl⁻).composition))
     set_composition!(NaOH,CompositionRule((Na⁺+CHESSCore.OH⁻).composition))
     set_composition!(sodium_chloride,CompositionRule((Na⁺+Cl⁻).composition))
+    set_composition!(potassium_chloride,CompositionRule((K⁺+Cl⁻).composition))
     set_composition!(cobalt_chloride,CompositionRule((Co²⁺+2*Cl⁻).composition))
     set_composition!(cobalt_nitrate,CompositionRule((Co²⁺+2*NO3⁻).composition))
     set_composition!(copper_chloride,CompositionRule((Cu²⁺+2*Cl⁻).composition))
@@ -42,6 +43,9 @@ function _register_electrolyte_compositions!()
     set_composition!(ammonium_chloride,CompositionRule((NH4⁺+Cl⁻).composition))
     set_composition!(ammonium_nitrate,CompositionRule((NH4⁺+NO3⁻).composition))
     set_composition!(ammonium_sulfate,CompositionRule((2*NH4⁺+SO4²⁻).composition))
+    # lysine is really L-Lysine monohydrochloride (Sigma/Thermo L5626, PubChem CID 69568) -- the
+    # cation is already defined in pKa_data.jl as the acid/base chain's own protonated endpoint.
+    set_composition!(lysine,CompositionRule((LysineCation+Cl⁻).composition))
 
     # hydrates -- waters of hydration included so derived molecular_weight still matches the stored value
     set_composition!(calcium_chloride,CompositionRule((Ca²⁺+2*Cl⁻+2*H2O).composition)) # dihydrate
@@ -54,5 +58,29 @@ function _register_electrolyte_compositions!()
     set_composition!(sodium_phosphate_di,CompositionRule((2*Na⁺+HPO4²⁻+7*H2O).composition)) # heptahydrate
     set_composition!(sodium_phosphate_mono,CompositionRule((Na⁺+H2PO4⁻+H2O).composition)) # monohydrate
     set_composition!(sodium_succinate_hexahydrate,CompositionRule((2*Na⁺+C4H4O4²⁻+6*H2O).composition))
+    # cysteine is really L-Cysteine hydrochloride monohydrate (Thermo Fisher BP376, PubChem CID
+    # 23462) -- the cation is already defined in pKa_data.jl as the acid/base chain's own
+    # protonated endpoint.
+    set_composition!(cysteine,CompositionRule((CysteineCation+Cl⁻+H2O).composition))
+
+    # Tetracycline family HCl salts -- their stored molecular_weight is the salt mass, not the free
+    # base (confirmed by exact arithmetic; see pKa_data.jl's comment above their Chemical
+    # definitions). Complete dissociation into the protonated tetracycline cation + Cl-, exactly like
+    # the ammonium salts above; the cation's own further acid/base equilibrium is registered
+    # separately via AcidBaseSystem in pKa_data.jl.
+    set_composition!(tetracycline,CompositionRule((TetracyclineCation+Cl⁻).composition))
+    set_composition!(doxycycline,CompositionRule((DoxycyclineCation+Cl⁻).composition))
+    set_composition!(chlortetracycline,CompositionRule((ChlortetracyclineCation+Cl⁻).composition))
+    set_composition!(minocycline,CompositionRule((MinocyclineCation+Cl⁻).composition))
+
+    # pyruvate/butyrate/tartrate are real sodium salts, confirmed against the lab's actual stocklist
+    # (Reagent_StockList.xlsx: Sigma P5280 "Pyruvic Acid Sodium", Sigma 303410 "Sodium butyrate",
+    # catalog AAA1618730 "Sodium L-(+) Tartrate" dihydrate) -- not bare ions with no counter-ion.
+    # ascorbate turned out to be the plain free acid (both stocklist catalog lines are "L-ASCORBIC
+    # ACID"), so it needs no CompositionRule at all -- see its corrected molecular_weight/name in
+    # solids.jl and its AcidBaseSystem registration in pKa_data.jl.
+    set_composition!(pyruvate,CompositionRule((Na⁺+PyruvateAnion).composition))
+    set_composition!(butyrate,CompositionRule((Na⁺+ButyrateAnion).composition))
+    set_composition!(tartrate,CompositionRule((2*Na⁺+TartrateDianion+2*H2O).composition)) # dihydrate
     return nothing
 end

@@ -22,7 +22,7 @@
 @reagent ampicillin "ampicllin" Solid 349.4u"g/mol" missing 6249
 @reagent arabinose "Arabinose" Solid 230.11u"g/mol" missing 188324
 @reagent arginine "L-arginine" Solid 174.2u"g/mol" missing 6322
-@reagent ascorbate "Ascorbate" Solid 175.12u"g/mol" missing 54679076
+@reagent ascorbate "L-Ascorbic Acid" Solid 176.12u"g/mol" missing 54670067
 @reagent asparagine "L-asparagine" Solid 132.12u"g/mol" 1.543u"g/mL" 6267
 @reagent aspartic_acid "L-aspartic acid" Solid 133.1u"g/mol" 1.6603u"g/mL" 5960
 @reagent b_nadph "β-NADPH (triphosphopyridine nucloetide)" Solid 743.4u"g/mol" missing 5885
@@ -33,7 +33,7 @@
 @reagent biotin "biotin" Solid 244.31u"g/mol" missing 171548
 @reagent bleomycin "bleomycin" Solid 1415.6u"g/mol" missing 5360373
 @reagent boric_acid "Boric Acid" Solid 61.84u"g/mol" 1.435u"g/mL" 7628
-@reagent butyrate "Butyrate" Solid 87.1u"g/mol" missing 104775
+@reagent butyrate "Sodium Butyrate" Solid missing missing 5222465
 @reagent calcium_chloride "calcium chloride dihydrate" Solid missing 1.85u"g/mL" 6093260
 @reagent carbenicillin "carbenicillin" Solid 378.4u"g/mol" missing 20824
 @reagent carnitine "D,L-Carnitine" Solid 161.2u"g/mol" missing 288
@@ -52,7 +52,7 @@
 @reagent copper_sulfate "Copper (II) sulfate" Solid missing 2.29u"g/mL" 24462
 @reagent cyclohexamide "cyclohexamide" Solid 281.35u"g/mol" missing 6197
 @reagent cycloserine "cycloserine" Solid 102.09u"g/mol" missing 6234
-@reagent cysteine "L-cysteine" Solid 121.16u"g/mol" missing 5862
+@reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing 23462
 @reagent cystine "L-cystine" Solid 240.3u"g/mol" missing 67678
 @reagent cytosine "cytosine" Solid 111.1u"g/mol" missing 597
 @reagent dextrin "dextrin from corn" Solid 504.4u"g/mol" missing 62698
@@ -90,7 +90,7 @@
 @reagent leucine "L-leucine" Solid 131.17u"g/mol" 1.293u"g/mL" 6106
 @reagent lincomycin "lincomycin" Solid 406.5u"g/mol" missing 3000540
 @reagent lipoic_acid "lipoic_acid" Solid 206.3u"g/mol" missing 6112
-@reagent lysine "L-lysine" Solid 146.19u"g/mol" missing 5962
+@reagent lysine "L-Lysine monohydrochloride" Solid missing missing 69568
 @reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid missing 1.68u"g/mL" 24843
 @reagent malic_acid "Malic Acid" Solid 134.09u"g/mol" 1.601u"g/mL" 525
 @reagent maltodextrin "maltodextrin" Solid missing missing missing
@@ -123,6 +123,7 @@
 @reagent phenylalanine "L-phenylalanine" Solid 165.19u"g/mol" missing 6140
 @reagent polymyxin_b "polymyxin_b" Solid 1301.6u"g/mol" missing 5702105
 @reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate" Solid missing 1.725u"g/mL" 24856
+@reagent potassium_chloride "Potassium Chloride" Solid missing 1.984u"g/mL" 4873
 @reagent potassium_phosphate_di "potassium phosphate dibasic" Solid missing missing 24450
 @reagent potassium_phosphate_mono "potassium phosphate monobasic" Solid missing 2.34u"g/mL" 516951
 @reagent proline "L-proline" Solid 115.13u"g/mol" 1.064u"g/mL" 145742
@@ -130,7 +131,7 @@
 @reagent propionic_acid "Propionic Acid" Solid 74.08u"g/mol" 0.995u"g/mL" 1032
 @reagent pyridoxal "pyridoxal hydrochloride" Solid 203.62u"g/mol" missing 6171
 @reagent pyridoxamine "pyridoxamine dihydrochloride" Solid 241.11u"g/mol" missing 10664
-@reagent pyruvate "pyruvate" Solid 87.05u"g/mol" missing 107735
+@reagent pyruvate "Sodium Pyruvate" Solid missing missing 23662274
 @reagent raffinose "Raffinose" Solid 504.4u"g/mol" missing 439242
 @reagent resazurin "Resazurin" Solid 229.19u"g/mol" missing 11077
 @reagent riboflavin "riboflavin (vitamin B2)" Solid 376.4u"g/mol" missing 493570
@@ -161,7 +162,7 @@
 @reagent sulfadiazine "sulfadiazine" Solid 250.28u"g/mol" missing 5215
 @reagent sulfamethazine "sulfamethazine" Solid 278.33u"g/mol" 1.4655u"g/mL" 5327
 @reagent sulfathiazole "sulfathiazole" Solid 255.3u"g/mol" missing 5340
-@reagent tartrate "Tartrate" Solid 148.07u"g/mol" missing 119400
+@reagent tartrate "sodium tartrate dihydrate" Solid missing missing 12598458
 @reagent taurine "Taurine" Solid 125.15u"g/mol" missing 1123
 @reagent tetracycline "tetracycline_hydrochloride" Solid 480.9u"g/mol" missing 54704426
 @reagent thb "Todd-Hewitt Broth" Solid missing missing missing

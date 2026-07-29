@@ -650,6 +650,38 @@ end
     @test isfinite(p2)
 end
 
+@testset "adjust_pH" begin
+    water_stock = 100u"mL"*rgt"water"
+
+    @test_throws ArgumentError adjust_pH(water_stock,0.5,HydrochloricAcid,SodiumHydroxide)
+    @test_throws ArgumentError adjust_pH(water_stock,14.5,HydrochloricAcid,SodiumHydroxide)
+
+    # lowering pH (acidic target) from neutral water
+    acidified = adjust_pH(water_stock,3.0,HydrochloricAcid,SodiumHydroxide)
+    @test pH(acidified) ≈ 3.0 atol=1e-3
+    @test pH(water_stock) == 7.0 # original stock is never mutated
+
+    # raising pH (basic target) from neutral water
+    basified = adjust_pH(water_stock,11.0,HydrochloricAcid,SodiumHydroxide)
+    @test pH(basified) ≈ 11.0 atol=1e-3
+    @test pH(water_stock) == 7.0
+
+    # target reachable regardless of starting point -- from an already-acidified stock too
+    reneutralized = adjust_pH(acidified,11.0,HydrochloricAcid,SodiumHydroxide)
+    @test pH(reneutralized) ≈ 11.0 atol=1e-3
+
+    # already at target: returns the same Stock object, no titrant added
+    @test adjust_pH(water_stock,7.0,HydrochloricAcid,SodiumHydroxide) === water_stock
+
+    # buffered/weak-acid stock: the search must work through real acid/base equilibrium chemistry,
+    # not just strong-electrolyte net-charge arithmetic
+    buffered = (0.1u"mol"*TestWeakAcid) + (1.0u"L"*rgt"water")
+    @test pH(buffered;ionic_strength_correction=false) < 3.0 # starts quite acidic
+    neutralized_buffer = adjust_pH(buffered,7.0,HydrochloricAcid,SodiumHydroxide;ionic_strength_correction=false)
+    @test pH(neutralized_buffer;ionic_strength_correction=false) ≈ 7.0 atol=1e-3
+    @test pH(buffered;ionic_strength_correction=false) < 3.0 # original buffered stock still unmodified
+end
+
 @testset "Formula algebra" begin
     @test (1*Na⁺).composition == Dict(Na⁺=>1)
     @test (Na⁺+Cl⁻).composition == Dict(Na⁺=>1,Cl⁻=>1)

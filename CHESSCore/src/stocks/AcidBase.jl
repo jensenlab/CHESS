@@ -366,3 +366,96 @@ function speciation(s::Stock;ionic_strength_correction::Bool=true)
     end
     return results
 end
+
+"""
+    _dose(r::Reagent, n::Unitful.Amount)
+
+Build the `Stock` contribution of `n` moles of `r`, regardless of whether `r` is a [`Solid`](@ref)
+(molar quantities are already supported directly, see `Stocks.jl`) or a [`Liquid`](@ref) (only
+volume-constructible there, so `n` is converted to a volume via `molecular_weight`/[`density`](@ref)
+first). Used by [`adjust_pH`](@ref) to titrate with either kind of reagent uniformly. Missing
+`molecular_weight`/`density` surface the same errors `convert` already raises elsewhere; `Gas`
+titrants aren't supported.
+"""
+_dose(r::Solid,n::Unitful.Amount) = n*r
+_dose(r::Liquid,n::Unitful.Amount) = uconvert(u"mL",n*molecular_weight(r)/density(r))*r
+
+"""
+    _bracket_titrant(f; n0, growth=2.0, max_expand=60)
+
+Expand outward from `f(0u"mol")` until `f` changes sign, establishing a bracket `(lo,hi)` (molar
+amounts) for [`adjust_pH`](@ref)'s bisection -- mirrors [`_bisect_pH`](@ref)'s own
+guaranteed-convergence-given-a-valid-bracket philosophy, but for "how much titrant" rather than "what
+pH." Throws an error (not a warning) if no sign change is found within `max_expand` doublings, since
+returning a stock that doesn't actually reach the target would be actively misleading, unlike
+`_bisect_pH`'s own boundary-estimate fallback for an already-bounded pH range.
+"""
+function _bracket_titrant(f;n0::Unitful.Amount,growth::Float64=2.0,max_expand::Int=60)
+    lo = 0.0u"mol"
+    flo = f(lo)
+    hi = n0
+    fhi = f(hi)
+    iter = 0
+    while sign(fhi)==sign(flo) && iter<max_expand
+        hi *= growth
+        fhi = f(hi)
+        iter += 1
+    end
+    sign(fhi)==sign(flo) && error(
+        "adjust_pH: could not bracket the target pH within $max_expand doublings of the titrant amount (tried up to $hi) -- the target may be unreachable with this titrant")
+    return lo,hi
+end
+
+"""
+    adjust_pH(s::Stock, target_ph::Real, acid::Reagent, base::Reagent;
+              ionic_strength_correction=true, tol=1e-4, max_iter=60) -> Stock
+
+Return a new `Stock` -- `s` plus however much of `acid` or `base` is needed -- whose [`pH`](@ref) is
+within `tol` of `target_ph` (must be in `[1,14]`). `s` itself is never modified: this falls out of
+`Stock`'s existing immutable design (`+`/`*` always construct new values, see `Stocks.jl`), the same
+way every other stock-combining operation in CHESSCore already works.
+
+Compares `pH(s)` to `target_ph` to decide direction -- `acid` if `s` is currently more basic than the
+target, `base` if more acidic -- then root-finds the required molar amount via an expanding bracket
+(see [`_bracket_titrant`](@ref)) followed by bisection, re-evaluating `pH(s + n*titrant)` at each
+trial `n` (through [`_dose`](@ref), so `acid`/`base` can be either a `Solid` or a `Liquid`). This
+reuses `pH(::Stock)` exactly as-is for every evaluation, so it works for any registered acid/base
+chemistry -- strong or weak titrant, buffered or unbuffered `s` -- with no separate solver logic.
+
+If `s` is already within `tol` of `target_ph`, returns `s` unchanged (no titrant needed).
+
+`ionic_strength_correction` is forwarded to every internal `pH` call, matching `pH(::Stock)`'s own
+keyword. If `max_iter` bisection steps aren't enough to reach `tol`, emits a warning and returns the
+best candidate found, matching the warn-and-degrade style used throughout this solver (e.g.
+[`_bisect_pH`](@ref), [`_solve_ph`](@ref)) -- rather than erroring outright, since a slightly
+off-target result is still useful.
+"""
+function adjust_pH(s::Stock,target_ph::Real,acid::Reagent,base::Reagent;
+                    ionic_strength_correction::Bool=true,tol::Float64=1e-4,max_iter::Int=60)
+    1<=target_ph<=14 || throw(ArgumentError("adjust_pH: target_ph must be in [1,14], got $target_ph"))
+
+    current = pH(s;ionic_strength_correction)
+    abs(current-target_ph) < tol && return s
+
+    titrant = current>target_ph ? acid : base
+    f(n::Unitful.Amount) = pH(s+_dose(titrant,n);ionic_strength_correction) - target_ph
+
+    n0 = max(uconvert(u"mol",volume_estimate(s)*1u"mmol/L"),1e-9u"mol")
+    lo,hi = _bracket_titrant(f;n0)
+    flo = f(lo)
+
+    converged = false
+    mid = lo
+    for _ in 1:max_iter
+        mid = (lo+hi)/2
+        fm = f(mid)
+        abs(fm) < tol && (converged=true; break)
+        if sign(fm)==sign(flo)
+            lo = mid
+        else
+            hi = mid
+        end
+    end
+    converged || @warn "adjust_pH: did not converge to within tol=$tol after $max_iter iterations; returning the best estimate found"
+    return s+_dose(titrant,mid)
+end
