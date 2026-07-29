@@ -33,6 +33,7 @@ makedocs(
                 "Stocks" => "manual/stocks.md",
                 "Organisms & Cultures" => "manual/organisms-cultures.md",
                 "Recipes & Solution Chemistry" => "manual/recipes.md",
+                "Acid/Base Chemistry" => "manual/acid-base.md",
                 "Wells: Depositing & Transferring Material" => "manual/wells.md",
             ],
             "Reads & Instrument Measurements" => "manual/reads.md",

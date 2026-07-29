@@ -97,4 +97,7 @@ julia> molecular_weight(NaCl)
 `CompositionRule` coefficients must be non-negative. A base's hydroxide contribution is represented
 with the canonical [`OH⁻`](@ref) `Chemical`, not a negative [`H⁺`](@ref) count -- this is what lets
 `pH` (covered in [Recipes & Solution Chemistry](recipes.md)) net acid and base contributions by
-explicit subtraction, rather than relying on signed stoichiometry.
+explicit subtraction, rather than relying on signed stoichiometry. A weak acid or base -- one that
+only partially dissociates, and so can't be captured by a fixed `CompositionRule` at all -- is
+registered separately as an [`AcidBaseSystem`](@ref) instead; see
+[Acid/Base Chemistry](acid-base.md).

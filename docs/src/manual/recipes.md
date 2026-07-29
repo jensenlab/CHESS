@@ -3,9 +3,12 @@
 !!! note
     This chapter's chemistry model is intentionally simple -- pitched at what a biology lab needs
     (dissociation into ions, molar concentration, pH), not a complete physical chemistry treatment.
-    Activity coefficients, ionic strength, and buffer/equilibrium effects are out of scope; `pH`
-    here is a direct estimate from net `H⁺`/`OH⁻` concentration, not a full equilibrium
-    calculation.
+    `pH` here is a direct estimate from net `H⁺`/`OH⁻` concentration, not a full equilibrium
+    calculation -- correct for strong electrolytes, but not for weak acids/bases or buffers. See
+    [Acid/Base Chemistry](acid-base.md) for activity coefficients, ionic strength, and
+    buffer/equilibrium effects; `pH(::Stock)` picks up that model automatically whenever a stock
+    contains a reagent with registered weak acid/base chemistry, falling back to the formula below
+    otherwise.
 
 A `Stock` is measured in `Reagent`s -- physical things you weigh out. [`Recipe`](@ref) reduces that
 to real molar quantities of `Chemical`s instead, accounting for dissociation, derived

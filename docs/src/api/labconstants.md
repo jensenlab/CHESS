@@ -31,6 +31,25 @@ end
 Markdown.parse(join(rows, "\n"))
 ```
 
+## Acid/base systems
+
+```@eval
+using CHESS.CHESSLabConstants, CHESS.CHESSCore, Markdown
+
+summary = CHESSCore.registry_summary([CHESSLabConstants])
+
+rows = ["| Reagent | Species (fully-protonated → fully-deprotonated) | pKa |", "|---|---|---|"]
+for r in sort(collect(summary.reagents); by=x->string(x.name))
+    reagent = getfield(r.module_, r.name)
+    sys = CHESSCore.acid_base_system(reagent)
+    sys === nothing && continue
+    species = join([s.name for s in sys.species], " → ")
+    pkas = join(round.(sys.pKa; digits=2), ", ")
+    push!(rows, "| `$(r.name)` | $species | $pkas |")
+end
+Markdown.parse(join(rows, "\n"))
+```
+
 ## Organisms
 
 ```@eval
