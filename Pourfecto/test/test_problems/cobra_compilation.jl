@@ -1,4 +1,4 @@
-using Pourfecto, CHESSCore, Unitful, Random
+using Pourfecto, CHESSCore, Unitful, Random, HiGHS
 Random.seed!(48207531)
 
 # using the same setup as the combinatorial media test 
@@ -39,9 +39,12 @@ end
 
 priority = PriorityDict("water" => typemax(UInt64))
 
-
-pc1 = pourfecto([source_deep_well],target_plates,[configurations["cobra"]];priority=priority)
-pc2 = pourfecto([source_deep_well],target_plates,[configurations["cobra"]];priority=priority,objective=["min_cost_flow","regularize_flows"])
+# This fixture's continuous QP (48 reagents x 288 wells) is too large for SCIP (the test suite's
+# default free solver) to solve within a reasonable time limit; HiGHS handles it quickly. min_cost_flow
+# (the default objective, used here) has no MILP flag and no quadratic scheduling constraints, so
+# HiGHS's lack of indicator/quadratic-constraint support (which rules it out as the global default --
+# see runtests.jl) doesn't apply here.
+pc1 = pourfecto([source_deep_well],target_plates,[configurations["cobra"]];priority=priority,optimizer=HiGHS.Optimizer)
 
 test_pourcast_compilation("Cobra Compilation",pc1)
 

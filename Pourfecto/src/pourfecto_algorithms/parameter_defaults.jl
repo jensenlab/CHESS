@@ -1,3 +1,5 @@
+const _default_optimizer = Ref{Any}(Gurobi.Optimizer)
+
 const _kw_pourfecto_default_= (;
     objective= "min_cost_flow",
     priority= PriorityDict(),

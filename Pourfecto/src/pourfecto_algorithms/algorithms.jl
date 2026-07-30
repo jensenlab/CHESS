@@ -8,6 +8,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         min_vol_threshold=_kw_pourfecto_default_.min_vol_threshold,
         require_nonzero=_kw_pourfecto_default_.require_nonzero,
         solution_tolerance = _kw_pourfecto_default_.solution_tolerance,
+        optimizer=_default_optimizer[],
         kwargs...)
 
     params[:priority] = priority
@@ -26,12 +27,21 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     full_priority= update_priority(sources,targets,priority)
     params[:priority] = full_priority 
 
-    model=Model(Gurobi.Optimizer) 
-    if quiet 
+    model=Model(optimizer)
+    if quiet
         set_silent(model)
-    end 
-    JuMP.set_attribute(model,"TimeLimit",grb_timelimit)
-    JuMP.set_attribute(model,"FeasibilityTol",grb_feasibility_tol)
+    end
+    set_time_limit_sec(model, grb_timelimit)
+    if optimizer === Gurobi.Optimizer
+        JuMP.set_attribute(model,"FeasibilityTol",grb_feasibility_tol)
+    elseif JuMP.solver_name(model) == "HiGHS"
+        # HiGHS's active-set QP solver can report a spurious "Solve error" on the larger,
+        # tightly-bounded re-solves solve_planning_model performs (bound residuals ~1e-7 trip its
+        # default tolerance on big models); loosening these tolerances avoids it. This has no
+        # effect on Gurobi/SCIP, which don't hit this failure mode.
+        JuMP.set_attribute(model,"primal_feasibility_tolerance",1e-4)
+        JuMP.set_attribute(model,"dual_feasibility_tolerance",1e-4)
+    end
 
     S,T = normalize_inputs(sources,targets) 
     chems = union(all_reagents(sources),all_reagents(targets))
@@ -167,14 +177,14 @@ function build_scheduling_model(
 
         if enforce_minimum_shot # This is an option because it turns the problem into an MILP
                 @variable(model,QI[1:A,1:D],Bin)
-                for d in 1:D  
-                        min_disp = minimum_shot(disp_nodes[d]) # minimum single shot volume 
-                        for d in 1:D 
+                for d in 1:D
+                        min_disp = minimum_shot(disp_nodes[d]) # minimum single shot volume
+                        for a in 1:A
                                 @constraint(model,Q[a,d] >= min_disp * QI[a,d])
                                 @constraint(model, Q[a,d] <= M * QI[a,d]) # big-M constraint to force it into a range  in { 0 , [min_disp,M]}
-                        end 
-                end 
-        end 
+                        end
+                end
+        end
 
 
         V = model[:V]
@@ -242,10 +252,14 @@ function solve_planning_model(
     N_t = length(targets)
     N_c = length(chems) 
 
-    # add a dummy binary variable prior to any solves if the problem will become and MILP later 
-    if requires_MILP(model,params;kwargs...)
+    # add a dummy binary variable prior to any solves if the problem will become and MILP later --
+    # this workaround is Gurobi-specific ("Gurobi errors out if you add integer or binary variables
+    # after solving with only continuous variables"). HiGHS/SCIP have no such restriction (confirmed
+    # directly), and adding this placeholder unconditionally would turn the still-continuous planning
+    # QP into a nominal MIQP for them -- which HiGHS cannot solve at all, even trivially.
+    if requires_MILP(model,params;kwargs...) && JuMP.solver_name(model) == "Gurobi"
         @variable(model,MILP_placeholder, Bin)
-    end 
+    end
 
 
     for level in priority_levels  # pass through all priority levels from lowest to higest level
@@ -261,7 +275,7 @@ function solve_planning_model(
             @objective(model, Min,sum(chem_weights' .*(slacks.^2))) # penalize large slacks, search for V that minimize slacks.
             optimize!(model)
 
-            # Check for optimality and feasibility 
+            # Check for optimality and feasibility
             term = termination_status(model)
             if term == MOI.OPTIMAL || term == MOI.OBJECTIVE_LIMIT
             if primal_status(model)==MOI.FEASIBLE_POINT
@@ -292,10 +306,10 @@ function solve_planning_model(
             end 
     
             
-    end 
-    optimize!(model) # resolve one last time with the final slack constraints -> we need to optimize before querying results for the secondary objectives 
+    end
+    optimize!(model) # resolve one last time with the final slack constraints -> we need to optimize before querying results for the secondary objectives
         current_slacks=abs.(JuMP.value.(slacks))
-        @constraint(model,slacks .>= - current_slacks) # fix the slacks for the scheduling phase once the plan has been found 
+        @constraint(model,slacks .>= - current_slacks) # fix the slacks for the scheduling phase once the plan has been found
         @constraint(model,slacks .<= current_slacks )
     optimize!(model)
     return model ,params

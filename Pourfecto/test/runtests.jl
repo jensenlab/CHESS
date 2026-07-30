@@ -1,5 +1,15 @@
 using Pourfecto
 using Test, CHESSCore, Unitful, AbstractTrees, CSV, DataFrames , Random
+using SCIP
+
+Pourfecto._default_optimizer[] = SCIP.Optimizer
+
+# The solver-backed test_problems/*.jl files below each call pourfecto(...) (a real SCIP/HiGHS
+# solve) at file top level, outside any @testset -- so their cost doesn't show up in the per-testset
+# Time column, but dominates the full suite's wall-clock time. Set POURFECTO_SKIP_SOLVER_TESTS=true
+# locally to skip them while iterating on source code; unset (or "false") runs everything, matching
+# today's full/CI behavior.
+const RUN_SOLVER_TESTS = get(ENV, "POURFECTO_SKIP_SOLVER_TESTS", "false") != "true"
 
 import Pourfecto: # from instruments folder
     SingleChannel, EightChannel
@@ -33,24 +43,26 @@ include("compute_positions.jl")
 include("masks.jl")
 include("dataframe_interface.jl")
 include("well_connections.jl")
-include("json_interface.jl")
 
 function all_planned_approx_target(p::Pourcast;kwargs...)
-    ps = planned_stocks(p) 
+    ps = planned_stocks(p)
     ts = target_stocks(p)
 
     return all([isapprox(ps[i],ts[i];kwargs...) for i in eachindex(ps)])
-end 
-
-
+end
 
 include("test_problems/test_compilation.jl")
-include("test_problems/checkerboard.jl")
-#include("test_problems/combinatorial_media.jl")
-include("test_problems/labware_stamping.jl")
-include("test_problems/mantis_pcr.jl")
-include("test_problems/tempest_compilation.jl")
-include("test_problems/cobra_compilation.jl")
-include("test_problems/nimbus_compilation.jl")
+
+if RUN_SOLVER_TESTS
+    include("json_interface.jl")
+    include("test_problems/checkerboard.jl")
+    #include("test_problems/combinatorial_media.jl")
+    include("test_problems/labware_stamping.jl")
+    include("test_problems/mantis_pcr.jl")
+    include("test_problems/minimum_shot.jl")
+    include("test_problems/tempest_compilation.jl")
+    include("test_problems/cobra_compilation.jl")
+    include("test_problems/nimbus_compilation.jl")
+end
 
 

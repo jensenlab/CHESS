@@ -3,9 +3,8 @@
 
 
 function min_cost_flow!(model::JuMP.Model,params::ParameterDict;config_costs::Vector{<:Real} = ones(params[:n_configs]),kwargs...)
-        params[:config_costs]= config_costs 
+        params[:config_costs]= config_costs
         Q = model[:Q]
-        
         asp_configs = Int.(round.(JuMP.value.(model[:asp_config])))
         disp_configs = Int.(round.(JuMP.value(model[:disp_config])))
 
