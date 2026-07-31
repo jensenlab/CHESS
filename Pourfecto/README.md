@@ -38,35 +38,25 @@ Pourfecto's goal is to abstract all of the logistical details of converting desi
 
 ## Installation
 
-## Installation
-
-Pourfecto can be installed from the [`Jensen Lab Registry`](https://github.com/jensenlab/JensenLabRegistry). Follow instructions to add the registry before continuing 
-
-Once the registry has been installed, add Pourfecto with the following command:
+Pourfecto is not published to a package registry — it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS:
 
 ```julia
-# after installing JensenLabRegistry
+# git clone https://github.com/jensenlab/CHESS && cd CHESS
 using Pkg
-Pkg.add("Pourfecto")
-```
-
-Then load the package:
-
-```julia
+Pkg.activate("Pourfecto")
+Pkg.instantiate()
 using Pourfecto
 ```
 
 !!! note 
-    Pourfecto requires an active [Gurobi](https://www.gurobi.com) license to run its planning and scheduling algorithms. Licenses are free for academic users as of the time of writing. 
+    Pourfecto's default optimizer, Gurobi, requires an active [Gurobi](https://www.gurobi.com) license (free for academic users as of the time of writing). See [Solver requirements](#solver-requirements) below for license-free alternatives.
 
 ---
 
-
-
-Most workflows also utilize the [JLIMS](https://github.com/jensenlab/JLIMS), [Unitful](https://github.com/JuliaPhysics/Unitful.jl), and [DataFrames](https://github.com/JuliaData/DataFrames.jl) Julia packages.
+Most workflows also utilize the [CHESSCore](https://jensenlab.github.io/CHESS/dev/), [Unitful](https://github.com/JuliaPhysics/Unitful.jl), and [DataFrames](https://github.com/JuliaData/DataFrames.jl) Julia packages.
 
 ```julia
-using JLIMS
+using CHESSCore
 using Unitful
 using DataFrames
 ```
@@ -75,11 +65,15 @@ using DataFrames
 
 ## Solver requirements
 
-Pourfecto builds combinatorial optimization models with JuMP and Gurobi.
+Pourfecto builds combinatorial optimization models with JuMP. By default it solves with Gurobi, but any JuMP-compatible solver can be used instead via the `optimizer` keyword — including the free, open-source `HiGHS` and `SCIP`, both already Pourfecto dependencies:
 
-You will need a working Gurobi installation and license available to Julia before solving Pourfecto models.
+```julia
+using HiGHS
 
-A minimal solver check:
+pourfecto(sources, targets, configs; optimizer=HiGHS.Optimizer)
+```
+
+If using the default Gurobi optimizer, you will need a working Gurobi installation and license available to Julia. A minimal solver check:
 
 ```julia
 using Gurobi
@@ -88,7 +82,7 @@ using JuMP
 model = Model(Gurobi.Optimizer)
 ```
 
-If this fails, configure Gurobi before running Pourfecto workflows.
+If this fails, configure Gurobi, or pass `optimizer=HiGHS.Optimizer` (or `SCIP.Optimizer`) to avoid the Gurobi dependency entirely.
 
 ---
 

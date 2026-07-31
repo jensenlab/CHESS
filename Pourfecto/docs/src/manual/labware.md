@@ -198,73 +198,17 @@ The output dataframe contains one row per non-empty well.
 
 ---
 
-## Creating Labware Manually 
+## Creating Labware Manually
 
-
-In addition to building labware from tables with [`df_to_labware`](@ref), you can create labware objects directly in Julia with CHESSCore's `build_location`, passing it the desired `LocationKind` from `location_kinds`:
-
-```julia
-using Pourfecto, CHESSCore
-
-plate = build_location(location_kinds[:DeepWP96], "source_plate")
-```
-
-This is useful for examples, tests, notebooks, and workflows where you want to programmatically construct source or target labware.
-
----
-
-
-### Adding stocks to labware
-
-Pourfecto provides a convenience function for depositing a `Stock` into a specific well of a `Labware` object.
-
-```@docs
-add_stock!
-```
-
-This function selects the well at `(row, col)`, deposits the given stock into that well, and returns the modified labware object.
-
-For example:
+In addition to building labware from tables with [`df_to_labware`](@ref), you can create and fill labware directly in Julia with CHESSCore's `build_location`/`location_kinds` and `add_stock!` — useful for examples, tests, notebooks, and workflows where writing a dataframe would be unnecessary:
 
 ```julia
 using Pourfecto, CHESSCore, Unitful
 
 plate = build_location(location_kinds[:DeepWP96], "source_plate")
-
 water_stock = 1u"mL" * string_to_reagent("water", Liquid)
 
-add_stock!(plate, water_stock, 1, 1)  # adds stock to row 1, column 1;  well A1
+add_stock!(plate, water_stock, 1, 1)  # adds stock to row 1, column 1; well A1
 ```
 
-The returned object is the same labware object, modified in place:
-
----
-
-#### Behavior when the well is not empty
-
-If the selected well already contains a stock, `add_stock!` emits a warning and still attempts to deposit the new stock:
-
-```julia
-add_stock!(plate, another_stock, 1, 1)
-```
-
-This may combine with or otherwise modify the existing well contents depending on the behavior of CHESSCore's `deposit!`.
-
-!!! warning
-    `add_stock!` does not prevent depositing into non-empty wells. It warns, then proceeds.
-
----
-
-#### Example: manually fill a source plate
-
-```julia
-using Pourfecto, CHESSCore, Unitful
-
-source_plate = build_location(location_kinds[:DeepWP96], "source_plate")
-
-stock_a = 1u"mL" * string_to_reagent("water", Liquid)
-stock_b = 900u"µL" * string_to_reagent("water", Liquid) + 100u"µL" * string_to_reagent("ethanol", Liquid)
-
-add_stock!(source_plate, stock_a, 1, 1)  # A1
-add_stock!(source_plate, stock_b, 1, 2)  # A2
-```
+For the full `LocationKind`/`Location` reference (available kinds, deck/well structure, and `add_stock!`'s underlying `deposit!` behavior), see CHESSCore's [Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/) manual page.

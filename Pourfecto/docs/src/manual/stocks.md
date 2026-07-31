@@ -195,146 +195,19 @@ df, units = stock_to_df(stocks, "q")
 
 ## Creating Stocks Manually
 
-
-Stocks can also be created manually with convenient arithmetic syntax from CHESSCore.
-
-This is useful in notebooks, tests, examples, and small workflows where writing a dataframe would be unnecessary.
-
-CHESSCore overloads the `*` operator so that quantities and reagents can be combined directly:
+Stocks can also be created manually with CHESSCore's arithmetic syntax (`*` to combine a quantity with a reagent, `+` to combine stocks, scalar `*`/`/` to scale, and quantity `*` to rescale to a target total) — useful in notebooks, tests, examples, and small workflows where writing a dataframe would be unnecessary:
 
 ```julia
 using Pourfecto, CHESSCore, Unitful
 
-sodium_chloride = string_to_reagent("sodium_chloride",Solid)
-water = string_to_reagent("water", Liquid) 
+water = string_to_reagent("water", Liquid)
+sodium_chloride = string_to_reagent("sodium_chloride", Solid)
 
-10u"mg" * sodium_chloride
-1u"mL" * water 
+buffer = 1u"mL" * water + 10u"mg" * sodium_chloride
+scaled = 2 * buffer
 ```
 
-Depending on the reagent type and unit, these expressions create solid stocks `Mixture`s or liquid stocks `Solution`s
-
-In general:
-
-- `mass * Solid` creates a Mixture
-- `amount * Solid` creates a Mixture
-- `volume * Liquid` creates a Solution
-
----
-
-
-### Combining stocks
-
-Stocks can be combined using `+`.
-
-For example:
-
-```julia
-stock = 900u"µL" * string_to_reagent("water", Liquid) + 100u"µL" * string_to_reagent("ethanol", Liquid)
-```
-
-This creates a stock containing both water and ethanol.
-
-A more complex example might include both solids and liquids:
-
-```julia
-buffer = 1u"mL" * string_to_reagent("water", Liquid) + 10u"mg" * string_to_reagent("sodium_chloride", Solid)
-```
-
----
-
-### Scaling stocks
-
-Stocks can be multiplied by scalar values.
-
-```julia
-stock2 = 2 * stock
-```
-
-This returns a new stock with all chemical quantities scaled by the given factor.
-
-Scalar multiplication works in either order:
-
-```julia
-stock2 = 2 * stock
-stock3 = stock * 2
-```
-
-Stocks can also be divided by scalars:
-
-```julia
-half_stock = stock / 2
-```
-
----
-
-### Rescaling a stock to a target quantity
-
-A stock can be scaled to a target total quantity using:
-
-```julia
-target_quantity * stock
-```
-
-For example, if `stock` represents a liquid mixture, you can scale it to a final volume:
-
-```julia
-small_stock = 100u"µL" * stock
-```
-
-or:
-
-```julia
-large_stock = 10u"mL" * stock
-```
-
-!!! note
-    The target quantity must be dimensionally compatible with the stock’s total quantity.
-    For example, a liquid stock can be scaled to a volume such as `100u"µL"`, but not
-    to an incompatible unit.
-
----
-
-
-### Example:  Adding multiple chemicals in a `For` Loop 
-
-
-
-```julia
-using Pourfecto, CHESSCore, Unitful
-
-chem_names = ["A","B","C","D"]
-chem_masses = [1,2,3,4]
-
-stock = 1u"mL" * string_to_reagent("water",Liquid) 
-for i in eachindex(chem_names)
-    stock += (chem_masses[i] *u"mg") * string_to_reagent(chem_names[i],Solid) 
-end 
-
-```
-
-This creates a stock containing:
-
-- 1 mL water
-- 1 mg A
-- 2 mg B
-- 3 mg C 
-- 4 mg D 
-
----
-
-### Operator summary
-
-| Expression | Meaning |
-|---|---|
-| `amount * solid` | Create a `Mixture` from a molar quantity of a solid |
-| `mass * solid` | Create a `Mixture` from a mass of a solid |
-| `volume * liquid` | Create a `Solution` from a volume of a liquid |
-| `num * stock` | Scale all stock components by `num` |
-| `stock * num` | Same as `num * stock` |
-| `stock / num` | Divide all stock components by `num` |
-| `quantity * stock` | Rescale stock to a target total quantity |
-| `stock * quantity` | Same as `quantity * stock` |
+For the full operator reference (`Mixture`/`Solution` construction rules, rescaling semantics, and more), see CHESSCore's [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) manual page.
 
 ---
 

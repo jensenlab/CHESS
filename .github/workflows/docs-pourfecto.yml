@@ -32,8 +32,23 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: Pourfecto
-      - uses: julia-actions/julia-docdeploy@v1
+      - name: Install GitHubActions.jl logger
+        run: |
+          using Pkg
+          Pkg.activate("docs-logger-env"; shared=true)
+          Pkg.add(Pkg.PackageSpec(name="GitHubActions", version="0.1"))
+        shell: julia --color=yes {0}
+      - name: Instantiate Pourfecto docs environment
+        run: julia --project=Pourfecto/docs -e 'using Pkg; Pkg.instantiate()'
+      - name: Build and deploy Pourfecto docs
+        run: |
+          julia --project=Pourfecto/docs -e '
+              @eval Module() begin
+                  push!(LOAD_PATH, "@docs-logger-env")
+                  import Logging, GitHubActions
+                  Logging.global_logger(GitHubActions.GitHubActionsLogger())
+                  pop!(LOAD_PATH)
+              end
+              include("Pourfecto/docs/make.jl")'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          project: Pourfecto/docs

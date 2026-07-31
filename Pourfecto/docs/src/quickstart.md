@@ -28,7 +28,7 @@ target_unit_df = CSV.read("<target_unit_file>.csv")
 targets = df_to_labware(target_value_df,target_unit_df)
 ```
 !!! note 
-    Pourfecto internally converts the DataFrames into [JLIMS](https://github.com/jensenlab/JLIMS) Labware objects.  
+    Pourfecto internally converts the DataFrames into [CHESSCore](https://jensenlab.github.io/CHESS/dev/) `Labware` objects. See the [Labware](@ref pourfecto_labware) manual page for details.
 
 ## Selecting Available Configurations 
 

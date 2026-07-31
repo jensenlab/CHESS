@@ -4,7 +4,9 @@
 CurrentModule = Pourfecto
 ```
 
-[Pourfecto.jl](https://github.com/jensenlab/Pourfecto) is a julia package for generating automated liquid-handling workflows by turning experimental goals into executable liquid-handling protocols. It separates protocol design into two stages: planning, which determines how available reagents should be combined to produce the desired target solutions, and scheduling, which decides how those transfers should be carried out on specific liquid-handling instruments. Pourfecto accounts for reagent availability, stock quantities, target compositions, labware constraints, instrument capabilities, deck space, and allowable transfer volumes to produce optimized workflows. 
+[Pourfecto.jl](https://github.com/jensenlab/Pourfecto) is a julia package for generating automated liquid-handling workflows by turning experimental goals into executable liquid-handling protocols. It separates protocol design into two stages: planning, which determines how available reagents should be combined to produce the desired target solutions, and scheduling, which decides how those transfers should be carried out on specific liquid-handling instruments. Pourfecto accounts for reagent availability, stock quantities, target compositions, labware constraints, instrument capabilities, deck space, and allowable transfer volumes to produce optimized workflows.
+
+Pourfecto builds directly on [CHESSCore](https://jensenlab.github.io/CHESS/dev/)'s reagent, stock, and labware/location model — see the [CHESS documentation](https://jensenlab.github.io/CHESS/dev/) for the underlying data model this package plans and schedules over.
 
 
 ## Installation
