@@ -5,6 +5,7 @@ lcov.info
 Manifest.toml
 Benjamin_David_PhD_Thesis.pdf
 docs/build/
+docs/src/examples/
 CHESSLabConstants/src/organisms/private/
 dev_scripts/
 Reagent_StockList.xlsx

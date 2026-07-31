@@ -1,4 +1,15 @@
-using Documenter, Pourfecto
+using Documenter, Literate, Pourfecto
+
+const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
+const GENERATED_DIR = joinpath(@__DIR__, "src", "examples")
+
+for name in ("checkerboard", "combinatorial_media")
+    Literate.markdown(
+        joinpath(EXAMPLES_DIR, name, "$name.jl"),
+        GENERATED_DIR;
+        documenter=true,
+    )
+end
 
 makedocs(sitename="Pourfecto.jl",
 remotes=nothing,
@@ -12,6 +23,10 @@ pages = [
         "manual/configurations.md",
         "manual/pourfecto_method.md",
         "manual/pourcasts.md"
+    ],
+    "Examples" => [
+        "examples/checkerboard.md",
+        "examples/combinatorial_media.md",
     ],
     "API Reference" => "api_reference.md",
     "Citing Pourfecto" => "citation.md" ,
