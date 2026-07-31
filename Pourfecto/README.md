@@ -49,7 +49,7 @@ using Pourfecto
 ```
 
 !!! note 
-    Pourfecto's default optimizer, Gurobi, requires an active [Gurobi](https://www.gurobi.com) license (free for academic users as of the time of writing). See [Solver requirements](#solver-requirements) below for license-free alternatives.
+      Pourfecto's default optimizer, Gurobi, requires an active [Gurobi](https://www.gurobi.com) license (free for academic users as of the time of writing). See [Solver requirements](#solver-requirements) below for license-free alternatives.
 
 ---
 

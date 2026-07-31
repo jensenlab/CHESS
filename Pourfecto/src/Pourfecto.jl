@@ -1,6 +1,6 @@
 module Pourfecto
 
-using Unitful, CHESSCore, CHESSLabConstants, AbstractTrees, DataFrames , JuMP , Gurobi , JSON, Plots, Random, CSV , Dates, TextWrap
+using Unitful, CHESSCore, CHESSLabConstants, AbstractTrees, DataFrames , JuMP , Gurobi , JSON, Plots, Random, CSV , Dates, TextWrap, Preferences
 
 import InteractiveUtils: subtypes
 import JSONTables: objecttable, jsontable
@@ -95,6 +95,8 @@ export Configuration, Head, Deck
 
 
 export configurations, objectives # constants
+
+export set_cobra_path! # persistent instrument-specific settings
 
 export reagent_to_string, string_to_reagent # string interface for reagents
 

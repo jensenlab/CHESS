@@ -51,7 +51,7 @@ dictionary keys:
 
 - `pause=true`: pause over each well before dispensing. If false, the instrument moves continuously while dispensing. 
 - `predispenses=0`: force the instrument to predispense a shot of liquid before starting the run. 
-- `cobra_path`: the local path the cobra should look for protocol files on the machine running the instrument 
+- `cobra_path`: the local path the cobra should look for protocol files on the machine running the instrument. Defaults to a persisted Preferences.jl setting if one has been set with [`set_cobra_path!`](@ref), otherwise `nothing`; must be set (via `set_cobra_path!` or directly with `cobra_settings["cobra_path"] = "..."`) before compiling a protocol.
 - `washtime`: set how long the wash system should flush the nozzles for 
 - `AspPad = 1.125`: Force the cobra to overaspirate by a factor of AspPad. Pourfecto takes this into account when planning 
 - `AspDistnace = 1.5`: set how many millimeters above the bottom of the labware the cobra should aspirate from. 
@@ -61,7 +61,7 @@ dictionary keys:
 cobra_settings=InstrumentSettings(
     "pause" => true, # pause over each well when dispensing. If false, the instrument sweeps 
     "predispenses" => 0,
-    "cobra_path" => "C:\\Users\\Dell\\University of Michigan Dropbox\\Benjamin David\\JensenLab\\Cobra\\",
+    "cobra_path" => @load_preference("cobra_path", nothing),
     "washtime" => 8000, 
     "AspPad" => piston_cobra.deadPad,
     "AspDistance" => 1.5 , 
@@ -70,6 +70,18 @@ cobra_settings=InstrumentSettings(
 
 
 configurations["cobra"] = Configuration{Cobra}(cobra_head,cobra_deck,cobra_settings;kind=CHESSCore.location_kinds[:Cobra])
+
+"""
+    set_cobra_path!(path)
+
+Persist `path` as the default `cobra_path` for this project (via Preferences.jl,
+stored in LocalPreferences.toml) and apply it to the current session immediately.
+"""
+function set_cobra_path!(path::AbstractString)
+    @set_preferences!("cobra_path" => path)
+    configurations["cobra"].settings["cobra_path"] = path
+    return path
+end
 
 
 const cobra_names=Dict{Symbol,AbstractString}(
@@ -406,6 +418,7 @@ function design_to_protocols(directory::AbstractString,design::DataFrame,source:
   maxASP=ustrip.(uconvert.(u"µL",map(x->x.asp[2],pistons(head(config))) ))
   maxShot=settings(config)["maxShot"]
   cobra_location=settings(config)["cobra_path"]
+  cobra_location === nothing && throw(ArgumentError("cobra_settings[\"cobra_path\"] is not set. Call Pourfecto.set_cobra_path!(\"...\") to set and persist it, or set cobra_settings[\"cobra_path\"] directly for this session only."))
   # Check for issues with the design
 
     r_in,c_in=CHESSCore.shape(source)

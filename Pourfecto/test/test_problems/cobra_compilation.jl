@@ -37,6 +37,8 @@ for p in 1:n_plates
 end 
 
 
+configurations["cobra"].settings["cobra_path"] = "C:\\Cobra\\"
+
 priority = PriorityDict("water" => typemax(UInt64))
 
 # This fixture's continuous QP (48 reagents x 288 wells) is too large for SCIP (the test suite's
