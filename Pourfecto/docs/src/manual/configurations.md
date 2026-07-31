@@ -42,7 +42,7 @@ Configuration{I}(
 
 where:
 
-- `I` is an [`Instrument`](@ref) type,
+- `I` is an [`InstrumentModel`](@ref) type,
 - `head` is a [`Head`](@ref) describing pistons and channels,
 - `deck` is a collection of [`DeckPosition`](@ref)s,
 - `settings` is an [`InstrumentSettings`](@ref) dictionary.
@@ -52,12 +52,12 @@ where:
 
 ## Instruments
 
-An [`Instrument`](@ref) is an abstract type used to identify a class of liquid handler.
+An [`InstrumentModel`](@ref) is an abstract type used to identify a class of liquid handler.
 
-To define a new instrument type, create a subtype of `Instrument`:
+To define a new instrument type, create a subtype of `InstrumentModel`:
 
 ```julia
-abstract type MyNewInstrument <: Instrument end
+abstract type MyNewInstrument <: InstrumentModel end
 ```
 
 Instrument types are used as parameters for [`Head`](@ref) and [`Configuration`](@ref):
@@ -389,7 +389,7 @@ A complete configuration combines an instrument type, head, deck, and settings.
 using Unitful
 using Pourfecto
 
-abstract type ExamplePipette <: Instrument end
+abstract type ExamplePipette <: InstrumentModel end
 
 piston = Piston{ContinuousActuator, SingleRepeater}(
     (20u"µL", 200u"µL"),
@@ -455,7 +455,7 @@ json_to_config
 
 When defining configurations:
 
-- Use an `Instrument` subtype for each distinct instrument class.
+- Use an `InstrumentModel` subtype for each distinct instrument class.
 - Set realistic aspiration and dispense limits on each `Piston`.
 - Keep `Channel` capacity consistent with physical hardware.
 - Use the head mask to represent real piston-channel connectivity.

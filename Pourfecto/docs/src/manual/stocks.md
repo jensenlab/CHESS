@@ -6,7 +6,7 @@
 CurrentModule = Pourfecto
 ```
 
-Pourfecto represents source and target materials as `JLIMS.Stock` objects. In most workflows, users do not need to construct `Stock`s manually. Instead, stocks can be created from tabular data using [`df_to_stock`](@ref).
+Pourfecto represents source and target materials as CHESSCore `Stock` objects. In most workflows, users do not need to construct `Stock`s manually. Instead, stocks can be created from tabular data using [`df_to_stock`](@ref).
 
 This is useful when reading stocks from CSV files, spreadsheets, notebooks, or user-facing forms.
 
@@ -141,7 +141,7 @@ Because these tables do not contain a `"volume"` column, Pourfecto parses this a
 
 When parsing stock tables, reagent names are usually taken from the column names.
 
-Pourfecto can turn those reagent names into `JLIMS.Chemical` objects automatically. Registered JLIMS chemicals are used when available. Unknown reagents are created on the fly with missing chemical properties.
+Pourfecto can turn those reagent names into `Reagent` objects automatically, via `string_to_reagent`. Registered reagents are used when available. Unknown reagents are created on the fly with missing chemical properties.
 
 For example, a column named:
 
@@ -161,9 +161,9 @@ If the reagent is not registered, Pourfecto will warn and create a generic chemi
 
 !!! note
     Unknown reagents can still be used for planning and scheduling. However, calculations
-    that require molecular weight or density may require fully registered JLIMS chemicals.
+    that require molecular weight or density may require fully registered reagents.
 
-See also: [`string_to_reagent`](@ref), [`reagent_to_string`](@ref)
+See also: [Reagents](@ref pourfecto_reagents)
 
 
 
@@ -196,16 +196,14 @@ df, units = stock_to_df(stocks, "q")
 ## Creating Stocks Manually
 
 
-Stocks can also be created manually with convenient arithmetic syntax from [JLIMS](https://github.com/jensenlab/JLIMS).
+Stocks can also be created manually with convenient arithmetic syntax from CHESSCore.
 
 This is useful in notebooks, tests, examples, and small workflows where writing a dataframe would be unnecessary.
 
-JLIMS overloads the `*` operator so that quantities and chemicals can be combined directly:
+CHESSCore overloads the `*` operator so that quantities and reagents can be combined directly:
 
 ```julia
-using JLIMS
-using Pourfecto 
-using Unitful
+using Pourfecto, CHESSCore, Unitful
 
 sodium_chloride = string_to_reagent("sodium_chloride",Solid)
 water = string_to_reagent("water", Liquid) 
@@ -214,7 +212,7 @@ water = string_to_reagent("water", Liquid)
 1u"mL" * water 
 ```
 
-Depending on the chemical type and unit, these expressions create solid stocks `Mixture`s or liquid stocks `Solution`s
+Depending on the reagent type and unit, these expressions create solid stocks `Mixture`s or liquid stocks `Solution`s
 
 In general:
 
@@ -232,7 +230,7 @@ Stocks can be combined using `+`.
 For example:
 
 ```julia
-stock = 900u"µL" * chem"water" + 100u"µL" * chem"ethanol" # assumes "water" and "ethanol" are pre-registered chemicals 
+stock = 900u"µL" * string_to_reagent("water", Liquid) + 100u"µL" * string_to_reagent("ethanol", Liquid)
 ```
 
 This creates a stock containing both water and ethanol.
@@ -240,7 +238,7 @@ This creates a stock containing both water and ethanol.
 A more complex example might include both solids and liquids:
 
 ```julia
-buffer = 1u"mL" * chem"water" + 10u"mg" * chem"sodium_chloride" # assumes "water" and "sodium_chloride" are pre-registered chemicals 
+buffer = 1u"mL" * string_to_reagent("water", Liquid) + 10u"mg" * string_to_reagent("sodium_chloride", Solid)
 ```
 
 ---
@@ -303,8 +301,7 @@ large_stock = 10u"mL" * stock
 
 
 ```julia
-using JLIMS
-using Unitful
+using Pourfecto, CHESSCore, Unitful
 
 chem_names = ["A","B","C","D"]
 chem_masses = [1,2,3,4]

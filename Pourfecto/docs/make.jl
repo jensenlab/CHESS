@@ -13,6 +13,7 @@ end
 
 makedocs(sitename="Pourfecto.jl",
 remotes=nothing,
+warnonly=[:cross_references],
 pages = [
     "Home" => "index.md",
     "Quick Start Guide" => "quickstart.md",
@@ -35,6 +36,9 @@ pages = [
 )
 
 deploydocs(
-    repo = "github.com/jensenlab/Pourfecto.git",
+    repo="github.com/jensenlab/CHESS.git",
+    dirname="pourfecto",
+    devbranch="main",
+    push_preview=true,
 )
 

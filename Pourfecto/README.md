@@ -1,6 +1,6 @@
 # Pourfecto.jl
 
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](http://jensenlab.net/Pourfecto/dev/)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://jensenlab.github.io/CHESS/pourfecto/dev/)
 
 
 **Pourfecto.jl** is a Julia package for planning and scheduling automated liquid handling workflows.

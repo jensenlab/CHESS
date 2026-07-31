@@ -6,7 +6,7 @@
 ```@meta
 CurrentModule = Pourfecto
 ```
-To plan executable liquid handling workflows, Pourfecto needs information about how `Stock`s are contained in physical labware. Just like for `Stock` objects, Pourfecto uses JLIMS to create `Labware` objects. 
+To plan executable liquid handling workflows, Pourfecto needs information about how `Stock`s are contained in physical labware. Just like for `Stock` objects, Pourfecto uses CHESSCore to create `Labware` objects.
 
 Pourfecto can create populated labware objects from stock tables augmented with labware metadata. This is useful when source plates, destination plates, tubes, reservoirs, or other labware are described in CSV files, spreadsheets, or `DataFrame`s.
 
@@ -45,7 +45,7 @@ The input dataframe must include:
 
 | Column | Description |
 |---|---|
-| `labware` | Labware type code used by `Pourfecto.generate(labware, name)` |
+| `labware` | `LocationKind` name registered in `location_kinds`, used to build the labware via `build_location(location_kinds[Symbol(labware)], name)` |
 | `name` | Name of the labware instance |
 | `well` | Well identifier, such as `"A1"`, `"B12"`, or `"H2"` |
 
@@ -69,17 +69,17 @@ Here, the columns `labware`, `name`, and `well` describe where each stock is loc
 
 ### Labware codes
 
-The `labware` column should contain a labware code recognized by Pourfecto.
+The `labware` column should contain a `LocationKind` name recognized by CHESSCore.
 
 ```julia
-keys(labwares)
+keys(location_kinds)
 ```
 returns the available labware codes.
 
 When parsing a table, Pourfecto calls:
 
 ```julia
-Pourfecto.generate(labware_code, name)
+build_location(location_kinds[Symbol(labware_code)], name)
 ```
 
 for each unique `(labware, name)` pair.
@@ -201,13 +201,15 @@ The output dataframe contains one row per non-empty well.
 ## Creating Labware Manually 
 
 
-In addition to building labware from tables with [`df_to_labware`](@ref), you can create labware objects directly in Julia with [`generate`](@ref).
+In addition to building labware from tables with [`df_to_labware`](@ref), you can create labware objects directly in Julia with CHESSCore's `build_location`, passing it the desired `LocationKind` from `location_kinds`:
+
+```julia
+using Pourfecto, CHESSCore
+
+plate = build_location(location_kinds[:DeepWP96], "source_plate")
+```
 
 This is useful for examples, tests, notebooks, and workflows where you want to programmatically construct source or target labware.
-
-```@docs
-generate
-```
 
 ---
 
@@ -225,13 +227,11 @@ This function selects the well at `(row, col)`, deposits the given stock into th
 For example:
 
 ```julia
-using JLIMS
-using Unitful
-using Pourfecto
+using Pourfecto, CHESSCore, Unitful
 
-plate = generate("DeepWP96", "source_plate")
+plate = build_location(location_kinds[:DeepWP96], "source_plate")
 
-water_stock = 1u"mL" * chem"water"
+water_stock = 1u"mL" * string_to_reagent("water", Liquid)
 
 add_stock!(plate, water_stock, 1, 1)  # adds stock to row 1, column 1;  well A1
 ```
@@ -248,7 +248,7 @@ If the selected well already contains a stock, `add_stock!` emits a warning and 
 add_stock!(plate, another_stock, 1, 1)
 ```
 
-This may combine with or otherwise modify the existing well contents depending on the behavior of `JLIMS.deposit!`.
+This may combine with or otherwise modify the existing well contents depending on the behavior of CHESSCore's `deposit!`.
 
 !!! warning
     `add_stock!` does not prevent depositing into non-empty wells. It warns, then proceeds.
@@ -258,14 +258,12 @@ This may combine with or otherwise modify the existing well contents depending o
 #### Example: manually fill a source plate
 
 ```julia
-using JLIMS
-using Unitful
-using Pourfecto
+using Pourfecto, CHESSCore, Unitful
 
-source_plate = generate("DeepWP96", "source_plate")
+source_plate = build_location(location_kinds[:DeepWP96], "source_plate")
 
-stock_a = 1u"mL" * chem"water"
-stock_b = 900u"µL" * chem"water" + 100u"µL" * chem"ethanol"
+stock_a = 1u"mL" * string_to_reagent("water", Liquid)
+stock_b = 900u"µL" * string_to_reagent("water", Liquid) + 100u"µL" * string_to_reagent("ethanol", Liquid)
 
 add_stock!(source_plate, stock_a, 1, 1)  # A1
 add_stock!(source_plate, stock_b, 1, 2)  # A2

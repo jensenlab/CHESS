@@ -1,6 +1,15 @@
 [deps]
+CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterTools = "35a29f4d-8980-5a13-9543-d66fff28ecb8"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 Pourfecto = "82aece00-2e0a-4aa7-b3de-eea0746b1d2e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[sources]
+CHESSCore = {path = "../../CHESSCore"}
+Pourfecto = {path = ".."}
