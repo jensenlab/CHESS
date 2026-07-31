@@ -50,13 +50,23 @@ end
 
 ## Decks
 
-# Pourfecto-owned, explicit admissibility set -- deliberately decoupled from CHESSCore.LocationKind's
-# `categories` field (a different-purpose, externally-owned field with no exclusivity enforced
-# between tags). Used for both the deck position below and effective_head_size/Mask further down, so
-# the two can't drift apart. Includes :brPCR96 (tagged :PCRLabware, not :WellPlate, in
+# Pourfecto-owned, explicit admissibility/geometry table -- deliberately decoupled from
+# CHESSCore.LocationKind's `categories` field (a different-purpose, externally-owned field with no
+# exclusivity enforced between tags). Includes :brPCR96 (tagged :PCRLabware, not :WellPlate, in
 # CHESSLabConstants) since Mask genuinely supports it -- deck admissibility must match, or that
-# support is unreachable dead code.
-const eight_channel_wellplate_kinds = Set([:WP96,:WP384,:DeepWP96,:DeepReservoir,:DeepWellColumn,:DeepWellRow,:brPCR96])
+# support is unreachable dead code. eight_channel_wellplate_kinds is *derived* from this table
+# (below), so deck admissibility, effective_head_size, and Mask geometry can never drift apart.
+const eight_channel_mask_rules = [
+    MaskRule(Set([:WP96,:DeepWP96,:brPCR96]), :aspirate, :sliding_window, (;)),
+    MaskRule(Set([:WP96,:DeepWP96,:brPCR96]), :dispense, :sliding_window, (;)),
+    MaskRule(Set([:WP384]), :aspirate, :sliding_window, (;v_spacing=2,h_spacing=2)), # channels are spaced to hit every other well row
+    MaskRule(Set([:WP384]), :dispense, :sliding_window, (;v_spacing=2,h_spacing=2)),
+    MaskRule(Set([:DeepReservoir]), :aspirate, :blanket, (;)), # single channel SLAS style reservoir only
+    MaskRule(Set([:DeepReservoir]), :dispense, :blanket, (;)),
+    MaskRule(Set([:DeepWellColumn,:DeepWellRow]), :aspirate, :sliding_window, (;)), # head is wider/taller than the labware in one dimension -- effective_head_size collapses that dimension automatically
+    MaskRule(Set([:DeepWellColumn,:DeepWellRow]), :dispense, :sliding_window, (;)),
+]
+const eight_channel_wellplate_kinds = union((r.kinds for r in eight_channel_mask_rules)...)
 
 eight_channel_deck = [
     ConstrainedPosition("benchtop",eight_channel_wellplate_kinds,(2,1),true,true,"rectangle") # Only two positions allowed to force new protocols for each pair of labware when slotting
@@ -111,30 +121,5 @@ end
 
 
 
-function Mask(h::Head{EightChannel},l::Labware)
-    k = kind(l).name
-
-    if k in (:WP96,:DeepWP96,:brPCR96)  # 96 well plates only
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-        disp,disp_positions = sliding_window_mask(h,l,:dispense)
-        return Mask(h,l,asp,disp,asp_positions,disp_positions)
-
-    elseif k == :WP384  # 384 well plates only -- channels are spaced to hit every other well row
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate;v_spacing=2,h_spacing=2)
-        disp,disp_positions = sliding_window_mask(h,l,:dispense;v_spacing=2,h_spacing=2)
-        return Mask(h,l,asp,disp,asp_positions,disp_positions)
-
-    elseif k == :DeepReservoir  # single channel SLAS style reservoir only
-        asp,asp_positions = blanket_mask(h,l,:aspirate)
-        disp,disp_positions = blanket_mask(h,l,:dispense)
-        return Mask(h,l,asp,disp,asp_positions,disp_positions)
-
-    elseif k in (:DeepWellColumn,:DeepWellRow) # head is wider/taller than the labware in one dimension -- effective_head_size collapses that dimension automatically
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-        disp,disp_positions = sliding_window_mask(h,l,:dispense)
-        return Mask(h,l,asp,disp,asp_positions,disp_positions)
-
-    else
-        Mask(h,l,(x,y,z)->false,(x,y,z)->false,(0,0),(0,0)) # unsupported kind for EightChannel -- trivial mask (no aspirate/dispense), matching the generic Head/Labware default in types.jl
-    end
-end
+Mask(h::Head{EightChannel},l::Labware) = build_mask_from_rules(h,l,eight_channel_mask_rules)
+mask_rules_for(::Configuration{EightChannel}) = eight_channel_mask_rules

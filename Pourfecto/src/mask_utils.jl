@@ -109,4 +109,63 @@ function blanket_mask(h::Head,l::Labware,direction::Symbol)
     return predicate, positions
 end
 
+"""
+    MaskRule(kinds, direction, archetype, kwargs)
+
+One declarative rule in an instrument's admissibility/geometry table: `kinds` (a `Set{Symbol}` of
+`LocationKind` names, or the sentinel `:all` for an instrument with no kind-based restriction, e.g.
+`SingleChannel`) may be used in `direction` (`:aspirate`/`:dispense`) via `archetype`
+(`:sliding_window`/`:blanket`), built with `kwargs` (spacing/overhang kwargs for `:sliding_window`;
+ignored for `:blanket`). An instrument's full admissibility+geometry definition is a
+`Vector{MaskRule}`; `build_mask_from_rules` consumes it to build a real `Mask`, and the same table can
+be walked generically (by kind, by direction) to derive that instrument's overall admissible-kind set
+or to independently verify its `Mask` output -- see `Pourfecto/test/masks.jl`.
+"""
+struct MaskRule
+    kinds::Union{Set{Symbol},Symbol}
+    direction::Symbol
+    archetype::Symbol
+    kwargs::NamedTuple
+end
+
+"""
+    build_mask_from_rules(h::Head,l::Labware,rules::Vector{MaskRule}) -> Mask
+
+Build a real `Mask` for `(h,l)` by finding, per direction, the first rule in `rules` whose `kinds`
+admits `kind(l).name` (or is `:all`) and building that rule's archetype. A direction with no matching
+rule defaults to the trivial always-false mask, exactly matching every instrument's existing
+"unsupported kind" fallback.
+"""
+function build_mask_from_rules(h::Head,l::Labware,rules::Vector{MaskRule})
+    k = kind(l).name
+    asp, asp_positions = (x,y,z)->false, (0,0)
+    disp, disp_positions = (x,y,z)->false, (0,0)
+    for rule in rules
+        (rule.kinds === :all || k in rule.kinds) || continue
+        pred, positions = rule.archetype == :sliding_window ? sliding_window_mask(h,l,rule.direction;rule.kwargs...) :
+                           rule.archetype == :blanket ? blanket_mask(h,l,rule.direction) :
+                           error("MaskRule archetype must be :sliding_window or :blanket, got $(rule.archetype)")
+        if rule.direction == :aspirate
+            asp, asp_positions = pred, positions
+        elseif rule.direction == :dispense
+            disp, disp_positions = pred, positions
+        else
+            error("MaskRule direction must be :aspirate or :dispense, got $(rule.direction)")
+        end
+    end
+    return Mask(h,l,asp,disp,asp_positions,disp_positions)
+end
+
+"""
+    mask_rules_for(config::Configuration) -> Union{Vector{MaskRule},Nothing}
+
+Return the `MaskRule` table backing `config`'s instrument, for generic (test-time) inspection --
+e.g. `Pourfecto/test/masks.jl`'s single generic Mask-coverage testset walks this to independently
+verify any registered instrument's `Mask` output, including a new instrument added later, as long as
+it defines its own `mask_rules_for(::Configuration{X}) = x_mask_rules` method alongside its `Mask`.
+Defaults to `nothing` for instruments with no kind-based rule table (e.g. `SingleChannel`, which is
+deliberately unconstrained -- see its own `Mask` method).
+"""
+mask_rules_for(::Configuration) = nothing
+
 

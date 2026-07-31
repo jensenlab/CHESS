@@ -18,12 +18,19 @@ cobra_channels = fill(Channel(1000u"µL"),4)
 
 cobra_head = Head{Cobra}(fill(piston_cobra,4),cobra_channels, cobra_head_mask)
 
-# Pourfecto-owned, explicit admissibility set -- deliberately decoupled from CHESSCore.LocationKind's
-# `categories` field (a different-purpose, externally-owned field with no exclusivity enforced
-# between tags). Used for both the deck positions below and the Mask branches further down, so the
-# two can't drift apart. Narrower than CHESSLabConstants' :WellPlate category -- Cobra's Mask has no
-# support for DeepReservoir/DeepWellColumn/DeepWellRow, so they're deliberately excluded here too.
-const cobra_wellplate_kinds = Set([:WP96,:DeepWP96,:WP384])
+# Pourfecto-owned, explicit admissibility/geometry table -- deliberately decoupled from
+# CHESSCore.LocationKind's `categories` field (a different-purpose, externally-owned field with no
+# exclusivity enforced between tags). Narrower than CHESSLabConstants' :WellPlate category -- Cobra
+# has no support for DeepReservoir/DeepWellColumn/DeepWellRow, so they're deliberately excluded here
+# too. cobra_wellplate_kinds is *derived* from this table (below), so deck admissibility and Mask
+# geometry can never drift apart -- there is only one place this is declared.
+const cobra_mask_rules = [
+    MaskRule(Set([:WP96,:DeepWP96]), :aspirate, :sliding_window, (;)),
+    MaskRule(Set([:WP96,:DeepWP96]), :dispense, :sliding_window, (;v_out=true)), # the mask can exit the plate vertically
+    MaskRule(Set([:WP384]), :aspirate, :sliding_window, (;v_spacing=2)),
+    MaskRule(Set([:WP384]), :dispense, :sliding_window, (;v_spacing=2,v_out=true)), # the mask can exit the plate vertically
+]
+const cobra_wellplate_kinds = union((r.kinds for r in cobra_mask_rules)...)
 
 cobra_deck = [
     ConstrainedPosition("Cobra Source Position",cobra_wellplate_kinds,(1,1),true,false,"rectangle")
@@ -71,23 +78,8 @@ const cobra_names=Dict{Symbol,AbstractString}(
   :WP384=>"384 Well p/n 3575 3576")
 
 ## Cobra Masks
-function Mask(h::Head{Cobra},l::Labware)
-    k = kind(l).name
-
-    if k in (:WP96,:DeepWP96)  # 96 well plates only
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-        disp,disp_positions = sliding_window_mask(h,l,:dispense;v_out=true) # the mask can exit the plate vertically
-        return Mask(h,l,asp,disp,asp_positions,disp_positions)
-
-    elseif k == :WP384  # 384 well plates only
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate;v_spacing=2)
-        disp,disp_positions = sliding_window_mask(h,l,:dispense;v_spacing=2,v_out=true) # the mask can exit the plate vertically
-        return Mask(h,l,asp,disp,asp_positions,disp_positions)
-
-    else
-        Mask(h,l,(x,y,z)->false,(x,y,z)->false,(0,0),(0,0)) # unsupported kind for Cobra -- trivial mask (no aspirate/dispense), matching the generic Head/Labware default in types.jl
-    end
-end
+Mask(h::Head{Cobra},l::Labware) = build_mask_from_rules(h,l,cobra_mask_rules)
+mask_rules_for(::Configuration{Cobra}) = cobra_mask_rules
 
 
 ## Cobra Compiling Functions 

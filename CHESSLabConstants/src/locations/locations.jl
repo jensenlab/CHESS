@@ -67,6 +67,7 @@
 @location_kind Bottle500mL [:ScrewBottle,:Bottle] (1,1) :Well500000 nothing "Fisher" "FB-800-500"
 @location_kind Bottle250mL [:ScrewBottle,:Bottle] (1,1) :Well250000 nothing "Fisher" "FB-800-250"
 @location_kind FilterBottle1L [:FilterBottle,:Bottle] (1,1) :Well1000000 nothing "Fisher" "FB12566506"
+@location_kind MantisBottle [:Bottle] (1,1) :Well1000000 nothing nothing nothing
 
 #Freezer labware
 @location_kind CryoTubeSlot [:Slot] nothing nothing nothing nothing nothing

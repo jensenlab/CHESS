@@ -16,8 +16,10 @@ mantis_head = Head{Mantis}([piston_mantis],mantis_channels, mantis_head_mask)
 # `categories` field (a different-purpose, externally-owned field with no exclusivity enforced
 # between tags). Used for both the deck positions below and the Mask branches further down, so the
 # two can't drift apart. mantis_aspirate_kinds includes :FilterBottle1L (tagged :Bottle in
-# CHESSLabConstants, treated the same as the other bottle kinds for Mantis's aspirate mechanism).
-const mantis_aspirate_kinds = Set([:Conical15,:Conical50,:Bottle1L,:Bottle250mL,:Bottle500mL,:FilterBottle1L])
+# CHESSLabConstants, treated the same as the other bottle kinds for Mantis's aspirate mechanism), and
+# :MantisBottle -- a labware kind that exists specifically to be Mantis-aspirate-only: since no other
+# instrument's own admissibility set lists it, it's automatically unschedulable everywhere else.
+const mantis_aspirate_kinds = Set([:Conical15,:Conical50,:Bottle1L,:Bottle250mL,:Bottle500mL,:FilterBottle1L,:MantisBottle])
 const mantis_dispense_kinds = Set([:WP96,:WP384,:brPCR96])
 
 const mantis_lc3_position =ConstrainedPosition("LC3",mantis_aspirate_kinds,(1,24),true,false,"circle")
@@ -38,24 +40,12 @@ const mantis_names = Dict(
 
 ## Mantis Masks
 
-
-function Mask(h::Head{Mantis},l::Labware)
-    k = kind(l).name
-
-    if k in mantis_aspirate_kinds # mantis can only aspirate into these labware
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-        disp = (well::Integer,position::Integer,channel::Integer) -> false
-        return Mask(h,l,asp,disp,asp_positions,(0,0))
-
-    elseif k in mantis_dispense_kinds # mantis can only dispense into these labware
-        disp,disp_positions = sliding_window_mask(h,l,:dispense)
-        asp = (well::Integer,position::Integer,channel::Integer) -> false
-        return Mask(h,l,asp,disp,(0,0),disp_positions)
-
-    else
-        Mask(h,l,(x,y,z)->false,(x,y,z)->false,(0,0),(0,0)) # unsupported kind for Mantis -- trivial mask (no aspirate/dispense), matching the generic Head/Labware default in types.jl
-    end
-end
+const mantis_mask_rules = [
+    MaskRule(mantis_aspirate_kinds, :aspirate, :sliding_window, (;)), # mantis can only aspirate from these labware
+    MaskRule(mantis_dispense_kinds, :dispense, :sliding_window, (;)), # mantis can only dispense into these labware
+]
+Mask(h::Head{Mantis},l::Labware) = build_mask_from_rules(h,l,mantis_mask_rules)
+mask_rules_for(::Configuration{Mantis}) = mantis_mask_rules
 
 
 
@@ -110,7 +100,6 @@ function write_instrument_files(directory::AbstractString,design::DataFrame,sour
 
         filename=joinpath(directory,basename(directory)*".dl.txt")
         S=nrow(design)
-        ### Stopped here 4/29 
         delay_header=vcat(S,repeat([0,""],S))
         outfile=open(filename,"w")
         tgt_plate = targets[1] # convert_design checks that targets is of length 1 

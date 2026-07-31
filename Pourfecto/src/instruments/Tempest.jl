@@ -25,14 +25,20 @@ tempest_head = Head{Tempest}(
     channel_routing = trues(1,8),  # the single shared intake is physically plumbed to all 8 dispense nozzles
 )
 
-# Pourfecto-owned, explicit admissibility sets -- deliberately decoupled from CHESSCore.LocationKind's
-# `categories` field (a different-purpose, externally-owned field with no exclusivity enforced
-# between tags). Used for both the deck positions below and the Mask branches further down, so the
-# two can't drift apart. tempest_aspirate_kinds includes :FilterBottle1L (tagged :Bottle in
-# CHESSLabConstants), preserving Tempest's existing behavior (this instrument already treated it as
-# aspirate-eligible, since deck and Mask used the same category check today).
+# Pourfecto-owned, explicit admissibility/geometry table -- deliberately decoupled from
+# CHESSCore.LocationKind's `categories` field (a different-purpose, externally-owned field with no
+# exclusivity enforced between tags). tempest_aspirate_kinds includes :FilterBottle1L (tagged
+# :Bottle in CHESSLabConstants), preserving Tempest's existing behavior (this instrument already
+# treated it as aspirate-eligible). tempest_dispense_kinds is *derived* from tempest_mask_rules
+# (below), so deck admissibility and Mask geometry can never drift apart.
 const tempest_aspirate_kinds = Set([:Conical15,:Conical50,:Bottle1L,:Bottle250mL,:Bottle500mL,:FilterBottle1L])
-const tempest_dispense_kinds = Set([:WP96,:WP384])
+
+const tempest_mask_rules = [
+    MaskRule(tempest_aspirate_kinds, :aspirate, :sliding_window, (;)), # tempest can only aspirate from these labware
+    MaskRule(Set([:WP96]), :dispense, :sliding_window, (;)),
+    MaskRule(Set([:WP384]), :dispense, :sliding_window, (;v_spacing=2,h_spacing=2)), # 384 well plates only
+]
+const tempest_dispense_kinds = union((r.kinds for r in tempest_mask_rules if r.direction==:dispense)...)
 
 const tempest_input =ConstrainedPosition("Tempest Input Slots",tempest_aspirate_kinds,(1,6),true,false,"circle")
 const tempest_main=ConstrainedPosition("Main Tempest Position",tempest_dispense_kinds,(1,1),false,true,"rectangle")
@@ -50,28 +56,8 @@ const tempest_names=Dict(
 
 ## Tempest Masks
 
-function Mask(h::Head{Tempest},l::Labware)
-    k = kind(l).name
-
-    if k in tempest_aspirate_kinds # tempest can only aspirate from these labware
-        asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-        disp = (well::Integer,position::Integer,channel::Integer) -> false
-        return Mask(h,l,asp,disp,asp_positions,(0,0))
-
-    elseif k == :WP96 # tempest can only dispense into these labware
-        disp,disp_positions = sliding_window_mask(h,l,:dispense)
-        asp = (well::Integer,position::Integer,channel::Integer) -> false
-        return Mask(h,l,asp,disp,(0,0),disp_positions)
-
-    elseif k == :WP384  # 384 well plates only
-        disp,disp_positions = sliding_window_mask(h,l,:dispense;v_spacing=2,h_spacing=2)
-        asp = (well::Integer,position::Integer,channel::Integer) -> false
-        return Mask(h,l,asp,disp,(0,0),disp_positions)
-
-    else
-        Mask(h,l,(x,y,z)->false,(x,y,z)->false,(0,0),(0,0)) # unsupported kind for Tempest -- trivial mask (no aspirate/dispense), matching the generic Head/Labware default in types.jl
-    end
-end
+Mask(h::Head{Tempest},l::Labware) = build_mask_from_rules(h,l,tempest_mask_rules)
+mask_rules_for(::Configuration{Tempest}) = tempest_mask_rules
 
 ## Compiling Functions 
 

@@ -24,12 +24,16 @@ tuberack50mL_0005=ConstrainedPosition("TubeRack50ML_0005",Set([:Conical50]),(2,3
 tuberack50mL_0006=ConstrainedPosition("TubeRack50ML_0006",Set([:Conical50]),(2,3),true,true,"circle")
 
 # 2 mL deep well plate
-# Explicit kind names, not CHESSCore.LocationKind categories -- Nimbus's Mask never branches on kind
-# (a single degenerate H=(1,1) formula applies to any labware), so there's no separate Mask-support
-# list this could drift from; this constant just removes a literal-Set duplication (used below twice).
+# Explicit kind names, not CHESSCore.LocationKind categories. This constant removes a literal-Set
+# duplication (used below twice) and also feeds nimbus_admissible_kinds further down, which Mask uses.
 const nimbus_deep_well_kinds = Set([:DeepWP96,:WP96,:DeepReservoir,:DeepWellColumn,:DeepWellRow])
 Cos_96_DW_2mL_0001=ConstrainedPosition("Cos_96_DW_2mL_0001",nimbus_deep_well_kinds,(1,1),true,true,"rectangle")
 Cos_96_DW_2mL_0002=ConstrainedPosition("Cos_96_DW_2mL_0002",nimbus_deep_well_kinds,(1,1),true,true,"rectangle")
+
+# The union of every kind admitted by any of Nimbus's deck slots -- Mask represents head capability,
+# independent of which physical slot a given instance sits in, so it gates on the union, while each
+# ConstrainedPosition above keeps its own narrower, slot-specific set unchanged.
+const nimbus_admissible_kinds = union(Set([:Conical15,:Conical50]), nimbus_deep_well_kinds)
 
 
 nimbus_deck = [Cos_96_DW_2mL_0001 tuberack50mL_0001 tuberack50mL_0002 EmptyPosition("tip rack"); tuberack50mL_0003 tuberack50mL_0004 tuberack50mL_0005 tuberack50mL_0006]
@@ -37,13 +41,14 @@ nimbus_deck = [Cos_96_DW_2mL_0001 tuberack50mL_0001 tuberack50mL_0002 EmptyPosit
 
 configurations["nimbus"] = Configuration{Nimbus}(nimbus_head,nimbus_deck,InstrumentSettings("max_tip_use" => 10);kind=CHESSCore.location_kinds[:Nimbus])
 
-## Nimbus Masks 
+## Nimbus Masks
 
-function Mask(h::Head{Nimbus},l::Labware)
-    asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-    disp,disp_positions = sliding_window_mask(h,l,:dispense)
-    return Mask(h,l,asp,disp,asp_positions,disp_positions)
-end
+const nimbus_mask_rules = [
+    MaskRule(nimbus_admissible_kinds, :aspirate, :sliding_window, (;)),
+    MaskRule(nimbus_admissible_kinds, :dispense, :sliding_window, (;)),
+]
+Mask(h::Head{Nimbus},l::Labware) = build_mask_from_rules(h,l,nimbus_mask_rules)
+mask_rules_for(::Configuration{Nimbus}) = nimbus_mask_rules
 
 
 

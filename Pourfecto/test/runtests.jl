@@ -24,7 +24,7 @@ import Pourfecto: # default_labware
     well_to_cartesian, cartesian_to_well
 
 import Pourfecto: #mask utils
-    compute_positions
+    compute_positions, compute_mask_sizes, effective_head_size, mask_rules_for
 
 import CHESSCore: # primitives now live in CHESSCore
     vc_to_stock, stock_to_vc, q_to_stock, stock_to_q

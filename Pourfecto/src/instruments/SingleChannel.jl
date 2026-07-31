@@ -89,13 +89,19 @@ configurations["p20"] = Configuration{SingleChannel}(head_p1000,single_channel_d
 configurations["p2"] = Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings)
 
 
-# Masks 
+# Masks
 
-function Mask(h::Head{SingleChannel},l::Labware)
-    asp,asp_positions = sliding_window_mask(h,l,:aspirate)
-    disp,disp_positions = sliding_window_mask(h,l,:dispense)
-    return Mask(h,l,asp,disp,asp_positions,disp_positions)
-end
+# Deliberately no kind-based admissibility gate: SingleChannel is a manual pipette, and a human can
+# physically pipette from/into any open labware. This matches single_channel_deck's own
+# UnconstrainedPosition (no ConstrainedPosition/kind-Set at all) -- both are consistently unconstrained.
+# The :all sentinel (see MaskRule) expresses this the same declarative way every other instrument
+# expresses its (narrower) admissibility, so it's covered by the same generic Mask-coverage test too.
+const single_channel_mask_rules = [
+    MaskRule(:all, :aspirate, :sliding_window, (;)),
+    MaskRule(:all, :dispense, :sliding_window, (;)),
+]
+Mask(h::Head{SingleChannel},l::Labware) = build_mask_from_rules(h,l,single_channel_mask_rules)
+mask_rules_for(::Configuration{SingleChannel}) = single_channel_mask_rules
 
 
 
