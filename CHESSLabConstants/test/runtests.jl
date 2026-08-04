@@ -221,6 +221,30 @@ end
     x = (-Ka+sqrt(Ka^2+4*Ka*C))/2 # independent closed-form quadratic solution
     expected_pH = -log10(x)
     @test CHESSCore.pH(stock;ionic_strength_correction=false) ≈ expected_pH atol=1e-6
+
+    # sodium acetate salts share the same AcidBaseSystem instance as acetic_acid (regression test
+    # for a real bug: OAc⁻ contributed by these salts was previously treated as an inert strong ion
+    # instead of the genuine weak base it is, found while diagnosing a reported pH discrepancy)
+    @test CHESSCore.acid_base_system(CHESSLabConstants.sodium_acetate_anhydrous) == sys
+    @test CHESSCore.acid_base_system(CHESSLabConstants.sodium_acetate_trihydrate) == sys
+
+    acetate_stock = (0.1u"mol"*CHESSLabConstants.sodium_acetate_anhydrous) + (1.0u"L"*CHESSLabConstants.water)
+    acetate_families,_ = CHESSCore._analytical_species(acetate_stock)
+    @test length(acetate_families) == 1 # OAc⁻ now recognized as a family member, not a strong ion
+    @test CHESSCore.pH(acetate_stock;ionic_strength_correction=false) > 7.0 # a weak base, genuinely basic
+end
+
+@testset "Acid/base equilibrium: lactic_acid is the 85% w/w solution (Sigma W261114), not pure acid" begin
+    # molecular_weight is purity-adjusted (90.08/0.85) so mass/MW yields moles of *real* lactic acid
+    # per gram of the 85% product actually weighed out -- regression test for a real reported pH
+    # discrepancy (carbon_sources_20x stock, predicted 4.94 vs measured 10.38)
+    @test CHESSCore.molecular_weight(CHESSLabConstants.lactic_acid) ≈ 105.976u"g/mol" atol=0.001u"g/mol"
+
+    stock = (10u"g"*CHESSLabConstants.lactic_acid) + (1.0u"L"*CHESSLabConstants.water)
+    families,_ = CHESSCore._analytical_species(stock)
+    @test length(families) == 1
+    expected_moles = 10u"g"/105.976u"g/mol" # not 10u"g"/90.08u"g/mol" (the pure-acid assumption)
+    @test uconvert(u"mol",families[1].total_concentration*CHESSCore.volume_estimate(stock)) ≈ expected_moles atol=1e-6u"mol"
 end
 
 @testset "Acid/base equilibrium: MOPS" begin

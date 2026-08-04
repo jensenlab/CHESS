@@ -92,7 +92,7 @@ eight_channel_names =[
 ]
 
 for h in eachindex(eight_channel_heads)
-    configurations[eight_channel_names[h]]= Configuration{EightChannel}(eight_channel_heads[h],eight_channel_deck,eight_channel_settings)
+    register_instrument!(Configuration{EightChannel}(eight_channel_heads[h],eight_channel_deck,eight_channel_settings); name=eight_channel_names[h])
 end
 
 

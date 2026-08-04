@@ -82,11 +82,11 @@ single_channel_settings = InstrumentSettings()
 
 ## Configurations 
 
-configurations["single_channel"] = Configuration{SingleChannel}(head_single_channel,single_channel_deck,single_channel_settings)
-configurations["p1000"] = Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings)
-configurations["p200"] = Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings)
-configurations["p20"] = Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings)
-configurations["p2"] = Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings)
+register_instrument!(Configuration{SingleChannel}(head_single_channel,single_channel_deck,single_channel_settings); name="single_channel")
+register_instrument!(Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings); name="p1000")
+register_instrument!(Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings); name="p200")
+register_instrument!(Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings); name="p20")
+register_instrument!(Configuration{SingleChannel}(head_p1000,single_channel_deck,single_channel_settings); name="p2")
 
 
 # Masks

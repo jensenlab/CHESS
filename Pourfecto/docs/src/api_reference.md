@@ -8,6 +8,6 @@
 ## Full docstrings
 
 ```@autodocs
-Modules = [Pourfecto]
+Modules = [Pourfecto, Pourfecto.TestUtils]
 Order = [:type, :constant, :function, :macro]
 ```

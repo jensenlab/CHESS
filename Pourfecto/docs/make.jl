@@ -27,7 +27,9 @@ pages = [
         "manual/labware.md",
         "manual/configurations.md",
         "manual/pourfecto_method.md",
-        "manual/pourcasts.md"
+        "manual/pourcasts.md",
+        "manual/compiling.md",
+        "manual/instruments.md",
     ],
     "Examples" => [
         "examples/checkerboard.md",

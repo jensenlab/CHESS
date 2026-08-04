@@ -3,6 +3,17 @@
 
 
 
+"""
+    can_place(l::Labware, d::DeckPosition) -> Bool
+    can_place(l::Labware, deck::Deck) -> Bool
+    can_place(l::Labware, config::Configuration) -> Bool
+
+Whether `l` is admissible on deck position `d` (or anywhere on `deck`, or on `config`'s deck). For a
+[`ConstrainedPosition`](@ref), admissibility means `kind(l).name` is in the position's declared
+`labware` set; an [`UnconstrainedPosition`](@ref) admits anything; an [`EmptyPosition`](@ref) admits
+nothing. The `Configuration` method additionally requires [`can_operate`](@ref) (a non-trivial
+`Mask`) -- deck admissibility and head operability are independent checks.
+"""
 function can_place(l::Labware,d::DeckPosition)
     return kind(l).name in labware(d)
   end

@@ -45,7 +45,7 @@ const tempest_main=ConstrainedPosition("Main Tempest Position",tempest_dispense_
 tempest_deck = vcat(tempest_input,tempest_main)
 
 
-configurations["tempest"] = Configuration{Tempest}(tempest_head,tempest_deck,InstrumentSettings();kind=CHESSCore.location_kinds[:Tempest])
+register_instrument!(Configuration{Tempest}(tempest_head,tempest_deck,InstrumentSettings();kind=CHESSCore.location_kinds[:Tempest]); name="tempest")
 
 
 const tempest_names=Dict(

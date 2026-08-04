@@ -423,6 +423,8 @@ config = Configuration{ExamplePipette}(
 
 This configuration describes a simple single-channel pipette that can aspirate from one deck position and dispense into another.
 
+`config` above isn't yet schedulable or testable -- it still needs a `Mask` method, registration in the global `configurations` registry, and (if it has a custom protocol file format) a compiler hook. See [Defining a New Instrument](@ref pourfecto_new_instrument) for masks, compiling, registration, and testing -- including how to do all of this from your own external package, without modifying Pourfecto itself.
+
 ---
 
 

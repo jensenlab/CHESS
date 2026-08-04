@@ -139,7 +139,7 @@ Common entries include:
 params(pc)[:objective]
 params(pc)[:priority]
 params(pc)[:quiet]
-params(pc)[:grb_timelimit]
+params(pc)[:solver_timelimit]
 params(pc)[:min_vol_threshold]
 params(pc)[:require_nonzero]
 params(pc)[:slack_tol]
@@ -284,6 +284,49 @@ Slack variables are useful for diagnosing:
 
 ---
 
+## Quality Control and Reporting
+
+`pourfecto(directory, source_labware, target_labware, configs; kwargs...)` automatically checks
+solution quality before compiling. It compares [`slacks`](@ref) against
+`params(pc)[:solution_tolerance]` (default `1e-2`) -- any slack whose magnitude exceeds the tolerance
+fails the check. See [Adjust solution-quality tolerance](@ref pourfecto_method) for how to change the
+tolerance.
+
+If any slack fails, `pourfecto` writes `solution_quality_report.csv` and `pourcast.json` to
+`directory`, then raises an error instead of compiling -- no protocol files are written. There is
+currently no way to downgrade this to a warning or skip the check.
+
+### Reading the quality report
+
+`solution_quality_report.csv` has one row per `(stock, chemical)` pair that failed tolerance:
+
+| Column | Meaning |
+|---|---|
+| `stock` | Index of the stock with the failing slack |
+| `chemical_index` | Index of the chemical within that stock |
+| `chemical` | Name of the chemical |
+| `slack_value` | The slack's actual value |
+| `tolerance` | The tolerance it was checked against |
+
+```julia
+using CSV, DataFrames
+
+report = CSV.read(joinpath(directory, "solution_quality_report.csv"), DataFrame)
+```
+
+### Checking quality manually
+
+The same check can be run on an already-solved `Pourcast` before attempting to compile it.
+`solution_quality` and `solution_quality_report` are not exported, so call them with the qualified
+name:
+
+```julia
+flags = Pourfecto.solution_quality(pc)         # BitMatrix, true where a slack fails tolerance
+report = Pourfecto.solution_quality_report(pc) # DataFrame of just the failures
+```
+
+---
+
 
 ### Comparing planned and target stocks
 
@@ -335,6 +378,9 @@ pc2 = json_to_pourcast(json)
 ```
 
 This is useful for archiving results, debugging failed runs, or passing Pourcasts to downstream compilation tools.
+
+To turn a solved `Pourcast` into protocol files ready to run on an instrument, see
+[Compiling Protocols](@ref pourfecto_compiling).
 
 ---
 
@@ -406,6 +452,9 @@ slacks(pc)
 params(pc)[:priority]
 transfers(pc)
 ```
+
+See [Quality Control and Reporting](@ref) for the automated check `pourfecto` runs against these slack
+values, and the report it produces when they fail tolerance.
 
 ---
 

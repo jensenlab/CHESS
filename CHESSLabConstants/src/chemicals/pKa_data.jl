@@ -252,9 +252,14 @@ function _register_acid_base_systems!()
         [_identity(propionic_acid),Propionate⁻],[4.87]))
     # reuses the existing OAc⁻ ion constant (ions.jl) already shared with the sodium acetate salts'
     # CompositionRules -- same conjugate species, whether reached via complete salt dissociation or
-    # partial acid equilibrium.
-    set_acid_base_system!(acetic_acid,AcidBaseSystem(
-        [_identity(acetic_acid),OAc⁻],[4.76]))
+    # partial acid equilibrium. Registered against the sodium acetate salts too (shared AcidBaseSystem
+    # instance, same pattern as the phosphate/carbonate families) -- without this, OAc⁻ contributed by
+    # sodium_acetate_anhydrous/trihydrate was wrongly treated as an inert strong ion instead of the
+    # genuine weak base it is (found while diagnosing a real reported pH discrepancy).
+    acetic_acid_system = AcidBaseSystem([_identity(acetic_acid),OAc⁻],[4.76])
+    set_acid_base_system!(acetic_acid,acetic_acid_system)
+    set_acid_base_system!(sodium_acetate_anhydrous,acetic_acid_system)
+    set_acid_base_system!(sodium_acetate_trihydrate,acetic_acid_system)
     # shikimic acid has 3 hydroxyls in addition to its one carboxylic acid group; only the carboxylic
     # acid is significantly acidic in the physiological/lab pH range modeled here. pKa is a
     # commonly-cited predicted value (ACD/Labs-style estimate, ~4.15) rather than a directly measured
@@ -342,8 +347,8 @@ function _register_acid_base_systems!()
     # pyruvate/butyrate/tartrate: identity is a real, charged salt component (see the Chemical
     # definitions' comment above) -- chains are built around that fact, not the assumption that
     # identity is the neutral acid.
-    set_acid_base_system!(pyruvate,AcidBaseSystem([PyruvicAcid,PyruvateAnion],[2.5]))
-    set_acid_base_system!(butyrate,AcidBaseSystem([ButyricAcid,ButyrateAnion],[4.82]))
+    set_acid_base_system!(sodium_pyruvate,AcidBaseSystem([PyruvicAcid,PyruvateAnion],[2.5]))
+    set_acid_base_system!(sodium_butyrate,AcidBaseSystem([ButyricAcid,ButyrateAnion],[4.82]))
     set_acid_base_system!(tartrate,AcidBaseSystem([TartaricAcid,TartrateMonoanion,TartrateDianion],[3.0,4.4]))
     set_acid_base_system!(biotin,AcidBaseSystem([_identity(biotin),BiotinAnion],[4.5]))
     # literature range ≈4.7-5.4; representative value, not a single universally-agreed constant.

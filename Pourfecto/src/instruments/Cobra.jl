@@ -1,3 +1,28 @@
+"""
+    abstract type Cobra <: InstrumentModel end
+
+Dispatch tag for the Art Robbins Instruments Cobra liquid handler, configured as run in the
+**Jensen Lab** (University of Michigan). This file is Pourfecto's worked example of a complete,
+non-trivial instrument integration -- a real `Mask`/`MaskRule` table, deck layout, and custom
+compiler output (SoftLinx XML protocol files plus a `.slvp` workflow file) -- but it is genuinely
+lab-specific and will **not** function correctly in another lab without reconfiguration:
+
+- `cobra_settings["cobra_path"]` (the on-instrument-PC protocol directory) must be set via
+  [`set_cobra_path!`](@ref) before compiling -- [`JENSENLAB_COBRA_PATH`](@ref) is only a convenience
+  seed value for the Jensen Lab's own path, not a usable default anywhere else.
+- `cobra_names` maps labware kinds to this lab's specific SoftLinx plate-type names (e.g.
+  `"96 Costar"`) -- these must match your own SoftLinx installation's configured plate library, which
+  may use different names even for physically identical plates.
+- The XML protocol/`.slvp` workflow templates target Art Robbins' **SoftLinx** scheduling software
+  specifically -- a different Cobra deployment (or a different liquid handler entirely) needs its own
+  `write_instrument_files` method producing whatever file format its own control software expects.
+- Deck geometry (`cobra_deck`) and mask rules (`cobra_mask_rules`) reflect the physical layout of this
+  lab's specific Cobra unit and may not generalize even to a different Cobra unit with a different
+  deck configuration.
+
+See the instrument-authoring guide (`docs/src/manual/instruments.md`) for how to define your own
+instrument in your own package, using this file as a template, rather than modifying it directly.
+"""
 abstract type Cobra <: InstrumentModel end
 
 piston_cobra = Piston{ContinuousActuator,MultiRepeater}(
@@ -69,7 +94,16 @@ cobra_settings=InstrumentSettings(
 )
 
 
-configurations["cobra"] = Configuration{Cobra}(cobra_head,cobra_deck,cobra_settings;kind=CHESSCore.location_kinds[:Cobra])
+register_instrument!(Configuration{Cobra}(cobra_head,cobra_deck,cobra_settings;kind=CHESSCore.location_kinds[:Cobra]); name="cobra")
+
+"""
+    JENSENLAB_COBRA_PATH
+
+The local path to protocol files on the JensenLab's Cobra instrument machine.
+Pass this to [`set_cobra_path!`](@ref) to configure `cobra_path` for that machine,
+e.g. `set_cobra_path!(JENSENLAB_COBRA_PATH)`. Other labs should use their own path instead.
+"""
+const JENSENLAB_COBRA_PATH = "C:\\Users\\Dell\\University of Michigan Dropbox\\Benjamin David\\JensenLab\\Cobra\\"
 
 """
     set_cobra_path!(path)

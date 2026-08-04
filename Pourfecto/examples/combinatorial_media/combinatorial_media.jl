@@ -102,13 +102,13 @@ configs = ["single_channel", "eight_channel_vertical", "eight_channel_horizontal
 # 4. **Minimize Configurations** — all sources available, scheduling
 #    minimizes the number of distinct instrument configurations used.
 
-pc1, time1 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, grb_timelimit=45)
+pc1, time1 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, solver_timelimit=45)
 
-pc2, time2 = @timed pourfecto(source_labware_no_reservoir, target_plates, configs; priority=priority, grb_timelimit=45)
+pc2, time2 = @timed pourfecto(source_labware_no_reservoir, target_plates, configs; priority=priority, solver_timelimit=45)
 
-pc3, time3 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_active_flow", grb_timelimit=100)
+pc3, time3 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_active_flow", solver_timelimit=100)
 
-pc4, time4 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_config", grb_timelimit=100)
+pc4, time4 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_config", solver_timelimit=100)
 
 # ## Reporting results
 #

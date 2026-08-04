@@ -79,8 +79,8 @@ function _register_electrolyte_compositions!()
     # ascorbate turned out to be the plain free acid (both stocklist catalog lines are "L-ASCORBIC
     # ACID"), so it needs no CompositionRule at all -- see its corrected molecular_weight/name in
     # solids.jl and its AcidBaseSystem registration in pKa_data.jl.
-    set_composition!(pyruvate,CompositionRule((Na⁺+PyruvateAnion).composition))
-    set_composition!(butyrate,CompositionRule((Na⁺+ButyrateAnion).composition))
+    set_composition!(sodium_pyruvate,CompositionRule((Na⁺+PyruvateAnion).composition))
+    set_composition!(sodium_butyrate,CompositionRule((Na⁺+ButyrateAnion).composition))
     set_composition!(tartrate,CompositionRule((2*Na⁺+TartrateDianion+2*H2O).composition)) # dihydrate
     return nothing
 end

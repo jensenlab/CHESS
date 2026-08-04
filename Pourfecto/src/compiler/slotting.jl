@@ -2,6 +2,13 @@
 # slotting functions find a layout for labware on a robot with a particular configuration
 
 
+"""
+    SlottingDict = Dict{Labware,Tuple{DeckPosition,Int}}
+
+Alias for a mapping from each piece of labware to the `(DeckPosition, slot)` it has been assigned to
+on an instrument's deck. Produced by [`slotting_greedy`](@ref)/[`packing_greedy`](@ref), and consumed
+by [`write_instrument_files`](@ref).
+"""
 SlottingDict = Dict{Labware,Tuple{DeckPosition,Int}}
 
 """
@@ -46,6 +53,16 @@ end
 
 
 
+"""
+    slotting_greedy(labware::Vector{<:Labware}, config::Configuration) -> SlottingDict
+
+Greedily assign each piece of `labware` to an open, admissible deck slot on `config`'s deck. Labware
+sharing a name (e.g. the same physical plate used as both a source and a target) is slotted once and
+shares that slot. Errors if any labware can't be placed on `config`'s deck at all
+(see [`can_place`](@ref)); labware that can be placed but for which no slot remains open is returned
+in the `not_placed` local (not currently surfaced -- see [`packing_greedy`](@ref), which calls this
+repeatedly to produce one or more slotting solutions covering everything).
+"""
 function slotting_greedy(labware::Vector{<:Labware},config::Configuration)
 
     for lw in labware
@@ -102,6 +119,20 @@ end
 
 
 
+"""
+    packing_greedy(pairings::Vector{Tuple{Labware,Labware}}, config::Configuration; kwargs...) -> Vector{SlottingDict}
+
+Produce one or more [`SlottingDict`](@ref) layouts covering every `(source,target)` pairing that must
+be co-slotted, by repeatedly calling [`slotting_greedy`](@ref) on the full remaining labware set and
+peeling off however many pairings that solution satisfies, until every pairing is covered. Each
+returned `SlottingDict` becomes one compiled protocol (see [`compile`](@ref)).
+
+This is the default `packing_method` for [`compile`](@ref) and the extension point instruments should
+override only when they have unusual slotting constraints -- e.g. `Cobra` overrides this to always
+produce one protocol per pairing (it only has two deck slots and deliberately wants a fresh protocol
+whenever the labware pairing changes), rather than greedily co-packing as many pairings as possible
+into each protocol the way this generic implementation does.
+"""
 function packing_greedy(pairings::Vector{Tuple{Labware,Labware}},config::Configuration;kwargs...)
 
     slotting_dicts=SlottingDict[]

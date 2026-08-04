@@ -32,6 +32,49 @@ By default, Pourfecto provides an assortment of pre-defined instruments. Use `ke
 """
 const configurations= Dict{String,Configuration}()
 
+"""
+    register_instrument!(config::Configuration; name::AbstractString, override::Bool=false)
+
+Register `config` in the global [`configurations`](@ref) registry under `name`, making it
+discoverable via `configurations["name"]` and usable by name in [`pourfecto`](@ref).
+
+Errors if `name` is already registered unless `override=true` (in which case the previous entry is
+replaced and a warning is emitted) -- this guards against two independently-authored instrument
+packages accidentally colliding on the same name. `config.kind`'s capability-bearing validation
+already happens inside the `Configuration{I}` outer constructor (see [`Configuration`](@ref)); this
+function only handles registry-level name bookkeeping, not re-validation.
+
+Third-party instrument packages should call this once per `Configuration` they define, typically at
+module top-level (or from `__init__()` if settings need to be read from `Preferences.jl`/environment
+state at load time) right after `using Pourfecto`.
+
+# Examples
+```jldoctest
+julia> abstract type ExInstrument <: InstrumentModel end
+
+julia> piston = Piston{ContinuousActuator,SingleRepeater}((20u"µL",200u"µL"),(20u"µL",200u"µL"),1);
+
+julia> head = Head{ExInstrument}([piston],[Channel(220u"µL")],trues(1,1));
+
+julia> deck = [UnconstrainedPosition("Deck",true,true,"square")];
+
+julia> register_instrument!(Configuration{ExInstrument}(head,deck); name="ex_instrument");
+
+julia> haskey(configurations,"ex_instrument")
+true
+```
+"""
+function register_instrument!(config::Configuration; name::AbstractString, override::Bool=false)
+    if haskey(configurations, name)
+        if !override
+            error("an instrument configuration named \"$name\" is already registered; pass override=true to replace it")
+        end
+        @warn "overwriting existing configuration \"$name\""
+    end
+    configurations[name] = config
+    return config
+end
+
 
 include("./compiler/adverbs_verbs.jl")
 include("./compiler/slotting.jl")
@@ -46,6 +89,7 @@ include("./instruments/Mantis.jl")
 include("./instruments/Tempest.jl")
 include("json_interface.jl")
 include("./compiler/compile.jl")
+include("test_utils.jl")
 
 
 
@@ -93,10 +137,31 @@ end
 export PriorityDict
 export Configuration, Head, Deck
 
+export InstrumentModel # dispatch tag every new instrument subtypes
+export Piston, Channel # head-building blocks
+export Actuator, ContinuousActuator, DiscreteActuator # actuator hierarchy
+export RepeaterStyle, SingleRepeater, MultiRepeater # repeater hierarchy
+export DeckPosition, EmptyPosition, UnconstrainedPosition, ConstrainedPosition # deck position hierarchy
+export InstrumentSettings
+
+export pistons, aspirate_channels, dispense_channels, channel_routing, aspirate_mask, dispense_mask # Head accessors
+export head, deck, settings, slots, labware, can_aspirate, can_dispense # Configuration/DeckPosition accessors
+
+export Mask, MaskRule, build_mask_from_rules, mask_rules_for # the mask/geometry system
+export asp, disp, asp_positions, disp_positions # Mask accessors, for a custom hand-written Mask method
+export sliding_window_mask, blanket_mask, effective_head_size # mask archetypes/primitives
+export compute_positions, compute_mask_sizes
+
+export can_place, can_operate # deck/labware admissibility
+
+export SlottingDict, slotting_greedy, packing_greedy # slotting/packing
+export write_instrument_files # compiler extension point (falls back to a generic transfer-table CSV)
+
+export register_instrument! # instrument registration
 
 export configurations, objectives # constants
 
-export set_cobra_path! # persistent instrument-specific settings
+export set_cobra_path!, JENSENLAB_COBRA_PATH # persistent instrument-specific settings
 
 export reagent_to_string, string_to_reagent # string interface for reagents
 

@@ -162,8 +162,9 @@ pc = pourfecto(
 | `objective` | `"min_cost_flow"` | `AbstractString` or `Vector{<:AbstractString}` | Scheduling | Sets the scheduling objective for Pourfecto. See `keys(objectives)` for available options. |
 | `priority` | `PriorityDict()` | `PriorityDict` | Planning | Specifies which reagents take precedence over others in the plan. Lower values indicate higher priority. Reagents with priority `0` must match exactly. |
 | `quiet` | `true` | `Bool` | Solver | Suppresses solver output when `true`. |
-| `grb_timelimit` | `30` | `Real` | Solver | Sets Gurobi’s [`TimeLimit`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#timelimit) parameter, in seconds. |
-| `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. |
+| `optimizer` | `Gurobi.Optimizer` | any JuMP-compatible optimizer | Solver | Sets the solver used for planning and scheduling. See [Choosing a solver](@ref pourfecto_choosing_a_solver). |
+| `solver_timelimit` | `30` | `Real` | Solver | Sets the solver's time limit, in seconds. Applies to any solver. |
+| `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Gurobi-specific; ignored by other solvers. |
 | `min_vol_threshold` | `0.1` | `Real` | Planning | Sets the minimum volume threshold in µL. Any required transfer must be at least this large. |
 | `require_nonzero` | `true` | `Bool` | Planning | If a target contains a reagent, require that some amount of that reagent is delivered, even if the optimal relaxed solution would deliver none. |
 | `enforce_minimum_shot` | `false` | `Bool` | Scheduling | Enforces minimum shot-volume constraints for each instrument. **Caution:** this introduces binary variables and turns the problem into a MILP. |
@@ -177,6 +178,33 @@ pc = pourfecto(
     ```julia
     params(pc)
     ```
+
+---
+
+## [Choosing a solver](@id pourfecto_choosing_a_solver)
+
+`pourfecto`'s `optimizer` keyword accepts any [JuMP](https://jump.dev)-compatible optimizer. Pourfecto
+defaults to `Gurobi.Optimizer` (free for academic use, but otherwise a commercial license), and is
+tested against two free, open-source alternatives:
+
+| Solver | License | Handles MIQP (`enforce_minimum_shot = true`) | Notes |
+|---|---|---|---|
+| [`Gurobi.Optimizer`](https://www.gurobi.com) | Commercial (free for academic use) | Yes | The production default; no known limitations against any of Pourfecto's objectives or constraints. |
+| [`SCIP.Optimizer`](https://scipopt.org) | Free, open-source | Yes | Pourfecto's own test suite runs on SCIP by default. Handles every objective and constraint Pourfecto can build, but is noticeably slower than Gurobi/HiGHS on large continuous QPs (many reagents × many wells). |
+| [`HiGHS.Optimizer`](https://highs.dev) | Free, open-source | **No** | Much faster than SCIP on large continuous QPs. However, HiGHS has no indicator- or quadratic-constraint support, so it **cannot** be used with `enforce_minimum_shot = true` or with scheduling objectives that require indicator constraints. It's safe with `enforce_minimum_shot = false` and objectives like the default `"min_cost_flow"` that don't need them. |
+
+```julia
+using SCIP
+pc = pourfecto(sources, targets, configs; optimizer = SCIP.Optimizer)
+```
+
+```julia
+using HiGHS
+pc = pourfecto(sources, targets, configs; optimizer = HiGHS.Optimizer, enforce_minimum_shot = false)
+```
+
+!!! warning
+    HiGHS silently fails to model indicator/quadratic constraints correctly if you request them — always pair `optimizer = HiGHS.Optimizer` with `enforce_minimum_shot = false` and an objective that doesn't need indicator constraints, or use SCIP/Gurobi instead.
 
 ---
 
@@ -208,13 +236,13 @@ pc = pourfecto(
 
 ### Set a solver time limit
 
-The default Gurobi time limit is 30 seconds:
+The default solver time limit is 30 seconds, and applies regardless of which `optimizer` is used:
 
 ```julia
 pc = pourfecto(
     sources,
     targets;
-    grb_timelimit = 30,
+    solver_timelimit = 30,
 )
 ```
 
@@ -225,7 +253,7 @@ pc = pourfecto(
     source_plate,
     target_plate,
     configs;
-    grb_timelimit = 300,
+    solver_timelimit = 300,
 )
 ```
 

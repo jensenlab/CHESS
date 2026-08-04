@@ -28,7 +28,7 @@ const mantis_main=ConstrainedPosition("Main",mantis_dispense_kinds,(1,1),false,t
 mantis_deck = [mantis_hv_position  mantis_main mantis_lc3_position]
 
 
-configurations["mantis"] = Configuration{Mantis}(mantis_head,mantis_deck,InstrumentSettings();kind=CHESSCore.location_kinds[:Mantis])
+register_instrument!(Configuration{Mantis}(mantis_head,mantis_deck,InstrumentSettings();kind=CHESSCore.location_kinds[:Mantis]); name="mantis")
 
 const mantis_names = Dict(
 

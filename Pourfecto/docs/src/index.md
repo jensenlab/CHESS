@@ -28,7 +28,7 @@ using Pourfecto
 ```
 
 !!! note 
-    Pourfecto requires an active [Gurobi](https://www.gurobi.com) license to run its planning and scheduling algorithms. Licenses are free for academic users as of the time of writing. 
+    By default, Pourfecto's planning and scheduling algorithms use [Gurobi](https://www.gurobi.com) (licenses are free for academic users as of the time of writing), but a Gurobi license isn't required — any JuMP-compatible optimizer can be used instead via the `optimizer` keyword. See [Choosing a solver](@ref pourfecto_choosing_a_solver) for the free alternatives Pourfecto is tested against and their tradeoffs.
 
 ---
 

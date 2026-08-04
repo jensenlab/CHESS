@@ -39,7 +39,7 @@ const nimbus_admissible_kinds = union(Set([:Conical15,:Conical50]), nimbus_deep_
 nimbus_deck = [Cos_96_DW_2mL_0001 tuberack50mL_0001 tuberack50mL_0002 EmptyPosition("tip rack"); tuberack50mL_0003 tuberack50mL_0004 tuberack50mL_0005 tuberack50mL_0006]
 
 
-configurations["nimbus"] = Configuration{Nimbus}(nimbus_head,nimbus_deck,InstrumentSettings("max_tip_use" => 10);kind=CHESSCore.location_kinds[:Nimbus])
+register_instrument!(Configuration{Nimbus}(nimbus_head,nimbus_deck,InstrumentSettings("max_tip_use" => 10);kind=CHESSCore.location_kinds[:Nimbus]); name="nimbus")
 
 ## Nimbus Masks
 

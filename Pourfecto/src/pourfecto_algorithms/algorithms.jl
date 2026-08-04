@@ -3,7 +3,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         params::ParameterDict;
         priority::PriorityDict=_kw_pourfecto_default_.priority,
         quiet::Bool=_kw_pourfecto_default_.quiet,
-        grb_timelimit::Real = _kw_pourfecto_default_.grb_timelimit,
+        solver_timelimit::Real = _kw_pourfecto_default_.solver_timelimit,
         grb_feasibility_tol::Real=_kw_pourfecto_default_.grb_feasibility_tol,
         min_vol_threshold=_kw_pourfecto_default_.min_vol_threshold,
         require_nonzero=_kw_pourfecto_default_.require_nonzero,
@@ -13,7 +13,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
 
     params[:priority] = priority
     params[:quiet] = quiet 
-    params[:grb_timelimit] =grb_timelimit
+    params[:solver_timelimit] =solver_timelimit
     params[:grb_feasibility_tol] = grb_feasibility_tol 
     params[:require_nonzero] = require_nonzero
     params[:min_vol_threshold]= min_vol_threshold
@@ -31,7 +31,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     if quiet
         set_silent(model)
     end
-    set_time_limit_sec(model, grb_timelimit)
+    set_time_limit_sec(model, solver_timelimit)
     if optimizer === Gurobi.Optimizer
         JuMP.set_attribute(model,"FeasibilityTol",grb_feasibility_tol)
     elseif JuMP.solver_name(model) == "HiGHS"
@@ -287,7 +287,7 @@ function solve_planning_model(
             if primal_status(model) == MOI.FEASIBLE_POINT
                     @warn "a solution was found for level $level, but it may be sub-optimal because the solver stopped due to reaching its $(timelimit)s  time limit."
             else 
-                    throw(error("the solver was unable to find a feasible solution for level $level in the $(params[:grb_timelimit])s time limit."))
+                    throw(error("the solver was unable to find a feasible solution for level $level in the $(params[:solver_timelimit])s time limit."))
             end 
             elseif term == MOI.INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
             println("infeasible solution")

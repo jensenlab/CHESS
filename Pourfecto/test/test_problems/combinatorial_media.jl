@@ -49,12 +49,12 @@ source_labware2 = [source_deep_well,water_bottle]
 configs = ["single_channel","eight_channel_vertical","eight_channel_horizontal","plate_master"]
 
 
-pc1 = pourfecto(source_labware,target_plates ,configs;priority=priority,grb_timelimit=45)
+pc1 = pourfecto(source_labware,target_plates ,configs;priority=priority,solver_timelimit=45)
 
 
-pc2 = pourfecto(source_labware2,target_plates,configs;priority=priority,grb_timelimit=45)
+pc2 = pourfecto(source_labware2,target_plates,configs;priority=priority,solver_timelimit=45)
 
-pc3 = pourfecto(source_labware,target_plates,configs;priority=priority,objective="min_active_flow",quiet=false,grb_timelimit=100)
+pc3 = pourfecto(source_labware,target_plates,configs;priority=priority,objective="min_active_flow",quiet=false,solver_timelimit=100)
 
 a1 = flows(pc1) .> 1e-4
 a2 = flows(pc2) .> 1e-4

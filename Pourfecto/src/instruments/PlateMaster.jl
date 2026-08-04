@@ -55,7 +55,7 @@ pm_settings= InstrumentSettings()
 
 ## Configuration
 
-configurations["plate_master"]= Configuration{PlateMaster}(pm_head,pm_deck,pm_settings;kind=CHESSCore.location_kinds[:Gilson])
+register_instrument!(Configuration{PlateMaster}(pm_head,pm_deck,pm_settings;kind=CHESSCore.location_kinds[:Gilson]); name="plate_master")
 
 
 ## Masks

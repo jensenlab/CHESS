@@ -33,7 +33,7 @@
 @reagent biotin "biotin" Solid 244.31u"g/mol" missing 171548
 @reagent bleomycin "bleomycin" Solid 1415.6u"g/mol" missing 5360373
 @reagent boric_acid "Boric Acid" Solid 61.84u"g/mol" 1.435u"g/mL" 7628
-@reagent butyrate "Sodium Butyrate" Solid missing missing 5222465
+@reagent sodium_butyrate "Sodium Butyrate" Solid 110.09u"g/mol" missing 5222465
 @reagent calcium_chloride "calcium chloride dihydrate" Solid missing 1.85u"g/mL" 6093260
 @reagent carbenicillin "carbenicillin" Solid 378.4u"g/mol" missing 20824
 @reagent carnitine "D,L-Carnitine" Solid 161.2u"g/mol" missing 288
@@ -84,7 +84,18 @@
 @reagent iron_sulfate "iron (II) sulfate" Solid missing 1.895u"g/mL" 62662
 @reagent isoleucine "L-isoleucine" Solid 131.17u"g/mol" missing 6306
 @reagent kanamycin "kanamycin" Solid 484.5u"g/mol" missing 6032
-@reagent lactic_acid "Lactic Acid" Solid 90.08u"g/mol" 1.2u"g/mL" 612
+@reagent lactic_acid "Lactic Acid (85% w/w solution)" Solid 105.976u"g/mol" 1.2u"g/mL" 612
+# ^ real product is Sigma-Aldrich W261114, "Lactic acid, natural, >=85%" -- a LIQUID (85% w/w aqueous
+# solution, remainder water + oligomers), dosed by weight in practice (confirmed with the lab), so
+# it's kept `Solid`-typed here to preserve mass-based dosing (10u"g"*rgt"lactic_acid") rather than
+# switched to `Liquid` (which only supports volume-based dosing, see Stocks.jl). The stored MW is
+# purity-adjusted (90.08/0.85 = 105.976) so mass/MW correctly yields moles of *real* lactic acid per
+# gram of product weighed out -- this is CHESSCore's only lever for "moles per gram," so it takes
+# priority here over representing the true compound's own molar mass. One consequence: the neutral
+# species in lactic_acid's AcidBaseSystem chain (pKa_data.jl) inherits this purity-adjusted mass via
+# `_identity(lactic_acid)`, so it no longer differs from Lactate⁻ by exactly one proton's mass --
+# cosmetically inconsistent, but doesn't affect the pH solve (moles/charges, not absolute masses,
+# drive that). Revisit if CHESSCore ever gains a first-class "purity/assay" concept on Reagent.
 @reagent lactose "D-lactose" Solid 342.3u"g/mol" missing 6134
 @reagent lb "LB Broth" Solid missing missing missing
 @reagent leucine "L-leucine" Solid 131.17u"g/mol" 1.293u"g/mL" 6106
@@ -131,7 +142,7 @@
 @reagent propionic_acid "Propionic Acid" Solid 74.08u"g/mol" 0.995u"g/mL" 1032
 @reagent pyridoxal "pyridoxal hydrochloride" Solid 203.62u"g/mol" missing 6171
 @reagent pyridoxamine "pyridoxamine dihydrochloride" Solid 241.11u"g/mol" missing 10664
-@reagent pyruvate "Sodium Pyruvate" Solid missing missing 23662274
+@reagent sodium_pyruvate "Sodium Pyruvate" Solid 110.04u"g/mol" missing 23662274
 @reagent raffinose "Raffinose" Solid 504.4u"g/mol" missing 439242
 @reagent resazurin "Resazurin" Solid 229.19u"g/mol" missing 11077
 @reagent riboflavin "riboflavin (vitamin B2)" Solid 376.4u"g/mol" missing 493570
