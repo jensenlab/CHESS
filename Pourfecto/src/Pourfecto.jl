@@ -13,6 +13,7 @@ import Plots: plot
 include("types.jl")
 include("instruments/utils.jl")
 include("exceptions.jl")
+include("diagnostics.jl")
 include("default_labware.jl")
 include("mask_utils.jl")
 include("dataframe_interface.jl")
@@ -167,7 +168,9 @@ export reagent_to_string, string_to_reagent # string interface for reagents
 
 export df_to_stock, stock_to_df, df_to_labware, labware_to_df # dataframe interface 
 
-export pourfecto # main pourfecto algorithm 
+export pourfecto # main pourfecto algorithm
+
+export InfeasibleSolveError # diagnosable solver-infeasibility exception
 
 export Pourcast, flows, transfers , slacks , planned_stocks , target_stocks, source_stocks, target_labware, source_labware, model_solution,scheduling_objective_value,configs ,transfers_by_config , params # pourcast functions 
 

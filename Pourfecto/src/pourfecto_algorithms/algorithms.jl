@@ -54,19 +54,30 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
 
 
 
-    # Define Model variables 
+    # Define Model variables
     @variable(model, V[1:N_s,1:N_t]>=0) # v(s,t) = volume of material transferred from source s to target t. units of v(s,t) are in µL, as determined by normalization
-    @variable(model,slacks[1:N_t,1:N_c]) # slack makes up the difference between targets and planned stocks 
+    @variable(model,slacks[1:N_t,1:N_c]) # slack makes up the difference between targets and planned stocks
 
+    # Every constraint added below is also registered here, so that if the model turns out to be
+    # infeasible, diagnose_infeasibility (diagnostics.jl) can translate a solver-reported conflicting
+    # constraint back into a human-readable Pourfecto-level cause (which target/source/chemical).
+    registry = Dict{JuMP.ConstraintRef,NamedTuple}()
+
+    # Stock objects carry no name of their own (that's a property of the Labware well holding them,
+    # which build_planning_model never sees -- it only sees the composition vectors) -- so
+    # registry descriptions identify sources/targets by their position in the input vectors.
 
     # constrain slacks to measure target stock error
-    @constraint(model, V'*S .- slacks .== T ) # create the targets with the sources, allowing for some slack. This is a mass/volume balance. 
-
+    balance_constraints = @constraint(model, V'*S .- slacks .== T ) # create the targets with the sources, allowing for some slack. This is a mass/volume balance.
+    for t in 1:N_t, c in 1:N_c
+        registry[balance_constraints[t,c]] = (category=:mass_balance, description="mass/volume balance constraint linking source composition to target #$t for chemical \"$(reagent_to_string(chems[c]))\"")
+    end
 
     #constraints to ensure that we don't overdraft sources
     for st in eachindex(sources)
-        @constraint(model, sum(V[st,:]) <= stock_quantity(sources[st]))
-    end 
+        con = @constraint(model, sum(V[st,:]) <= stock_quantity(sources[st]))
+        registry[con] = (category=:overdraft, description="overdraft constraint on source #$st")
+    end
 
     # constraints to ensure we don't overproduce targets. For an in-place target sharing a well
     # with a source (see same_well_pairs), the true limit is the well's physical capacity, not its
@@ -74,10 +85,11 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     same_well_targets = Set(last.(same_well_pairs))
     for st in eachindex(targets)
         if st in same_well_targets && !ismissing(target_capacities[st])
-            @constraint(model, sum(V[:,st]) <= target_capacities[st])
+            con = @constraint(model, sum(V[:,st]) <= target_capacities[st])
         else
-            @constraint(model,sum(V[:,st]) <= stock_quantity(targets[st]))
+            con = @constraint(model,sum(V[:,st]) <= stock_quantity(targets[st]))
         end
+        registry[con] = (category=:capacity, description="capacity constraint on target #$st")
     end
 
     # pin in-place wells: a well shared between source and target keeps its existing content by
@@ -85,28 +97,34 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     # isn't representable). Combined with the source overdraft constraint above, this forces every
     # other outbound flow from a pinned source well to zero automatically.
     for (s,t) in same_well_pairs
-        @constraint(model, V[s,t] == stock_quantity(sources[s]))
+        con = @constraint(model, V[s,t] == stock_quantity(sources[s]))
+        registry[con] = (category=:pinning, description="in-place pinning constraint fixing target #$t to retain its existing $(stock_quantity(sources[s])) from source #$s")
     end
 
-    if require_nonzero  # requiring nonzero transfers for each needed destination well and chemical 
+    if require_nonzero  # requiring nonzero transfers for each needed destination well and chemical
         for c in 1:N_c
-                srcs_with_chem=S[:,c] .> 0 
+                srcs_with_chem=S[:,c] .> 0
                 for t in 1:N_t
-                        if T[t,c] > 0 
-                                @constraint(model,sum( V[:,t] .* srcs_with_chem) >=  min_vol_threshold ) # check that at least one transfer happens if an ingredient is needed in a destination, even if the optimial solution is to not dispense anything.  
-                        end 
-                end 
-        end 
+                        if T[t,c] > 0
+                                @constraint(model,sum( V[:,t] .* srcs_with_chem) >=  min_vol_threshold ) # check that at least one transfer happens if an ingredient is needed in a destination, even if the optimial solution is to not dispense anything.
+                        end
+                end
+        end
     end
     for c in 1:N_c
         if full_priority[reagent_to_string(chems[c])] == UInt(0)
-                @constraint(model, slacks[:,c] .== 0) # priority 0 ingredients must hit the target exactly for each destination. The slack must be zero (because the delivered quantity must be zero)  
+                cons = @constraint(model, slacks[:,c] .== 0) # priority 0 ingredients must hit the target exactly for each destination. The slack must be zero (because the delivered quantity must be zero)
+                for con in cons
+                    registry[con] = (category=:priority0, description="priority-0 exact-match constraint requires 0 slack for chemical \"$(reagent_to_string(chems[c]))\" across all targets")
+                end
         end
-     end 
+     end
 
-    return model ,params 
+    model.ext[:pourfecto_constraints] = registry
 
-end 
+    return model ,params
+
+end
 
 
 
@@ -297,23 +315,7 @@ function solve_planning_model(
             @objective(model, Min,sum(chem_weights' .*(slacks.^2))) # penalize large slacks, search for V that minimize slacks.
             optimize!(model)
 
-            # Check for optimality and feasibility
-            term = termination_status(model)
-            if term == MOI.OPTIMAL || term == MOI.OBJECTIVE_LIMIT
-            if primal_status(model)==MOI.FEASIBLE_POINT
-                    println("Optimal Solution Found For Level $level")
-            elseif primal_status(model)==MOI.NO_SOLUTION
-                    throw(error("No solution exists For Level $level"))
-            end 
-            elseif term == MOI.TIME_LIMIT
-            if primal_status(model) == MOI.FEASIBLE_POINT
-                    @warn "a solution was found for level $level, but it may be sub-optimal because the solver stopped due to reaching its $(params[:solver_timelimit])s  time limit."
-            else 
-                    throw(error("the solver was unable to find a feasible solution for level $level in the $(params[:solver_timelimit])s time limit."))
-            end 
-            elseif term == MOI.INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
-            throw(error("the problem is infeasible for level $level ($term). Check that the targets are consistent with the sources and any pinned in-place wells."))
-            end
+            check_solve_status!(model, level)
             current_slacks=abs.(JuMP.value.(slacks))
             
             for c in 1:N_c
@@ -360,24 +362,26 @@ function _solve_scheduling_model(
 
         objectives[objective](model,params;kwargs...)
         optimize!(model)
+        check_solve_status!(model, "scheduling")
 
-        return model, params 
+        return model, params
 
-end 
+end
 function _solve_scheduling_model(
         model::JuMP.Model,
         params::ParameterDict,
         objective::Vector{<:AbstractString};
         kwargs...)
 
-        for obj in objective 
+        for obj in objective
                 objectives[obj](model,params;kwargs...)
                 optimize!(model)
-        end 
+                check_solve_status!(model, "scheduling")
+        end
 
-        return model, params 
+        return model, params
 
-end 
+end
 
 
 function check_objective_dict(obj::AbstractString)

@@ -1,4 +1,4 @@
-using Pourfecto, CHESSCore, Unitful
+using Pourfecto, CHESSCore, Unitful, HiGHS
 
 water = string_to_reagent("water",Liquid)
 X = string_to_reagent("X",Liquid) # a reagent already present in the "existing" well content
@@ -30,9 +30,24 @@ NaOH = string_to_reagent("NaOH",Liquid) # the reagent being added in place
     @test isapprox(V[3,2],3;atol=1e-2)   # exact NaOH dose delivered to well B
 
     # capacity: well A can't hold its existing 200µL plus any addition if capacity is set below that
-    @test_throws ErrorException Pourfecto.planner([s1,s2,s3],[t1,t2];
+    @test_throws Pourfecto.InfeasibleSolveError Pourfecto.planner([s1,s2,s3],[t1,t2];
         priority=Pourfecto.PriorityDict("NaOH"=>UInt(0)),
         same_well_pairs=swp,target_capacities=[190.0,1000.0])
+
+    # same scenario under HiGHS (which, unlike the test suite's default SCIP, supports conflict/IIS
+    # analysis) should identify the pinning and capacity constraints on well A as the joint cause.
+    err = try
+        Pourfecto.planner([s1,s2,s3],[t1,t2];
+            priority=Pourfecto.PriorityDict("NaOH"=>UInt(0)),
+            same_well_pairs=swp,target_capacities=[190.0,1000.0],optimizer=HiGHS.Optimizer)
+        nothing
+    catch e
+        e
+    end
+    @test err isa Pourfecto.InfeasibleSolveError
+    categories = Set(c.category for c in err.causes)
+    @test :pinning in categories
+    @test :capacity in categories
 end
 
 @testset "in-place planning: incomplete target declaration is a legitimate infeasibility" begin
@@ -46,7 +61,21 @@ end
     s_naoh = 100u"mL"*NaOH
     t1 = 150u"µL"*water + 50u"µL"*X + 5u"µL"*NaOH # omits Y entirely
 
-    @test_throws ErrorException Pourfecto.planner([s1,s_naoh],[t1];same_well_pairs=[(1,1)],target_capacities=[1000.0])
+    @test_throws Pourfecto.InfeasibleSolveError Pourfecto.planner([s1,s_naoh],[t1];same_well_pairs=[(1,1)],target_capacities=[1000.0])
+
+    # under HiGHS, the conflict should be attributed to Y's priority-0 exact-match constraint and the
+    # in-place pinning constraint that forces Y's existing amount to carry forward.
+    err = try
+        Pourfecto.planner([s1,s_naoh],[t1];same_well_pairs=[(1,1)],target_capacities=[1000.0],optimizer=HiGHS.Optimizer)
+        nothing
+    catch e
+        e
+    end
+    @test err isa Pourfecto.InfeasibleSolveError
+    categories = Set(c.category for c in err.causes)
+    @test :priority0 in categories
+    @test :pinning in categories
+    @test any(c -> occursin("\"Y\"", c.description), err.causes)
 end
 
 @testset "in-place scheduling end-to-end" begin
@@ -74,4 +103,34 @@ end
     @test all_planned_approx_target(pc;atol=1e-1*u"µL")
 
     @test_throws ErrorException pourfecto([reservoir,source_plate],[target_plate],c) # same call, no opt-in, still blocked by default
+end
+
+@testset "scheduling-level infeasibility (physical minimum shot) is reported, not silent" begin
+    # build_scheduling_model folds the instrument's physical minimum-shot constraint (Q must be 0 or
+    # >= min_disp, via enforce_minimum_shot's binary QI) into the same joint model that
+    # solve_planning_model iterates over -- so a dose too small for any config to physically dispense
+    # makes the *joint* planning+scheduling model infeasible, not just a downstream scheduling detail.
+    # Previously this surfaced only as an opaque MOI.INFEASIBLE with no attribution; it must now come
+    # back as an InfeasibleSolveError naming the priority-0/mass-balance conflict on the affected well.
+    target_plate = build_location(location_kinds[:WP96],"min_shot_target")
+    for w in vec(children(target_plate))
+        w.stock = 150u"µL"*water + 50u"µL"*X + 0.1u"µL"*NaOH # 0.1µL is below plate_master's 1µL minimum shot
+    end
+    source_plate = build_location(location_kinds[:WP96],"min_shot_source")
+    for w in vec(children(source_plate))
+        w.stock = 150u"µL"*water + 50u"µL"*X
+    end
+    reservoir = build_location(location_kinds[:DeepReservoir])
+    children(reservoir)[1].stock = 100u"mL"*NaOH
+
+    c = [configurations["plate_master"]]
+
+    # Note: this scenario is checked only under the test suite's default SCIP, not HiGHS. HiGHS's
+    # active-set solver has a known spurious-error quirk on solve_planning_model's tightly-bounded
+    # re-solves (see the HiGHS tolerance workaround in build_planning_model) that also surfaces here
+    # once enforce_minimum_shot adds binary variables to the mix, reporting OTHER_ERROR instead of a
+    # clean INFEASIBLE -- correctly caught by check_solve_status!'s fallback branch as an ErrorException,
+    # but not as an InfeasibleSolveError with attributable causes.
+    @test_throws Pourfecto.InfeasibleSolveError pourfecto([reservoir,source_plate],[target_plate],c;
+        allow_in_place=true,priority=Pourfecto.PriorityDict("NaOH"=>UInt(0)),enforce_minimum_shot=true)
 end

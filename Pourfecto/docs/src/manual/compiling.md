@@ -77,39 +77,21 @@ set of labware to open slots) and [`packing_greedy`](@ref) (calls `slotting_gree
 every required pairing is covered).
 
 `slotting_greedy` assigns labware to slots first-come-first-served, in the order the labware was
-given:
-
-```
-open_slots = every (position, slot) pair on config's deck
-dedupe labware by name (a plate used as both source and target only needs one slot)
-
-for each unique piece of labware:
-    if it can't be placed on this deck at all: error
-    scan open_slots in order, take the first slot that admits this labware
-    if a slot was found: remove it from open_slots
-    else: add this labware to not_placed
-
-map each duplicate labware back onto its counterpart's slot
-
-return the labware -> (position, slot) mapping
-```
+given. It first collects every open `(position, slot)` pair on the deck, then deduplicates the labware
+by name -- a plate used as both a source and a target only needs one slot. For each unique piece of
+labware, it scans the open slots in order and claims the first one that admits it, removing that slot
+from further consideration; if a piece of labware can't be placed on the deck at all, it raises an
+error immediately, while labware that's placeable in principle but finds no open slot left is simply
+set aside rather than erroring. Finally, any duplicate labware is mapped back onto whichever slot its
+counterpart ended up in, so the same physical plate isn't assigned two different slots.
 
 `packing_greedy` calls `slotting_greedy` as a subroutine, peeling off whichever pairings each layout
-happens to satisfy until none are left:
-
-```
-remaining = all (source, target) pairings that must be co-slotted
-layouts = []
-
-while remaining is not empty:
-    layout = slotting_greedy(labware from remaining, config)
-    covered = pairings in remaining where both source and target got a slot in layout
-    if covered is empty: error, no progress possible
-    layouts += layout
-    remaining -= covered
-
-return layouts
-```
+happens to satisfy until none are left. Starting from every `(source, target)` pairing that must be
+co-slotted, it repeatedly runs `slotting_greedy` over the labware that's still unresolved, checks which
+pairings that layout actually covers (both members ended up with a slot), and keeps that layout as one
+protocol before continuing with only the leftover pairings. If a pass covers nothing new, it raises an
+error rather than looping forever; otherwise it stops once every pairing has been covered by some
+layout.
 
 To inspect a layout as a table rather than a raw `Dict`, use `slottingdict_to_df`:
 
