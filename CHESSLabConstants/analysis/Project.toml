@@ -1,0 +1,12 @@
+name = "pH_prediction_accuracy_analysis"
+
+[deps]
+CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
+CHESSLabConstants = "51347251-55e0-4e7d-9685-600600911616"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[sources]
+CHESSCore = {path = "../../CHESSCore"}
+CHESSLabConstants = {path = ".."}

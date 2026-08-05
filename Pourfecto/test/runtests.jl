@@ -43,6 +43,7 @@ include("compute_positions.jl")
 include("masks.jl")
 include("dataframe_interface.jl")
 include("well_connections.jl")
+include("in_place.jl")
 
 function all_planned_approx_target(p::Pourcast;kwargs...)
     ps = planned_stocks(p)
@@ -63,6 +64,7 @@ if RUN_SOLVER_TESTS
     include("test_problems/tempest_compilation.jl")
     include("test_problems/cobra_compilation.jl")
     include("test_problems/nimbus_compilation.jl")
+    include("test_problems/in_place.jl")
 end
 
 

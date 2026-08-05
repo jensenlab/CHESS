@@ -210,6 +210,26 @@
 @chemical BenzamidineCation "Benzamidine(cation)" 1 121.158u"g/mol"
 @chemical GuanidineCation "Guanidine(cation)" 1 60.078u"g/mol"
 
+# Metal-cation hydrolysis, and other salts audited on request. Fe³⁺ (registered on iron_chloride and
+# iron_nitrate) is a classic hydrolyzing Lewis-acidic metal cation -- this is why FeCl3 solutions are
+# well known to run distinctly acidic in practice. Only the first hydrolysis step is modeled (real
+# solutions precipitate Fe(OH)3 rather than continuing as a clean aqueous equilibrium past that);
+# same documented-simplification spirit as boric acid's apparent pKa. Fe²⁺ (iron_sulfate) hydrolyzes
+# far more weakly (pKa≈9.5, standard reference value e.g. Baes & Mesmer) since its lower charge
+# density polarizes coordinated water much less than Fe³⁺'s -- registered too, for completeness.
+@chemical FeOH²⁺ "FeOH2+" 2 72.847u"g/mol" # Fe3+ + H2O - H+
+@chemical FeOH⁺ "FeOH+" 1 72.847u"g/mol" # Fe2+ + H2O - H+ (same mass as FeOH2+, one less charge)
+
+# Succinic acid: sodium_succinate_hexahydrate's own CompositionRule already dissociates to the fully
+# deprotonated dianion (C4H4O4²⁻, already in ions.jl), same situation as pyruvate/butyrate/tartrate --
+# these two new endpoints are the more-protonated states above it in the chain.
+@chemical SuccinicAcid "Succinic acid" 0 118.086u"g/mol" # matches real succinic acid's MW (118.09) -- consistency check
+@chemical SuccinateMonoanion "Succinate(monoanion)" -1 117.078u"g/mol"
+
+# Ammonium: NH4⁺ (already in ions.jl, shared by ammonium_chloride/ammonium_nitrate/ammonium_sulfate)
+# is one of the most well-established weak acids in aqueous chemistry (conjugate acid of ammonia).
+@chemical NH3 "NH3" 0 17.031u"g/mol" # PubChem CID 222
+
 function _register_acid_base_systems!()
     # Phosphoric acid family: H3PO4 ⇌ H2PO4⁻ ⇌ HPO4²⁻ ⇌ PO4³⁻ -- pKa1/pKa2/pKa3 = 2.148/7.198/12.375
     # (CRC Handbook, 25°C). Shared across all four phosphate salts -- same conjugate family regardless
@@ -228,6 +248,22 @@ function _register_acid_base_systems!()
     carbonic_acid_system = AcidBaseSystem([H2CO3,HCO3⁻,CO3²⁻],[6.352,10.329])
     set_acid_base_system!(sodium_bicarbonate,carbonic_acid_system)
     set_acid_base_system!(sodium_carbonate,carbonic_acid_system)
+
+    # Dissolved atmospheric CO2, registered as the default `pH(...;water_correction=true)` correction
+    # (see CHESSCore.OpenSystemSpecies/set_default_water_correction! -- an open-system boundary
+    # condition, fixed [CO2(aq)] rather than a fixed total dose, so it correctly absorbs more into
+    # HCO3-/CO3(2-) as pH rises, unlike a naive fixed-mole-dose approach). Free [CO2(aq)] concentration
+    # calibrated against an empirical measurement (2026): a 20 g/L NaCl solution (NaCl itself has no
+    # acid/base chemistry of its own -- confirmed via composition/acid_base_system elsewhere in this
+    # package -- so this measurement isolates the water's own background acidity, with enough ionic
+    # strength for a stable probe reading) read pH 5.93. Solved (via bisection on the free
+    # concentration, matching pH under this exact open-system model, ionic_strength_correction on) for
+    # the value reproducing that exactly: 1.7005985e-6 mol/L. Recalibrated here (was 1.639648e-6) after
+    # the Truesdell-Jones ion-parameter upgrade (see ions.jl's _register_ion_parameters!) gave Na+/Cl-
+    # their own real activity coefficients instead of sharing Davies' one-per-charge value -- re-verify
+    # numerically after any change to the activity model, rather than assume a stale constant still
+    # reproduces the same measurement.
+    CHESSCore.set_default_water_correction!(CHESSCore.OpenSystemSpecies(carbonic_acid_system,1.7005985e-6u"mol/L"))
 
     # Organic acids -- each fully-protonated (neutral) reference state is built from the reagent's own
     # name/molecular_weight, so it's `==` to what composition(reagent) already returns by default (see
@@ -397,6 +433,23 @@ function _register_acid_base_systems!()
     set_acid_base_system!(amitrole,AcidBaseSystem([AmitroleCation,_identity(amitrole)],[4.2]))
     set_acid_base_system!(benzamadine,AcidBaseSystem([BenzamidineCation,_identity(benzamadine)],[11.6]))
     set_acid_base_system!(guanidine,AcidBaseSystem([GuanidineCation,_identity(guanidine)],[13.6]))
+
+    # Requested audit: iron chloride, sodium succinate, ammonium sulfate (plus the salts sharing the
+    # same ion, same shared-family pattern as phosphate/carbonate/acetic acid above).
+    # Fe3+ hydrolysis, first step only (see the Chemical definitions' comment above):
+    iron_hydrolysis_system = AcidBaseSystem([Fe³⁺,FeOH²⁺],[2.2])
+    set_acid_base_system!(iron_chloride,iron_hydrolysis_system)
+    set_acid_base_system!(iron_nitrate,iron_hydrolysis_system)
+    # Fe2+ hydrolysis (much weaker than Fe3+'s, see the Chemical definitions' comment above):
+    set_acid_base_system!(iron_sulfate,AcidBaseSystem([Fe²⁺,FeOH⁺],[9.5]))
+    # succinic acid: sodium_succinate_hexahydrate's identity is already the dianion (see above):
+    set_acid_base_system!(sodium_succinate_hexahydrate,AcidBaseSystem(
+        [SuccinicAcid,SuccinateMonoanion,C4H4O4²⁻],[4.21,5.64]))
+    # ammonium, shared across all three ammonium salts:
+    ammonium_system = AcidBaseSystem([NH4⁺,NH3],[9.25])
+    set_acid_base_system!(ammonium_chloride,ammonium_system)
+    set_acid_base_system!(ammonium_nitrate,ammonium_system)
+    set_acid_base_system!(ammonium_sulfate,ammonium_system)
 
     return nothing
 end

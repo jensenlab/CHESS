@@ -32,6 +32,7 @@ function __init__()
     _register_occupancy_rules!()
     _register_electrolyte_compositions!()
     _register_acid_base_systems!()
+    _register_ion_parameters!()
 end
 
 end # module CHESSLabConstants

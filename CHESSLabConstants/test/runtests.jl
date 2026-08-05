@@ -1,5 +1,7 @@
 using CHESSCore, CHESSLabConstants, Test, Unitful
 
+include("empirical_measurements.jl")
+
 @testset "CHESSLabConstants loads and registers as a lab module" begin
     @test isdefined(CHESSLabConstants, :get_mw_density)
     @test :get_mw_density in names(CHESSLabConstants) # exported
@@ -247,6 +249,87 @@ end
     @test uconvert(u"mol",families[1].total_concentration*CHESSCore.volume_estimate(stock)) ≈ expected_moles atol=1e-6u"mol"
 end
 
+@testset "Acid/base equilibrium: iron/succinate/ammonium audit" begin
+    # iron_chloride: Fe3+ hydrolysis, shared with iron_nitrate (same Fe3+ chemistry)
+    fe_sys = CHESSCore.acid_base_system(CHESSLabConstants.iron_chloride)
+    @test fe_sys isa AcidBaseSystem
+    @test fe_sys.pKa == [2.2]
+    @test fe_sys == CHESSCore.acid_base_system(CHESSLabConstants.iron_nitrate)
+    fe_stock = (0.01u"mol"*CHESSLabConstants.iron_chloride) + (1.0u"L"*CHESSLabConstants.water)
+    @test CHESSCore.pH(fe_stock;ionic_strength_correction=false) < 3.0 # markedly acidic, matches known FeCl3 behavior
+
+    # iron_sulfate: Fe2+ hydrolysis, much weaker than Fe3+'s (lower charge density)
+    fe2_sys = CHESSCore.acid_base_system(CHESSLabConstants.iron_sulfate)
+    @test fe2_sys isa AcidBaseSystem
+    @test fe2_sys.pKa == [9.5]
+    fe2_stock = (0.01u"mol"*CHESSLabConstants.iron_sulfate) + (1.0u"L"*CHESSLabConstants.water)
+    fe2_pH = CHESSCore.pH(fe2_stock;ionic_strength_correction=false)
+    @test 4.0 < fe2_pH < 7.0 # mildly acidic, not markedly so
+    @test fe2_pH > CHESSCore.pH(fe_stock;ionic_strength_correction=false) # less acidic than the Fe3+ salt at the same concentration
+
+    # sodium_succinate_hexahydrate: identity is already the dianion, chain built upward from it
+    succ_sys = CHESSCore.acid_base_system(CHESSLabConstants.sodium_succinate_hexahydrate)
+    @test succ_sys isa AcidBaseSystem
+    @test succ_sys.pKa == [4.21,5.64]
+    @test succ_sys.species[3] == CHESSLabConstants.C4H4O4²⁻
+    succ_stock = (0.01u"mol"*CHESSLabConstants.sodium_succinate_hexahydrate) + (1.0u"L"*CHESSLabConstants.water)
+    @test CHESSCore.pH(succ_stock;ionic_strength_correction=false) > 7.0 # basic, the fully-deprotonated salt of a weak acid
+
+    # ammonium: shared across all three ammonium salts
+    nh4_sys = CHESSCore.acid_base_system(CHESSLabConstants.ammonium_sulfate)
+    @test nh4_sys isa AcidBaseSystem
+    @test nh4_sys.pKa == [9.25]
+    @test nh4_sys == CHESSCore.acid_base_system(CHESSLabConstants.ammonium_chloride)
+    @test nh4_sys == CHESSCore.acid_base_system(CHESSLabConstants.ammonium_nitrate)
+    nh4_stock = (0.01u"mol"*CHESSLabConstants.ammonium_sulfate) + (1.0u"L"*CHESSLabConstants.water)
+    @test CHESSCore.pH(nh4_stock;ionic_strength_correction=false) < 7.0 # mildly acidic, textbook ammonium-salt behavior
+end
+
+@testset "Acid/base equilibrium: default water_correction (open-system dissolved atmospheric CO2)" begin
+    spec = CHESSCore.default_water_correction[]
+    @test spec isa CHESSCore.OpenSystemSpecies
+    @test spec.system.pKa == [6.352,10.329]
+    @test spec.system == CHESSCore.acid_base_system(CHESSLabConstants.sodium_bicarbonate)
+    @test uconvert(u"mol/L",spec.free_concentration) ≈ 1.7005985e-6u"mol/L" atol=1e-9u"mol/L"
+
+    plain_water_stock = 1u"L"*CHESSLabConstants.water
+    @test CHESSCore.pH(plain_water_stock) == 7.0 # unaffected by default (water_correction=false)
+    @test CHESSCore.pH(plain_water_stock;water_correction=true) < 6.5 # measurably acidified
+
+    # the exact empirical calibration point: NaCl has no acid/base chemistry of its own, so this
+    # measurement isolates the water's own background acidity
+    nacl_amt = 20u"g"/CHESSCore.molecular_weight(CHESSLabConstants.sodium_chloride)
+    nacl_stock = plain_water_stock + nacl_amt*CHESSLabConstants.sodium_chloride
+    @test CHESSCore.pH(nacl_stock;water_correction=true) ≈ 5.93 atol=1e-3
+end
+
+@testset "Truesdell-Jones ion parameters registered from wateq4f.dat" begin
+    expected = Dict(
+        CHESSLabConstants.Na⁺=>(4.0,0.075), CHESSLabConstants.K⁺=>(3.5,0.015),
+        CHESSLabConstants.Ca²⁺=>(5.0,0.165), CHESSLabConstants.Mg²⁺=>(5.5,0.2),
+        CHESSLabConstants.Fe²⁺=>(6.0,0.0), CHESSLabConstants.Fe³⁺=>(9.0,0.0),
+        CHESSLabConstants.Cl⁻=>(3.5,0.015), CHESSLabConstants.NO3⁻=>(3.0,0.0),
+        CHESSLabConstants.SO4²⁻=>(5.0,-0.04), CHESSLabConstants.CO3²⁻=>(5.4,0.0),
+        CHESSLabConstants.HCO3⁻=>(5.4,0.0),
+    )
+    for (chem,params) in expected
+        @test get(CHESSCore.ion_parameters,chem,nothing) == params
+    end
+    # NH4+ has no -gamma line in wateq4f.dat -- deliberately left unregistered (Davies fallback),
+    # not guessed
+    @test !haskey(CHESSCore.ion_parameters,CHESSLabConstants.NH4⁺)
+
+    # the Davies-reliability warning no longer fires for bicarbonate_10x: CO3²⁻/HCO3⁻ now have real
+    # Truesdell-Jones parameters, so they're exempt from the "no citable parameter" check
+    bicarbonate_10x = 12.5u"g"*rgt"sodium_bicarbonate" + 1u"L"*rgt"water"
+    @test_logs CHESSCore.pH(bicarbonate_10x;water_correction=true)
+
+    # but it still fires where genuinely warranted: sodium_succinate_hexahydrate's custom organic
+    # dianion has no registered ion_parameters, so it's still Davies-only
+    succ = 2.06u"g"*rgt"sodium_succinate_hexahydrate" + 10u"mL"*rgt"water"
+    @test_logs (:warn,r"Davies' reliable range") CHESSCore.pH(succ;water_correction=true)
+end
+
 @testset "Acid/base equilibrium: MOPS" begin
     sys = CHESSCore.acid_base_system(CHESSLabConstants.mops)
     @test sys isa AcidBaseSystem
@@ -314,7 +397,7 @@ end
         :alanine,:valine,:leucine,:isoleucine,:glycine,:proline,:serine,:threonine,:methionine,
         :phenylalanine,:tryptophan,:asparagine,:glutamine,:citruline,:histidine,:cysteine,:tyrosine,
         :lysine,:arginine,:ornithine,:cystine,
-        :edta,:ascorbate,:pyruvate,:butyrate,:tartrate,:biotin,:lipoic_acid,
+        :edta,:ascorbate,:sodium_pyruvate,:sodium_butyrate,:tartrate,:biotin,:lipoic_acid,
         :sulfadiazine,:sulfamethazine,:sulfathiazole,:ciprofloxacin,:ofloxacin,
         :penicillin_g,:ampicillin,:amoxicillin,:carbenicillin,:oxacillin,
         :tetracycline,:doxycycline,:chlortetracycline,:minocycline,
@@ -369,15 +452,15 @@ end
 
     # pyruvate is real sodium pyruvate (confirmed against Reagent_StockList.xlsx, Sigma P5280) --
     # its CompositionRule dissociates into Na+ and the correctly-charged anion, not a bare ion
-    pyr_products = CHESSCore.composition(CHESSLabConstants.pyruvate).products
+    pyr_products = CHESSCore.composition(CHESSLabConstants.sodium_pyruvate).products
     @test pyr_products[CHESSLabConstants.PyruvateAnion] == 1
     @test pyr_products[CHESSLabConstants.Na⁺] == 1
-    @test CHESSCore.molecular_weight(CHESSLabConstants.pyruvate) ≈ 110.04u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_pyruvate) ≈ 110.04u"g/mol" atol=0.01u"g/mol"
     # dissolving the real salt (Na+ + pyruvate-) is a base-hydrolysis problem, not the free acid's
     # Henderson-Hasselbalch case -- the conjugate base of a moderately strong acid (pKa=2.5) hydrolyzes
     # only weakly, giving a mildly basic solution; checked against the base-hydrolysis closed form
     # (Kb=Kw/Ka) to a loose tolerance (the approximation itself isn't exact here) and a sanity range
-    pyr_stock = (0.1u"mol"*CHESSLabConstants.pyruvate) + (1.0u"L"*CHESSLabConstants.water)
+    pyr_stock = (0.1u"mol"*CHESSLabConstants.sodium_pyruvate) + (1.0u"L"*CHESSLabConstants.water)
     Ka = 10.0^(-2.5)
     Kb = 1e-14/Ka
     C = ustrip(uconvert(u"mol/L",0.1u"mol"/CHESSCore.volume_estimate(pyr_stock)))
@@ -387,10 +470,10 @@ end
     @test 7.0 < pH(pyr_stock;ionic_strength_correction=false) < 8.0
 
     # butyrate is real sodium butyrate (confirmed: Sigma 303410)
-    but_products = CHESSCore.composition(CHESSLabConstants.butyrate).products
+    but_products = CHESSCore.composition(CHESSLabConstants.sodium_butyrate).products
     @test but_products[CHESSLabConstants.ButyrateAnion] == 1
     @test but_products[CHESSLabConstants.Na⁺] == 1
-    @test CHESSCore.molecular_weight(CHESSLabConstants.butyrate) ≈ 110.09u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_butyrate) ≈ 110.09u"g/mol" atol=0.01u"g/mol"
 
     # tartrate is real sodium tartrate dihydrate (confirmed against Reagent_StockList.xlsx, catalog
     # AAA1618730) -- 2 Na+ and 2 waters of hydration, not a bare dianion

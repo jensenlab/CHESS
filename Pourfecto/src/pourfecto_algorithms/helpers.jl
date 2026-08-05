@@ -5,6 +5,55 @@ function all_unique_labware_names(sources::Vector{<:Labware},targets::Vector{<:L
 end
 
 """
+    unambiguous_labware_names(sources::Vector{<:Labware},targets::Vector{<:Labware})
+
+Like [`all_unique_labware_names`](@ref), but permits a labware name to appear in both `sources`
+and `targets` (an in-place transfer). Still rejects a name repeated *within* `sources` alone, or
+*within* `targets` alone, since that's always ambiguous regardless of in-place mode.
+"""
+function unambiguous_labware_names(sources::Vector{<:Labware},targets::Vector{<:Labware})
+    return allunique(CHESSCore.name.(sources)) && allunique(CHESSCore.name.(targets))
+end
+
+"""
+    same_well_pairs(source_labware::Vector{<:Labware},target_labware::Vector{<:Labware})
+
+Index pairs `(s,t)` into `stocks(source_labware)`/`stocks(target_labware)` (equivalently, into the
+`sources`/`targets` vectors `build_planning_model` operates on) whose wells are the exact same
+physical well -- i.e. same labware name and same well name -- appearing in both the source and
+target labware. Empty whenever no labware name is shared between `source_labware` and
+`target_labware`.
+"""
+function same_well_pairs(source_labware::Vector{<:Labware},target_labware::Vector{<:Labware})
+    src_wells = vcat(well_names.(source_labware)...)
+    tgt_wells = vcat(well_names.(target_labware)...)
+    pairs = Tuple{Int,Int}[]
+    for (s,sw) in enumerate(src_wells)
+        for (t,tw) in enumerate(tgt_wells)
+            if sw == tw
+                push!(pairs,(s,t))
+            end
+        end
+    end
+    return pairs
+end
+
+"""
+    target_well_capacities(target_labware::Vector{<:Labware})
+
+Physical well capacity (via [`CHESSCore.wellcapacity`](@ref)) for each well in
+`target_labware`, in the same flattened order as `stocks(target_labware)`. Entries are `missing`
+when the well's [`LocationKind`](@ref) doesn't define a capacity.
+"""
+function target_well_capacities(target_labware::Vector{<:Labware};unit=u"µL")
+    wells = vcat(map(lw->vec(CHESSCore.children(lw)),target_labware)...)
+    return map(wells) do w
+        cap = CHESSCore.wellcapacity(w)
+        isnothing(cap) ? missing : ustrip(uconvert(unit,cap))
+    end
+end
+
+"""
     planning_concentration(stock::CHESSCore.Stock, ingredient::CHESSCore.Solid)
     planning_concentration(stock::CHESSCore.Stock, ingredient::CHESSCore.Liquid)
 

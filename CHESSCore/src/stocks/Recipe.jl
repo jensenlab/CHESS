@@ -124,7 +124,7 @@ function net_hydrogen_ion_concentration(s::Stock)
 end
 
 """
-    pH(s::Stock; ionic_strength_correction=true)
+    pH(s::Stock; ionic_strength_correction=true, water_correction=false, water_correction_source=nothing)
 
 Estimate the pH of `s`. General case: partitions `s`'s [`recipe`](@ref) into any registered
 [`AcidBaseSystem`](@ref) families (see [`acid_base_system`](@ref)) plus every other charged species,
@@ -149,10 +149,28 @@ glucose, or an `Empty` stock) -- as opposed to charged species that happen to ex
 equimolar HCl + NaOH, or plain NaCl) -- the returned `7.0` isn't a computed result, just the neutral
 default with nothing behind it; this case emits a `@warn` so it isn't mistaken for a real answer.
 
+Set `water_correction=true` to add a background open-system correction (e.g. dissolved atmospheric
+CO2) to `s`'s equilibrium before estimating pH -- most stocks don't need this level of detail and
+should leave it `false` (the default). Modeled as an [`OpenSystemSpecies`](@ref) (a fixed *free-species*
+concentration, not a fixed total dose) so its contribution grows correctly with pH -- important for
+poorly-buffered basic solutions (e.g. a pure conjugate-base salt), which real atmospheric CO2 shifts
+much more than a fixed dose would. With no `water_correction_source` given, this uses
+[`default_water_correction`](@ref) (registered by a lab module, e.g. CHESSLabConstants's atmospheric-CO2
+correction, via [`set_default_water_correction!`](@ref)); pass `water_correction_source` explicitly to
+use a different [`OpenSystemSpecies`](@ref) instead.
+
 See also [`speciation`](@ref) for a per-family breakdown at the solved pH.
 """
-function pH(s::Stock;ionic_strength_correction::Bool=true)
+function pH(s::Stock;ionic_strength_correction::Bool=true,
+            water_correction::Bool=false,water_correction_source::Union{Nothing,OpenSystemSpecies}=nothing)
     families,strong_ions = _analytical_species(s)
+    families = Vector{AbstractAnalyticalSpecies}(families)
+    if water_correction
+        spec = water_correction_source === nothing ? default_water_correction[] : water_correction_source
+        spec === nothing && throw(ArgumentError(
+            "water_correction=true requires either water_correction_source, or a lab module registering a default via set_default_water_correction! (e.g. CHESSLabConstants)"))
+        push!(families,spec)
+    end
     if isempty(families)
         isempty(strong_ions) && @warn "pH: no chemicals in this Stock participate in acid/base equilibrium (no registered AcidBaseSystem, no charged species) -- returning the neutral default (7.0), not a computed value"
         return _pH_strong_electrolyte_only(net_hydrogen_ion_concentration(s))

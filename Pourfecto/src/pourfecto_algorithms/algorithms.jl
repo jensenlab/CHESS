@@ -9,6 +9,8 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         require_nonzero=_kw_pourfecto_default_.require_nonzero,
         solution_tolerance = _kw_pourfecto_default_.solution_tolerance,
         optimizer=_default_optimizer[],
+        same_well_pairs::Vector{Tuple{Int,Int}}=Tuple{Int,Int}[],
+        target_capacities::Vector=fill(missing,length(targets)),
         kwargs...)
 
     params[:priority] = priority
@@ -66,10 +68,25 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         @constraint(model, sum(V[st,:]) <= stock_quantity(sources[st]))
     end 
 
-    # constraints to ensure we don't overproduce targets 
+    # constraints to ensure we don't overproduce targets. For an in-place target sharing a well
+    # with a source (see same_well_pairs), the true limit is the well's physical capacity, not its
+    # declared quantity -- the declared quantity is what's being solved for, not a known bound.
+    same_well_targets = Set(last.(same_well_pairs))
     for st in eachindex(targets)
-        @constraint(model,sum(V[:,st]) <= stock_quantity(targets[st]))
-    end 
+        if st in same_well_targets && !ismissing(target_capacities[st])
+            @constraint(model, sum(V[:,st]) <= target_capacities[st])
+        else
+            @constraint(model,sum(V[:,st]) <= stock_quantity(targets[st]))
+        end
+    end
+
+    # pin in-place wells: a well shared between source and target keeps its existing content by
+    # construction (there's no removal/aspirate-out variable in this model, so partial retention
+    # isn't representable). Combined with the source overdraft constraint above, this forces every
+    # other outbound flow from a pinned source well to zero automatically.
+    for (s,t) in same_well_pairs
+        @constraint(model, V[s,t] == stock_quantity(sources[s]))
+    end
 
     if require_nonzero  # requiring nonzero transfers for each needed destination well and chemical 
         for c in 1:N_c
@@ -152,7 +169,10 @@ function build_scheduling_model(
 
         M = ustrip(uconvert(u"µL",sum((q for q in CHESSCore.quantity.(sources) if !ismissing(q));init=0u"µL"))) # Empty sources contribute 0 to the big-M bound, matching stock_quantity's ismissing convention
 
-        model, params = build_planning_model(sources,targets,params;kwargs...)
+        swp = same_well_pairs(source_labware,target_labware) # empty unless a labware name is shared between source_labware and target_labware (in-place mode)
+        target_caps = target_well_capacities(target_labware)
+
+        model, params = build_planning_model(sources,targets,params;same_well_pairs=swp,target_capacities=target_caps,kwargs...)
 
 
         src_wellnames = vcat(well_names.(source_labware)...)
@@ -190,11 +210,13 @@ function build_scheduling_model(
         V = model[:V]
 
 
-        for s in 1:S 
-                for t in 1:T 
-                        @constraint(model, V[s,t] == sum(Q[flow_connections[s,t]])) # main scheduling constraints mapping flows to wells 
-                end 
-        end 
+        swp_set = Set(swp)
+        for s in 1:S
+                for t in 1:T
+                        (s,t) in swp_set && continue # a pinned in-place well needs no physical aspirate/dispense -- V[s,t] is already fixed by build_planning_model
+                        @constraint(model, V[s,t] == sum(Q[flow_connections[s,t]])) # main scheduling constraints mapping flows to wells
+                end
+        end
 
 
 
@@ -285,15 +307,13 @@ function solve_planning_model(
             end 
             elseif term == MOI.TIME_LIMIT
             if primal_status(model) == MOI.FEASIBLE_POINT
-                    @warn "a solution was found for level $level, but it may be sub-optimal because the solver stopped due to reaching its $(timelimit)s  time limit."
+                    @warn "a solution was found for level $level, but it may be sub-optimal because the solver stopped due to reaching its $(params[:solver_timelimit])s  time limit."
             else 
                     throw(error("the solver was unable to find a feasible solution for level $level in the $(params[:solver_timelimit])s time limit."))
             end 
             elseif term == MOI.INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
-            println("infeasible solution")
-            println(term)
-
-            end 
+            throw(error("the problem is infeasible for level $level ($term). Check that the targets are consistent with the sources and any pinned in-place wells."))
+            end
             current_slacks=abs.(JuMP.value.(slacks))
             
             for c in 1:N_c
@@ -403,14 +423,21 @@ function planner(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESSCore.
 end
 
 
-function scheduler(source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware},configs::Vector{<:Configuration};kwargs...)
+function scheduler(source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware},configs::Vector{<:Configuration};allow_in_place::Bool=_kw_pourfecto_default_.allow_in_place,kwargs...)
         start_time = Dates.now()
         parameters = ParameterDict()
         pourfecto_version_metadata!(parameters)
-        if !(all_unique_labware_names(source_labware,target_labware))
-                error("all labware must have unique names")
-        end 
-    mdl, parameters,sources,targets = build_scheduling_model(source_labware,target_labware,configs,parameters;kwargs...) 
+        parameters[:allow_in_place] = allow_in_place
+        if allow_in_place
+                if !(unambiguous_labware_names(source_labware,target_labware))
+                        error("all labware must have unique names")
+                end
+        else
+                if !(all_unique_labware_names(source_labware,target_labware))
+                        error("all labware must have unique names")
+                end
+        end
+    mdl, parameters,sources,targets = build_scheduling_model(source_labware,target_labware,configs,parameters;kwargs...)
     mdl, parameters = solve_planning_model(mdl,sources,targets,parameters; kwargs...)
     mdl,parameters = solve_scheduling_model(mdl,parameters;kwargs...)
     mdl_solution= pourfecto_model_solution(mdl)

@@ -11,7 +11,8 @@ const _kw_pourfecto_default_= (;
     enforce_minimum_shot=false,
     slack_tol = 1e-2,
     config_costs = "ones(length(configs))",
-    solution_tolerance = 1e-2 
+    solution_tolerance = 1e-2,
+    allow_in_place=false
 )
 
 
@@ -26,7 +27,8 @@ const _kw_pourfecto_default_doc_ = (;
     enforce_minimum_shot = "Enforce the minimum shot volume constraints for each instrument. **Caution** turns the problem into an MILP.",
     slack_tol = "Set the tolerance of the slacks in the solution to stay with in a percentage of the optimal value. A value of 0.01 equates to a 1% tolerance.",
     config_costs = "Set the relative cost of using each configuration.",
-    solution_tolerance = "Set the limit for the magnitude of any single slack. A value of 1 indicates that the slack can be as large as the largest target in the model. "
+    solution_tolerance = "Set the limit for the magnitude of any single slack. A value of 1 indicates that the slack can be as large as the largest target in the model. ",
+    allow_in_place = "Allow the same physical labware to appear in both `source_labware` and `target_labware`, for in-place transfers (e.g. adding a reagent to a plate's existing stocks). Wells shared between source and target keep their existing content by construction, bounded by physical well capacity rather than the target's declared quantity."
 
 )
 

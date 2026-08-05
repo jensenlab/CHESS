@@ -638,7 +638,7 @@ end
     dilute_base_chem = CHESSCore.Chemical("TestDiluteA-",-1,59.0u"g/mol")
     dilute_sys = AcidBaseSystem([dilute_acid_chem,dilute_base_chem],[7.0])
     dilute_fam = AnalyticalSpecies(dilute_sys,1e-7u"mol/L")
-    p = pH([dilute_fam],Tuple{Int,Unitful.Molarity}[];ionic_strength_correction=false)
+    p = pH([dilute_fam],Tuple{CHESSCore.Chemical,Unitful.Molarity}[];ionic_strength_correction=false)
     @test 6.5 < p < 7.0 # between neutral and pKa, not naively at pKa/2+3.5-ish extremes
 
     # high ionic strength (~1M): must not error, should warn-and-degrade at worst
@@ -646,7 +646,7 @@ end
     conc_base_chem = CHESSCore.Chemical("TestConcA-",-1,59.0u"g/mol")
     conc_sys = AcidBaseSystem([conc_acid_chem,conc_base_chem],[4.76])
     conc_fam = AnalyticalSpecies(conc_sys,1.0u"mol/L")
-    p2 = pH([conc_fam],Tuple{Int,Unitful.Molarity}[];ionic_strength_correction=true)
+    p2 = pH([conc_fam],Tuple{CHESSCore.Chemical,Unitful.Molarity}[];ionic_strength_correction=true)
     @test isfinite(p2)
 end
 
@@ -680,6 +680,74 @@ end
     neutralized_buffer = adjust_pH(buffered,7.0,HydrochloricAcid,SodiumHydroxide;ionic_strength_correction=false)
     @test pH(neutralized_buffer;ionic_strength_correction=false) ≈ 7.0 atol=1e-3
     @test pH(buffered;ionic_strength_correction=false) < 3.0 # original buffered stock still unmodified
+end
+
+@testset "pH: water_correction throws when nothing is registered or passed" begin
+    plain = 1u"L"*rgt"water"
+    @test default_water_correction[] === nothing
+    @test_throws ArgumentError pH(plain;water_correction=true)
+end
+
+# a stand-in atmospheric-CO2-style correction for this package's own tests -- CHESSCore has no
+# CHESSLabConstants dependency, so this mirrors (not reuses) CHESSLabConstants's registered default
+set_default_water_correction!(OpenSystemSpecies(test_weak_acid_system,0.01u"mol/L"))
+
+@testset "pH: water_correction" begin
+    plain = 1u"L"*rgt"water"
+
+    # default lookup path: no source given, falls back to the registered default -- measurably acidifies
+    @test pH(plain;water_correction=true,ionic_strength_correction=false) < pH(plain;ionic_strength_correction=false)
+    @test pH(plain) == 7.0 # water_correction defaults to false -- no change to existing behavior
+
+    # explicit water_correction_source overrides the registered default
+    stronger_source = OpenSystemSpecies(test_weak_acid_system,0.05u"mol/L")
+    @test pH(plain;water_correction=true,water_correction_source=stronger_source,ionic_strength_correction=false) <
+        pH(plain;water_correction=true,ionic_strength_correction=false)
+
+    # the original stock is never mutated
+    @test liquids(plain)[rgt"water"] == 1u"L"
+
+    # open-system physics, the whole point of this design: a poorly-buffered, fully-deprotonated
+    # conjugate-base stock is shifted MUCH more by the correction than a near-neutral one is -- a fixed
+    # TOTAL dose (the old, replaced mechanism) would have shifted every stock by roughly the same
+    # amount regardless of its own pH, which is exactly the bug this design fixes
+    weak_base_stock = 0.5u"mol"*TestWeakAcidNa + 1.0u"L"*rgt"water"
+    shift_neutral = pH(plain;ionic_strength_correction=false) - pH(plain;water_correction=true,ionic_strength_correction=false)
+    shift_basic = pH(weak_base_stock;ionic_strength_correction=false) - pH(weak_base_stock;water_correction=true,ionic_strength_correction=false)
+    @test shift_basic > shift_neutral
+end
+
+@testset "Truesdell-Jones ion parameters" begin
+    # a test ion with registered Truesdell-Jones parameters (mirrors real Ca2+ wateq4f.dat values, for
+    # a clean hand-check) vs an identical-charge one without (Davies fallback)
+    test_ion_tj = CHESSCore.Chemical("TestIonTJ",2,40.0u"g/mol")
+    set_ion_parameters!(test_ion_tj,5.0,0.165)
+    test_ion_davies = CHESSCore.Chemical("TestIonDavies",2,40.0u"g/mol")
+
+    I = 0.1
+    A,B = 0.5085,0.3281
+    sqrtI = sqrt(I)
+    expected_log_gamma = -A*4*sqrtI/(1+B*5.0*sqrtI) + 0.165*I
+    @test CHESSCore._activity_coefficient(test_ion_tj,2,I) ≈ exp10(expected_log_gamma) atol=1e-10
+
+    # unregistered ion falls back exactly to Davies
+    @test CHESSCore._activity_coefficient(test_ion_davies,2,I) ≈ activity_coefficient(2,I) atol=1e-12
+
+    # the two differ (confirms T-J is actually being used for the registered ion, not silently
+    # falling back to the same Davies formula)
+    @test !(CHESSCore._activity_coefficient(test_ion_tj,2,I) ≈ CHESSCore._activity_coefficient(test_ion_davies,2,I))
+
+    # neutral species always resolve to γ=1.0 regardless of registration
+    neutral_ion = CHESSCore.Chemical("TestNeutral",0,10.0u"g/mol")
+    @test CHESSCore._activity_coefficient(neutral_ion,0,I) == 1.0
+
+    # H⁺/OH⁻ have real CHESSCore-level registered parameters (wateq4f.dat)
+    @test CHESSCore.ion_parameters[H⁺] == (9.0,0.0)
+    @test CHESSCore.ion_parameters[OH⁻] == (3.5,0.0)
+
+    # Kw_eff fix: H⁺ and OH⁻ are different species with different real å, so they now get different γ's
+    # (previously both used one shared charge-1 γ, an approximation this refactor corrects)
+    @test CHESSCore._activity_coefficient(H⁺,1,I) != CHESSCore._activity_coefficient(OH⁻,1,I)
 end
 
 @testset "Formula algebra" begin
