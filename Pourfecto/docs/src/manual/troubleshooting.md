@@ -33,16 +33,29 @@ end
 
 Possible categories:
 
+Planning-stage (volumes only, no instruments):
+
 - `:mass_balance` -- the source composition can't be combined to hit a target's composition
 - `:overdraft` -- a source doesn't have enough material for everything drawing on it
 - `:capacity` -- a target (or a pinned in-place well) can't hold the volume assigned to it
 - `:pinning` -- an in-place well's existing content conflicts with another constraint
 - `:priority0` -- a priority-0 chemical (must match its target exactly, zero slack) can't be hit exactly
 
+Scheduling-stage (instrument/config assignment, only present when scheduling with `pourfecto(source_labware, target_labware, configs; ...)`):
+
+- `:flow_connection` -- a required transfer between two specific wells has no way to route through the available instrument flows
+- `:invalid_flow` -- a specific aspirate/dispense pairing is physically impossible for a given config (wrong labware, mismatched piston, etc.)
+- `:minimum_shot` -- a dispense is required to be either zero or above a config's minimum shot volume (only when `enforce_minimum_shot=true`), and neither option fits
+- `:source_flow_overdraft` -- a source can't supply everything drawing on it once instrument dead-volume padding is included
+
 When several categories co-occur, the message includes a short interpretation of the likely root
 cause -- for example, `:pinning` together with `:priority0` usually means an in-place well's
 existing content includes a chemical the target never declares, which defaults that chemical to
 priority 0 (must be exactly zero) while the pin forces its existing amount to carry forward.
+`:invalid_flow` showing up at all usually means no configured instrument can physically reach both
+wells involved in a required transfer -- add a compatible configuration, or remove the transfer.
+`:minimum_shot` alongside `:priority0`/`:mass_balance` usually means a required dose is smaller
+than every available config's minimum shot volume.
 
 ### Detailed vs. generic messages
 
@@ -64,6 +77,17 @@ constraints into the same joint model `solve_planning_model` iterates over, so t
 infeasibility is often reported at a priority level rather than at `"scheduling"` -- the level in
 the message reflects where the solver actually detected it, not which stage introduced the
 constraint.
+
+### Raw solver logs vs. `InfeasibleSolveError`
+
+By default (`quiet=true`), Pourfecto silences the underlying optimizer's own console output.
+Passing `quiet=false` re-enables it, so you may see native solver text -- for example, Gurobi
+printing `Solution count 0` -- immediately before an `InfeasibleSolveError` is raised. That text is
+the solver's own log for one particular `optimize!` call (planning can call it several times, once
+per priority level, plus scheduling objectives each add their own); it isn't a separate failure and
+isn't something Pourfecto controls the wording of. `InfeasibleSolveError` is Pourfecto's own
+structured diagnosis of that same event, and it's what carries the `causes`. When `quiet=false`
+triggers this, the error message is prefixed with a note pointing this out.
 
 ## Slacks and solution quality
 

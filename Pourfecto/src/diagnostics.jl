@@ -17,6 +17,10 @@ function infeasibility_hint(grouped::Dict{Symbol,Vector{NamedTuple}})
         return "This usually means an in-place well's existing content includes a chemical the target never declares (so it defaults to priority-0 / must-be-zero) while being pinned to carry that chemical forward."
     elseif haskey(grouped, :pinning) && haskey(grouped, :capacity)
         return "This usually means a pinned in-place well's existing content already exceeds, or leaves no room within, its declared or physical capacity."
+    elseif haskey(grouped, :invalid_flow)
+        return "This usually means no configured instrument (config/piston/position combination) can physically route between these wells -- add a compatible configuration, or remove this transfer requirement."
+    elseif haskey(grouped, :minimum_shot) && (haskey(grouped, :priority0) || haskey(grouped, :mass_balance))
+        return "This usually means a required dose falls below every available configuration's minimum shot volume -- either allow a larger dose/slack, or add a configuration with a smaller minimum shot."
     elseif haskey(grouped, :overdraft) && haskey(grouped, :mass_balance)
         return "This usually means the available source material can't cover the required target composition, independent of priorities."
     else
@@ -101,7 +105,13 @@ function check_solve_status!(model::JuMP.Model, level)
             throw(error("the solver was unable to find a feasible solution for level $level in the $(tl)s time limit."))
         end
     elseif term == MOI.INFEASIBLE || term == MOI.INFEASIBLE_OR_UNBOUNDED
-        throw(diagnose_infeasibility(model, level))
+        err = diagnose_infeasibility(model, level)
+        if !MOI.get(model, MOI.Silent())
+            # quiet=false lets the raw solver log (e.g. Gurobi's "Solution count 0") print directly to
+            # stdout during optimize! -- make clear that text is native solver chatter, not this error.
+            err = InfeasibleSolveError("(the solver log printed above, e.g. \"Solution count 0\", is native solver output -- this message is Pourfecto's own diagnosis of the same failure.)\n" * err.msg, err.level, err.causes)
+        end
+        throw(err)
     else
         throw(error("the solver returned an unexpected status ($term) for level $level. This may indicate a numerical issue with the model; consult the solver's own log output for details."))
     end

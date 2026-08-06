@@ -105,6 +105,50 @@ end
     @test_throws ErrorException pourfecto([reservoir,source_plate],[target_plate],c) # same call, no opt-in, still blocked by default
 end
 
+@testset "build_scheduling_model registers scheduling-stage constraints with real well names" begin
+    # build_planning_model alone can only label sources/targets by bare index ("source #3") since a
+    # Stock carries no name. build_scheduling_model knows the actual labware/well names, and should
+    # both (a) pass those down so even the planning-level categories (mass_balance, overdraft, ...)
+    # get real names, and (b) register its own scheduling-only constraints (flow routing, physically
+    # invalid instrument pairings, and source overdraft with dead-volume padding) so that a solver's
+    # conflict/IIS analysis can attribute a scheduling-stage infeasibility to something a user can act
+    # on, not just an opaque MOI.INFEASIBLE.
+    source_plate = build_location(location_kinds[:WP96],"registry_check_plate")
+    target_plate = build_location(location_kinds[:WP96],"registry_check_plate")
+
+    for w in vec(children(source_plate))
+        w.stock = 150u"µL"*water + 50u"µL"*X
+    end
+    for w in vec(children(target_plate))
+        w.stock = 150u"µL"*water + 50u"µL"*X + 5u"µL"*NaOH
+    end
+
+    reservoir = build_location(location_kinds[:DeepReservoir])
+    children(reservoir)[1].stock = 100u"mL"*NaOH
+
+    c = [configurations["p200"],configurations["plate_master"]]
+
+    params = Pourfecto.ParameterDict()
+    model, params, sources, targets = Pourfecto.build_scheduling_model(
+        [reservoir,source_plate],[target_plate],c,params;
+        allow_in_place=true,priority=Pourfecto.PriorityDict("NaOH"=>UInt(0)))
+
+    registry = model.ext[:pourfecto_constraints]
+    categories = Set(v.category for v in values(registry))
+
+    @test :flow_connection in categories
+    @test :source_flow_overdraft in categories
+    @test :mass_balance in categories # planning-level category, now labeled with real names too
+
+    # planning-level descriptions should carry real labware/well names, not the bare-index fallback
+    mass_balance_descriptions = [v.description for v in values(registry) if v.category == :mass_balance]
+    @test any(d -> occursin("registry_check_plate", d), mass_balance_descriptions)
+    @test !any(d -> occursin("target #", d), mass_balance_descriptions)
+
+    flow_connection_descriptions = [v.description for v in values(registry) if v.category == :flow_connection]
+    @test any(d -> occursin("registry_check_plate", d), flow_connection_descriptions)
+end
+
 @testset "scheduling-level infeasibility (physical minimum shot) is reported, not silent" begin
     # build_scheduling_model folds the instrument's physical minimum-shot constraint (Q must be 0 or
     # >= min_disp, via enforce_minimum_shot's binary QI) into the same joint model that

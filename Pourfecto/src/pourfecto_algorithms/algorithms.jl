@@ -11,6 +11,8 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         optimizer=_default_optimizer[],
         same_well_pairs::Vector{Tuple{Int,Int}}=Tuple{Int,Int}[],
         target_capacities::Vector=fill(missing,length(targets)),
+        source_labels::Vector{String}=["source #$i" for i in eachindex(sources)],
+        target_labels::Vector{String}=["target #$i" for i in eachindex(targets)],
         kwargs...)
 
     params[:priority] = priority
@@ -64,19 +66,21 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     registry = Dict{JuMP.ConstraintRef,NamedTuple}()
 
     # Stock objects carry no name of their own (that's a property of the Labware well holding them,
-    # which build_planning_model never sees -- it only sees the composition vectors) -- so
-    # registry descriptions identify sources/targets by their position in the input vectors.
+    # which build_planning_model never sees -- it only sees the composition vectors), so by default
+    # registry descriptions identify sources/targets by their position in the input vectors. Callers
+    # that do have real names (e.g. build_scheduling_model, which knows the labware/well names) can
+    # pass source_labels/target_labels to get more useful descriptions.
 
     # constrain slacks to measure target stock error
     balance_constraints = @constraint(model, V'*S .- slacks .== T ) # create the targets with the sources, allowing for some slack. This is a mass/volume balance.
     for t in 1:N_t, c in 1:N_c
-        registry[balance_constraints[t,c]] = (category=:mass_balance, description="mass/volume balance constraint linking source composition to target #$t for chemical \"$(reagent_to_string(chems[c]))\"")
+        registry[balance_constraints[t,c]] = (category=:mass_balance, description="mass/volume balance constraint linking source composition to $(target_labels[t]) for chemical \"$(reagent_to_string(chems[c]))\"")
     end
 
     #constraints to ensure that we don't overdraft sources
     for st in eachindex(sources)
         con = @constraint(model, sum(V[st,:]) <= stock_quantity(sources[st]))
-        registry[con] = (category=:overdraft, description="overdraft constraint on source #$st")
+        registry[con] = (category=:overdraft, description="overdraft constraint on $(source_labels[st])")
     end
 
     # constraints to ensure we don't overproduce targets. For an in-place target sharing a well
@@ -89,7 +93,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         else
             con = @constraint(model,sum(V[:,st]) <= stock_quantity(targets[st]))
         end
-        registry[con] = (category=:capacity, description="capacity constraint on target #$st")
+        registry[con] = (category=:capacity, description="capacity constraint on $(target_labels[st])")
     end
 
     # pin in-place wells: a well shared between source and target keeps its existing content by
@@ -98,7 +102,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     # other outbound flow from a pinned source well to zero automatically.
     for (s,t) in same_well_pairs
         con = @constraint(model, V[s,t] == stock_quantity(sources[s]))
-        registry[con] = (category=:pinning, description="in-place pinning constraint fixing target #$t to retain its existing $(stock_quantity(sources[s])) from source #$s")
+        registry[con] = (category=:pinning, description="in-place pinning constraint fixing $(target_labels[t]) to retain its existing $(stock_quantity(sources[s])) from $(source_labels[s])")
     end
 
     if require_nonzero  # requiring nonzero transfers for each needed destination well and chemical
@@ -190,11 +194,17 @@ function build_scheduling_model(
         swp = same_well_pairs(source_labware,target_labware) # empty unless a labware name is shared between source_labware and target_labware (in-place mode)
         target_caps = target_well_capacities(target_labware)
 
-        model, params = build_planning_model(sources,targets,params;same_well_pairs=swp,target_capacities=target_caps,kwargs...)
-
-
         src_wellnames = vcat(well_names.(source_labware)...)
         tgt_wellnames = vcat(well_names.(target_labware)...)
+        # (labware name, well name) -> a readable label, so infeasibility diagnostics (diagnostics.jl)
+        # can name the actual physical well instead of a bare "source #3" index.
+        source_labels = ["well $(w[2]) of labware \"$(w[1])\"" for w in src_wellnames]
+        target_labels = ["well $(w[2]) of labware \"$(w[1])\"" for w in tgt_wellnames]
+
+        model, params = build_planning_model(sources,targets,params;same_well_pairs=swp,target_capacities=target_caps,source_labels=source_labels,target_labels=target_labels,kwargs...)
+
+        registry = model.ext[:pourfecto_constraints]
+
         asp_nodes = Pourfecto.compute_flow_nodes(Pourfecto.AspNode,configs,source_labware)
         disp_nodes = Pourfecto.compute_flow_nodes(Pourfecto.DispNode,configs,target_labware)
 
@@ -217,9 +227,13 @@ function build_scheduling_model(
                 @variable(model,QI[1:A,1:D],Bin)
                 for d in 1:D
                         min_disp = minimum_shot(disp_nodes[d]) # minimum single shot volume
+                        disp_labware_name = CHESSCore.name(labware(disp_nodes[d].mask))
                         for a in 1:A
-                                @constraint(model,Q[a,d] >= min_disp * QI[a,d])
-                                @constraint(model, Q[a,d] <= M * QI[a,d]) # big-M constraint to force it into a range  in { 0 , [min_disp,M]}
+                                con_lo = @constraint(model,Q[a,d] >= min_disp * QI[a,d])
+                                con_hi = @constraint(model, Q[a,d] <= M * QI[a,d]) # big-M constraint to force it into a range  in { 0 , [min_disp,M]}
+                                desc = "physical minimum-shot constraint: config \"$(CHESSCore.name(disp_nodes[d].configuration))\" dispensing onto labware \"$(disp_labware_name)\" requires each dispense to be 0 or at least $(min_disp) µL"
+                                registry[con_lo] = (category=:minimum_shot, description=desc)
+                                registry[con_hi] = (category=:minimum_shot, description=desc)
                         end
                 end
         end
@@ -232,24 +246,29 @@ function build_scheduling_model(
         for s in 1:S
                 for t in 1:T
                         (s,t) in swp_set && continue # a pinned in-place well needs no physical aspirate/dispense -- V[s,t] is already fixed by build_planning_model
-                        @constraint(model, V[s,t] == sum(Q[flow_connections[s,t]])) # main scheduling constraints mapping flows to wells
+                        con = @constraint(model, V[s,t] == sum(Q[flow_connections[s,t]])) # main scheduling constraints mapping flows to wells
+                        registry[con] = (category=:flow_connection, description="flow-routing constraint requires transfers from $(source_labels[s]) to $(target_labels[t]) to be carried entirely by available instrument flows")
                 end
         end
 
 
 
 
-        for a in 1:A 
-                for d in 1:D 
+        for a in 1:A
+                for d in 1:D
                         if !is_valid_flow(asp_nodes[a],disp_nodes[d])
-                                @constraint(model,Q[a,d] == 0)  # if the flows aren't valid constrain them to zero  
-                        end 
-                end 
-        end 
+                                con = @constraint(model,Q[a,d] == 0)  # if the flows aren't valid constrain them to zero
+                                asp_labware_name = CHESSCore.name(labware(asp_nodes[a].mask))
+                                disp_labware_name = CHESSCore.name(labware(disp_nodes[d].mask))
+                                registry[con] = (category=:invalid_flow, description="no valid instrument flow: config \"$(CHESSCore.name(asp_nodes[a].configuration))\" cannot route from labware \"$(asp_labware_name)\" (aspirate, piston $(asp_nodes[a].piston)) to labware \"$(disp_labware_name)\" (dispense, piston $(disp_nodes[d].piston))")
+                        end
+                end
+        end
 
         for s in 1:S
                 flow_idxs=vcat(flow_connections[s,:]...)
-                @constraint(model, sum(padding_factors[flow_idxs] .* Q[flow_idxs]) <= stock_quantity(sources[s]))  # ensure that the sum of all flows drawing from source s does not exceed the stock quantity, while accounting for the padding factor supplied by the configuration. This is the scheduling version of the "don't overdraft sources" constraint in planning
+                con = @constraint(model, sum(padding_factors[flow_idxs] .* Q[flow_idxs]) <= stock_quantity(sources[s]))  # ensure that the sum of all flows drawing from source s does not exceed the stock quantity, while accounting for the padding factor supplied by the configuration. This is the scheduling version of the "don't overdraft sources" constraint in planning
+                registry[con] = (category=:source_flow_overdraft, description="physical overdraft constraint on $(source_labels[s]), accounting for instrument dead-volume padding")
         end
 
 
