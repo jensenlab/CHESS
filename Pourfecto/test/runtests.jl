@@ -53,6 +53,7 @@ function all_planned_approx_target(p::Pourcast;kwargs...)
 end
 
 include("test_problems/test_compilation.jl")
+include("test_problems/nimbus_batching.jl")
 
 if RUN_SOLVER_TESTS
     include("json_interface.jl")

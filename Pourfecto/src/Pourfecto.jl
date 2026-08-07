@@ -79,6 +79,7 @@ end
 
 include("./compiler/adverbs_verbs.jl")
 include("./compiler/slotting.jl")
+include("./compiler/batching.jl")
 include("plotting/plotting.jl")
 include("./compiler/helpers.jl")
 include("./instruments/SingleChannel.jl")
@@ -113,6 +114,7 @@ If the Pourcast fails a `solution_quality` check, `pourfecto` will produce an er
 
 ## Keyword Arguments
 $(_pourfecto_kw_doc_())
+* `packing_method::Function = packing_greedy`: forwarded to `compile`; the slotting/packing routine used when compiling the resulting `Pourcast` to `directory`. See the [Compiling Pourcasts](@ref pourfecto_compiling) manual page for details.
 """
 function pourfecto(directory::AbstractString,source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware},configs::Union{Vector{<:AbstractString},Vector{<:Configuration}};kwargs...)
     pc = pourfecto(source_labware,target_labware,configs;kwargs...)
@@ -157,6 +159,7 @@ export can_place, can_operate # deck/labware admissibility
 
 export SlottingDict, slotting_greedy, packing_greedy # slotting/packing
 export write_instrument_files # compiler extension point (falls back to a generic transfer-table CSV)
+export DispenseItem, grid_distance, split_oversized, cluster_batches, order_greedy, order_exact, order_batch, tip_change_flags # aspirate/dispense batching
 
 export register_instrument! # instrument registration
 

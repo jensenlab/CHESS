@@ -130,6 +130,51 @@ plot_slotting
 
 ---
 
+## Nimbus: one-to-many aspirate/dispense batching
+
+Unlike the generic one-transfer-per-row fallback, the Nimbus's `write_instrument_files` batches
+multiple dispenses under a single aspirate whenever they fit within the channel's capacity,
+rather than aspirating once per destination well. Its protocol CSV uses a unified action-row
+schema:
+
+| Column | Meaning |
+|---|---|
+| `Labware ID`, `Labware Position ID` | The labware/position acted on by this row |
+| `Volume (uL)` | The volume aspirated or dispensed by this row |
+| `Aspirate`, `Dispense` | Exactly one of these is `1`; the other `0` |
+| `Change Tip Before` | `1` on an aspirate row that should be preceded by a tip change |
+
+An aspirate row is always immediately followed by the dispense rows it feeds, whose volumes sum
+to the aspirate's volume. Which destinations get grouped into the same aspirate is decided by a
+distance-aware greedy bin-packing pass -- spatially nearby destinations on the target plate are
+preferred, subject to the channel's capacity -- and a transfer larger than capacity is split
+across multiple aspirates, with any remainder free to share a batch with other destinations.
+
+`write_instrument_files(..., config::Configuration{Nimbus}, ...)` accepts a `batch_ordering`
+keyword controlling how dispenses *within* a batch are sequenced:
+
+- `:greedy` (default) -- a fast nearest-neighbor tour.
+- `:exact` -- the minimum-total-travel-distance ordering, found by brute-force search. Only
+  tractable for small batches (capped at 8 items; larger batches fall back to `:greedy` with a
+  warning), since batch *membership* is fixed by the greedy packing step -- only the ordering
+  within an already-formed batch is solved exactly.
+
+```julia
+pourfecto(directory, source_labware, target_labware, ["nimbus"]; batch_ordering=:exact)
+```
+
+is enough to try the exact ordering; `compile(directory, pourcast; batch_ordering=:exact)` works
+the same way against an already-solved `Pourcast`, letting you compare `:greedy` against `:exact`
+on the same design before deciding which to use by default.
+
+!!! note
+    `"max_tip_use"` in the Nimbus `Configuration`'s settings now counts aspirate **batches**, not
+    individual dispense shots -- since one aspirate now typically feeds several dispenses, the
+    same numeric setting forces a tip refresh less often in wall-clock/shot terms than it used to.
+    Tip changes are still always forced on a source change, regardless of this setting.
+
+---
+
 ## Troubleshooting
 
 ### `labware type ... cannot be placed on a ... deck`

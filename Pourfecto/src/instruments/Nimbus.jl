@@ -109,51 +109,120 @@ function convert_design(design::DataFrame,sources::Vector{<:Labware},targets::Ve
 end
 
 
+"""
+    batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy) -> (DataFrame, Vector{Int}, Vector)
+
+Group [`convert_design`](@ref)'s flat source/destination transfer list into one-to-many
+aspirate/dispense batches, bounded by the Nimbus channel's dispense capacity. For each distinct
+source well (grouped in first-appearance row order), destination transfers are volume-split
+against capacity ([`split_oversized`](@ref)), packed into capacity-bounded, distance-aware
+batches ([`cluster_batches`](@ref)), and ordered within each batch
+([`order_batch`](@ref); `batch_ordering` is `:greedy` or `:exact`). Each batch is emitted as one
+aspirate row (source well, total batch volume) followed by its dispense rows, in the unified
+`"Labware ID","Labware Position ID","Volume (uL)","Aspirate","Dispense","Change Tip Before"`
+schema (`"Change Tip Before"` is left `0` here; the caller fills it in via
+[`tip_change_flags`](@ref)).
+
+Returns `(action_df, aspirate_row_indices, batch_sources)`: `aspirate_row_indices` are the
+1-based row indices of `action_df` holding an aspirate action, and `batch_sources[k]` is the
+`(labware id, position)` of the k-th batch's source, in emission order -- both needed by the
+caller to compute and apply tip-change flags without re-deriving batch boundaries.
+"""
+function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy)
+    capacity = ustrip(uconvert(u"µL", dispense_channels(head(config))[1].capacity))
+
+    # group rows by source well, preserving first-appearance order
+    source_keys = Tuple{String,Union{String,Integer}}[]
+    groups = Dict{Tuple{String,Union{String,Integer}},Vector{Int}}()
+    for row in 1:nrow(df)
+        key = (df[row,"Source Labware ID"], df[row,"Source Position ID"])
+        if !haskey(groups,key)
+            groups[key] = Int[]
+            push!(source_keys,key)
+        end
+        push!(groups[key],row)
+    end
+
+    labware_id=String[]
+    labware_position=Union{String,Integer}[]
+    volume=Real[]
+    aspirate=Int[]
+    dispense=Int[]
+    aspirate_row_indices=Int[]
+    batch_sources=Tuple{String,Union{String,Integer}}[]
+
+    row_idx=0
+    for key in source_keys
+        items = map(groups[key]) do r
+            pos = df[r,"Destination Position ID"]
+            position = pos isa AbstractString ? well_to_cartesian(pos) : CartesianIndex(1,1)
+            DispenseItem(r,position,df[r,"Volume (uL)"])
+        end
+        for batch in cluster_batches(split_oversized(items,capacity),capacity)
+            batch = order_batch(batch,batch_ordering)
+            push!(labware_id,key[1]); push!(labware_position,key[2])
+            push!(volume,sum(item.volume for item in batch)); push!(aspirate,1); push!(dispense,0)
+            row_idx += 1
+            push!(aspirate_row_indices,row_idx)
+            push!(batch_sources,key)
+            for item in batch
+                push!(labware_id,df[item.col,"Destination Labware ID"])
+                push!(labware_position,df[item.col,"Destination Position ID"])
+                push!(volume,item.volume); push!(aspirate,0); push!(dispense,1)
+                row_idx += 1
+            end
+        end
+    end
+
+    action_df = DataFrame(
+        "Labware ID" => labware_id,
+        "Labware Position ID" => labware_position,
+        "Volume (uL)" => volume,
+        "Aspirate" => aspirate,
+        "Dispense" => dispense,
+        "Change Tip Before" => zeros(Int,row_idx),
+    )
+    return action_df, aspirate_row_indices, batch_sources
+end
 
 
 
-function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{Nimbus},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);kwargs...) 
-    # input error handling 
-    S,T = size(design) 
+"""
+    write_instrument_files(directory, design, source, target, config::Configuration{Nimbus}, slotting=slotting_greedy(...); batch_ordering::Symbol=:greedy, kwargs...)
+
+Compile a `design` into a Nimbus protocol CSV written to `directory`. Unlike the generic
+compiler fallback, the Nimbus supports one-to-many aspirate/dispense: for each source well, as
+many destination dispenses as fit within the channel's capacity are drawn up in a single
+aspirate and dispensed together, rather than aspirating once per destination (see
+[`batch_design`](@ref) for the batching/ordering pipeline). `batch_ordering` selects how
+dispenses within a batch are sequenced -- `:greedy` (default, nearest-neighbor) or `:exact`
+(optimal, brute-force -- only tractable for small batches, see [`order_exact`](@ref)) -- and can
+be benchmarked against each other by calling `pourfecto`/`compile` with either value.
+
+The written CSV uses a unified action-row schema: `"Labware ID","Labware Position ID",
+"Volume (uL)","Aspirate","Dispense","Change Tip Before"`. Each row is either an aspirate action
+(source well, `Aspirate=1`) or a dispense action (`Dispense=1`); an aspirate row is always
+immediately followed by the dispense rows it feeds, whose volumes sum to the aspirate's volume.
+`"Change Tip Before"` is `1` on an aspirate row when the tip should be changed before that
+aspirate: always on a source change, and periodically thereafter per the instrument's
+`"max_tip_use"` setting (see [`tip_change_flags`](@ref)) -- note `"max_tip_use"` now counts
+aspirate *batches*, not individual dispense shots.
+"""
+function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{Nimbus},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);batch_ordering::Symbol=:greedy,kwargs...)
+    # input error handling
+    S,T = size(design)
     S == sum(length.(source)) && T == sum(length.(target)) || ArgumentError("Dimension mismatch between design ($S x $T) and number of wells in the source and target labware ($(sum(length.(source))) x $(sum(length.(target))) )")
     all(map(x-> x in keys(slotting),vcat(source,target)))|| ArgumentError("All labware must be slotted")
     allunique(values(slotting)) || ArgumentError("Only one labware can be assigned to a given slot")
     df=convert_design(design,source,target,slotting,config)
-    n=nrow(df)
-    dispense_df=DataFrame([[],[],[],[],[],],names(df))
-    for i = 1:n 
-        vol=df[i,"Volume (uL)"] *u"µL"
-        while vol > 1e-4u"µL"
-            shotvol=min(dispense_channels(head(config))[1].capacity,vol) # maximum shot volume of 1 ml
-            push!(dispense_df,(df[i,"Source Labware ID"],df[i,"Source Position ID"],ustrip(uconvert(u"µL",shotvol)),df[i,"Destination Labware ID"],df[i,"Destination Position ID"]))
-            vol-=shotvol
-        end 
-    end 
-    #append!(dispenses,dispense_df)
 
-    n=nrow(dispense_df)
-    
-    change_tip=zeros(Int64,n)
-    for i in 2:n
-        if dispense_df[i,"Source Position ID"] != dispense_df[i-1,"Source Position ID"]
-            change_tip[i]=1
-        end 
-    end 
+    action_df,aspirate_row_indices,batch_sources = batch_design(df,config;batch_ordering)
+    action_df[aspirate_row_indices,"Change Tip Before"] .= tip_change_flags(batch_sources,settings(config)["max_tip_use"])
 
-    windowsize=settings(config)["max_tip_use"]
-    for i in 1:n-windowsize+1   
-        window=change_tip[i:i+windowsize-1]
-        if sum(window)==0
-            change_tip[i+windowsize-1]=1
-        end 
-    end 
-    dispense_df[!,"Change Tip Before"].= change_tip
-    
     if ~isdir(directory)
         mkdir(directory)
-    end 
+    end
 
-    
-    CSV.write(joinpath(directory,basename(directory)*".csv"),dispense_df)
-    return nothing 
-end 
+    CSV.write(joinpath(directory,basename(directory)*".csv"),action_df)
+    return nothing
+end
