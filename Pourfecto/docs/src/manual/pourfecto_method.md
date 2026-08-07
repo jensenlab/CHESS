@@ -164,13 +164,14 @@ pc = pourfecto(
 | `quiet` | `true` | `Bool` | Solver | Suppresses solver output when `true`. |
 | `optimizer` | `Gurobi.Optimizer` | any JuMP-compatible optimizer | Solver | Sets the solver used for planning and scheduling. See [Choosing a solver](@ref pourfecto_choosing_a_solver). |
 | `solver_timelimit` | `30` | `Real` | Solver | Sets the solver's time limit, in seconds. Applies to any solver. |
-| `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Gurobi-specific; ignored by other solvers. |
+| `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Also reused as the indicator/big-M epsilon inside every MILP scheduling objective regardless of the active solver, so it isn't purely a Gurobi-only setting in practice. |
 | `min_vol_threshold` | `0.1` | `Real` | Planning | Sets the minimum volume threshold in µL. Any required transfer must be at least this large. |
 | `require_nonzero` | `true` | `Bool` | Planning | If a target contains a reagent, require that some amount of that reagent is delivered, even if the optimal relaxed solution would deliver none. |
 | `enforce_minimum_shot` | `false` | `Bool` | Scheduling | Enforces minimum shot-volume constraints for each instrument. **Caution:** this introduces binary variables and turns the problem into a MILP. |
 | `slack_tol` | `1e-2` | `Real` | Planning | Sets the tolerance for preserving slack values across priority levels. A value of `0.01` corresponds to a 1% tolerance. |
 | `config_costs` | `ones(length(configs))` | `Vector{Real}` | Scheduling objective | Sets the relative cost of using each configuration. Used by objectives such as `"min_cost_flow"`. |
-| `solution_tolerance` | `1e-2` | `Real` | Quality control / planning | Sets the allowable magnitude for individual slacks in solution-quality checks. A value of `1` allows slack as large as the largest target quantity in the model. |
+| `solution_tolerance` | `1e-2` | `Real` | Quality control / planning | Sets the allowable magnitude for individual slacks in solution-quality checks. Slacks are normalized per chemical, so a value of `1` allows a chemical's slack to be as large as the largest target quantity *of that chemical*, not the largest target in the whole model. |
+| `allow_in_place` | `false` | `Bool` | Planning | Allows the same physical labware to appear in both `source_labware` and `target_labware`, for in-place transfers (e.g. adding a reagent to a plate's existing stocks). Wells shared between source and target keep their existing content by construction, bounded by physical well capacity rather than the target's declared quantity. See [Allow in-place transfers](@ref) below. |
 
 !!! note
     Keyword arguments are stored in the [`ParameterDict`](@ref) inside the returned [`Pourcast`](@ref). You can inspect them with:
@@ -494,5 +495,28 @@ pc = pourfecto(
 
 ---
 
+### Allow in-place transfers
+
+By default, Pourfecto rejects a source and target labware that share a name -- reusing a name changes the physical meaning of the transfer, so it's treated as a likely mistake unless you opt in:
+
+```julia
+allow_in_place = false
+```
+
+Setting `allow_in_place = true` lets the same physical labware appear on both sides, for transfers that add reagent to a plate's existing contents (e.g. adjusting pH, dosing an already-seeded assay plate) rather than filling an empty target from scratch. Source and target wells are matched by labware name and well name; a matched well's existing content is pinned -- forced to carry forward at its full existing quantity -- and bounded by its physical well capacity rather than the naively-summed target composition.
+
+```julia
+pc = pourfecto(
+    [naoh_reservoir, existing_plate],
+    [target_plate], # same name as existing_plate
+    configs;
+    allow_in_place = true,
+)
+```
+
+!!! warning
+    Every reagent in an in-place well's existing content must be restated in its target composition (or given explicit nonzero priority) -- a reagent that's never declared in any target defaults to priority `0` (blocked), which directly conflicts with the pin forcing its existing amount to carry forward. See the [in-place transfers example](../examples/in_place.md) for a full worked walkthrough, including this exact pitfall and how the resulting `InfeasibleSolveError` reports it.
+
+---
 
 

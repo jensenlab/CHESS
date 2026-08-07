@@ -6,7 +6,7 @@ const GENERATED_DIR = joinpath(@__DIR__, "src", "examples")
 # Rendered as plain, non-executed code blocks (not `@example`) -- these examples build large
 # combinatorial optimization models that require a real solver (Gurobi by default) to actually
 # run, which the docs build environment shouldn't depend on.
-for name in ("checkerboard", "combinatorial_media", "priority")
+for name in ("checkerboard", "combinatorial_media", "priority", "in_place")
     Literate.markdown(
         joinpath(EXAMPLES_DIR, name, "$name.jl"),
         GENERATED_DIR;
@@ -37,6 +37,7 @@ pages = [
         "examples/checkerboard.md",
         "examples/combinatorial_media.md",
         "examples/priority.md",
+        "examples/in_place.md",
     ],
     "API Reference" => "api_reference.md",
     "Citing Pourfecto" => "citation.md" ,

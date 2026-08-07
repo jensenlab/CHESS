@@ -21,13 +21,13 @@ const _kw_pourfecto_default_doc_ = (;
     priority = "a [`PriorityDict`](@ref) that specifies which reagents take precedence over others in a plan.",
     quiet = "Supress the printout of the solver.",
     solver_timelimit = "Set the solver's time limit, in seconds.",
-    grb_feasibility_tol= "Set the Gurobi solver's [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter.",
+    grb_feasibility_tol= "Set the Gurobi solver's [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Also reused as the indicator/big-M epsilon inside every MILP scheduling objective, regardless of which solver is active -- so it isn't purely a Gurobi-only setting in practice.",
     min_vol_threshold = "Set the minimum volume threshold in µL. Any transfer must be at least this large.",
     require_nonzero = "If a target contains a reagent, require that some amount of that reagent is delivered, even if the optimal solution is none.", 
     enforce_minimum_shot = "Enforce the minimum shot volume constraints for each instrument. **Caution** turns the problem into an MILP.",
     slack_tol = "Set the tolerance of the slacks in the solution to stay with in a percentage of the optimal value. A value of 0.01 equates to a 1% tolerance.",
     config_costs = "Set the relative cost of using each configuration.",
-    solution_tolerance = "Set the limit for the magnitude of any single slack. A value of 1 indicates that the slack can be as large as the largest target in the model. ",
+    solution_tolerance = "Set the limit for the magnitude of any single slack. Slacks are normalized per chemical, so a value of 1 indicates that a chemical's slack can be as large as the largest target quantity *of that chemical*, not the largest target in the whole model. ",
     allow_in_place = "Allow the same physical labware to appear in both `source_labware` and `target_labware`, for in-place transfers (e.g. adding a reagent to a plate's existing stocks). Wells shared between source and target keep their existing content by construction, bounded by physical well capacity rather than the target's declared quantity."
 
 )

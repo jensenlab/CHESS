@@ -35,17 +35,17 @@ Possible categories:
 
 Planning-stage (volumes only, no instruments):
 
-- `:mass_balance` -- the source composition can't be combined to hit a target's composition
+- `:mass_balance` -- the source composition can't be combined to hit a target's composition (see `require_nonzero`, `min_vol_threshold`)
 - `:overdraft` -- a source doesn't have enough material for everything drawing on it
-- `:capacity` -- a target (or a pinned in-place well) can't hold the volume assigned to it
-- `:pinning` -- an in-place well's existing content conflicts with another constraint
-- `:priority0` -- a priority-0 chemical (must match its target exactly, zero slack) can't be hit exactly
+- `:capacity` -- a target (or a pinned in-place well) can't hold the volume assigned to it (see `allow_in_place`)
+- `:pinning` -- an in-place well's existing content conflicts with another constraint (see `allow_in_place`)
+- `:priority0` -- a priority-0 chemical (must match its target exactly, zero slack) can't be hit exactly (see `priority`)
 
 Scheduling-stage (instrument/config assignment, only present when scheduling with `pourfecto(source_labware, target_labware, configs; ...)`):
 
 - `:flow_connection` -- a required transfer between two specific wells has no way to route through the available instrument flows
 - `:invalid_flow` -- a specific aspirate/dispense pairing is physically impossible for a given config (wrong labware, mismatched piston, etc.)
-- `:minimum_shot` -- a dispense is required to be either zero or above a config's minimum shot volume (only when `enforce_minimum_shot=true`), and neither option fits
+- `:minimum_shot` -- a dispense is required to be either zero or above a config's minimum shot volume (only when `enforce_minimum_shot=true`), and neither option fits (see `enforce_minimum_shot`)
 - `:source_flow_overdraft` -- a source can't supply everything drawing on it once instrument dead-volume padding is included
 
 When several categories co-occur, the message includes a short interpretation of the likely root
@@ -77,6 +77,55 @@ constraints into the same joint model `solve_planning_model` iterates over, so t
 infeasibility is often reported at a priority level rather than at `"scheduling"` -- the level in
 the message reflects where the solver actually detected it, not which stage introduced the
 constraint.
+
+### Worked example
+
+Every well of a target plate needs a 0.1µL dose of NaOH, but the only available instrument
+(`plate_master`) has a 1µL minimum shot -- with `enforce_minimum_shot=true`, each dispense must be
+either exactly 0 or at least 1µL, and 0.1µL is neither:
+
+```julia
+water = string_to_reagent("water", Liquid)
+X = string_to_reagent("X", Liquid)
+NaOH = string_to_reagent("NaOH", Liquid)
+
+target_plate = build_location(location_kinds[:WP96], "min_shot_target")
+for w in vec(children(target_plate))
+    w.stock = 150u"µL"*water + 50u"µL"*X + 0.1u"µL"*NaOH # below plate_master's 1µL minimum shot
+end
+source_plate = build_location(location_kinds[:WP96], "min_shot_source")
+for w in vec(children(source_plate))
+    w.stock = 150u"µL"*water + 50u"µL"*X
+end
+reservoir = build_location(location_kinds[:DeepReservoir])
+children(reservoir)[1].stock = 100u"mL"*NaOH
+
+pourfecto([reservoir, source_plate], [target_plate], [configurations["plate_master"]];
+    allow_in_place=true, priority=PriorityDict("NaOH"=>UInt(0)), enforce_minimum_shot=true)
+```
+
+This raises an `InfeasibleSolveError` whose message reads:
+
+```text
+the problem is infeasible at priority level 0. The following constraints cannot be satisfied together:
+  - physical minimum-shot constraint: config "Gilson" dispensing onto labware "min_shot_target" requires each dispense to be 0 or at least 1 µL
+  - mass/volume balance constraint linking source composition to well F11 of labware "min_shot_target" for chemical "NaOH"
+  - priority-0 exact-match constraint requires 0 slack for chemical "NaOH" across all targets
+  - flow-routing constraint requires transfers from well A1 of labware "..." to well F11 of labware "min_shot_target" to be carried entirely by available instrument flows
+This usually means a required dose falls below every available configuration's minimum shot volume -- either allow a larger dose/slack, or add a configuration with a smaller minimum shot.
+```
+
+Reading the four causes together:
+
+- `:minimum_shot` -- `plate_master`'s "Gilson" config can only dispense 0 or ≥1µL onto this plate
+- `:mass_balance` -- the plan needs exactly 0.1µL of NaOH delivered to well F11 to hit the target
+- `:priority0` -- NaOH is priority 0, so that 0.1µL must be delivered *exactly*, with zero slack
+- `:flow_connection` -- the only route for that NaOH is through the same physically-constrained instrument flow
+
+None of these is individually the "bug" -- together they pin the delivered NaOH volume to a value
+no available instrument can produce. The auto-generated hint at the bottom (triggered by the
+`:minimum_shot` + `:priority0`/`:mass_balance` combination described above) names the fix
+directly: raise the dose (or its tolerance), or add a finer-grained instrument.
 
 ### Raw solver logs vs. `InfeasibleSolveError`
 
