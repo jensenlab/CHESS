@@ -13,20 +13,36 @@ ledger, and reconstructs any state on demand by simulating that history. The des
 inspired by how chess games are recorded: not as a sequence of board positions, but as a sequence
 of moves, replayed by an engine that knows the rules.
 
-This mirrors the shape of the CHESS package family itself:
+This repository is organized into a few functional categories of packages:
 
-- **[`CHESSCore`](https://jensenlab.github.io/CHESS/stable/api/core/)** -- the "lab engine":
-  `Location`/`Stock`/`Attribute`/`Read` types and the pure, in-memory operations that act on them
-  (`move_into!`, `transfer!`, `set_attribute!`, `record_read!`).
-- **[`CHESSDatabase`](https://jensenlab.github.io/CHESS/stable/api/database/)** -- an append-only
-  SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into
-  `CHESSCore` objects on demand.
-- **[`CHESSLabConstants`](https://jensenlab.github.io/CHESS/stable/api/labconstants/)** -- a
-  starter set of registered lab constants (reagents, organisms, location kinds, instruments,
-  standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining
-  your own lab's constants.
-- **`CHESS`** -- the umbrella package: `@reexport`s all three, plus `Unitful`, so `using CHESS`
-  alone is enough to get everything.
+### CHESS
+
+The core engine: recording, reconstructing, and looking up lab state.
+
+| Package | Description | Docs |
+|---|---|---|
+| [`CHESSCore`](CHESSCore) | The "lab engine": `Location`/`Stock`/`Attribute`/`Read` types and the pure, in-memory operations that act on them (`move_into!`, `transfer!`, `set_attribute!`, `record_read!`). | [stable](https://jensenlab.github.io/CHESS/stable/api/core/) / [dev](https://jensenlab.github.io/CHESS/dev/api/core/) |
+| [`CHESSDatabase`](CHESSDatabase) | An append-only SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand. | [stable](https://jensenlab.github.io/CHESS/stable/api/database/) / [dev](https://jensenlab.github.io/CHESS/dev/api/database/) |
+| [`CHESSLabConstants`](CHESSLabConstants) | A starter set of registered lab constants (reagents, organisms, location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining your own lab's constants. | [stable](https://jensenlab.github.io/CHESS/stable/api/labconstants/) / [dev](https://jensenlab.github.io/CHESS/dev/api/labconstants/) |
+| `CHESS` | The umbrella package: `@reexport`s `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, plus `Unitful`, so `using CHESS` alone is enough to get everything except packages from the other categories below. | [stable](https://jensenlab.github.io/CHESS/stable) / [dev](https://jensenlab.github.io/CHESS/dev) |
+
+### Schedulers
+
+Packages that plan and schedule lab operations against the CHESS engine's data model.
+
+| Package | Description | Docs |
+|---|---|---|
+| [`Pourfecto`](Pourfecto) | Plans and schedules automated liquid-handling workflows -- turns source stocks, target compositions, labware, and instrument configurations into an executable protocol. See [`Pourfecto/README.md`](Pourfecto/README.md) for its own install/quickstart notes (it has extra solver-license setup CHESS itself doesn't need). | [dev](https://jensenlab.github.io/CHESS/pourfecto/dev/) |
+| [`PlateArrays`](PlateArrays) | Schedules microplate layouts and places optimal controls for detecting errors in microplate experiments. See [`PlateArrays/README.md`](PlateArrays/README.md) for usage details. | [dev](https://jensenlab.github.io/CHESS/platearrays/dev/) |
+
+### Data Processing
+
+Packages for processing and analyzing data recorded through CHESS (e.g. reads and measurements).
+No packages yet.
+
+### Quality Control
+
+Packages for QC/validation workflows built on CHESS data. No packages yet.
 
 ## Installation
 
