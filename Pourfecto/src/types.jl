@@ -71,11 +71,9 @@ const REPEATER_TYPES = Dict{String,DataType}(
 
 
 """
-  struct Piston{A <: Actuator, R<: RepeaterStyle}  
-      minAsp::Unitful.Volume 
-      maxAsp::Unitful.Volume 
-      minDisp::Unitful.Volume
-      maxDisp::Unitful.Volume
+  struct Piston{A <: Actuator, R<: RepeaterStyle}
+      asp::Tuple{Unitful.Volume,Unitful.Volume}
+      disp::Tuple{Unitful.Volume,Unitful.Volume}
       deadPad::Real
   end
 
@@ -156,6 +154,7 @@ See Also [`Configuration`](@ref)
     aspirate_mask::BitMatrix
     dispense_channels::AbstractArray{Channel}
     dispense_mask::BitMatrix
+    channel_routing::BitMatrix
   end
 
 An instance of a head for a instrument `I`. Heads contain `pistons` that independently control
@@ -256,9 +255,12 @@ struct EmptyPosition <: DeckPosition
 end 
 
 """
-  struct UnconstrainedPosition <: DeckPosition 
+  struct UnconstrainedPosition <: DeckPosition
     name::String
-  end 
+    aspirate::Bool
+    dispense::Bool
+    plotting_shape::String
+  end
 
 Represents a position that can hold any number of any labware
 

@@ -48,7 +48,7 @@ parent moving: if the incubator gets wheeled into a different room, every plate 
 moves along for free, with nothing extra to track --- just like in the real world. 
 
 
-## The four location types
+## The three location types
 
 Not every location behaves the same way structurally. Most locations are **generic**: flexible
 containers that can hold any number of other locations, and can be freely rearranged. A room, a
@@ -67,10 +67,12 @@ single well can never be pulled out and relocated on its own. Similarly, Labware
 Locations can never hold reagents -- that property is reserved specifically for Wells. Wells cannot
 hold other locations either: they are terminal, sitting at the bottom of the hierarchy.
 
-**Instruments** are a fourth, more specialized case: locations that can actively *do* things to
-other locations (move them, read them, change their environment) rather than just sit there and be
-acted upon.
-
+Some locations are also **capability-bearing**: they can actively *do* things to other locations
+(move them, read them, change their environment) rather than just sit there and be acted upon. An
+autoclave or a liquid-handling robot is a common example. Capability is a flag on a location's
+[`LocationKind`](@ref) (`is_instrument`), not a fourth structural type -- a capability-bearing
+location is still concretely a `GenericLocation` or a `Labware`, whichever its shape calls for. See
+[Reads & Instrument Measurements](reads.md) for how capability data and instrument reads work.
 
 - **[`GenericLocation`](@ref)** -- mutable, unordered membership: children can be freely added and
   removed, subject to rules covered in the next chapter, [Movement & Occupancy](movement.md).
@@ -80,26 +82,23 @@ acted upon.
   labware as a whole can still be moved freely -- it's only its own internal slots that are fixed.
   Examples include, microwell plates, bottles, tube racks.
 - **[`Well`](@ref)** -- a terminal leaf: it can never have children of its own, and unlike the
-  other three types, it can never be independently relocated -- it's permanently fused to its
+  other two types, it can never be independently relocated -- it's permanently fused to its
   labware. A well is also the only place actual material is stored; see
   [Stocks & Chemistry](stocks.md).
-- **[`Instrument`](@ref)** -- behaves like a `GenericLocation` for the purposes of the hierarchy,
-  but is also the only one of the four that can *act on* other locations -- moving them, reading
-  them, changing their environment -- rather than only ever being acted upon. 
 
 ## Location kinds
 
-All locations fall into one of these four categories, but locations may have distinct properties. `LocationKind`s serve to differentiate specific locations from one another. For example, How is a 96-well plate different from a 384-well plate? They are both `Labware`, but they have different numbers of wells in different arrangements. Each of these plates' `LocationKind` stores the data that allows CHESS to distinguish them from each other and impart capabilities and constraints on each. 
+All locations fall into one of these three categories, but locations may have distinct properties. `LocationKind`s serve to differentiate specific locations from one another. For example, How is a 96-well plate different from a 384-well plate? They are both `Labware`, but they have different numbers of wells in different arrangements. Each of these plates' `LocationKind` stores the data that allows CHESS to distinguish them from each other and impart capabilities and constraints on each. 
 
 It's worth being precise about two words that sound interchangeable but aren't: **type** and
-**kind**. *Type* means one of the four concrete `Location` subtypes just covered --- the fixed set that CHESSCore operates on. These are types in the Julian sense.  A Location's *Kind* stores data and parameters. Many kinds share one type, and registering a new kind (a new plate model, a new
+**kind**. *Type* means one of the three concrete `Location` subtypes just covered --- the fixed set that CHESSCore operates on. These are types in the Julian sense.  A Location's *Kind* stores data and parameters. Many kinds share one type, and registering a new kind (a new plate model, a new
 instrument) never adds a new type.
 
 An earlier design of CHESS gave every specific kind of location its own concrete Julia type (a `Plate` type,
 a `Rack` type, and so on), optionally arranged in a richer type hierarchy. **The current
-implementation instead has exactly four concrete `Location` subtypes** --
-[`GenericLocation`](@ref), [`Labware`](@ref),
-[`Well`](@ref), and [`Instrument`](@ref) -- and *kind* (a 96-well plate vs. a 384-well plate vs. a
+implementation instead has exactly three concrete `Location` subtypes** --
+[`GenericLocation`](@ref), [`Labware`](@ref), and
+[`Well`](@ref) -- and *kind* (a 96-well plate vs. a 384-well plate vs. a
 tube rack) is [`LocationKind`](@ref): a named, interned, immutable *value*, not a type.
 
 CHESSCore provides a macro for creating new LocationKinds:
@@ -127,8 +126,10 @@ LocationKind(WP96)
 ```
 
 [`concretetype(kind)`](@ref) maps a `LocationKind` to
-the one Julia type that represents it: `Instrument` if it's flagged as an instrument, `Well` if it
-has a `capacity`, `Labware` if it has a `shape` and `socket`, `GenericLocation` otherwise.
+the one Julia type that represents it: `Well` if it has a `capacity`, `Labware` if it has a
+`shape`, `GenericLocation` otherwise. This is independent of whether the kind is
+capability-bearing (`is_instrument`) -- a capability-bearing kind still concretizes to whichever
+of these three its `capacity`/`shape` calls for.
 
 ```julia-repl 
 julia> kind(loc"WP96")

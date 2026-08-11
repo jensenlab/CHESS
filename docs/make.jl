@@ -48,6 +48,7 @@ makedocs(
                 "Instrument Interfaces" => "manual/instrument-interfaces.md",
             ],
             "Interop" => "manual/interop.md",
+            "Troubleshooting" => "manual/troubleshooting.md",
         ],
         "API Reference" => [
             "CHESSCore" => "api/core.md",

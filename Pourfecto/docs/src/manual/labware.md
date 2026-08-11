@@ -45,7 +45,7 @@ The input dataframe must include:
 
 | Column | Description |
 |---|---|
-| `labware` | `LocationKind` name registered in `location_kinds`, used to build the labware via `build_location(location_kinds[Symbol(labware)], name)` |
+| `labware` | `LocationKind` name registered in `location_kinds` (populated by whichever lab modules are registered via `CHESSCore.register_lab` -- see [Registering Lab Constants](https://jensenlab.github.io/CHESS/dev/manual/registering-lab-constants/); `CHESSLabConstants`, loaded automatically by `using CHESS`, provides the plate kinds used on this page), used to build the labware via `build_location(location_kinds[Symbol(labware)], name)` |
 | `name` | Name of the labware instance |
 | `well` | Well identifier, such as `"A1"`, `"B12"`, or `"H2"` |
 
@@ -212,3 +212,6 @@ add_stock!(plate, water_stock, 1, 1)  # adds stock to row 1, column 1; well A1
 ```
 
 For the full `LocationKind`/`Location` reference (available kinds, deck/well structure, and `add_stock!`'s underlying `deposit!` behavior), see CHESSCore's [Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/) manual page.
+
+!!! note
+    Pourfecto's own examples sometimes set `.stock` directly (`children(plate)[row, col].stock = ...`) or accumulate into it (`well.stock += ...`) instead of calling `add_stock!`/`deposit!`. This is a Pourfecto-idiomatic shortcut for quickly building example/test labware -- it skips `deposit!`'s well-capacity check, so it's fine for building up a target composition from scratch (where the values are already known to fit) but isn't a substitute for `deposit!` when depositing into labware whose existing contents you don't control.

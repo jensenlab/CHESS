@@ -231,7 +231,7 @@ end
 
 
 """
-    slotting_requirements(pc::Pourcast; threshold::Real = 1e-4) -> Vector{BitMatrix}
+    slotting_requirements(pc::Pourcast) -> Vector{BitMatrix}
 
 Compute per-configuration source→target “slotting” requirements from a `Pourcast`
 plan by marking which source labware must be able to transfer to which target
@@ -243,22 +243,18 @@ of size `(S, T)` where:
 - `S == length(source_labware(pc))` (number of source labware items)
 - `T == length(target_labware(pc))` (number of target labware items)
 - `M[s, t] == true` if **any** transfer value associated with transfers from
-  `sources[s]` to `targets[t]` in configuration `c` exceeds `threshold`.
+  `sources[s]` to `targets[t]` in configuration `c` is greater than `0`.
   Otherwise `M[s, t] == false`.
 
 This is useful for determining which source/target pairs must be physically
 co-slotted/accessible in each configuration.
-
-# Keyword Arguments
-- `threshold::Real = 1e-4`: Minimum transfer magnitude considered “present”.
-  Transfers `> threshold` trigger a `true` requirement.
 
 # Returns
 - `Vector{BitMatrix}`: A length-`C` vector of boolean matrices, one per configuration,
   where `C == length(configs(pc))`. Each matrix has shape `(S, T)`.
 
 # Notes
-- The comparison is strictly greater than (`>`) `threshold`.
+- The comparison is strictly greater than (`>`) `0`.
 - Requires the following `Pourcast`-related functions to be defined:
   `transfers_by_config`, `configs`, `source_labware`, `target_labware`,
   `transfer_indices`.

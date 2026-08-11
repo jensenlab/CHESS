@@ -112,7 +112,7 @@ end
 """
     batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy) -> (DataFrame, Vector{Int}, Vector)
 
-Group [`convert_design`](@ref)'s flat source/destination transfer list into one-to-many
+Group `convert_design`'s flat source/destination transfer list into one-to-many
 aspirate/dispense batches, bounded by the Nimbus channel's dispense capacity. For each distinct
 source well (grouped in first-appearance row order), destination transfers are volume-split
 against capacity ([`split_oversized`](@ref)), packed into capacity-bounded, distance-aware

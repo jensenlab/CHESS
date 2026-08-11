@@ -31,3 +31,10 @@ custom buffer
 The returned object is still usable as a reagent identifier in Pourfecto — for planning and labeling a workflow — but calculations that require molecular weight or density (e.g. mass ↔ mole or mass ↔ volume conversions) need a registered reagent instead. See CHESSCore's [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) page for registration (the `@reagent` macro, `register_lab`, and the `reagent_context` keyword) and for `reagent_to_string`, the inverse operation.
 
 This is the form used throughout Pourfecto's own examples and tests; it's also what Pourfecto calls internally when parsing reagent names out of [stock](@ref pourfecto_stocks) tables.
+
+!!! note
+    CHESSCore's `reagent_context` keyword (used with `stock_to_dict`/`dict_to_stock` round-tripping
+    -- see [Interop](https://jensenlab.github.io/CHESS/dev/manual/interop/)) isn't used anywhere in
+    Pourfecto's own DataFrame interface (`df_to_labware`/`labware_to_df`), which resolves reagents
+    through `string_to_reagent` instead. If you're only using Pourfecto's table-based workflow, the
+    `reagent_context` silent-fallback failure mode described in that chapter doesn't apply to you.

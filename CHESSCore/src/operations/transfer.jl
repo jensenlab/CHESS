@@ -1,6 +1,6 @@
 
 """
-    transfer!(donor::Well,recipient::Well,quantity::Union{Unitful.Volume,Unitful.Mass};instrument=nothing)
+    transfer!(donor::Well,recipient::Well,quantity::Union{Unitful.Volume,Unitful.Mass},configuration::String="";instrument=nothing)
 
 Remove `quantity` from `donor` and move it to `recipient`
 

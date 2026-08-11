@@ -1,11 +1,11 @@
 # # Priority: Dosing a Poorly Water-Soluble Drug
 #
-# This example works through a real dosing problem: we need to prepare wells
+# This example works through a real dosing problem: preparing wells
 # at a high and a low concentration of a drug that is only mildly soluble in
-# water but dissolves well in DMSO. We have two possible drug stocks: one
+# water but dissolves well in DMSO. Two possible drug stocks are available: one
 # dissolved in water at a low, solubility-limited concentration, and one
 # dissolved in DMSO at a much higher concentration. DMSO is undesirable at
-# high concentrations (it's cytotoxic to cells), so we'd rather draw from the
+# high concentrations (it's cytotoxic to cells), so the plan should draw from the
 # water stock whenever the dose allows it, and only reach for the DMSO stock
 # when the water stock's low concentration makes that impossible. The rest of
 # each well is backfilled with water.
@@ -15,8 +15,9 @@
 # along with the drug. There's no way to hit an exact drug dose while also
 # guaranteeing zero DMSO. [`PriorityDict`](@ref) is exactly the tool for
 # expressing "get the drug dose right; prefer the water stock and minimize
-# DMSO; let backfill water make up the rest" -- and, as we'll see, it lets
-# Pourfecto *choose* which stock to draw from rather than us scripting it.
+# DMSO; let backfill water make up the rest" -- it lets
+# Pourfecto *choose* which stock to draw from rather than scripting it directly,
+# as the [Setting priority explicitly](@ref) section below shows.
 
 using Pourfecto, CHESSCore, Unitful, DataFrames
 
@@ -66,7 +67,7 @@ configs = ["single_channel", "eight_channel_horizontal", "plate_master"]
 
 # ## A first attempt: priority without DMSO
 #
-# It's tempting to only set a priority for the reagent we care about, the
+# It's tempting to only set a priority for the reagent that matters, the
 # drug, and leave DMSO alone:
 
 naive_priority = PriorityDict("drug" => UInt64(1))
@@ -107,7 +108,7 @@ pc = pourfecto(source_labware, [target_plate], configs; priority=priority)
 # ## Comparing the naive and explicit runs
 #
 # [`planned_stocks`](@ref) reconstructs what Pourfecto actually planned to
-# deliver to each well; [`target_stocks`](@ref) is what we asked for;
+# deliver to each well; [`target_stocks`](@ref) is what was requested;
 # [`transfers`](@ref) is the full source-by-target volume matrix, which shows
 # exactly how much of each well came from the water-based drug stock versus
 # the DMSO-based drug stock. `CHESSCore.concentration` turns a

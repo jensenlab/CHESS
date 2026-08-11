@@ -46,8 +46,7 @@ where `<config_type> = string(get_config_type(configs(pourcast)[c]))` and
 - `packing_method::Function = packing_greedy`: Packing/slotting routine called as
   `packing_method(slotting_pairs, config)`. It must return a collection of
   slotting dictionaries (one per generated protocol).
-- `kwargs...`: Forwarded keyword arguments passed to `slotting_requirements(...)`
-  and `write_instrument_files(...)` (e.g., a transfer threshold).
+- `kwargs...`: Forwarded keyword arguments passed to `write_instrument_files(...)`.
 
 
 # Side Effects
@@ -55,7 +54,7 @@ where `<config_type> = string(get_config_type(configs(pourcast)[c]))` and
 - Writes instrument/protocol files via `write_instrument_files`.
 
 # Algorithm (per configuration)
-1. Compute `slotting_reqs = slotting_requirements(pourcast; kwargs...)`.
+1. Compute `slotting_reqs = slotting_requirements(pourcast)`.
 2. Convert `slotting_reqs[c]` into a vector of `(source::Labware, target::Labware)`
    pairs that require co-slotting.
 3. Generate one or more slotting solutions:

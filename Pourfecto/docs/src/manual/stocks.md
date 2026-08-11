@@ -1,5 +1,11 @@
 # [Stocks](@id pourfecto_stocks) 
 
+!!! note
+    This page covers Pourfecto's table-conversion layer on top of CHESSCore's `Stock` type. It
+    assumes familiarity with `Stock` itself -- see CHESSCore's
+    [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) manual page first if you
+    haven't read it.
+
 ## Creating Stocks from Tables 
 
 ```@meta

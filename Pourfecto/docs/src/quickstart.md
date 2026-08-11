@@ -1,4 +1,4 @@
-
+# [Quickstart](@id pourfecto_quickstart)
 
 The workflow for using Pourfecto is: 
 
@@ -8,6 +8,9 @@ The workflow for using Pourfecto is:
 4. Run the Pourfecto planning and scheduling algorithm to create a solved [`Pourcast`](@ref)
 5. Compile and Inspect the resulting `Pourcast`.
 
+The code below shows the shape of each step, but the file paths in it are placeholders -- it isn't
+meant to be copied and run as-is. For a complete, runnable example that builds its own source and
+target data inline, see [Checkerboard Assay](@ref) in the Examples section.
 
 ## Defining Source and Labware
 
@@ -34,7 +37,7 @@ targets = df_to_labware(target_value_df,target_unit_df)
 
 Pourfecto defines liquid handler instances as [`Configuration`](@ref) objects. Configurations combine an instrument's pipetting [`Head`](@ref) with a [`Deck`](@ref) that can hold the source and target labware. Users can define custom configurations, but Pourfecto provides an assortment of default configurations in the [`configurations`](@ref) dictionary.
 
-In this example we will select two defualt Configurations: 
+This example selects two default Configurations: 
 1) an eight channel pipette (oriented in the vertical direction)
 2) a Hamilton Nimbus (configured with slots for 50 mL conical tubes and a single SLAS plate slot, a common configuration in the Jensen Lab)
 

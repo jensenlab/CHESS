@@ -8,22 +8,24 @@ CurrentModule = Pourfecto
 
 Pourfecto builds directly on [CHESSCore](https://jensenlab.github.io/CHESS/dev/)'s reagent, stock, and labware/location model — see the [CHESS documentation](https://jensenlab.github.io/CHESS/dev/) for the underlying data model this package plans and schedules over.
 
+!!! note "Prerequisite reading"
+    Pourfecto's manual assumes familiarity with CHESSCore's
+    [Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/),
+    [Movement & Occupancy](https://jensenlab.github.io/CHESS/dev/manual/movement/),
+    [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/), and
+    [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) chapters. The ledger/database
+    chapters (Committing & Uploading, The Ledger, Caching & Repair, and so on) aren't needed to use
+    Pourfecto.
 
 ## Installation
 
-Pourfecto can be installed from the [`Jensen Lab Registry`](https://github.com/jensenlab/JensenLabRegistry). Follow instructions to add the registry before continuing 
-
-Once the registry has been installed, add Pourfecto with the following command:
+Pourfecto is not published to a package registry -- it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS:
 
 ```julia
-# after installing JensenLabRegistry
+# git clone https://github.com/jensenlab/CHESS && cd CHESS
 using Pkg
-Pkg.add("Pourfecto")
-```
-
-Then load the package:
-
-```julia
+Pkg.activate("Pourfecto")
+Pkg.instantiate()
 using Pourfecto
 ```
 

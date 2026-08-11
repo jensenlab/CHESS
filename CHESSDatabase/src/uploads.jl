@@ -24,7 +24,7 @@ end
 
 
 """
-    upload(fun::Funciton,args...;time=DateTime=Dates.now())
+    upload(fun::Function,args...;ledger_id=nothing,time=Dates.now(),instrument=nothing,instrument_time=nothing)
 
 Execute and upload a CHESS operation to a CHESS Database. If an error occurs in either execution or uploading, [`upload`](@ref) will return an error and rollback any changes to the database
 
@@ -65,7 +65,7 @@ end
 """
    upload_activity(location::Location)
 
-Add an entry to the Activity table a [`Locaiton`](@ref)
+Add an entry to the Activity table a [`Location`](@ref)
     
 Locations can be toggled between an active and inactive state. Activity can be used to show or hide locations in user interfaces.  
 """
@@ -228,9 +228,9 @@ end
 
 
 """
-    upload_transfer(sourceID::Integer,destinationID::Integer,quantity::Real,unit::AbstractString)
+    upload_transfer(source::Well,destination::Well,quant::Union{Unitful.Mass,Unitful.Volume},configuration::AbstractString="";ledger_id,time,instrument_id,instrument_time)
 
-commit a transfer of `quantity` from  well `sourceID` to well `destinationID`
+Commit a transfer of `quant` from `source` to `destination`.
 """
 function upload_transfer(source::Well,destination::Well,quant::Union{Unitful.Mass,Unitful.Volume},configuration::AbstractString="";ledger_id::Integer=append_ledger(),time::DateTime=now(),
         instrument_id::Union{Integer,Nothing}=nothing,instrument_time::Union{DateTime,Nothing}=nothing)

@@ -2,7 +2,7 @@
 
 
 """
-    reconstruct_location!(loc::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+    reconstruct_location!(loc::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
 
 Reconstruct the entire state of a [`Location`](@ref) `location` in a CHESS Database. 
 
@@ -33,7 +33,7 @@ end
 
 
 """
-    reconstruct_location(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+    reconstruct_location(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
 
 Reconstruct the entire state of location in a CHESS Database using only an integer location_id
 

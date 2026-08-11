@@ -20,8 +20,8 @@ since it can only reach one well at a time. A 96-channel pipette can't be
 used at all here, since it dispenses to every well simultaneously and can't
 vary volume independently by row or column.
 
-We'll build this experiment in Pourfecto, let it choose from a set of
-available pipetting configurations, and see whether it converges on the
+This example builds the experiment in Pourfecto, lets it choose from a set of
+available pipetting configurations, and checks whether it converges on the
 16-operation eight-channel solution.
 
 ```julia
@@ -30,7 +30,7 @@ using Pourfecto, CHESSCore, Unitful
 
 ## Defining reagents and source labware
 
-Reagents are created from names with [`string_to_reagent`](@ref). We need
+Reagents are created from names with [`string_to_reagent`](@ref). This example needs
 two solid reagents (A and B) and water to dissolve them.
 
 ```julia
@@ -55,7 +55,7 @@ children(B_reservoir)[1].stock = B_stock
 
 ## Filling the target plate
 
-We fill the 8x8 block of the 96-well target plate so that the volume of
+This fills the 8x8 block of the 96-well target plate so that the volume of
 `A_stock` decreases by 10 µL per row and the volume of `B_stock` decreases
 by 10 µL per column, starting from 80 µL of each.
 
@@ -70,7 +70,7 @@ for row in 1:8
 end
 ```
 
-A heatmap of the target plate shows the checkerboard pattern we just
+A heatmap of the target plate shows the checkerboard pattern just
 created — the combined A/B volume is highest in the top-left corner and
 decreases toward the bottom-right.
 
@@ -80,9 +80,9 @@ plot(target_plate; well_heatmap=true)
 
 ## Planning and scheduling
 
-We give Pourfecto four candidate configurations to choose from: a
+Pourfecto is given four candidate configurations to choose from: a
 single-channel pipette, an eight-channel pipette (both orientations), and
-a plate-filling PlateMaster. We run the algorithm twice — once with the
+a plate-filling PlateMaster. The algorithm runs twice — once with the
 default `"min_cost_flow"` objective, and once asking Pourfecto to minimize
 the number of *active* flow operations directly.
 

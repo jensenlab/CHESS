@@ -1,7 +1,7 @@
 
 
 """
-    _reconstruction_transfer(donor,recipient,quantity)
+    _reconstruction_transfer(donor,recipient,quantity,configuration::String="")
 
 Internal, non-exported helper used only by the ledger-replay simulation below. Returns new
 `(donor,recipient)` objects reflecting a transfer of `quantity`, without mutating the originals — the

@@ -16,8 +16,8 @@ Fields:
 - `vendor`/`catalog`: descriptive product data, if applicable.
 - `default_parent_cost`/`default_child_cost`: fallback occupancy costs used when no specific or
   category-based [`occupancy_cost`](@ref) rule applies.
-- `actuatable_attributes`: names of [`AttributeKind`](@ref)s this kind's [`Instrument`](@ref) is
-  associated with -- descriptive only, not enforced; empty for non-instrument kinds.
+- `actuatable_attributes`: names of [`AttributeKind`](@ref)s this kind is
+  associated with as an instrument -- descriptive only, not enforced; empty for non-instrument kinds.
 - `performable_operations`: mutating operation functions (e.g. `move_into!`, `transfer!`,
   `set_attribute!`) this kind's instrument can perform on *other* locations; empty for non-instrument
   kinds.

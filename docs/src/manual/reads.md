@@ -71,11 +71,12 @@ julia> Absorbance(missing)
 missing
 ```
 
-## `Instrument`s and capability gating
+## Instrument capability gating
 
-There is a single concrete `Instrument` type for every instrument model -- per-model capability is
-data on its [`LocationKind`](@ref) ([`performable_operations`](@ref), [`actuatable_attributes`](@ref),
-[`readable_types`](@ref)), not a distinct Julia type. `record_read!`'s optional `instrument` keyword
+There is no dedicated `Instrument` type -- an instrument is a `GenericLocation` or `Labware`
+(whichever fits its physical shape) whose `LocationKind` is flagged `is_instrument`, carrying the
+per-model capability data ([`performable_operations`](@ref), [`actuatable_attributes`](@ref),
+[`readable_types`](@ref)). `record_read!`'s optional `instrument` keyword
 routes the call through `_check_capability`: it does nothing when `instrument` is omitted (the
 default), otherwise the instrument must have the calling operation in its `performable_operations`
 or the call throws `ArgumentError`:

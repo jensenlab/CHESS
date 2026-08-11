@@ -26,7 +26,7 @@ adverbs_s = sanitize_tokens(adverbs)
 verbs_s   = sanitize_tokens(verbs)
 
 # directory-safe pairings
-names = random_adverb_verb_pairs(adverbs_s, verbs_s, 50)
+names = random_adverb_verb_pairs(50; adverbs=adverbs_s, verbs=verbs_s)
 """
 function sanitize_tokens(xs::AbstractVector{<:AbstractString};lowercase::Bool=true,replace_space_hyphen::Bool=true,allow_digits::Bool=true,keep_underscores::Bool=true,drop_empty::Bool=true,de_duplicate::Bool=true,sort_items::Bool=false)::Vector{String}
 # Build allowlist regex dynamically
@@ -361,7 +361,7 @@ const verbs = sanitize_tokens(String[
 
 
 """
-    random_adverb_verb_pairs(adverbs, verbs, n; rng=Random.default_rng(), unique=true) -> Vector{String}
+    random_adverb_verb_pairs(n=1; adverbs=adverbs, verbs=verbs, rng=Random.default_rng(), make_unique=true) -> Vector{String}
 
 Generate `n` directory-safe random strings of the form `adverb_verb` by sampling
 from `adverbs` and `verbs` (assumed to be Julia vectors of strings).
@@ -372,7 +372,7 @@ Directory-safety rules applied:
 - all other non `[a-z0-9_]` characters removed
 - repeated `_` collapsed; leading/trailing `_` stripped
 
-If `unique=true`, results are unique; throws if `n` exceeds the number of possible
+If `make_unique=true`, results are unique; throws if `n` exceeds the number of possible
 unique combinations after sanitization.
 """
 function random_adverb_verb_pairs(n::Integer=1;

@@ -81,13 +81,14 @@ directly in `"value"`.
 Every subtype shares a common set of fields: `kind`, `name`, `is_locked`, `is_active`, its own
 `attributes`, and `reads`. Beyond that:
 
-- `GenericLocation`/`Instrument` add a `"children"` list, where each child is converted the same
+- `GenericLocation` adds a `"children"` list, where each child is converted the same
   way -- children can themselves have children, nested as deep as the real hierarchy goes.
 - `Well` adds `"cost"` and `"stock"` (a nested `stock_to_dict`).
 - `Labware` is the one non-flat exception: `"wells"` is a nested 2D array matching its shape, so a
   `Labware` and its wells convert to a `Dict` and back as a single unit -- matching how a human
   actually thinks about a plate.
-- `Instrument` additionally includes informational-only `actuatable_attributes`/
+- Any capability-bearing location (`GenericLocation` or `Labware` with `is_instrument` set on its
+  kind) additionally includes informational-only `actuatable_attributes`/
   `performable_operations`/`readable_types` -- these are never consulted on reconstruction, which
   always re-derives real capability from the resolved `LocationKind` by name.
 

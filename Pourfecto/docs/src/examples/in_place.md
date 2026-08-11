@@ -11,7 +11,7 @@ adjusting pH, dosing a stimulant -- without discarding what's already
 there. Pourfecto calls this an **in-place transfer**: the source and
 target are the same physical wells.
 
-As an example, we will add sodium hydroxide to every well
+This example adds sodium hydroxide to every well
 of an already-filled plate to neutralize pH, keeping the
 existing water and buffer intact.
 
@@ -22,7 +22,7 @@ using Pourfecto, CHESSCore, Unitful
 ## Reagents and labware
 
 `existing_plate` represents the plate's current contents. `target_plate`
-represents what we want each well to contain afterward -- the same water
+represents what each well should contain afterward -- the same water
 and buffer, plus the NaOH addition. Because `Well.stock` is a single
 mutable field, "current state" and "desired state" for the same physical
 plate have to be two separate `Labware` objects; Pourfecto recognizes them
@@ -94,7 +94,7 @@ and the naoh_reservoir row should show exactly 5 µL.
 ## Incomplete target declaration
 
 Suppose the existing plate also has a trace of a preservative that was omitted
-in the target -- it's not something we're trying to
+in the target -- it's not something the plan is trying to
 change, just an oversight:
 
 ```julia

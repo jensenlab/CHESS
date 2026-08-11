@@ -7,7 +7,7 @@ CurrentModule = Pourfecto
 
 Pourfecto uses **configurations** to describe the liquid-handling instruments available to a scheduling problem. A [`Configuration`](@ref) defines the physical and operational constraints of an instrument, including:
 
-- how liquid can be aspirated aspirated and dispensed by the instrument at once,
+- how liquid can be aspirated and dispensed by the instrument at once,
 - how much liquid each channel can carry,
 - which pistons are connected to which channels,
 - which labware can be placed on the deck,
@@ -15,6 +15,18 @@ Pourfecto uses **configurations** to describe the liquid-handling instruments av
 - and any additional instrument-specific settings.
 
 Configurations are supplied to Pourfecto when solving for a [`Pourcast`](@ref). They tell the algorithm what operations are physically possible.
+
+A `Configuration` is a different concept from CHESSCore's capability-bearing `Instrument` location
+(see [Reads & Instrument Measurements](https://jensenlab.github.io/CHESS/dev/manual/reads/)):
+`Instrument` capability gates *recording* an operation against a physical device in the ledger,
+while a `Configuration` describes a device for *scheduling* purposes only. There's no automatic
+bridge between the two today -- compiling a `Pourcast` writes protocol files rather than calling
+`upload(...; instrument=...)`.
+
+!!! note
+    Most users only need [Using pre-defined Configurations](@ref) below. The rest of this page
+    (building custom `Piston`/`Head`/`Configuration` machinery) is for adding support for a new
+    physical liquid handler -- see [Defining a New Instrument](@ref pourfecto_new_instrument).
 
 ---
 ## Using pre-defined Configurations 
@@ -288,7 +300,7 @@ A [`ConstrainedPosition`](@ref) represents a deck position that can hold only sp
 ```julia
 pos = ConstrainedPosition(
     "plate_position",
-    Set([MyPlateType]),
+    Set([:MyPlateKind]),
     (1, 1),
     true,
     true,
@@ -301,7 +313,7 @@ The fields are:
 | Field | Meaning |
 |---|---|
 | `name` | Position name |
-| `labware` | Set of allowed `JLIMS.Labware` types |
+| `labware` | `Set{Symbol}` of allowed `LocationKind` names |
 | `slots` | Number of labware slots available |
 | `aspirate` | Whether aspiration is allowed |
 | `dispense` | Whether dispensing is allowed |
@@ -312,7 +324,7 @@ For example, a position that can hold only [SLAS plates](https://www.slas.org/re
 ```julia
 plate_position = ConstrainedPosition(
     "plate_position",
-    Set([SLASLabware]),
+    Set([:MySLASPlateKind]),
     (1, 1),
     true,
     true,
@@ -342,8 +354,8 @@ A more constrained deck might look like:
 
 ```julia
 deck = [
-    ConstrainedPosition("source_plate_slot", Set([SourcePlateType]), (1, 1), true, false, "rectangle"),
-    ConstrainedPosition("target_plate_slot", Set([TargetPlateType]), (1, 1), false, true, "rectangle"),
+    ConstrainedPosition("source_plate_slot", Set([:SourcePlateKind]), (1, 1), true, false, "rectangle"),
+    ConstrainedPosition("target_plate_slot", Set([:TargetPlateKind]), (1, 1), false, true, "rectangle"),
     EmptyPosition("unused"),
 ]
 ```

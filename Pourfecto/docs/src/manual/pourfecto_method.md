@@ -26,14 +26,14 @@ The main user-interface for planning and scheduling is [`pourfecto`](@ref). This
 
 ### Planning from stocks
 
-If you only have source and target `JLIMS.Stock` objects, call:
+If you only have source and target `CHESSCore.Stock` objects, call:
 
 ```julia
-pourfecto(sources::Vector{<:JLIMS.Stock}, targets::Vector{<:JLIMS.Stock})
+pourfecto(sources::Vector{<:CHESSCore.Stock}, targets::Vector{<:CHESSCore.Stock})
 ```
 
 
-This runs Pourfecto in **planning mode**. The result is a [`Pourcast`](@ref) containing the planned transfer matrix. Planning is useful to verify that the stock inputs result in a feasible liquid transfer platn. Planning **does not** consider any of the logistical details of the liquid handling workflow. 
+This runs Pourfecto in **planning mode**. The result is a [`Pourcast`](@ref) containing the planned transfer matrix. Planning is useful to verify that the stock inputs result in a feasible liquid transfer plan. Planning **does not** consider any of the logistical details of the liquid handling workflow. 
 
 
 ---
@@ -43,7 +43,7 @@ This runs Pourfecto in **planning mode**. The result is a [`Pourcast`](@ref) con
 If your source and target stocks are already placed in labware, you can pass labware directly:
 
 ```julia
-pc = pourfecto(source_labware::Vector{<:JLIMS.Labware}, target_labware::Vector{<:JLIMS.Labware})
+pc = pourfecto(source_labware::Vector{<:CHESSCore.Labware}, target_labware::Vector{<:CHESSCore.Labware})
 ```
 
 This also runs in **planning mode**. Pourfecto extracts the stocks from the supplied labware and plans transfers between those stocks.
@@ -56,7 +56,7 @@ This also runs in **planning mode**. Pourfecto extracts the stocks from the supp
 To run in both planning and scheduling modes, provide source labware, target labware, and instrument configurations:
 
 ```julia
-pc = pourfecto(source_labware::Vector{<:JLIMS.Labware}, target_labware::Vector{<:JLIMS.Labware},configs::Vector{<:Configuration})
+pc = pourfecto(source_labware::Vector{<:CHESSCore.Labware}, target_labware::Vector{<:CHESSCore.Labware},configs::Vector{<:Configuration})
 ```
 
 This mode plans the required transfers and then schedules them using the provided liquid-handler configurations.
@@ -110,8 +110,8 @@ where:
 
 ```julia
 directory::AbstractString
-source_labware::Vector{<:JLIMS.Labware}
-target_labware::Vector{<:JLIMS.Labware}
+source_labware::Vector{<:CHESSCore.Labware}
+target_labware::Vector{<:CHESSCore.Labware}
 configs::Union{Vector{<:AbstractString}, Vector{<:Configuration}}
 ```
 

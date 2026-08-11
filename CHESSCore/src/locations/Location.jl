@@ -168,7 +168,7 @@ See also: [`unlock!`](@ref),[`lock!`](@ref),[`toggle_lock!`](@ref),[`unlock`](@r
 is_locked(x::Location)=x.is_locked # locked locations cannot be moved from their current parent. Children of locked locations CAN be moved.
 
 """
-    unlock!(x::Location)
+    unlock!(x::Location;instrument::Union{Location,Nothing}=nothing)
 Change the state of the `is_locked` property of a location to `false`.
 
 See also: [`is_locked`](@ref). To preview this without mutating `x`, see
@@ -179,7 +179,7 @@ function unlock!(x::Location;instrument::Union{Location,Nothing}=nothing)
 end
 
 """
-    lock!(x::Location)
+    lock!(x::Location;instrument::Union{Location,Nothing}=nothing)
 Change the state of the `is_locked` property of a location to `true`.
 
 See also: [`is_locked`](@ref). To preview this without mutating `x`, see
@@ -190,7 +190,7 @@ function lock!(x::Location;instrument::Union{Location,Nothing}=nothing)
 end
 
 """
-    toggle_lock!(x:Location)
+    toggle_lock!(x::Location;instrument::Union{Location,Nothing}=nothing)
 
 Flip the state of the `is_locked` property of a location.
 
@@ -215,7 +215,7 @@ end
 
 
 """
-    activate!(x::Location)
+    activate!(x::Location;instrument::Union{Location,Nothing}=nothing)
 
 Set the `is_active` property of [`Location`](@ref) `x` to `true`
 
@@ -226,7 +226,7 @@ function activate!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_active=true
 end
 """
-    deactivate!(x::Location)
+    deactivate!(x::Location;instrument::Union{Location,Nothing}=nothing)
 
 Set the `is_active` property of [`Location`](@ref) `x` to `false`
 
@@ -238,7 +238,7 @@ function deactivate!(x::Location;instrument::Union{Location,Nothing}=nothing)
 end
 
 """
-    toggle_activity!(x::Location)
+    toggle_activity!(x::Location;instrument::Union{Location,Nothing}=nothing)
 
 Switch the `is_active` property of [`Location`](@ref) `x` from its current state.
 

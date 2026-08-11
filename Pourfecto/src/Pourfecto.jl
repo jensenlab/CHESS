@@ -114,6 +114,7 @@ If the Pourcast fails a `solution_quality` check, `pourfecto` will produce an er
 
 ## Keyword Arguments
 $(_pourfecto_kw_doc_())
+* `optimizer = Gurobi.Optimizer`: The JuMP-compatible optimizer used to solve the underlying models (e.g. `HiGHS.Optimizer`, `SCIP.Optimizer`).
 * `packing_method::Function = packing_greedy`: forwarded to `compile`; the slotting/packing routine used when compiling the resulting `Pourcast` to `directory`. See the [Compiling Pourcasts](@ref pourfecto_compiling) manual page for details.
 """
 function pourfecto(directory::AbstractString,source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware},configs::Union{Vector{<:AbstractString},Vector{<:Configuration}};kwargs...)

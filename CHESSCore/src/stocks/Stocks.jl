@@ -220,7 +220,7 @@ function *(quantity::Unitful.Mass,chemical::Solid)
     return Stock(Set{Organism}(),SolidDict(chemical => uconvert(prefquantunits(chemical),quantity)),LiquidDict())
 end
 """
-    *(quantity::Unitful.Mass,chemical::Solid)
+    *(quantity::Unitful.Volume,chemical::Liquid)
 
 Overload the `*` operator to construct a Solution from a volume of a liquid.
 """
@@ -252,7 +252,7 @@ end
 """
     /(stock::Stock,num::Real)
 
-Overload the `/` operator to divide a Stock by a scalar. Returns a new Stock with all chemical quantities scaled by a factor of `num` 
+Overload the `/` operator to divide a Stock by a scalar. Returns a new Stock with all chemical quantities scaled by a factor of `1/num`.
 """
 /(stock::Stock,num::Real) = *(1/num,stock)
 

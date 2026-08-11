@@ -78,8 +78,9 @@ dictionary keys:
 - `predispenses=0`: force the instrument to predispense a shot of liquid before starting the run. 
 - `cobra_path`: the local path the cobra should look for protocol files on the machine running the instrument. Defaults to a persisted Preferences.jl setting if one has been set with [`set_cobra_path!`](@ref), otherwise `nothing`; must be set (via `set_cobra_path!` or directly with `cobra_settings["cobra_path"] = "..."`) before compiling a protocol.
 - `washtime`: set how long the wash system should flush the nozzles for 
-- `AspPad = 1.125`: Force the cobra to overaspirate by a factor of AspPad. Pourfecto takes this into account when planning 
-- `AspDistnace = 1.5`: set how many millimeters above the bottom of the labware the cobra should aspirate from. 
+- `AspPad = 1.125`: Force the cobra to overaspirate by a factor of AspPad. Pourfecto takes this into account when planning
+- `AspDistance = 1.5`: set how many millimeters above the bottom of the labware the cobra should aspirate from.
+- `maxShot = 40`: the maximum single-shot dispense volume, in µL.
 
 
 """

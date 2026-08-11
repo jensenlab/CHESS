@@ -491,6 +491,7 @@ Run the Pourfecto algorithm in **planning** mode using just the source and targe
 
 ## Keyword Arguments 
 $(_pourfecto_kw_doc_())
+* `optimizer = Gurobi.Optimizer`: The JuMP-compatible optimizer used to solve the underlying models (e.g. `HiGHS.Optimizer`, `SCIP.Optimizer`).
 """
 function pourfecto(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESSCore.Stock};kwargs...)
         return planner(sources,targets;kwargs...)
@@ -508,6 +509,7 @@ Run the Pourfecto algorithm in **planning** mode using just the source and targe
 
 ## Keyword Arguments 
 $(_pourfecto_kw_doc_())
+* `optimizer = Gurobi.Optimizer`: The JuMP-compatible optimizer used to solve the underlying models (e.g. `HiGHS.Optimizer`, `SCIP.Optimizer`).
 """
 function pourfecto(source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware};kwargs...)
         sources = stocks(source_labware)
@@ -531,6 +533,7 @@ Run the Pourfecto algorithm in **planning and scheduling** mode
 
 ## Keyword Arguments 
 $(_pourfecto_kw_doc_())
+* `optimizer = Gurobi.Optimizer`: The JuMP-compatible optimizer used to solve the underlying models (e.g. `HiGHS.Optimizer`, `SCIP.Optimizer`).
 """
 function pourfecto(source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware},configs::Vector{<:Configuration};kwargs...)
         return scheduler(source_labware,target_labware,configs;kwargs...)
@@ -550,6 +553,7 @@ Run the Pourfecto algorithm in **planning and scheduling** mode.
 
 ## Keyword Arguments 
 $(_pourfecto_kw_doc_())
+* `optimizer = Gurobi.Optimizer`: The JuMP-compatible optimizer used to solve the underlying models (e.g. `HiGHS.Optimizer`, `SCIP.Optimizer`).
 """
 function pourfecto(source_labware::Vector{<:CHESSCore.Labware},target_labware::Vector{<:CHESSCore.Labware},configs_string::Vector{<:AbstractString};kwargs...)
         configs = map(x->configurations[x],configs_string)

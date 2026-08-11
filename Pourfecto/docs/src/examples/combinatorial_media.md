@@ -4,9 +4,9 @@ EditURL = "../../../examples/combinatorial_media/combinatorial_media.jl"
 
 # Combinatorial Media Preparation
 
-This example reproduces a high-throughput microbial growth experiment: we
-need to prepare 480 unique 200 µL media wells — five 96-well target plates
-— each containing a random subset of up to 48 candidate reagents dissolved
+This example reproduces a high-throughput microbial growth experiment:
+preparing 480 unique 200 µL media wells — five 96-well target plates —
+each containing a random subset of up to 48 candidate reagents dissolved
 in water.
 
 The source stocks are spread across three different labware types:
@@ -29,8 +29,8 @@ affects the resulting plan.
 using Pourfecto, CHESSCore, Unitful, Random, DataFrames, CSV
 ```
 
-We randomly generate the media compositions. For this reason alone, we include
-a seed.
+The media compositions are randomly generated, so this example sets a seed
+for reproducibility.
 
 ```julia
 Random.seed!(48207531)
@@ -106,8 +106,8 @@ configs = ["single_channel", "eight_channel_vertical", "eight_channel_horizontal
 
 ## Comparing scheduling scenarios
 
-We run four scenarios that vary either the available source labware or the
-scheduling objective:
+This example runs four scenarios that vary either the available source
+labware or the scheduling objective:
 
 1. **All Sources** — every source labware available, default
    `"min_cost_flow"` objective.
@@ -131,9 +131,9 @@ pc4, time4 = @timed pourfecto(source_labware_all, target_plates, configs; priori
 
 ## Reporting results
 
-For each scenario we tally the transfers performed by each instrument
-configuration, the total scheduled flow volume, the number of active
-(nonzero) flows, and the solve time.
+For each scenario, the table below tallies the transfers performed by each
+instrument configuration, the total scheduled flow volume, the number of
+active (nonzero) flows, and the solve time.
 
 ```julia
 pcs = [pc1, pc2, pc3, pc4]
@@ -176,7 +176,7 @@ A few things stand out in this table:
 - **Minimize Configurations** tends to concentrate transfers onto fewer
   distinct instrument types, at the cost of solve time or total flow.
 
-Finally, we save the comparison table alongside the example for reference.
+Finally, the comparison table is saved alongside the example for reference.
 
 ```julia
 CSV.write(joinpath(@__DIR__, "combinatorial_media_results.csv"), df)

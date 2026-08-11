@@ -17,21 +17,19 @@ This mirrors the shape of the CHESS package family itself:
   operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand.
 - **[`CHESSLabConstants`](api/labconstants.md)** -- a starter set of registered lab constants (reagents, organisms,
   location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros, can serve as a template for defining your own lab's constants.
-- **`CHESS`** -- packages everything into a single repository 
+- **`CHESS`** -- the umbrella package: `@reexport`s all three, plus `Unitful`, so `using CHESS`
+  alone is enough to get everything.
 
 
 ## Installation
 
 CHESS requires **Julia 1.12 or later** -- the repository ties its four packages together as a
-Julia `[workspace]`, a Pkg feature introduced in 1.12.
+Julia `[workspace]`, a Pkg feature introduced in 1.12. The workspace members resolve each other via
+local paths, not a package registry, so **CHESS must be used from a local clone** --
+`Pkg.add(url="...")` from another project will not work, since Pkg does not carry a workspace's
+local path resolution to consumers that merely add it as a dependency, and none of these packages
+are published to a registry.
 
-To use CHESS as a dependency in your own project:
-```julia
-using Pkg
-Pkg.add(url="https://github.com/jensenlab/CHESS")
-```
-
-For local development (working on CHESS itself):
 ```julia
 # git clone https://github.com/jensenlab/CHESS && cd CHESS
 using Pkg
@@ -47,7 +45,7 @@ Pkg.instantiate()
 using CHESS
 
 room = GenericLocation(nothing, "Main Room", Room)
-plate = build_location(WP96, "Plate 1")
+plate = build_location(loc"WP96", "Plate 1")
 move_into!(room, plate)
 
 set_attribute!(room, Temperature(25u"°C"))

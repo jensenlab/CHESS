@@ -1,14 +1,14 @@
 # Instrument Interfaces
 
-[Reads & Instrument Measurements](reads.md) covered `Instrument` capability gating entirely within
+[Reads & Instrument Measurements](reads.md) covered instrument capability gating entirely within
 `CHESSCore` -- `performable_operations` and `_check_capability`, checked in memory, with no notion of
 persistence at all. This chapter covers the other half: how `CHESSDatabase` records *which*
 instrument actually performed a persisted operation.
 
 ## A clean package boundary
 
-`CHESSCore` owns `Instrument`, `performable_operations`, and `_check_capability` -- it has zero
-concept of a database, an `InstrumentID` column, or a ledger. `CHESSDatabase` owns zero capability
+`CHESSCore` owns instrument capability -- `performable_operations` and `_check_capability` -- it
+has zero concept of a database, an `InstrumentID` column, or a ledger. `CHESSDatabase` owns zero capability
 logic -- it never calls `_check_capability` directly, never inspects `performable_operations` -- and
 owns 100% of the attribution: the `InstrumentID`/`InstrumentTime` columns on `Transfers`/
 `Movements`/`EnvironmentAttributes`/`Reads`.
