@@ -26,27 +26,31 @@ end
 
 
 
-function assign_plates(wells::BitMatrix,experiments::Vararg{Experiment};bound_plates=bound_plates,plate_timelimit=100,quiet=true,kwargs...)
-    ## Place experiments on plates by sequential minimization of the following criteria 
-    # 1. minimize the number of plates used 
-    # 2. minimize the number of splits between experiments on plates 
-    # 3. minimize the total number of runs (minimize the number of controls needed because of splitting) 
+function assign_plates(wells::BitMatrix,experiments::Vararg{Experiment};bound_plates=bound_plates,plate_timelimit=100,quiet=true,optimizer=_default_optimizer[],kwargs...)
+    ## Place experiments on plates by sequential minimization of the following criteria
+    # 1. minimize the number of plates used
+    # 2. minimize the number of splits between experiments on plates
+    # 3. minimize the total number of runs (minimize the number of controls needed because of splitting)
     W=sum(wells)
-    N=length(experiments) # number of experiments 
+    N=length(experiments) # number of experiments
 
     P=bound_plates(wells,experiments...) # bound on number of plates
 
-    model=Model(Gurobi.Optimizer)
-    set_attribute(model,"TimeLimit",plate_timelimit)
+    model=Model(optimizer)
+    set_time_limit_sec(model,Float64(plate_timelimit))
     if quiet 
         set_silent(model)
     end 
 
-    @variable(model, r[1:N,1:P] >= 0, Int ) # number of runs from experiment n on plate p
-    @variable(model, c[1:N,1:P], Bin) # indicator for controls for experiment n on plate p 
-    @variable(model, Ip[1:P],Bin) # indicator for if plate p is needed
     controls=map(x->x.positive_controls+x.negative_controls,experiments)
     runs=map(x->x.runs,experiments)
+
+    # r's upper bound (each experiment's own run count) must be finite -- solvers that lack native
+    # indicator constraint support (e.g. HiGHS) bridge `!c[n,p] => {r[n,p] == 0}` into a big-M
+    # reformulation, which requires every variable in the constraint to have a finite domain.
+    @variable(model, 0 <= r[n=1:N,1:P] <= runs[n], Int ) # number of runs from experiment n on plate p
+    @variable(model, c[1:N,1:P], Bin) # indicator for controls for experiment n on plate p
+    @variable(model, Ip[1:P],Bin) # indicator for if plate p is needed
 
     for p in 1:P
         @constraint(model, sum(r[:,p]+controls.*c[:,p]) <= W * Ip[p]) # number of runs per plate in use must be less than or equal to the plate size across all experiments

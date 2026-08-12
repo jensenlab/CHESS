@@ -3,27 +3,28 @@
 
 
 """
-    function MILP(P::Int,N::Int,wells::BitMatrix;objective::Function=hybrid,minimize=true,timelimit=100)
+    function MILP(P::Int,N::Int,wells::BitMatrix;objective::Function=hybrid,minimize=true,timelimit=100,optimizer=_default_optimizer[])
 
-MILP solver for control placment. Requires Gurobi licence.
+MILP solver for control placment.
 
-# Arguments 
+# Arguments
 - `wells`: A BitMatrix indicating the shape and active wells, use `trues(n,m)` for a full n x m plate.
 - `P`: The integer number of positive controls
-- `N`: The integer number of negative controls 
+- `N`: The integer number of negative controls
 
-# Keyword Arguments 
+# Keyword Arguments
 - `objective`: the objective type for the MILP solver. Must be either 'minimax' or 'hybrid'.
 - `timelimit`: time limit in seconds for the solver to return a suboptimal solution if it hasn't found an optimal one
-- `minimize`: if true, the solver minimizes the distance from experiment wells to control wells. if false, it will maximize (this is not useful for practical purposes but is helpful for assessing performance) 
+- `minimize`: if true, the solver minimizes the distance from experiment wells to control wells. if false, it will maximize (this is not useful for practical purposes but is helpful for assessing performance)
+- `optimizer`: the JuMP-compatible optimizer used to solve the model, defaulting to `Gurobi.Optimizer` (requires a Gurobi license). A license-free alternative such as `HiGHS.Optimizer` can be passed instead.
 
 """
-function MILP(wells::BitMatrix,P::Int,N::Int;objective::Function=hybrid,minimize=true,timelimit=100)
+function MILP(wells::BitMatrix,P::Int,N::Int;objective::Function=hybrid,minimize=true,timelimit=100,optimizer=_default_optimizer[])
 
     in(objective,[hybrid,minimax]) ? nothing : throw(ArgumentError("the objective for the MILP Solver must either be 'minimax' or 'hybrid'"))
     R,C=size(wells)
-    model=Model(Gurobi.Optimizer)
-    set_attribute(model,"TimeLimit",timelimit)
+    model=Model(optimizer)
+    set_time_limit_sec(model,Float64(timelimit))
     @variable(model, x[1:R,1:C],Bin);
     @variable(model,y[1:R,1:C],Bin);
     @variable(model,dwx[1:R,1:C]>=0);
@@ -103,7 +104,7 @@ function MILP(wells::BitMatrix,P::Int,N::Int;objective::Function=hybrid,minimize
         @objective(model,Min,-1*sum(wells.*(dwx+dwy)));
     end
     optimize!(model)
-    return PlateArray(wells,BitMatrix(JuMP.value.(x)),BitMatrix(JuMP.value.(y)))
+    return PlateArray(wells,Bool.(round.(JuMP.value.(x))),Bool.(round.(JuMP.value.(y))))
 end
 
 #= test 

@@ -7,14 +7,17 @@ Gurobi,
 Distributions,
 Plots,
 ColorBrewer,
-DataFrames
+DataFrames,
+JSON
 
 import Plots: plot
-import DataFrames: DataFrame 
-import Base: == , size 
+import DataFrames: DataFrame
+import Base: == , size
 include("./types.jl")
 include("./utils.jl")
-include("./interface.jl")
+include("./interface/dataframe_interface.jl")
+include("./interface/json_interface.jl")
+include("./solvers/defaults.jl")
 include("./solvers/objectives.jl")
 include("./solvers/exchange.jl")
 include("./solvers/MILP.jl")
@@ -42,6 +45,8 @@ export place_controls, solvers, objectives
 export arrayer
 #visualize_plate
 export plot
+#json_interface.jl
+export platearray_to_json, json_to_platearray
 
 
 

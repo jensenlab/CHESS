@@ -1,9 +1,13 @@
-using Test , PlateArrays, DataFrames
+using Test , PlateArrays, DataFrames, JSON
 
 import PlateArrays: OccupancyError,margins,expected_LHS,neighbors, hybrid, minimax, LHS, exchange, MILP
 import PlateArrays: letter_code, wellnames, alphabet_code, manhattan_distance, neighboring_ring,
     distance_score_ring, distance_score_brute, scale, distance_to_edge, partition, bound_plates,
     assign_plates, Plots
+import PlateArrays: raise_platearray, lower_bitmatrix, raise_bitmatrix, TYPEKEY
+
+using HiGHS
+PlateArrays._default_optimizer[] = HiGHS.Optimizer
 
 @testset "Construction" begin
     @test isa(PlateArray(trues(8,12),falses(8,12),falses(8,12)),PlateArray)
@@ -68,7 +72,7 @@ end
 
 @testset "place_controls" begin
     @test place_controls(trues(8,12),8,8) isa PlateArray
-    @test place_controls(trues(8,12),8,8,solver="MILP") isa PlateArray
+    @test place_controls(trues(8,12),8,8,solver="MILP",timelimit=10) isa PlateArray
     @test place_controls(trues(8,12),8,8,objective="LHS") isa PlateArray
     @test place_controls(trues(8,12),8,8,objective="minimax") isa PlateArray
     @test place_controls(plate) isa PlateArray
@@ -200,6 +204,24 @@ end
     plots = plot(designs_matrix)
     @test length(plots) == size(designs_matrix,2)
     @test all(p -> p isa Plots.Plot, plots)
+end
+
+@testset "JSON interface" begin
+    @test json_to_platearray(platearray_to_json(plate)) == plate
+
+    m = trues(2,3); m[1,2] = false
+    @test raise_bitmatrix(JSON.parse(JSON.json(lower_bitmatrix(m)))) == m
+
+    bad = JSON.parse(JSON.json(Dict(TYPEKEY=>"NotABitMatrix","size"=>[2,2],"data"=>[true,false,true,false])))
+    @test_throws ErrorException raise_bitmatrix(bad)
+
+    bad_pa = JSON.parse(JSON.json(Dict(TYPEKEY=>"NotAPlateArray")))
+    @test_throws ErrorException raise_platearray(bad_pa)
+
+    pos_json = lower_bitmatrix(plate.positives)
+    overlapping = JSON.parse(JSON.json(Dict(TYPEKEY=>"PlateArray",
+        "wells"=>lower_bitmatrix(plate.wells), "positives"=>pos_json, "negatives"=>pos_json)))
+    @test_throws OccupancyError raise_platearray(overlapping)
 end
 
 
