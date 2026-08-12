@@ -110,26 +110,55 @@ end
 
 
 """
-    batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy) -> (DataFrame, Vector{Int}, Vector)
+    batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy,
+                 volume_precision::Int=1, insert_blowouts::Bool=false,
+                 waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
+                 dead_volume_buffer::Real=0.0) -> DataFrame
 
 Group `convert_design`'s flat source/destination transfer list into one-to-many
-aspirate/dispense batches, bounded by the Nimbus channel's dispense capacity. For each distinct
-source well (grouped in first-appearance row order), destination transfers are volume-split
-against capacity ([`split_oversized`](@ref)), packed into capacity-bounded, distance-aware
-batches ([`cluster_batches`](@ref)), and ordered within each batch
-([`order_batch`](@ref); `batch_ordering` is `:greedy` or `:exact`). Each batch is emitted as one
-aspirate row (source well, total batch volume) followed by its dispense rows, in the unified
-`"Labware ID","Labware Position ID","Volume (uL)","Aspirate","Dispense","Change Tip Before"`
-schema (`"Change Tip Before"` is left `0` here; the caller fills it in via
-[`tip_change_flags`](@ref)).
+aspirate/dispense batches, bounded by the Nimbus channel's dispense capacity, and emit them in
+the unified action-row schema `"Labware ID","Labware Position ID","Volume (uL)","Action",
+"Change Tip Before"` (`Action` is `"Aspirate"`, `"Dispense"`, or `"Blowout"`).
 
-Returns `(action_df, aspirate_row_indices, batch_sources)`: `aspirate_row_indices` are the
-1-based row indices of `action_df` holding an aspirate action, and `batch_sources[k]` is the
-`(labware id, position)` of the k-th batch's source, in emission order -- both needed by the
-caller to compute and apply tip-change flags without re-deriving batch boundaries.
+For each distinct source well (grouped in first-appearance row order), destination transfers are
+volume-split against capacity ([`split_oversized`](@ref)), packed into capacity-bounded,
+distance-aware batches ([`cluster_batches`](@ref)), and ordered within each batch
+([`order_batch`](@ref); `batch_ordering` is `:greedy` or `:exact`).
+
+Volumes are rounded to `volume_precision` decimal places such that each aspirate's own tip-load
+cycle sums back to its aspirate volume *exactly* at that precision
+([`round_with_exact_sum`](@ref)) -- the last value in the cycle (a dispense, or the blowout when
+present) absorbs whatever rounding remainder is needed, rather than every value being rounded
+independently, which can otherwise leave a hairline float residual that a strict downstream
+`available >= requested` check rejects. If a rounded aspirate volume is ever found to exceed the
+channel's true capacity, this throws rather than silently clamping (clamping would silently
+reintroduce the same kind of exact-sum mismatch it's meant to prevent).
+
+When `insert_blowouts=true`, a batch that's immediately followed by a re-aspirate under the same
+tip (no tip change between them) gets a trailing `Blowout` row at `waste_target`, sized to drain
+`dead_volume_buffer` before the next aspirate -- that batch's own aspirate volume is then sized to
+cover its dispenses *plus* the buffer (the blowout is the last value in its cycle, so it absorbs
+the rounding remainder). `waste_target` (a `(labware id, position)` tuple) and a positive
+`dead_volume_buffer` (in µL, `< capacity`) are required when `insert_blowouts=true`. Batch
+formation reserves `capacity - dead_volume_buffer` of headroom for *every* batch in this mode
+(not just the ones that end up needing a blowout), since which batches need one isn't known until
+tip-change flags are computed across the whole design. **This path is opt-in and, per the
+generator's own refactor notes, not yet physically validated** -- it changes no behavior unless
+explicitly enabled.
 """
-function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy)
+function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy,
+    volume_precision::Int=1, insert_blowouts::Bool=false,
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
+    dead_volume_buffer::Real=0.0)
+
     capacity = ustrip(uconvert(u"µL", dispense_channels(head(config))[1].capacity))
+
+    if insert_blowouts
+        isnothing(waste_target) && throw(ArgumentError("batch_design: insert_blowouts=true requires a waste_target (labware id, position)"))
+        dead_volume_buffer > 0 || throw(ArgumentError("batch_design: insert_blowouts=true requires dead_volume_buffer > 0"))
+        dead_volume_buffer < capacity || throw(ArgumentError("batch_design: dead_volume_buffer ($dead_volume_buffer) must be less than channel capacity ($capacity)"))
+    end
+    effective_capacity = insert_blowouts ? capacity - dead_volume_buffer : capacity
 
     # group rows by source well, preserving first-appearance order
     source_keys = Tuple{String,Union{String,Integer}}[]
@@ -143,72 +172,100 @@ function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_orderi
         push!(groups[key],row)
     end
 
-    labware_id=String[]
-    labware_position=Union{String,Integer}[]
-    volume=Real[]
-    aspirate=Int[]
-    dispense=Int[]
-    aspirate_row_indices=Int[]
-    batch_sources=Tuple{String,Union{String,Integer}}[]
-
-    row_idx=0
+    # pass 1: cluster each source's destinations into ordered batches (flat, emission order)
+    batches = Vector{DispenseItem}[]
+    batch_sources = Tuple{String,Union{String,Integer}}[]
     for key in source_keys
         items = map(groups[key]) do r
             pos = df[r,"Destination Position ID"]
             position = pos isa AbstractString ? well_to_cartesian(pos) : CartesianIndex(1,1)
             DispenseItem(r,position,df[r,"Volume (uL)"])
         end
-        for batch in cluster_batches(split_oversized(items,capacity),capacity)
-            batch = order_batch(batch,batch_ordering)
-            push!(labware_id,key[1]); push!(labware_position,key[2])
-            push!(volume,sum(item.volume for item in batch)); push!(aspirate,1); push!(dispense,0)
-            row_idx += 1
-            push!(aspirate_row_indices,row_idx)
+        for batch in cluster_batches(split_oversized(items,effective_capacity),effective_capacity)
+            push!(batches,order_batch(batch,batch_ordering))
             push!(batch_sources,key)
-            for item in batch
-                push!(labware_id,df[item.col,"Destination Labware ID"])
-                push!(labware_position,df[item.col,"Destination Position ID"])
-                push!(volume,item.volume); push!(aspirate,0); push!(dispense,1)
-                row_idx += 1
-            end
         end
     end
 
-    action_df = DataFrame(
+    flags = tip_change_flags(batch_sources,settings(config)["max_tip_use"])
+
+    # pass 2: round each cycle's volumes (folding in a trailing blowout where one is needed) and emit rows
+    n = length(batches)
+    labware_id=String[]
+    labware_position=Union{String,Integer}[]
+    volume=Float64[]
+    action=String[]
+    change_tip=Int[]
+
+    for i in 1:n
+        batch = batches[i]
+        has_trailing_blowout = insert_blowouts && i < n && flags[i+1] == 0
+
+        raw_volumes = [item.volume for item in batch]
+        cycle_values = has_trailing_blowout ? vcat(raw_volumes,dead_volume_buffer) : raw_volumes
+        rounded = round_with_exact_sum(cycle_values,volume_precision)
+        aspirate_volume = sum(rounded)
+
+        aspirate_volume <= capacity + 1e-9 || throw(ArgumentError("batch_design: rounded aspirate volume $aspirate_volume µL for source $(batch_sources[i]) (batch $i of $n) exceeds channel capacity $capacity µL"))
+
+        push!(labware_id,batch_sources[i][1]); push!(labware_position,batch_sources[i][2])
+        push!(volume,aspirate_volume); push!(action,"Aspirate"); push!(change_tip,flags[i])
+
+        for (k,item) in enumerate(batch)
+            push!(labware_id,df[item.col,"Destination Labware ID"])
+            push!(labware_position,df[item.col,"Destination Position ID"])
+            push!(volume,rounded[k]); push!(action,"Dispense"); push!(change_tip,0)
+        end
+
+        if has_trailing_blowout
+            push!(labware_id,waste_target[1]); push!(labware_position,waste_target[2])
+            push!(volume,rounded[end]); push!(action,"Blowout"); push!(change_tip,0)
+        end
+    end
+
+    return DataFrame(
         "Labware ID" => labware_id,
         "Labware Position ID" => labware_position,
         "Volume (uL)" => volume,
-        "Aspirate" => aspirate,
-        "Dispense" => dispense,
-        "Change Tip Before" => zeros(Int,row_idx),
+        "Action" => action,
+        "Change Tip Before" => change_tip,
     )
-    return action_df, aspirate_row_indices, batch_sources
 end
 
 
 
 """
-    write_instrument_files(directory, design, source, target, config::Configuration{Nimbus}, slotting=slotting_greedy(...); batch_ordering::Symbol=:greedy, kwargs...)
+    write_instrument_files(directory, design, source, target, config::Configuration{Nimbus}, slotting=slotting_greedy(...);
+                            batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
+                            waste_target=nothing, dead_volume_buffer::Real=0.0, kwargs...)
 
 Compile a `design` into a Nimbus protocol CSV written to `directory`. Unlike the generic
 compiler fallback, the Nimbus supports one-to-many aspirate/dispense: for each source well, as
 many destination dispenses as fit within the channel's capacity are drawn up in a single
 aspirate and dispensed together, rather than aspirating once per destination (see
-[`batch_design`](@ref) for the batching/ordering pipeline). `batch_ordering` selects how
-dispenses within a batch are sequenced -- `:greedy` (default, nearest-neighbor) or `:exact`
+[`batch_design`](@ref) for the full batching/rounding/blowout pipeline). `batch_ordering` selects
+how dispenses within a batch are sequenced -- `:greedy` (default, nearest-neighbor) or `:exact`
 (optimal, brute-force -- only tractable for small batches, see [`order_exact`](@ref)) -- and can
 be benchmarked against each other by calling `pourfecto`/`compile` with either value.
 
 The written CSV uses a unified action-row schema: `"Labware ID","Labware Position ID",
-"Volume (uL)","Aspirate","Dispense","Change Tip Before"`. Each row is either an aspirate action
-(source well, `Aspirate=1`) or a dispense action (`Dispense=1`); an aspirate row is always
-immediately followed by the dispense rows it feeds, whose volumes sum to the aspirate's volume.
-`"Change Tip Before"` is `1` on an aspirate row when the tip should be changed before that
-aspirate: always on a source change, and periodically thereafter per the instrument's
-`"max_tip_use"` setting (see [`tip_change_flags`](@ref)) -- note `"max_tip_use"` now counts
-aspirate *batches*, not individual dispense shots.
+"Volume (uL)","Action","Change Tip Before"`, `Action` being `"Aspirate"`, `"Dispense"`, or
+`"Blowout"`. An aspirate row is always immediately followed by the rows it feeds (its dispenses,
+and a trailing blowout when `insert_blowouts=true` and a re-aspirate follows under the same tip),
+whose volumes sum to the aspirate's volume *exactly* at `volume_precision` decimal places (see
+[`round_with_exact_sum`](@ref)). `"Change Tip Before"` is `1` on an aspirate row when the tip
+should be changed before that aspirate: always on a source change, and periodically thereafter
+per the instrument's `"max_tip_use"` setting (see [`tip_change_flags`](@ref)) -- note
+`"max_tip_use"` counts aspirate *batches*, not individual dispense shots. It's always `0` on
+`Dispense`/`Blowout` rows.
+
+`insert_blowouts`, `waste_target`, and `dead_volume_buffer` control the (opt-in, not yet
+physically validated) dead-volume Blowout path -- see [`batch_design`](@ref).
 """
-function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{Nimbus},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);batch_ordering::Symbol=:greedy,kwargs...)
+function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{Nimbus},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);
+    batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
+    dead_volume_buffer::Real=0.0, kwargs...)
     # input error handling
     S,T = size(design)
     S == sum(length.(source)) && T == sum(length.(target)) || ArgumentError("Dimension mismatch between design ($S x $T) and number of wells in the source and target labware ($(sum(length.(source))) x $(sum(length.(target))) )")
@@ -216,8 +273,7 @@ function write_instrument_files(directory::AbstractString,design::DataFrame,sour
     allunique(values(slotting)) || ArgumentError("Only one labware can be assigned to a given slot")
     df=convert_design(design,source,target,slotting,config)
 
-    action_df,aspirate_row_indices,batch_sources = batch_design(df,config;batch_ordering)
-    action_df[aspirate_row_indices,"Change Tip Before"] .= tip_change_flags(batch_sources,settings(config)["max_tip_use"])
+    action_df = batch_design(df,config;batch_ordering,volume_precision,insert_blowouts,waste_target,dead_volume_buffer)
 
     if ~isdir(directory)
         mkdir(directory)

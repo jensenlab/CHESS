@@ -20,29 +20,36 @@ via `CartesianIndices(children(target))`.
 well_col(R::Int, r::Int, c::Int) = (c - 1) * R + r
 
 """
-    run_and_summarize(name, design, sources, targets; batch_ordering=:greedy) -> DataFrame
+    run_and_summarize(name, design, sources, targets; batch_ordering=:greedy, volume_precision=1,
+                       insert_blowouts=false, waste_target=nothing, dead_volume_buffer=0.0) -> DataFrame
 
 Slot `sources`/`targets` onto the Nimbus deck, compile `design` via `write_instrument_files` to
 `data/nimbus_lab_testing/<name>/`, then print a short summary (aspirate-batch count, dispense
-count, tip-change count, total volume) and return the written CSV as a DataFrame for further
-inspection.
+count, blowout count, tip-change count, total volume) and return the written CSV as a DataFrame
+for further inspection.
 """
-function run_and_summarize(name::AbstractString, design::DataFrame, sources::Vector{<:Labware}, targets::Vector{<:Labware}; batch_ordering::Symbol=:greedy)
+function run_and_summarize(name::AbstractString, design::DataFrame, sources::Vector{<:Labware}, targets::Vector{<:Labware};
+    batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
+    dead_volume_buffer::Real=0.0)
     config = configurations["nimbus"]
     slotting = slotting_greedy(vcat(sources, targets), config)
     outdir = joinpath(OUTPUT_ROOT, name)
-    write_instrument_files(outdir, design, sources, targets, config, slotting; batch_ordering)
+    write_instrument_files(outdir, design, sources, targets, config, slotting;
+        batch_ordering, volume_precision, insert_blowouts, waste_target, dead_volume_buffer)
 
     df = CSV.read(joinpath(outdir, basename(outdir) * ".csv"), DataFrame)
-    n_aspirates = count(==(1), df.Aspirate)
-    n_dispenses = count(==(1), df.Dispense)
+    n_aspirates = count(==("Aspirate"), df.Action)
+    n_dispenses = count(==("Dispense"), df.Action)
+    n_blowouts = count(==("Blowout"), df.Action)
     n_tip_changes = count(==(1), df[!, "Change Tip Before"])
-    total_volume = sum(df[df.Dispense .== 1, "Volume (uL)"])
+    total_volume = sum(df[df.Action .== "Dispense", "Volume (uL)"])
 
-    println("== $name (batch_ordering=$batch_ordering) ==")
+    println("== $name (batch_ordering=$batch_ordering, insert_blowouts=$insert_blowouts) ==")
     println("  wrote:             $(joinpath(outdir, basename(outdir) * ".csv"))")
     println("  aspirate batches:  $n_aspirates")
     println("  dispenses:         $n_dispenses")
+    println("  blowouts:          $n_blowouts")
     println("  tip changes:       $n_tip_changes")
     println("  total dispensed:   $(total_volume) uL")
     println()

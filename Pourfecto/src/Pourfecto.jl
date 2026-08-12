@@ -160,7 +160,7 @@ export can_place, can_operate # deck/labware admissibility
 
 export SlottingDict, slotting_greedy, packing_greedy # slotting/packing
 export write_instrument_files # compiler extension point (falls back to a generic transfer-table CSV)
-export DispenseItem, grid_distance, split_oversized, cluster_batches, order_greedy, order_exact, order_batch, tip_change_flags # aspirate/dispense batching
+export DispenseItem, grid_distance, split_oversized, cluster_batches, order_greedy, order_exact, order_batch, tip_change_flags, round_with_exact_sum # aspirate/dispense batching
 
 export register_instrument! # instrument registration
 

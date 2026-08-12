@@ -182,6 +182,27 @@ function order_batch(batch::Vector{DispenseItem}, method::Symbol)
 end
 
 """
+    round_with_exact_sum(values::Vector{<:Real}, digits::Int) -> Vector{Float64}
+
+Round every element of `values` to `digits` decimal places except the last, which instead absorbs
+whatever remainder is needed so the rounded values sum *exactly* to `round(sum(values), digits)`.
+
+Rounding every element independently can leave the rounded sum off from the rounded total by a
+hairline amount (e.g. `-1.42e-14`) due to ordinary floating-point summation drift -- fatal when a
+downstream consumer does a strict `sum(dispenses) >= aspirated` check. Computing the last element
+as a remainder rather than an independently-rounded value guarantees exact agreement by
+construction, regardless of how many elements are in `values`.
+"""
+function round_with_exact_sum(values::Vector{<:Real}, digits::Int)
+    n = length(values)
+    n == 0 && return Float64[]
+    total = round(sum(values), digits=digits)
+    n == 1 && return [total]
+    rounded = Float64[round(v, digits=digits) for v in values[1:end-1]]
+    return vcat(rounded, total - sum(rounded))
+end
+
+"""
     tip_change_flags(batch_sources::Vector, windowsize::Int) -> Vector{Int}
 
 Per-batch analogue of a shot-level sliding-window tip-change heuristic: given `batch_sources[i]`

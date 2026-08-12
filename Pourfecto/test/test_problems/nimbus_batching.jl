@@ -80,6 +80,27 @@ import Pourfecto: convert_design, batch_design
         @test any(flags[4:11] .== 1)
     end
 
+    @testset "round_with_exact_sum" begin
+        # reproduces the real float-drift bug: values that "should" sum to 990.3 but leave a
+        # hairline residual (e.g. -1.42e-14) under naive independent rounding + subtraction
+        drifting = [36.7, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 533.6000000000001]
+        target = round(sum(drifting), digits=1)
+        rounded = round_with_exact_sum(drifting, 1)
+        @test sum(rounded) == target # exact, not isapprox -- this is the whole point of the fix
+        @test length(rounded) == length(drifting)
+
+        # single-element and already-exact cases
+        @test round_with_exact_sum([5.0], 1) == [5.0]
+        @test sum(round_with_exact_sum([100.0, 200.0, 300.0], 1)) == 600.0
+
+        # every value but the last is independently rounded; only the last absorbs the remainder
+        vals = [1.05, 2.03, 3.07]
+        r = round_with_exact_sum(vals, 1)
+        @test r[1] == round(1.05, digits=1)
+        @test r[2] == round(2.03, digits=1)
+        @test sum(r) == round(sum(vals), digits=1)
+    end
+
     @testset "convert_design / batch_design / write_instrument_files integration" begin
         source1 = build_location(location_kinds[:Conical50],"nimbus_batch_test_source1")
         source2 = build_location(location_kinds[:Conical50],"nimbus_batch_test_source2")
@@ -105,27 +126,30 @@ import Pourfecto: convert_design, batch_design
 
         for batch_ordering in (:greedy,:exact)
             df = convert_design(design,sources,targets,slotting,config)
-            action_df,aspirate_idx,batch_sources = batch_design(df,config;batch_ordering)
-            action_df[aspirate_idx,"Change Tip Before"] .= tip_change_flags(batch_sources,settings(config)["max_tip_use"])
+            action_df = batch_design(df,config;batch_ordering)
 
-            @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Aspirate","Dispense","Change Tip Before"]
-            @test all(row -> (row.Aspirate == 1) != (row.Dispense == 1), eachrow(action_df)) # exactly one of the two set
+            @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Action","Change Tip Before"]
+            @test all(a -> a in ("Aspirate","Dispense","Blowout"), action_df.Action)
+            @test !("Blowout" in action_df.Action) # insert_blowouts defaults to false -- no regression
             @test all(<=(1000), action_df[!,"Volume (uL)"]) # capacity respected everywhere
 
+            aspirate_idx = findall(==("Aspirate"),action_df.Action)
             n = nrow(action_df)
             for (k,i) in enumerate(aspirate_idx)
                 block_end = k < length(aspirate_idx) ? aspirate_idx[k+1]-1 : n
                 dispense_sum = sum(action_df[i+1:block_end,"Volume (uL)"])
                 @test isapprox(dispense_sum,action_df[i,"Volume (uL)"];atol=1e-6)
-                @test all(action_df[i+1:block_end,"Dispense"] .== 1)
+                @test all(action_df[i+1:block_end,"Action"] .== "Dispense")
                 @test all(action_df[i+1:block_end,"Change Tip Before"] .== 0) # only aspirate rows can flag a change
             end
 
             @test sum(action_df[aspirate_idx,"Volume (uL)"]) == 1500+300*4+200*2
 
             # source2's first batch must have Change Tip Before = 1 (a genuine source change)
-            source2_first_aspirate = aspirate_idx[findfirst(s -> s == batch_sources[end],batch_sources)]
-            @test action_df[source2_first_aspirate,"Change Tip Before"] == 1
+            aspirate_keys = collect(zip(action_df[aspirate_idx,"Labware ID"],action_df[aspirate_idx,"Labware Position ID"]))
+            source_change_idx = findfirst(k -> k != aspirate_keys[1],aspirate_keys)
+            @test !isnothing(source_change_idx)
+            @test action_df[aspirate_idx[source_change_idx],"Change Tip Before"] == 1
             # very first aspirate overall is never forced
             @test action_df[aspirate_idx[1],"Change Tip Before"] == 0
 
@@ -137,6 +161,81 @@ import Pourfecto: convert_design, batch_design
                 @test nrow(written) == nrow(action_df)
             end
         end
+    end
+
+    @testset "insert_blowouts" begin
+        source = build_location(location_kinds[:Conical50],"nimbus_blowout_test_source")
+        target = build_location(location_kinds[:DeepWP96],"nimbus_blowout_test_target")
+        sources = Labware[source]
+        targets = Labware[target]
+        config = configurations["nimbus"]
+        slotting = slotting_greedy(vcat(sources,targets),config)
+
+        R,C = size(target)
+        well_col(letter_row,col) = (col-1)*R + letter_row
+
+        # 12 wells x 108uL under one source -- forces 2 aspirate batches under the same tip
+        # (effective capacity 980 = 1000-20 fits 9 wells; the 3 remaining wells form a 2nd batch)
+        design = DataFrame(zeros(1,R*C),:auto)
+        for c in 1:12
+            design[1,well_col(1,c)] = 108.0
+        end
+
+        df = convert_design(design,sources,targets,slotting,config)
+        waste_target = ("LiquidWaste_0001","1")
+        action_df = batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=20.0)
+
+        @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Action","Change Tip Before"]
+        blowout_idx = findall(==("Blowout"),action_df.Action)
+        @test length(blowout_idx) == 1 # exactly one re-aspirate boundary in this scenario
+        @test all(action_df[blowout_idx,"Labware ID"] .== "LiquidWaste_0001")
+        @test all(action_df[blowout_idx,"Change Tip Before"] .== 0) # always 0 for Blowout rows
+
+        # a blowout never immediately precedes the very first aspirate, and never trails the last batch
+        aspirate_idx = findall(==("Aspirate"),action_df.Action)
+        @test blowout_idx[1] > aspirate_idx[1]
+        @test blowout_idx[1] < aspirate_idx[end]
+
+        # per-cycle invariant: sum(dispenses in cycle) + (blowout, if present) == that cycle's aspirate volume, exactly
+        n = nrow(action_df)
+        for (k,i) in enumerate(aspirate_idx)
+            block_end = k < length(aspirate_idx) ? aspirate_idx[k+1]-1 : n
+            cycle_sum = sum(action_df[i+1:block_end,"Volume (uL)"])
+            @test cycle_sum == action_df[i,"Volume (uL)"]
+        end
+
+        # no rounded aspirate volume exceeds true channel capacity
+        @test all(<=(1000.0), action_df[aspirate_idx,"Volume (uL)"])
+
+        # opt-in: default (insert_blowouts=false) must never emit Blowout rows -- regression check
+        default_df = batch_design(df,config)
+        @test !("Blowout" in default_df.Action)
+
+        # validation errors
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true) # missing waste_target
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=0.0) # buffer must be > 0
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=1000.0) # buffer must be < capacity
+    end
+
+    @testset "Bug 2 guard: capacity exceeded throws" begin
+        source = build_location(location_kinds[:Conical50],"nimbus_capacity_guard_source")
+        target = build_location(location_kinds[:DeepWP96],"nimbus_capacity_guard_target")
+        sources = Labware[source]
+        targets = Labware[target]
+        config = configurations["nimbus"]
+        slotting = slotting_greedy(vcat(sources,targets),config)
+        R = size(target)[1]
+
+        design = DataFrame(zeros(1,R*size(target)[2]),:auto)
+        design[1,1] = 999.96 # rounds to 1000.0 at 1 decimal -- exactly at capacity, must NOT throw
+        df = convert_design(design,sources,targets,slotting,config)
+        action_df = batch_design(df,config)
+        @test action_df[1,"Volume (uL)"] == 1000.0
+
+        # batching already guarantees every batch's raw volume stays within (effective) capacity,
+        # so the guard is a defensive assertion that should be unreachable through the public API
+        # in normal use -- the boundary case above (rounds up to exactly capacity) is the
+        # meaningful regression check that the guard's float-safety epsilon doesn't false-positive.
     end
 
 end

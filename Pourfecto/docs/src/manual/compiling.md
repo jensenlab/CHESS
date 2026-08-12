@@ -140,15 +140,48 @@ schema:
 | Column | Meaning |
 |---|---|
 | `Labware ID`, `Labware Position ID` | The labware/position acted on by this row |
-| `Volume (uL)` | The volume aspirated or dispensed by this row |
-| `Aspirate`, `Dispense` | Exactly one of these is `1`; the other `0` |
-| `Change Tip Before` | `1` on an aspirate row that should be preceded by a tip change |
+| `Volume (uL)` | The volume aspirated, dispensed, or blown out by this row, rounded to `volume_precision` decimal places (default 1) |
+| `Action` | `"Aspirate"`, `"Dispense"`, or `"Blowout"` |
+| `Change Tip Before` | `1` on an aspirate row that should be preceded by a tip change; always `0` for `Dispense`/`Blowout` rows |
 
-An aspirate row is always immediately followed by the dispense rows it feeds, whose volumes sum
-to the aspirate's volume. Which destinations get grouped into the same aspirate is decided by a
-distance-aware greedy bin-packing pass -- spatially nearby destinations on the target plate are
-preferred, subject to the channel's capacity -- and a transfer larger than capacity is split
-across multiple aspirates, with any remainder free to share a batch with other destinations.
+An aspirate row is always immediately followed by the rows it feeds -- its dispenses, and (see
+below) a trailing blowout when one applies -- whose volumes sum to the aspirate's volume
+*exactly* at the rounded precision, not merely approximately: the last value in each cycle absorbs
+whatever rounding remainder is needed, rather than every value being rounded independently, which
+can otherwise leave a hairline float residual (e.g. `-1.42e-14`) that a strict downstream
+`available >= requested` check on the instrument side rejects. Which destinations get grouped into
+the same aspirate is decided by a distance-aware greedy bin-packing pass -- spatially nearby
+destinations on the target plate are preferred, subject to the channel's capacity -- and a
+transfer larger than capacity is split across multiple aspirates, with any remainder free to share
+a batch with other destinations.
+
+### Dead-volume Blowout (opt-in, not yet physically validated)
+
+Draining a tip to exactly its computed zero is fragile against real pipetting tolerances, since
+tips in a protocol are frequently reused across several re-aspirate cycles without a tip change.
+Passing `insert_blowouts=true` inserts a `Blowout` row -- draining a fixed `dead_volume_buffer` to
+a `waste_target` -- immediately after any batch that's followed by a re-aspirate under the same
+tip (no batch immediately followed by an actual tip change, and never the very last batch, gets
+one). That batch's own aspirate volume is then sized to cover its dispenses *plus* the buffer
+(the blowout is the last value in its cycle, so it absorbs the rounding remainder) -- batch
+formation reserves `capacity - dead_volume_buffer` of headroom for every batch in this mode to
+keep that sum within the channel's true capacity.
+
+```julia
+write_instrument_files(directory, design, source, target, configurations["nimbus"];
+    insert_blowouts=true, waste_target=("LiquidWaste_0001", "1"), dead_volume_buffer=20.0)
+```
+
+`waste_target` (a `(labware id, position)` tuple) and a positive `dead_volume_buffer` (in µL, less
+than the channel's capacity) are required when `insert_blowouts=true` -- there's no built-in
+default, since real values are lab/deck-specific.
+
+!!! warning
+    This path is opt-in and defaults to `false`: it changes no existing behavior unless
+    explicitly enabled. It has not yet been validated end-to-end against real instrument hardware
+    -- see `csv_generation_refactor_notes.md`'s Bug 3 section for the open items (confirming the
+    waste labware's real deck position, the corresponding instrument-side `.hsl` support, and a
+    RunControl smoke test).
 
 `write_instrument_files(..., config::Configuration{Nimbus}, ...)` accepts a `batch_ordering`
 keyword controlling how dispenses *within* a batch are sequenced:

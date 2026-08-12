@@ -29,6 +29,6 @@ settings(config)["max_tip_use"] = 3 # lowered just for this demonstration; affec
 
 df = run_and_summarize("multi_source_tip_changes", design, Labware[source1, source2], Labware[target])
 println("Change Tip Before, per aspirate row, in emission order:")
-aspirates = df[df.Aspirate .== 1, :]
+aspirates = df[df.Action .== "Aspirate", :]
 show(aspirates[:, ["Labware ID", "Labware Position ID", "Volume (uL)", "Change Tip Before"]], allrows=true)
 println()

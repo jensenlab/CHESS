@@ -22,12 +22,12 @@ greedy_df = run_and_summarize("greedy_vs_exact_ordering_greedy", design, Labware
 exact_df = run_and_summarize("greedy_vs_exact_ordering_exact", design, Labware[source], Labware[target]; batch_ordering=:exact)
 
 function tour_distance(df::DataFrame)
-    dispenses = df[df.Dispense .== 1, "Labware Position ID"]
+    dispenses = df[df.Action .== "Dispense", "Labware Position ID"]
     positions = well_to_cartesian.(dispenses)
     return sum(grid_distance(positions[i], positions[i+1]) for i in 1:length(positions)-1)
 end
 
-println("greedy dispense order: ", greedy_df[greedy_df.Dispense .== 1, "Labware Position ID"])
-println("exact dispense order:  ", exact_df[exact_df.Dispense .== 1, "Labware Position ID"])
+println("greedy dispense order: ", greedy_df[greedy_df.Action .== "Dispense", "Labware Position ID"])
+println("exact dispense order:  ", exact_df[exact_df.Action .== "Dispense", "Labware Position ID"])
 println("greedy total intra-batch travel distance: ", round(tour_distance(greedy_df), digits=2))
 println("exact total intra-batch travel distance:  ", round(tour_distance(exact_df), digits=2))
