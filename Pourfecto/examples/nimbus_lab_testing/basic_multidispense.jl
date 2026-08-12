@@ -1,5 +1,7 @@
 # Basic one-to-many aspirate/dispense: one source feeds a full plate row, split into as few
-# capacity-bounded aspirates as fit -- the core case this feature exists for.
+# capacity-bounded aspirates as fit -- the core case this feature exists for. insert_blowouts is
+# explicitly disabled here (it defaults to true) to keep this demonstration focused on plain
+# batching; see blowout_dead_volume.jl for that path specifically.
 #
 # Usage: julia --project=Pourfecto Pourfecto/examples/nimbus_lab_testing/basic_multidispense.jl
 
@@ -14,4 +16,4 @@ for c in 1:C
     design[1, well_col(R, 1, c)] = 300.0 # row A, all 12 columns, 300 uL each -> forces multiple aspirates (3600 uL total / 1000 uL capacity)
 end
 
-run_and_summarize("basic_multidispense", design, Labware[source], Labware[target])
+run_and_summarize("basic_multidispense", design, Labware[source], Labware[target]; insert_blowouts=false)

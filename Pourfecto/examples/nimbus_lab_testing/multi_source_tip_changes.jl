@@ -27,7 +27,7 @@ end
 config = configurations["nimbus"]
 settings(config)["max_tip_use"] = 3 # lowered just for this demonstration; affects this process only
 
-df = run_and_summarize("multi_source_tip_changes", design, Labware[source1, source2], Labware[target])
+df = run_and_summarize("multi_source_tip_changes", design, Labware[source1, source2], Labware[target]; insert_blowouts=false)
 println("Change Tip Before, per aspirate row, in emission order:")
 aspirates = df[df.Action .== "Aspirate", :]
 show(aspirates[:, ["Labware ID", "Labware Position ID", "Volume (uL)", "Change Tip Before"]], allrows=true)

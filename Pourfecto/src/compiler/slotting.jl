@@ -54,7 +54,7 @@ end
 
 
 """
-    slotting_greedy(labware::Vector{<:Labware}, config::Configuration) -> SlottingDict
+    slotting_greedy(labware::Vector{<:Labware}, config::Configuration; pinned::SlottingDict=SlottingDict()) -> SlottingDict
 
 Greedily assign each piece of `labware` to an open, admissible deck slot on `config`'s deck. Labware
 sharing a name (e.g. the same physical plate used as both a source and a target) is slotted once and
@@ -62,8 +62,15 @@ shares that slot. Errors if any labware can't be placed on `config`'s deck at al
 (see [`can_place`](@ref)); labware that can be placed but for which no slot remains open is returned
 in the `not_placed` local (not currently surfaced -- see [`packing_greedy`](@ref), which calls this
 repeatedly to produce one or more slotting solutions covering everything).
+
+`pinned` pre-seeds the result with fixed `labware => (position,slot)` assignments -- e.g. a
+permanently-mounted fixture that always occupies the same physical deck slot -- before the greedy
+loop runs; those slots are removed from consideration for every other piece of labware, and pinned
+labware is skipped by the ordinary placement loop. Empty by default, so existing callers see no
+behavior change. See `Nimbus.jl`'s `slotting_greedy(::Vector{<:Labware},::Configuration{Nimbus})`
+override for a worked example (a reserved waste-conical slot).
 """
-function slotting_greedy(labware::Vector{<:Labware},config::Configuration)
+function slotting_greedy(labware::Vector{<:Labware},config::Configuration;pinned::SlottingDict=SlottingDict())
 
     for lw in labware
         can_place(lw,config) || error("labware type $(typeof(lw)) cannot be placed on a $(CHESSCore.name(config)) deck")
@@ -72,22 +79,29 @@ function slotting_greedy(labware::Vector{<:Labware},config::Configuration)
     slotting = SlottingDict()
     open_slots = Set{Tuple{DeckPosition,Int}}()
 
-    for position in deck(config) 
+    for position in deck(config)
         n_slots = prod(slots(position))
-        for i in 1:n_slots 
+        for i in 1:n_slots
             push!(open_slots,(position,i))
-        end 
-    end 
+        end
+    end
 
-    labware_to_place = Labware[] # only place labware with unique names. Some sources can also be targets, so we need to avoid double counting them 
+    for (lw,s) in pinned
+        slotting[lw] = s
+        delete!(open_slots,s)
+    end
+
+    pinned_names = CHESSCore.name.(collect(keys(pinned)))
+    labware_to_place = Labware[] # only place labware with unique names. Some sources can also be targets, so we need to avoid double counting them
     duplicate_labware = Labware[]
-    for lw in labware 
+    for lw in labware
+        CHESSCore.name(lw) in pinned_names && continue # already pinned above
         if !in(CHESSCore.name(lw), CHESSCore.name.(labware_to_place))
             push!(labware_to_place,lw)
-        else 
+        else
             push!(duplicate_labware,lw)
         end
-    end 
+    end
 
 
     not_placed=Labware[]
@@ -98,24 +112,24 @@ function slotting_greedy(labware::Vector{<:Labware},config::Configuration)
                 slotting[lw]= s
                 delete!(open_slots,s)
                 placed=true
-                break 
-            end 
-        end 
+                break
+            end
+        end
 
         if !placed
             push!(not_placed,lw)
-        end 
-    end 
+        end
+    end
 
     placed_labware = collect(keys(slotting))
     for lw in duplicate_labware
        idx =findfirst(x->CHESSCore.name(lw) == CHESSCore.name(x),placed_labware)
-        slotting[lw] = slotting[placed_labware[idx]] # slot the duplicate labware back into the same spot 
-    end 
-        
+        slotting[lw] = slotting[placed_labware[idx]] # slot the duplicate labware back into the same spot
+    end
+
 
     return slotting
-end 
+end
 
 
 

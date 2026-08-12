@@ -145,43 +145,63 @@ schema:
 | `Change Tip Before` | `1` on an aspirate row that should be preceded by a tip change; always `0` for `Dispense`/`Blowout` rows |
 
 An aspirate row is always immediately followed by the rows it feeds -- its dispenses, and (see
-below) a trailing blowout when one applies -- whose volumes sum to the aspirate's volume
-*exactly* at the rounded precision, not merely approximately: the last value in each cycle absorbs
-whatever rounding remainder is needed, rather than every value being rounded independently, which
-can otherwise leave a hairline float residual (e.g. `-1.42e-14`) that a strict downstream
-`available >= requested` check on the instrument side rejects. Which destinations get grouped into
-the same aspirate is decided by a distance-aware greedy bin-packing pass -- spatially nearby
-destinations on the target plate are preferred, subject to the channel's capacity -- and a
-transfer larger than capacity is split across multiple aspirates, with any remainder free to share
-a batch with other destinations.
+below) a trailing blowout when one applies -- whose volumes sum to the aspirate's volume, minus a
+small fixed **`aspirate_buffer`** (default `0.01` µL), *exactly* at the rounded precision: the last
+value in each cycle absorbs whatever rounding remainder is needed, rather than every value being
+rounded independently, which can otherwise leave a hairline float residual (e.g. `-1.42e-14`) that
+a strict downstream `available >= requested` check on the instrument side rejects.
+`aspirate_buffer` itself is a **deliberate** margin, not a rounding artifact -- an unconditional
+physical safety allowance (applies whether or not `insert_blowouts` is used) against real-world
+pipetting inaccuracy leaving a tip short for the last action in a cycle. It's added on top of the
+rounded dispense/blowout sum without being re-rounded to `volume_precision` -- otherwise a buffer
+finer than that resolution (like the `0.01` default under the default `volume_precision=1`) would
+simply round away. Which destinations get grouped into the same aspirate is decided by a
+distance-aware greedy bin-packing pass -- spatially nearby destinations on the target plate are
+preferred, subject to the channel's capacity minus `aspirate_buffer` and a rounding margin (`0.5 *
+10^(-volume_precision)`, the most a raw value can round *up* by) -- and a transfer larger than
+capacity is split across multiple aspirates, with any remainder free to share a batch with other
+destinations.
 
-### Dead-volume Blowout (opt-in, not yet physically validated)
+### Reserved waste conical
+
+One slot on the Nimbus deck -- `TubeRack50ML_0006`, slot 5, the slot nearest the tip rack and
+waste area on the real deck -- is permanently reserved for a Conical50 tube used as liquid waste.
+This is a fixture of the physical deck layout, not a per-protocol choice: `slotting_greedy`'s
+`Configuration{Nimbus}` override pins a dedicated waste-conical `Labware` to that slot on *every*
+Nimbus compile (whether or not that particular protocol uses `insert_blowouts`), and excludes the
+slot from ordinary source/target slotting. This leaves 35 of the 36 total `Conical50` rack slots
+available for real reagents. The waste conical shows up like any other placed labware in
+`loading_table.csv` and the deck diagram (`plot_slotting`), so it's visible to whoever loads the
+physical deck.
+
+### Dead-volume Blowout (default-on)
 
 Draining a tip to exactly its computed zero is fragile against real pipetting tolerances, since
 tips in a protocol are frequently reused across several re-aspirate cycles without a tip change.
-Passing `insert_blowouts=true` inserts a `Blowout` row -- draining a fixed `dead_volume_buffer` to
-a `waste_target` -- immediately after any batch that's followed by a re-aspirate under the same
-tip (no batch immediately followed by an actual tip change, and never the very last batch, gets
-one). That batch's own aspirate volume is then sized to cover its dispenses *plus* the buffer
-(the blowout is the last value in its cycle, so it absorbs the rounding remainder) -- batch
-formation reserves `capacity - dead_volume_buffer` of headroom for every batch in this mode to
-keep that sum within the channel's true capacity.
+**`insert_blowouts` defaults to `true`, with `dead_volume_buffer` defaulting to `20.0` µL** -- a
+`Blowout` row is inserted, draining `dead_volume_buffer` to `waste_target`, immediately after any
+batch that's followed by a re-aspirate under the same tip (no batch immediately followed by an
+actual tip change, and never the very last batch, gets one). That batch's own aspirate volume is
+then sized to cover its dispenses *plus* the buffer (the blowout is the last value in its cycle,
+so it absorbs the rounding remainder) -- batch formation reserves that headroom for every batch in
+this mode to keep the sum within the channel's true capacity.
 
 ```julia
-write_instrument_files(directory, design, source, target, configurations["nimbus"];
-    insert_blowouts=true, waste_target=("LiquidWaste_0001", "1"), dead_volume_buffer=20.0)
+write_instrument_files(directory, design, source, target, configurations["nimbus"])
+# equivalent to explicitly passing insert_blowouts=true, dead_volume_buffer=20.0
 ```
 
-`waste_target` (a `(labware id, position)` tuple) and a positive `dead_volume_buffer` (in µL, less
-than the channel's capacity) are required when `insert_blowouts=true` -- there's no built-in
-default, since real values are lab/deck-specific.
+`waste_target` defaults to the reserved waste conical above, so it doesn't need to be supplied --
+pass a different `(labware id, position)` tuple to target something else instead. Pass
+`insert_blowouts=false` to disable the path entirely, or override `dead_volume_buffer` with a
+different positive value (in µL, less than the channel's capacity) for a different tube/protocol.
 
 !!! warning
-    This path is opt-in and defaults to `false`: it changes no existing behavior unless
-    explicitly enabled. It has not yet been validated end-to-end against real instrument hardware
-    -- see `csv_generation_refactor_notes.md`'s Bug 3 section for the open items (confirming the
-    waste labware's real deck position, the corresponding instrument-side `.hsl` support, and a
-    RunControl smoke test).
+    The reserved deck slot is real and always active, and `insert_blowouts`/`dead_volume_buffer`
+    now default to on/`20.0` -- but the Blowout path itself hasn't yet been validated end-to-end
+    against real instrument hardware -- see `csv_generation_refactor_notes.md`'s Bug 3 section for
+    the remaining open items (the
+    instrument-side `.hsl` support for the `Blowout` action, and a RunControl smoke test).
 
 `write_instrument_files(..., config::Configuration{Nimbus}, ...)` accepts a `batch_ordering`
 keyword controlling how dispenses *within* a batch are sequenced:

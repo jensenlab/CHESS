@@ -5,7 +5,7 @@
 # needed to run them.
 
 using Pourfecto, CHESSCore, Unitful, DataFrames, CSV
-import Pourfecto: well_to_cartesian, cartesian_to_well
+import Pourfecto: well_to_cartesian, cartesian_to_well, nimbus_waste_target
 
 const OUTPUT_ROOT = joinpath(@__DIR__, "..", "..", "data", "nimbus_lab_testing")
 mkpath(OUTPUT_ROOT) # write_instrument_files uses mkdir (not mkpath), so the parent must already exist
@@ -21,7 +21,8 @@ well_col(R::Int, r::Int, c::Int) = (c - 1) * R + r
 
 """
     run_and_summarize(name, design, sources, targets; batch_ordering=:greedy, volume_precision=1,
-                       insert_blowouts=false, waste_target=nothing, dead_volume_buffer=0.0) -> DataFrame
+                       insert_blowouts=false, waste_target=nimbus_waste_target, dead_volume_buffer=0.0,
+                       aspirate_buffer=0.01) -> DataFrame
 
 Slot `sources`/`targets` onto the Nimbus deck, compile `design` via `write_instrument_files` to
 `data/nimbus_lab_testing/<name>/`, then print a short summary (aspirate-batch count, dispense
@@ -30,13 +31,13 @@ for further inspection.
 """
 function run_and_summarize(name::AbstractString, design::DataFrame, sources::Vector{<:Labware}, targets::Vector{<:Labware};
     batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
-    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-    dead_volume_buffer::Real=0.0)
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_waste_target,
+    dead_volume_buffer::Real=0.0, aspirate_buffer::Real=0.01)
     config = configurations["nimbus"]
     slotting = slotting_greedy(vcat(sources, targets), config)
     outdir = joinpath(OUTPUT_ROOT, name)
     write_instrument_files(outdir, design, sources, targets, config, slotting;
-        batch_ordering, volume_precision, insert_blowouts, waste_target, dead_volume_buffer)
+        batch_ordering, volume_precision, insert_blowouts, waste_target, dead_volume_buffer, aspirate_buffer)
 
     df = CSV.read(joinpath(outdir, basename(outdir) * ".csv"), DataFrame)
     n_aspirates = count(==("Aspirate"), df.Action)

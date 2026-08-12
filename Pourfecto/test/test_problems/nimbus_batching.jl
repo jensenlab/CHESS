@@ -1,4 +1,4 @@
-import Pourfecto: convert_design, batch_design
+import Pourfecto: convert_design, batch_design, nimbus_waste_conical, nimbus_waste_slot, nimbus_waste_target, tuberack50mL_0006
 
 @testset "Nimbus Batching" begin
 
@@ -191,26 +191,29 @@ import Pourfecto: convert_design, batch_design
         design[2,well_col(1,6)] = 200
         design[2,well_col(1,7)] = 200
 
+        default_aspirate_buffer = 0.01 # must match batch_design's default
+
         for batch_ordering in (:greedy,:exact)
             df = convert_design(design,sources,targets,slotting,config)
-            action_df = batch_design(df,config;batch_ordering)
+            action_df = batch_design(df,config;batch_ordering,insert_blowouts=false)
 
             @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Action","Change Tip Before"]
             @test all(a -> a in ("Aspirate","Dispense","Blowout"), action_df.Action)
-            @test !("Blowout" in action_df.Action) # insert_blowouts defaults to false -- no regression
-            @test all(<=(1000), action_df[!,"Volume (uL)"]) # capacity respected everywhere
+            @test !("Blowout" in action_df.Action) # this test is about batching/ordering, not blowouts -- explicitly disabled
+            @test all(<=(1000+default_aspirate_buffer+1e-9), action_df[!,"Volume (uL)"]) # capacity (+buffer) respected everywhere
 
             aspirate_idx = findall(==("Aspirate"),action_df.Action)
             n = nrow(action_df)
             for (k,i) in enumerate(aspirate_idx)
                 block_end = k < length(aspirate_idx) ? aspirate_idx[k+1]-1 : n
                 dispense_sum = sum(action_df[i+1:block_end,"Volume (uL)"])
-                @test isapprox(dispense_sum,action_df[i,"Volume (uL)"];atol=1e-6)
+                # the aspirate carries the unbuffered dispense sum plus the safety margin, exactly
+                @test isapprox(dispense_sum+default_aspirate_buffer,action_df[i,"Volume (uL)"];atol=1e-6)
                 @test all(action_df[i+1:block_end,"Action"] .== "Dispense")
                 @test all(action_df[i+1:block_end,"Change Tip Before"] .== 0) # only aspirate rows can flag a change
             end
 
-            @test sum(action_df[aspirate_idx,"Volume (uL)"]) == 1500+300*4+200*2
+            @test isapprox(sum(action_df[aspirate_idx,"Volume (uL)"]),1500+300*4+200*2+length(aspirate_idx)*default_aspirate_buffer;atol=1e-6)
 
             # source2's first batch must have Change Tip Before = 1 (a genuine source change)
             aspirate_keys = collect(zip(action_df[aspirate_idx,"Labware ID"],action_df[aspirate_idx,"Labware Position ID"]))
@@ -222,7 +225,7 @@ import Pourfecto: convert_design, batch_design
 
             mktempdir() do dir
                 outdir = joinpath(dir,"nimbus_batch_test")
-                write_instrument_files(outdir,design,sources,targets,config,slotting;batch_ordering)
+                write_instrument_files(outdir,design,sources,targets,config,slotting;batch_ordering,insert_blowouts=false)
                 written = CSV.read(joinpath(outdir,"nimbus_batch_test.csv"),DataFrame)
                 @test names(written) == names(action_df)
                 @test nrow(written) == nrow(action_df)
@@ -249,13 +252,14 @@ import Pourfecto: convert_design, batch_design
         end
 
         df = convert_design(design,sources,targets,slotting,config)
-        waste_target = ("LiquidWaste_0001","1")
-        action_df = batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=20.0)
+        # no waste_target passed -- relies entirely on the default (the reserved waste conical)
+        action_df = batch_design(df,config;insert_blowouts=true,dead_volume_buffer=20.0)
 
         @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Action","Change Tip Before"]
         blowout_idx = findall(==("Blowout"),action_df.Action)
         @test length(blowout_idx) == 1 # exactly one re-aspirate boundary in this scenario
-        @test all(action_df[blowout_idx,"Labware ID"] .== "LiquidWaste_0001")
+        @test all(action_df[blowout_idx,"Labware ID"] .== nimbus_waste_target[1])
+        @test all(action_df[blowout_idx,"Labware Position ID"] .== nimbus_waste_target[2])
         @test all(action_df[blowout_idx,"Change Tip Before"] .== 0) # always 0 for Blowout rows
 
         # a blowout never immediately precedes the very first aspirate, and never trails the last batch
@@ -263,25 +267,129 @@ import Pourfecto: convert_design, batch_design
         @test blowout_idx[1] > aspirate_idx[1]
         @test blowout_idx[1] < aspirate_idx[end]
 
-        # per-cycle invariant: sum(dispenses in cycle) + (blowout, if present) == that cycle's aspirate volume, exactly
+        default_aspirate_buffer = 0.01 # must match batch_design's default
+
+        # per-cycle invariant: sum(dispenses in cycle) + (blowout, if present) + aspirate_buffer == that cycle's aspirate volume, exactly
         n = nrow(action_df)
         for (k,i) in enumerate(aspirate_idx)
             block_end = k < length(aspirate_idx) ? aspirate_idx[k+1]-1 : n
             cycle_sum = sum(action_df[i+1:block_end,"Volume (uL)"])
-            @test cycle_sum == action_df[i,"Volume (uL)"]
+            @test isapprox(cycle_sum+default_aspirate_buffer,action_df[i,"Volume (uL)"];atol=1e-6)
         end
 
-        # no rounded aspirate volume exceeds true channel capacity
-        @test all(<=(1000.0), action_df[aspirate_idx,"Volume (uL)"])
+        # no rounded aspirate volume exceeds true channel capacity (+ the small safety buffer)
+        @test all(<=(1000.0+default_aspirate_buffer+1e-9), action_df[aspirate_idx,"Volume (uL)"])
 
-        # opt-in: default (insert_blowouts=false) must never emit Blowout rows -- regression check
-        default_df = batch_design(df,config)
-        @test !("Blowout" in default_df.Action)
+        # insert_blowouts now defaults to true (with dead_volume_buffer=20.0) -- zero blowout kwargs
+        # still produces the same Blowout row as the explicit call above
+        implicit_df = batch_design(df,config)
+        implicit_blowout_idx = findall(==("Blowout"),implicit_df.Action)
+        @test length(implicit_blowout_idx) == 1
+        @test all(implicit_df[implicit_blowout_idx,"Volume (uL)"] .== 20.0)
+
+        # explicitly disabling it still works
+        disabled_df = batch_design(df,config;insert_blowouts=false)
+        @test !("Blowout" in disabled_df.Action)
+
+        # an explicit waste_target still overrides the default
+        custom_target = ("SomeOtherWaste","3")
+        custom_df = batch_design(df,config;insert_blowouts=true,waste_target=custom_target,dead_volume_buffer=20.0)
+        custom_blowout_idx = findall(==("Blowout"),custom_df.Action)
+        @test all(custom_df[custom_blowout_idx,"Labware ID"] .== "SomeOtherWaste")
 
         # validation errors
-        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true) # missing waste_target
-        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=0.0) # buffer must be > 0
-        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=1000.0) # buffer must be < capacity
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target=nothing,dead_volume_buffer=20.0) # explicitly no waste_target
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,dead_volume_buffer=0.0) # buffer must be > 0
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,dead_volume_buffer=1000.0) # buffer must be < capacity
+    end
+
+    @testset "aspirate_buffer" begin
+        source = build_location(location_kinds[:Conical50],"nimbus_aspirate_buffer_source")
+        target = build_location(location_kinds[:DeepWP96],"nimbus_aspirate_buffer_target")
+        sources = Labware[source]
+        targets = Labware[target]
+        config = configurations["nimbus"]
+        slotting = slotting_greedy(vcat(sources,targets),config)
+        R,C = size(target)
+
+        design = DataFrame(zeros(1,R*C),:auto)
+        design[1,1] = 300.0
+        design[1,2] = 200.0
+        df = convert_design(design,sources,targets,slotting,config)
+
+        # default buffer: aspirate exceeds the dispense sum by exactly aspirate_buffer
+        # (insert_blowouts explicitly off -- this test is about aspirate_buffer in isolation)
+        action_df = batch_design(df,config;insert_blowouts=false)
+        @test action_df[1,"Volume (uL)"] - sum(action_df[2:end,"Volume (uL)"]) ≈ 0.01 atol=1e-9
+
+        # same, with a trailing blowout in the cycle -- force a second batch under one tip so a
+        # blowout actually appears (a single small cycle has no re-aspirate to blow out ahead of)
+        design2 = DataFrame(zeros(1,R*C),:auto)
+        for c in 1:12
+            design2[1,(c-1)*R+1] = 108.0
+        end
+        df2 = convert_design(design2,sources,targets,slotting,config)
+        action_df2 = batch_design(df2,config;insert_blowouts=true,dead_volume_buffer=20.0)
+        aspirate_idx2 = findall(==("Aspirate"),action_df2.Action)
+        block_end = aspirate_idx2[2]-1
+        cycle1_sum = sum(action_df2[aspirate_idx2[1]+1:block_end,"Volume (uL)"]) # dispenses + blowout
+        @test action_df2[aspirate_idx2[1],"Volume (uL)"] - cycle1_sum ≈ 0.01 atol=1e-9
+
+        # custom buffer value is honored exactly
+        custom_df = batch_design(df,config;aspirate_buffer=0.5,insert_blowouts=false)
+        @test custom_df[1,"Volume (uL)"] - sum(custom_df[2:end,"Volume (uL)"]) ≈ 0.5 atol=1e-9
+
+        # aspirate_buffer=0.0 reproduces the old exact-sum behavior exactly
+        zero_buf_df = batch_design(df,config;aspirate_buffer=0.0,insert_blowouts=false)
+        @test zero_buf_df[1,"Volume (uL)"] == sum(zero_buf_df[2:end,"Volume (uL)"])
+
+        # capacity-margin regression: a raw volume sitting just under the reserved headroom
+        # (capacity - aspirate_buffer - rounding_margin) stays as a single, unsplit batch and
+        # never trips the capacity guard -- proving the reserved margin actually closes the gap
+        # that used to let a near-capacity value round up and overflow after the buffer was added
+        margin = 0.01 + 0.5*10.0^(-1) # default aspirate_buffer + default rounding_margin (volume_precision=1)
+        design3 = DataFrame(zeros(1,R*C),:auto)
+        design3[1,1] = 1000.0 - margin - 0.001 # just inside the reserved headroom
+        df3 = convert_design(design3,sources,targets,slotting,config)
+        action_df3 = batch_design(df3,config;insert_blowouts=false)
+        @test nrow(action_df3) == 2 # stays a single aspirate/dispense pair, no split
+        @test action_df3[1,"Volume (uL)"] <= 1000.0 + 1e-9
+
+        # validation errors
+        @test_throws ArgumentError batch_design(df,config;aspirate_buffer=-0.1,insert_blowouts=false)
+        @test_throws ArgumentError batch_design(df,config;aspirate_buffer=1000.0,insert_blowouts=false) # alone already >= capacity
+        @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,dead_volume_buffer=999.99,aspirate_buffer=0.01) # combined >= capacity
+    end
+
+    @testset "nimbus_waste_conical reservation" begin
+        config = configurations["nimbus"]
+
+        # always present and pinned, regardless of what other labware is being slotted
+        source = build_location(location_kinds[:Conical50],"nimbus_waste_reservation_source")
+        slotting = slotting_greedy(Labware[source],config)
+        @test nimbus_waste_conical in keys(slotting)
+        @test slotting[nimbus_waste_conical] == (tuberack50mL_0006,nimbus_waste_slot)
+        @test slotting[source] != slotting[nimbus_waste_conical]
+
+        # unconditional: reserved even when nothing in this protocol uses insert_blowouts
+        slotting_no_source = slotting_greedy(Labware[],config)
+        @test nimbus_waste_conical in keys(slotting_no_source)
+        @test slotting_no_source[nimbus_waste_conical] == (tuberack50mL_0006,nimbus_waste_slot)
+
+        # exactly 35 of the 36 Conical50 slots remain available -- nothing else can ever land on
+        # the reserved slot, even when every other slot is requested
+        many_sources = [build_location(location_kinds[:Conical50],"nimbus_waste_reservation_src_$i") for i in 1:36]
+        full_slotting = slotting_greedy(Labware[many_sources...],config)
+        placed = filter(lw -> lw in keys(full_slotting),many_sources)
+        @test length(placed) == 35
+        @test all(lw -> full_slotting[lw] != (tuberack50mL_0006,nimbus_waste_slot),placed)
+
+        # the generic slotting_greedy's new `pinned` kwarg defaults to empty and is a no-op for a
+        # non-Nimbus config -- confirms the shared function's behavior is unchanged for everyone else
+        other_config = configurations["single_channel"]
+        plain_source = build_location(location_kinds[:WP96],"nimbus_waste_reservation_unrelated")
+        other_slotting = slotting_greedy(Labware[plain_source],other_config)
+        @test !(nimbus_waste_conical in keys(other_slotting))
     end
 
     @testset "polish_clustering integration" begin
@@ -305,12 +413,15 @@ import Pourfecto: convert_design, batch_design
         design[2,well_col(1,6)] = 200
         design[2,well_col(1,7)] = 200
 
+        default_aspirate_buffer = 0.01 # must match batch_design's default
+
         df = convert_design(design,sources,targets,slotting,config)
-        default_df = batch_design(df,config) # polish_clustering=false, the default
-        polished_df = batch_design(df,config;polish_clustering=true)
+        # insert_blowouts explicitly off -- this test is about polish_clustering in isolation
+        default_df = batch_design(df,config;insert_blowouts=false) # polish_clustering=false, the default
+        polished_df = batch_design(df,config;polish_clustering=true,insert_blowouts=false)
 
         # regression: default behavior is byte-for-byte unaffected by the new kwarg's existence
-        @test default_df == batch_design(df,config;polish_clustering=false)
+        @test default_df == batch_design(df,config;polish_clustering=false,insert_blowouts=false)
 
         for action_df in (default_df,polished_df)
             @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Action","Change Tip Before"]
@@ -319,10 +430,10 @@ import Pourfecto: convert_design, batch_design
             for (k,i) in enumerate(aspirate_idx)
                 block_end = k < length(aspirate_idx) ? aspirate_idx[k+1]-1 : n
                 dispense_sum = sum(action_df[i+1:block_end,"Volume (uL)"])
-                @test isapprox(dispense_sum,action_df[i,"Volume (uL)"];atol=1e-6)
+                @test isapprox(dispense_sum+default_aspirate_buffer,action_df[i,"Volume (uL)"];atol=1e-6)
                 @test all(action_df[i+1:block_end,"Change Tip Before"] .== 0)
             end
-            @test all(<=(1000), action_df[!,"Volume (uL)"])
+            @test all(<=(1000+default_aspirate_buffer+1e-9), action_df[!,"Volume (uL)"])
         end
 
         # the same multiset of dispense (Labware ID, Position ID) pairs appears regardless of
@@ -337,7 +448,7 @@ import Pourfecto: convert_design, batch_design
 
         mktempdir() do dir
             outdir = joinpath(dir,"nimbus_polish_test")
-            write_instrument_files(outdir,design,sources,targets,config,slotting;polish_clustering=true,polish_max_iterations=500)
+            write_instrument_files(outdir,design,sources,targets,config,slotting;polish_clustering=true,polish_max_iterations=500,insert_blowouts=false)
             written = CSV.read(joinpath(outdir,"nimbus_polish_test.csv"),DataFrame)
             @test names(written) == names(polished_df)
         end
@@ -352,16 +463,35 @@ import Pourfecto: convert_design, batch_design
         slotting = slotting_greedy(vcat(sources,targets),config)
         R = size(target)[1]
 
+        # 999.96 used to round to exactly 1000.0 and fit as a single aspirate before aspirate_buffer
+        # existed. With the buffer + rounding-margin headroom now reserved during clustering, a
+        # value this close to true capacity is correctly split into two batches instead -- proving
+        # the reserved headroom (not the guard) is what prevents overflow here.
         design = DataFrame(zeros(1,R*size(target)[2]),:auto)
-        design[1,1] = 999.96 # rounds to 1000.0 at 1 decimal -- exactly at capacity, must NOT throw
+        design[1,1] = 999.96
         df = convert_design(design,sources,targets,slotting,config)
-        action_df = batch_design(df,config)
-        @test action_df[1,"Volume (uL)"] == 1000.0
+        action_df = batch_design(df,config;insert_blowouts=false)
+        aspirate_idx = findall(==("Aspirate"),action_df.Action)
+        @test length(aspirate_idx) == 2 # split, not a single 1000.0 aspirate
+        @test all(<=(1000.0+1e-9), action_df[aspirate_idx,"Volume (uL)"]) # never exceeds true capacity
+        # each batch's single dispense is rounded independently (no remainder to redistribute
+        # within a 1-item list), so the total can drift from the nominal design value by up to a
+        # rounding unit -- not a regression, just a property of per-batch independent rounding
+        @test isapprox(sum(action_df[action_df.Action .== "Dispense","Volume (uL)"]),999.96;atol=0.1)
+
+        # a value comfortably under the reserved headroom stays as one batch, with the buffer visible
+        design2 = DataFrame(zeros(1,R*size(target)[2]),:auto)
+        design2[1,1] = 500.0
+        df2 = convert_design(design2,sources,targets,slotting,config)
+        action_df2 = batch_design(df2,config;insert_blowouts=false)
+        @test nrow(action_df2) == 2 # one aspirate, one dispense
+        @test isapprox(action_df2[1,"Volume (uL)"],500.01;atol=1e-6)
 
         # batching already guarantees every batch's raw volume stays within (effective) capacity,
-        # so the guard is a defensive assertion that should be unreachable through the public API
-        # in normal use -- the boundary case above (rounds up to exactly capacity) is the
-        # meaningful regression check that the guard's float-safety epsilon doesn't false-positive.
+        # so the guard itself is a defensive assertion that should be unreachable through the
+        # public API in normal use -- the cases above are the meaningful regression checks that
+        # the reserved headroom (aspirate_buffer + dead_volume_buffer + rounding margin) actually
+        # prevents overflow rather than relying on the guard to catch it after the fact.
     end
 
 end

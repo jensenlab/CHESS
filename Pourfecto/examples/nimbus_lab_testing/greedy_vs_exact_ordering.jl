@@ -18,8 +18,8 @@ for (r,c) in scattered
     design[1, well_col(R, r, c)] = 100.0 # 800 uL total, one batch, all 8 destinations together
 end
 
-greedy_df = run_and_summarize("greedy_vs_exact_ordering_greedy", design, Labware[source], Labware[target]; batch_ordering=:greedy)
-exact_df = run_and_summarize("greedy_vs_exact_ordering_exact", design, Labware[source], Labware[target]; batch_ordering=:exact)
+greedy_df = run_and_summarize("greedy_vs_exact_ordering_greedy", design, Labware[source], Labware[target]; batch_ordering=:greedy, insert_blowouts=false)
+exact_df = run_and_summarize("greedy_vs_exact_ordering_exact", design, Labware[source], Labware[target]; batch_ordering=:exact, insert_blowouts=false)
 
 function tour_distance(df::DataFrame)
     dispenses = df[df.Action .== "Dispense", "Labware Position ID"]

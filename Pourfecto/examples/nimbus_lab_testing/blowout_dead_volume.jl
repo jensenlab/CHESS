@@ -1,13 +1,17 @@
-# Demonstrates the (opt-in, NOT YET physically validated -- see csv_generation_refactor_notes.md)
-# dead-volume Blowout path: a single source forced into several re-aspirate batches under one tip,
-# each pair of consecutive same-tip batches separated by a Blowout row that drains a fixed
-# dead-volume buffer before the next aspirate. Prints each cycle's dispense-sum(+blowout) vs.
-# aspirate-volume check so the exact-agreement invariant is directly eyeballable.
+# Demonstrates the opt-in dead-volume Blowout path: a single source forced into several
+# re-aspirate batches under one tip, each pair of consecutive same-tip batches separated by a
+# Blowout row that drains a fixed dead-volume buffer before the next aspirate. Prints each cycle's
+# dispense-sum(+blowout) vs. aspirate-volume check so the (buffer-aware) exact-agreement invariant
+# is directly eyeballable -- every aspirate carries a small, unconditional safety margin
+# (aspirate_buffer, default 0.01 uL) beyond what its cycle actually needs, so real-world pipetting
+# inaccuracy on the last action in a cycle (e.g. the blowout itself) doesn't leave the tip short.
 #
-# waste_target below is a PLACEHOLDER -- LiquidWaste_0001's real deck Position ID has not been
-# confirmed on the instrument side (see the notes' Bug 3 section). Do not treat this script's
-# output as ready to run on the real Nimbus until that's confirmed and the parallel .hsl update
-# lands.
+# waste_target is left unspecified below, so it uses the default: the permanently-reserved waste
+# conical at TubeRack50ML_0006, slot 5 (nearest the tip rack), excluded from ordinary
+# source/target slotting on every Nimbus compile -- see Pourfecto.nimbus_waste_target and
+# slotting_greedy's Configuration{Nimbus} override. The Blowout path itself is still opt-in and
+# not yet validated end-to-end against real instrument hardware (the instrument-side .hsl support
+# and a RunControl smoke test remain open -- see csv_generation_refactor_notes.md's Bug 3 section).
 #
 # Usage: julia --project=Pourfecto Pourfecto/examples/nimbus_lab_testing/blowout_dead_volume.jl
 
@@ -25,18 +29,19 @@ for c in 1:12
     design[1, well_col(R, 1, c)] = 108.0
 end
 
-waste_target = ("LiquidWaste_0001", "1") # PLACEHOLDER -- see module comment above
 dead_volume_buffer = 20.0
 
 df = run_and_summarize("blowout_dead_volume", design, Labware[source], Labware[target];
-    insert_blowouts=true, waste_target, dead_volume_buffer)
+    insert_blowouts=true, dead_volume_buffer)
 
-println("Per-cycle check: sum(dispenses in cycle) + (blowout, if present) == that cycle's aspirate volume")
+println("Per-cycle check: sum(dispenses in cycle) + (blowout, if present) + aspirate_buffer == that cycle's aspirate volume")
 aspirate_idx = findall(==("Aspirate"), df.Action)
 n = nrow(df)
+aspirate_buffer = 0.01 # must match the default passed (implicitly) to run_and_summarize below
 for (k, i) in enumerate(aspirate_idx)
     block_end = k < length(aspirate_idx) ? aspirate_idx[k+1] - 1 : n
     cycle_sum = sum(df[i+1:block_end, "Volume (uL)"])
     aspirate_volume = df[i, "Volume (uL)"]
-    println("  cycle $k: aspirate=$aspirate_volume  sum(dispense+blowout)=$cycle_sum  match=$(cycle_sum == aspirate_volume)")
+    margin = aspirate_volume - cycle_sum
+    println("  cycle $k: aspirate=$aspirate_volume  sum(dispense+blowout)=$cycle_sum  margin=$margin  match=$(isapprox(margin,aspirate_buffer;atol=1e-6))")
 end

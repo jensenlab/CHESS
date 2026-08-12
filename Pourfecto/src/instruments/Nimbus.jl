@@ -52,7 +52,36 @@ mask_rules_for(::Configuration{Nimbus}) = nimbus_mask_rules
 
 
 
-## Nimbus Compiling Functions 
+## Nimbus Waste Conical
+#
+# One slot on the physical Nimbus deck permanently holds a Conical50 tube used as liquid waste for
+# the Blowout path (see batch_design's insert_blowouts) -- a real, always-present piece of hardware,
+# not something chosen per-protocol. TubeRack50ML_0006, slot 5 is the slot nearest the tip rack and
+# waste area on the real deck. This is reserved unconditionally (every Nimbus compile, whether or not
+# that particular protocol uses insert_blowouts), since the tube is physically there regardless.
+
+const nimbus_waste_conical = build_location(CHESSCore.location_kinds[:Conical50],"NimbusWasteConical")
+const nimbus_waste_slot = 5
+const nimbus_waste_target = (tuberack50mL_0006.name,nimbus_waste_slot)
+
+"""
+    slotting_greedy(labware::Vector{<:Labware}, config::Configuration{Nimbus}) -> SlottingDict
+
+Nimbus-specific override: pins [`nimbus_waste_conical`](@ref) to its fixed physical slot
+(`TubeRack50ML_0006`, slot `$(nimbus_waste_slot)`, nearest the tip rack) before delegating
+everything else to the generic [`slotting_greedy`](@ref). That slot is a permanent fixture on the
+real Nimbus deck -- excluded from ordinary source/target slotting on every compile, independent of
+whether the protocol actually uses the Blowout path, exactly like [`Cobra`](@ref)'s
+`packing_greedy` override reflects its own instrument-specific deck constraints.
+"""
+function slotting_greedy(labware::Vector{<:Labware},config::Configuration{Nimbus})
+    pinned = SlottingDict(nimbus_waste_conical => (tuberack50mL_0006,nimbus_waste_slot))
+    return slotting_greedy(vcat(labware,[nimbus_waste_conical]),config;pinned)
+end
+
+
+
+## Nimbus Compiling Functions
 
 function convert_design(design::DataFrame,sources::Vector{<:Labware},targets::Vector{<:Labware}, slotting::SlottingDict,config::Configuration{Nimbus}) 
     # helper function that converts the design and slotting scheme into operations for the nimbus 
@@ -111,9 +140,9 @@ end
 
 """
     batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy,
-                 volume_precision::Int=1, insert_blowouts::Bool=false,
-                 waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-                 dead_volume_buffer::Real=0.0, polish_clustering::Bool=false,
+                 volume_precision::Int=1, insert_blowouts::Bool=true,
+                 waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_waste_target,
+                 dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01, polish_clustering::Bool=false,
                  polish_max_iterations::Int=1000) -> DataFrame
 
 Group `convert_design`'s flat source/destination transfer list into one-to-many
@@ -126,26 +155,49 @@ volume-split against capacity ([`split_oversized`](@ref)), packed into capacity-
 distance-aware batches ([`cluster_batches`](@ref)), and ordered within each batch
 ([`order_batch`](@ref); `batch_ordering` is `:greedy` or `:exact`).
 
-Volumes are rounded to `volume_precision` decimal places such that each aspirate's own tip-load
-cycle sums back to its aspirate volume *exactly* at that precision
+Dispense/Blowout volumes within a cycle are rounded to `volume_precision` decimal places such that
+they sum back to the *unbuffered* portion of the aspirate volume *exactly* at that precision
 ([`round_with_exact_sum`](@ref)) -- the last value in the cycle (a dispense, or the blowout when
 present) absorbs whatever rounding remainder is needed, rather than every value being rounded
 independently, which can otherwise leave a hairline float residual that a strict downstream
-`available >= requested` check rejects. If a rounded aspirate volume is ever found to exceed the
-channel's true capacity, this throws rather than silently clamping (clamping would silently
-reintroduce the same kind of exact-sum mismatch it's meant to prevent).
+`available >= requested` check rejects.
+
+The `Aspirate` row itself then adds `aspirate_buffer` on top of that rounded sum
+(`aspirate_volume = sum(rounded dispense/blowout values) + aspirate_buffer`) -- a small,
+*deliberate* physical safety margin against real-world pipetting inaccuracy (an under-aspiration
+or a dispense that loses slightly more than its nominal volume can otherwise leave the tip short
+for the last action in a cycle, e.g. a `Blowout`). Unlike the dispense/blowout rows, the aspirate
+row is **not** re-rounded to `volume_precision` -- doing so could erase a buffer finer than that
+resolution (e.g. the default `aspirate_buffer=0.01` vanishes under the default
+`volume_precision=1`, since `round(x+0.01,digits=1) == round(x,digits=1)` in general). This is an
+**unconditional default** (unlike every other kwarg here, `aspirate_buffer=0.01` changes existing
+default output) since the margin should always be present regardless of `insert_blowouts`.
+
+Batch formation reserves headroom for both `aspirate_buffer` and a **rounding margin** (`0.5 *
+10.0^(-volume_precision)`, the worst a raw value can round *up* by) in addition to
+`dead_volume_buffer` -- without the rounding margin, a raw cycle volume just under
+`capacity - aspirate_buffer` could round up to something that, once `aspirate_buffer` is added,
+exceeds true capacity, defeating the purpose of reserving headroom at all. If a computed aspirate
+volume is nonetheless ever found to exceed the channel's true capacity, this throws rather than
+silently clamping (clamping would silently reintroduce the same kind of exact-sum mismatch Bug 1
+was fixed to prevent) -- with the margins above, this should not be reachable through normal use.
 
 When `insert_blowouts=true`, a batch that's immediately followed by a re-aspirate under the same
 tip (no tip change between them) gets a trailing `Blowout` row at `waste_target`, sized to drain
 `dead_volume_buffer` before the next aspirate -- that batch's own aspirate volume is then sized to
 cover its dispenses *plus* the buffer (the blowout is the last value in its cycle, so it absorbs
-the rounding remainder). `waste_target` (a `(labware id, position)` tuple) and a positive
-`dead_volume_buffer` (in µL, `< capacity`) are required when `insert_blowouts=true`. Batch
-formation reserves `capacity - dead_volume_buffer` of headroom for *every* batch in this mode
-(not just the ones that end up needing a blowout), since which batches need one isn't known until
-tip-change flags are computed across the whole design. **This path is opt-in and, per the
-generator's own refactor notes, not yet physically validated** -- it changes no behavior unless
-explicitly enabled.
+the rounding remainder). `waste_target` defaults to [`nimbus_waste_target`](@ref) -- the
+permanently-reserved waste conical (`TubeRack50ML_0006`, slot `$(nimbus_waste_slot)`, see
+[`slotting_greedy`](@ref)'s `Configuration{Nimbus}` override) -- so callers using the default deck
+layout don't need to supply it; pass a different `(labware id, position)` tuple to target something
+else. A positive `dead_volume_buffer` (in µL, `< capacity`, default `20.0`) is required when
+`insert_blowouts=true`. Batch formation reserves headroom for `dead_volume_buffer` for *every*
+batch in this mode (not just the ones that end up needing a blowout), since which batches need one
+isn't known until tip-change flags are computed across the whole design, on top of the
+`aspirate_buffer`/rounding headroom described above. **`insert_blowouts` defaults to `true`**: a
+protocol compiled with no blowout-related kwargs at all still gets `Blowout` rows wherever a
+re-aspirate happens under the same tip, draining the default `20.0` µL to the reserved waste
+conical. Pass `insert_blowouts=false` explicitly to disable it entirely.
 
 When `polish_clustering=true`, an exchange/local-search pass ([`polish_batches`](@ref)) runs on
 each source's clustered batches before within-batch ordering, swapping/relocating items between
@@ -154,18 +206,21 @@ pass, capped at `polish_max_iterations` improving moves. Opt-in; default `false`
 behavior exactly.
 """
 function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy,
-    volume_precision::Int=1, insert_blowouts::Bool=false,
-    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-    dead_volume_buffer::Real=0.0, polish_clustering::Bool=false, polish_max_iterations::Int=1000)
+    volume_precision::Int=1, insert_blowouts::Bool=true,
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_waste_target,
+    dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01, polish_clustering::Bool=false, polish_max_iterations::Int=1000)
 
     capacity = ustrip(uconvert(u"µL", dispense_channels(head(config))[1].capacity))
+    rounding_margin = 0.5 * 10.0^(-volume_precision)
 
     if insert_blowouts
         isnothing(waste_target) && throw(ArgumentError("batch_design: insert_blowouts=true requires a waste_target (labware id, position)"))
         dead_volume_buffer > 0 || throw(ArgumentError("batch_design: insert_blowouts=true requires dead_volume_buffer > 0"))
-        dead_volume_buffer < capacity || throw(ArgumentError("batch_design: dead_volume_buffer ($dead_volume_buffer) must be less than channel capacity ($capacity)"))
     end
-    effective_capacity = insert_blowouts ? capacity - dead_volume_buffer : capacity
+    aspirate_buffer >= 0 || throw(ArgumentError("batch_design: aspirate_buffer must be >= 0"))
+    reserved = aspirate_buffer + (insert_blowouts ? dead_volume_buffer : 0.0) + rounding_margin
+    reserved < capacity || throw(ArgumentError("batch_design: aspirate_buffer + dead_volume_buffer + rounding margin ($reserved) must be less than channel capacity ($capacity)"))
+    effective_capacity = capacity - reserved
 
     # group rows by source well, preserving first-appearance order
     source_keys = Tuple{String,Union{String,Integer}}[]
@@ -213,7 +268,7 @@ function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_orderi
         raw_volumes = [item.volume for item in batch]
         cycle_values = has_trailing_blowout ? vcat(raw_volumes,dead_volume_buffer) : raw_volumes
         rounded = round_with_exact_sum(cycle_values,volume_precision)
-        aspirate_volume = sum(rounded)
+        aspirate_volume = sum(rounded) + aspirate_buffer
 
         aspirate_volume <= capacity + 1e-9 || throw(ArgumentError("batch_design: rounded aspirate volume $aspirate_volume µL for source $(batch_sources[i]) (batch $i of $n) exceeds channel capacity $capacity µL"))
 
@@ -245,9 +300,9 @@ end
 
 """
     write_instrument_files(directory, design, source, target, config::Configuration{Nimbus}, slotting=slotting_greedy(...);
-                            batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
-                            waste_target=nothing, dead_volume_buffer::Real=0.0, polish_clustering::Bool=false,
-                            polish_max_iterations::Int=1000, kwargs...)
+                            batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=true,
+                            waste_target=nimbus_waste_target, dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01,
+                            polish_clustering::Bool=false, polish_max_iterations::Int=1000, kwargs...)
 
 Compile a `design` into a Nimbus protocol CSV written to `directory`. Unlike the generic
 compiler fallback, the Nimbus supports one-to-many aspirate/dispense: for each source well, as
@@ -262,15 +317,23 @@ The written CSV uses a unified action-row schema: `"Labware ID","Labware Positio
 "Volume (uL)","Action","Change Tip Before"`, `Action` being `"Aspirate"`, `"Dispense"`, or
 `"Blowout"`. An aspirate row is always immediately followed by the rows it feeds (its dispenses,
 and a trailing blowout when `insert_blowouts=true` and a re-aspirate follows under the same tip),
-whose volumes sum to the aspirate's volume *exactly* at `volume_precision` decimal places (see
-[`round_with_exact_sum`](@ref)). `"Change Tip Before"` is `1` on an aspirate row when the tip
-should be changed before that aspirate: always on a source change, and periodically thereafter
-per the instrument's `"max_tip_use"` setting (see [`tip_change_flags`](@ref)) -- note
-`"max_tip_use"` counts aspirate *batches*, not individual dispense shots. It's always `0` on
-`Dispense`/`Blowout` rows.
+whose volumes sum to `aspirate - aspirate_buffer` *exactly* at `volume_precision` decimal places
+(see [`round_with_exact_sum`](@ref)) -- the aspirate carries `aspirate_buffer` extra, a small
+unconditional physical safety margin (default `0.01` µL) against real-world pipetting inaccuracy
+on the last action in a cycle; see [`batch_design`](@ref) for the full precision/headroom
+reasoning. `"Change Tip Before"` is `1` on an aspirate row when the tip should be changed before
+that aspirate: always on a source change, and periodically thereafter per the instrument's
+`"max_tip_use"` setting (see [`tip_change_flags`](@ref)) -- note `"max_tip_use"` counts aspirate
+*batches*, not individual dispense shots. It's always `0` on `Dispense`/`Blowout` rows.
 
-`insert_blowouts`, `waste_target`, and `dead_volume_buffer` control the (opt-in, not yet
-physically validated) dead-volume Blowout path -- see [`batch_design`](@ref).
+`insert_blowouts`, `waste_target`, and `dead_volume_buffer` control the dead-volume Blowout path
+-- see [`batch_design`](@ref). **`insert_blowouts` defaults to `true`, with `dead_volume_buffer`
+defaulting to `20.0` µL** -- compiling with none of these three kwargs supplied still inserts
+`Blowout` rows wherever a re-aspirate happens under the same tip. `waste_target` defaults to the
+permanently-reserved waste conical ([`nimbus_waste_target`](@ref)) automatically excluded from
+ordinary source/target slotting (see `slotting_greedy`'s `Configuration{Nimbus}` override), so it
+doesn't need to be supplied explicitly either. Pass `insert_blowouts=false` to disable the path
+entirely.
 
 `polish_clustering` (and `polish_max_iterations`) enable an exchange/local-search pass over
 `cluster_batches`'s output to further reduce head-travel distance -- see
@@ -278,9 +341,9 @@ physically validated) dead-volume Blowout path -- see [`batch_design`](@ref).
 behavior exactly.
 """
 function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{Nimbus},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);
-    batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
-    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-    dead_volume_buffer::Real=0.0, polish_clustering::Bool=false, polish_max_iterations::Int=1000, kwargs...)
+    batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=true,
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_waste_target,
+    dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01, polish_clustering::Bool=false, polish_max_iterations::Int=1000, kwargs...)
     # input error handling
     S,T = size(design)
     S == sum(length.(source)) && T == sum(length.(target)) || ArgumentError("Dimension mismatch between design ($S x $T) and number of wells in the source and target labware ($(sum(length.(source))) x $(sum(length.(target))) )")
@@ -288,7 +351,7 @@ function write_instrument_files(directory::AbstractString,design::DataFrame,sour
     allunique(values(slotting)) || ArgumentError("Only one labware can be assigned to a given slot")
     df=convert_design(design,source,target,slotting,config)
 
-    action_df = batch_design(df,config;batch_ordering,volume_precision,insert_blowouts,waste_target,dead_volume_buffer,polish_clustering,polish_max_iterations)
+    action_df = batch_design(df,config;batch_ordering,volume_precision,insert_blowouts,waste_target,dead_volume_buffer,aspirate_buffer,polish_clustering,polish_max_iterations)
 
     if ~isdir(directory)
         mkdir(directory)

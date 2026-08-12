@@ -16,7 +16,7 @@ design[1, well_col(R, 1, 2)] = 200.0
 design[1, well_col(R, 1, 3)] = 200.0
 design[1, well_col(R, 1, 4)] = 200.0
 
-df = run_and_summarize("oversized_transfer", design, Labware[source], Labware[target])
+df = run_and_summarize("oversized_transfer", design, Labware[source], Labware[target]; insert_blowouts=false)
 println("Expect the 500 uL remainder from well A1 to share a batch with one or more of A2/A3/A4 (each 200 uL) rather than getting its own aspirate:")
 show(df, allrows=true)
 println()
