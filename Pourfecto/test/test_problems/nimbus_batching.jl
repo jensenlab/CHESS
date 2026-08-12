@@ -43,6 +43,73 @@ import Pourfecto: convert_design, batch_design
         @test same_batch_pairs >= 1
     end
 
+    @testset "polish_batches" begin
+        multiset(batches) = sort([(i.col,i.volume) for b in batches for i in b])
+        cost(batches) = sum(b -> Pourfecto._batch_travel(b,:greedy), batches)
+
+        @testset "swap improves a badly-clustered pair" begin
+            # two batches each pairing a "near" item with a "far" item -- swapping the far items
+            # between batches leaves each batch with its near pair instead, a large improvement
+            p1 = DispenseItem(1,CartesianIndex(1,1),100)
+            p2 = DispenseItem(2,CartesianIndex(1,100),100)
+            p3 = DispenseItem(3,CartesianIndex(1,2),100)
+            p4 = DispenseItem(4,CartesianIndex(1,101),100)
+            batches = [[p1,p2],[p3,p4]]
+            capacity = 400
+
+            polished = polish_batches(batches,capacity)
+            @test cost(polished) < cost(batches)
+            @test multiset(polished) == multiset(batches) # every item preserved exactly once
+            @test all(b -> sum(i.volume for i in b) <= capacity, polished)
+        end
+
+        @testset "relocate improves an item stuck in the wrong batch" begin
+            # a lone item sitting right next to a tight 3-item cluster, currently paired instead
+            # with a far outlier -- relocating it into the cluster is a large improvement
+            p1 = DispenseItem(1,CartesianIndex(1,1),100)
+            p2 = DispenseItem(2,CartesianIndex(1,2),100)
+            p3 = DispenseItem(3,CartesianIndex(1,3),100)
+            lone = DispenseItem(4,CartesianIndex(1,4),100)
+            far = DispenseItem(5,CartesianIndex(1,500),100)
+            batches = [[p1,p2,p3],[lone,far]]
+            capacity = 500
+
+            polished = polish_batches(batches,capacity)
+            @test cost(polished) < cost(batches)
+            @test multiset(polished) == multiset(batches)
+            @test all(b -> sum(i.volume for i in b) <= capacity, polished)
+            @test all(!isempty,polished) # no empty batch ever appears in output
+        end
+
+        @testset "already-optimal clustering is left alone (non-strict)" begin
+            items = [DispenseItem(i,CartesianIndex(1,i),100) for i in 1:6]
+            batches = cluster_batches(items,250) # 2 items/batch, adjacent pairs -- already optimal
+            polished = polish_batches(batches,250)
+            @test cost(polished) <= cost(batches)
+            @test multiset(polished) == multiset(batches)
+        end
+
+        @testset "capacity is always respected, even under tight margins" begin
+            p1 = DispenseItem(1,CartesianIndex(1,1),300)
+            p2 = DispenseItem(2,CartesianIndex(1,100),100)
+            p3 = DispenseItem(3,CartesianIndex(1,2),300)
+            batches = [[p1,p2],[p3]] # batch 1 is exactly at capacity, no slack
+            capacity = 400
+            polished = polish_batches(batches,capacity)
+            @test all(b -> sum(i.volume for i in b) <= capacity, polished)
+            @test multiset(polished) == multiset(batches)
+        end
+
+        @testset "max_iterations=0 returns input unchanged" begin
+            p1 = DispenseItem(1,CartesianIndex(1,1),100)
+            p2 = DispenseItem(2,CartesianIndex(1,100),100)
+            p3 = DispenseItem(3,CartesianIndex(1,2),100)
+            p4 = DispenseItem(4,CartesianIndex(1,101),100)
+            batches = [[p1,p2],[p3,p4]]
+            @test polish_batches(batches,400;max_iterations=0) == batches
+        end
+    end
+
     @testset "order_greedy vs order_exact" begin
         # 4 points on a line: optimal tour visits them in line order regardless of start
         line = [DispenseItem(1,CartesianIndex(1,1),0),DispenseItem(2,CartesianIndex(1,2),0),
@@ -215,6 +282,65 @@ import Pourfecto: convert_design, batch_design
         @test_throws ArgumentError batch_design(df,config;insert_blowouts=true) # missing waste_target
         @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=0.0) # buffer must be > 0
         @test_throws ArgumentError batch_design(df,config;insert_blowouts=true,waste_target,dead_volume_buffer=1000.0) # buffer must be < capacity
+    end
+
+    @testset "polish_clustering integration" begin
+        source1 = build_location(location_kinds[:Conical50],"nimbus_polish_test_source1")
+        source2 = build_location(location_kinds[:Conical50],"nimbus_polish_test_source2")
+        target = build_location(location_kinds[:DeepWP96],"nimbus_polish_test_target")
+        sources = Labware[source1,source2]
+        targets = Labware[target]
+        config = configurations["nimbus"]
+        slotting = slotting_greedy(vcat(sources,targets),config)
+
+        R,C = size(target)
+        well_col(letter_row,col) = (col-1)*R + letter_row
+
+        design = DataFrame(zeros(2,R*C),:auto)
+        design[1,well_col(1,1)] = 1500 # oversized transfer, same scenario as the main integration test
+        design[1,well_col(1,2)] = 300
+        design[1,well_col(1,3)] = 300
+        design[1,well_col(1,4)] = 300
+        design[1,well_col(1,5)] = 300
+        design[2,well_col(1,6)] = 200
+        design[2,well_col(1,7)] = 200
+
+        df = convert_design(design,sources,targets,slotting,config)
+        default_df = batch_design(df,config) # polish_clustering=false, the default
+        polished_df = batch_design(df,config;polish_clustering=true)
+
+        # regression: default behavior is byte-for-byte unaffected by the new kwarg's existence
+        @test default_df == batch_design(df,config;polish_clustering=false)
+
+        for action_df in (default_df,polished_df)
+            @test names(action_df) == ["Labware ID","Labware Position ID","Volume (uL)","Action","Change Tip Before"]
+            aspirate_idx = findall(==("Aspirate"),action_df.Action)
+            n = nrow(action_df)
+            for (k,i) in enumerate(aspirate_idx)
+                block_end = k < length(aspirate_idx) ? aspirate_idx[k+1]-1 : n
+                dispense_sum = sum(action_df[i+1:block_end,"Volume (uL)"])
+                @test isapprox(dispense_sum,action_df[i,"Volume (uL)"];atol=1e-6)
+                @test all(action_df[i+1:block_end,"Change Tip Before"] .== 0)
+            end
+            @test all(<=(1000), action_df[!,"Volume (uL)"])
+        end
+
+        # the same multiset of dispense (Labware ID, Position ID) pairs appears regardless of
+        # polish_clustering -- membership within a batch may change, but no destination is
+        # dropped, duplicated, or reassigned to a different source's worth of volume
+        dispense_pairs(df) = sort(collect(zip(df[df.Action .== "Dispense","Labware ID"],df[df.Action .== "Dispense","Labware Position ID"],df[df.Action .== "Dispense","Volume (uL)"])))
+        @test dispense_pairs(default_df) == dispense_pairs(polished_df)
+
+        # total dispensed volume unchanged
+        total(df) = sum(df[df.Action .== "Dispense","Volume (uL)"])
+        @test total(default_df) == total(polished_df)
+
+        mktempdir() do dir
+            outdir = joinpath(dir,"nimbus_polish_test")
+            write_instrument_files(outdir,design,sources,targets,config,slotting;polish_clustering=true,polish_max_iterations=500)
+            written = CSV.read(joinpath(outdir,"nimbus_polish_test.csv"),DataFrame)
+            @test names(written) == names(polished_df)
+        end
     end
 
     @testset "Bug 2 guard: capacity exceeded throws" begin

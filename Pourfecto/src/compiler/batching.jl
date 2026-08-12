@@ -203,6 +203,113 @@ function round_with_exact_sum(values::Vector{<:Real}, digits::Int)
 end
 
 """
+    _batch_travel(batch::Vector{DispenseItem}, method::Symbol) -> Float64
+
+Sum of consecutive `grid_distance`s in `batch` after ordering it with `order_batch(batch,method)`.
+The shared cost function used both by [`polish_batches`](@ref)'s search loop and by the benchmark
+suite to measure clustering quality -- the same metric throughout, so "improvement" during search
+means the same thing as "improvement" when reported afterward.
+"""
+function _batch_travel(batch::Vector{DispenseItem}, method::Symbol)
+    ordered = order_batch(batch,method)
+    length(ordered) <= 1 && return 0.0
+    return sum(grid_distance(ordered[i].position,ordered[i+1].position) for i in 1:length(ordered)-1)
+end
+
+# Scans all (batch,batch) x (item,item) pairs for a swap that strictly reduces total travel
+# distance without breaking either batch's capacity; applies the first one found and returns
+# true, or returns false if none exists. Mutates `batches` in place.
+function _try_swap!(batches::Vector{Vector{DispenseItem}}, capacity::Real, ordering_method::Symbol, eps::Real)
+    for a in 1:length(batches), b in a+1:length(batches)
+        vol_a = sum(item.volume for item in batches[a]; init=zero(capacity))
+        vol_b = sum(item.volume for item in batches[b]; init=zero(capacity))
+        for ii in eachindex(batches[a]), jj in eachindex(batches[b])
+            item_i,item_j = batches[a][ii],batches[b][jj]
+            (vol_a - item_i.volume + item_j.volume > capacity || vol_b - item_j.volume + item_i.volume > capacity) && continue
+
+            new_a = copy(batches[a]); new_a[ii] = item_j
+            new_b = copy(batches[b]); new_b[jj] = item_i
+            delta = (_batch_travel(new_a,ordering_method) + _batch_travel(new_b,ordering_method)) -
+                    (_batch_travel(batches[a],ordering_method) + _batch_travel(batches[b],ordering_method))
+            if delta < -eps
+                batches[a],batches[b] = new_a,new_b
+                return true
+            end
+        end
+    end
+    return false
+end
+
+# Scans all (batch,batch) x item candidates for a relocate that strictly reduces total travel
+# distance without breaking the destination batch's capacity; applies the first one found and
+# returns true, or returns false if none exists. Mutates `batches` in place. Unlike swap, this
+# can shrink a batch to empty -- callers are responsible for dropping empties afterward.
+function _try_relocate!(batches::Vector{Vector{DispenseItem}}, capacity::Real, ordering_method::Symbol, eps::Real)
+    for a in 1:length(batches), b in 1:length(batches)
+        a == b && continue
+        vol_b = sum(item.volume for item in batches[b]; init=zero(capacity))
+        for ii in eachindex(batches[a])
+            item_i = batches[a][ii]
+            vol_b + item_i.volume > capacity && continue
+
+            new_a = [x for (k,x) in enumerate(batches[a]) if k != ii]
+            new_b = vcat(batches[b],[item_i])
+            delta = (_batch_travel(new_a,ordering_method) + _batch_travel(new_b,ordering_method)) -
+                    (_batch_travel(batches[a],ordering_method) + _batch_travel(batches[b],ordering_method))
+            if delta < -eps
+                batches[a],batches[b] = new_a,new_b
+                return true
+            end
+        end
+    end
+    return false
+end
+
+"""
+    polish_batches(batches::Vector{Vector{DispenseItem}}, capacity::Real;
+                   max_iterations::Int=1000, ordering_method::Symbol=:greedy) -> Vector{Vector{DispenseItem}}
+
+Exchange/local-search polishing pass over already-clustered `batches` (e.g. [`cluster_batches`](@ref)'s
+output): repeatedly applies the first strictly-improving swap or relocate move found (see
+[`_try_swap!`](@ref)/[`_try_relocate!`](@ref)) -- exchanging one item between two batches, or moving
+one item into another batch's spare capacity -- until a full scan finds no improving move or
+`max_iterations` is reached. `capacity` must be whatever bound `batches` was actually clustered
+against (e.g. an effective capacity reduced for a dead-volume buffer elsewhere in the pipeline).
+`ordering_method` is only the internal distance proxy used to evaluate candidate moves during
+search (default `:greedy`, to keep move evaluation cheap); it does not affect how the returned
+batches are subsequently ordered by the caller.
+
+Every input item ends up in exactly one output batch (no drops/duplicates), every output batch's
+volume stays `≤ capacity`, and total travel distance never increases: since only strictly-improving
+moves are ever accepted, this holds by construction, but this function double-checks it
+defensively at the end and falls back to returning the untouched input (with an `@warn`) if the
+final recomputed cost is ever found to exceed the initial cost.
+"""
+function polish_batches(batches::Vector{Vector{DispenseItem}}, capacity::Real; max_iterations::Int=1000, ordering_method::Symbol=:greedy)
+    original = deepcopy(batches)
+    working = deepcopy(batches)
+    eps = 1e-9
+
+    initial_cost = sum(b -> _batch_travel(b,ordering_method), working; init=0.0)
+
+    iterations = 0
+    improved = true
+    while improved && iterations < max_iterations
+        improved = _try_swap!(working,capacity,ordering_method,eps) || _try_relocate!(working,capacity,ordering_method,eps)
+        iterations += 1
+    end
+
+    working = filter(!isempty,working)
+    final_cost = sum(b -> _batch_travel(b,ordering_method), working; init=0.0)
+
+    if final_cost > initial_cost + eps
+        @warn "polish_batches: internal cost tracking diverged from recomputed cost; returning pre-polish batches unchanged"
+        return original
+    end
+    return working
+end
+
+"""
     tip_change_flags(batch_sources::Vector, windowsize::Int) -> Vector{Int}
 
 Per-batch analogue of a shot-level sliding-window tip-change heuristic: given `batch_sources[i]`

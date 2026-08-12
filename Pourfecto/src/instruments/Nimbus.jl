@@ -113,7 +113,8 @@ end
     batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy,
                  volume_precision::Int=1, insert_blowouts::Bool=false,
                  waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-                 dead_volume_buffer::Real=0.0) -> DataFrame
+                 dead_volume_buffer::Real=0.0, polish_clustering::Bool=false,
+                 polish_max_iterations::Int=1000) -> DataFrame
 
 Group `convert_design`'s flat source/destination transfer list into one-to-many
 aspirate/dispense batches, bounded by the Nimbus channel's dispense capacity, and emit them in
@@ -145,11 +146,17 @@ formation reserves `capacity - dead_volume_buffer` of headroom for *every* batch
 tip-change flags are computed across the whole design. **This path is opt-in and, per the
 generator's own refactor notes, not yet physically validated** -- it changes no behavior unless
 explicitly enabled.
+
+When `polish_clustering=true`, an exchange/local-search pass ([`polish_batches`](@ref)) runs on
+each source's clustered batches before within-batch ordering, swapping/relocating items between
+batches to further reduce total head-travel distance beyond `cluster_batches`'s single greedy
+pass, capped at `polish_max_iterations` improving moves. Opt-in; default `false` preserves current
+behavior exactly.
 """
 function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_ordering::Symbol=:greedy,
     volume_precision::Int=1, insert_blowouts::Bool=false,
     waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-    dead_volume_buffer::Real=0.0)
+    dead_volume_buffer::Real=0.0, polish_clustering::Bool=false, polish_max_iterations::Int=1000)
 
     capacity = ustrip(uconvert(u"µL", dispense_channels(head(config))[1].capacity))
 
@@ -181,7 +188,9 @@ function batch_design(df::DataFrame, config::Configuration{Nimbus}; batch_orderi
             position = pos isa AbstractString ? well_to_cartesian(pos) : CartesianIndex(1,1)
             DispenseItem(r,position,df[r,"Volume (uL)"])
         end
-        for batch in cluster_batches(split_oversized(items,effective_capacity),effective_capacity)
+        clustered = cluster_batches(split_oversized(items,effective_capacity),effective_capacity)
+        polished = polish_clustering ? polish_batches(clustered,effective_capacity;max_iterations=polish_max_iterations) : clustered
+        for batch in polished
             push!(batches,order_batch(batch,batch_ordering))
             push!(batch_sources,key)
         end
@@ -237,7 +246,8 @@ end
 """
     write_instrument_files(directory, design, source, target, config::Configuration{Nimbus}, slotting=slotting_greedy(...);
                             batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
-                            waste_target=nothing, dead_volume_buffer::Real=0.0, kwargs...)
+                            waste_target=nothing, dead_volume_buffer::Real=0.0, polish_clustering::Bool=false,
+                            polish_max_iterations::Int=1000, kwargs...)
 
 Compile a `design` into a Nimbus protocol CSV written to `directory`. Unlike the generic
 compiler fallback, the Nimbus supports one-to-many aspirate/dispense: for each source well, as
@@ -261,11 +271,16 @@ per the instrument's `"max_tip_use"` setting (see [`tip_change_flags`](@ref)) --
 
 `insert_blowouts`, `waste_target`, and `dead_volume_buffer` control the (opt-in, not yet
 physically validated) dead-volume Blowout path -- see [`batch_design`](@ref).
+
+`polish_clustering` (and `polish_max_iterations`) enable an exchange/local-search pass over
+`cluster_batches`'s output to further reduce head-travel distance -- see
+[`polish_batches`](@ref) and [`batch_design`](@ref). Opt-in; default `false` preserves current
+behavior exactly.
 """
 function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{Nimbus},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);
     batch_ordering::Symbol=:greedy, volume_precision::Int=1, insert_blowouts::Bool=false,
     waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-    dead_volume_buffer::Real=0.0, kwargs...)
+    dead_volume_buffer::Real=0.0, polish_clustering::Bool=false, polish_max_iterations::Int=1000, kwargs...)
     # input error handling
     S,T = size(design)
     S == sum(length.(source)) && T == sum(length.(target)) || ArgumentError("Dimension mismatch between design ($S x $T) and number of wells in the source and target labware ($(sum(length.(source))) x $(sum(length.(target))) )")
@@ -273,7 +288,7 @@ function write_instrument_files(directory::AbstractString,design::DataFrame,sour
     allunique(values(slotting)) || ArgumentError("Only one labware can be assigned to a given slot")
     df=convert_design(design,source,target,slotting,config)
 
-    action_df = batch_design(df,config;batch_ordering,volume_precision,insert_blowouts,waste_target,dead_volume_buffer)
+    action_df = batch_design(df,config;batch_ordering,volume_precision,insert_blowouts,waste_target,dead_volume_buffer,polish_clustering,polish_max_iterations)
 
     if ~isdir(directory)
         mkdir(directory)

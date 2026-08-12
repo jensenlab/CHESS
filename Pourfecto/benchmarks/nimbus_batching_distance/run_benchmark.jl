@@ -5,11 +5,12 @@
 #       [results_csv]
 #
 # Unlike the other benchmarks in this folder, this one exercises only the compile-stage batching
-# logic (Pourfecto.cluster_batches/order_greedy/order_exact, src/compiler/batching.jl) directly on
-# synthetic DispenseItems -- no pourfecto() solve, no Gurobi/SCIP/HiGHS license needed. It sweeps
-# two axes per instance: clustering (naive first-fit vs. the real distance-aware cluster_batches)
-# and within-batch ordering (:greedy vs. :exact), scoring each of the four combinations by total
-# intra-batch consecutive-dispense grid distance -- exactly what order_greedy/order_exact optimize.
+# logic (Pourfecto.cluster_batches/order_greedy/order_exact/polish_batches, src/compiler/batching.jl)
+# directly on synthetic DispenseItems -- no pourfecto() solve, no Gurobi/SCIP/HiGHS license needed.
+# It sweeps three axes per instance: clustering (naive first-fit vs. the real distance-aware
+# cluster_batches, vs. cluster_batches + the polish_batches exchange/local-search pass), and
+# within-batch ordering (:greedy vs. :exact), scoring by total intra-batch consecutive-dispense
+# grid distance -- exactly what order_greedy/order_exact/polish_batches optimize.
 
 using Pourfecto, Unitful, CSV, DataFrames
 
@@ -34,23 +35,27 @@ function run_one(pattern::Symbol, density::Real, seed::Int)
 
     naive = naive_cluster_batches(items, CAPACITY)
     default = cluster_batches(items, CAPACITY)
+    polished = polish_batches(default, CAPACITY)
 
     naive_greedy = total_distance(naive, :greedy)
     naive_exact = total_distance(naive, :exact)
     default_greedy = total_distance(default, :greedy)
     default_exact = total_distance(default, :exact)
+    polished_greedy = total_distance(polished, :greedy)
 
     pct_improve(baseline, improved) = baseline == 0 ? 0.0 : round(100 * (baseline - improved) / baseline, digits=1)
 
     return (
         pattern=pattern, density=density, seed=seed, n_items=length(items),
-        naive_n_batches=length(naive), default_n_batches=length(default),
+        naive_n_batches=length(naive), default_n_batches=length(default), polished_n_batches=length(polished),
         naive_greedy_distance=round(naive_greedy, digits=2),
         naive_exact_distance=round(naive_exact, digits=2),
         default_greedy_distance=round(default_greedy, digits=2),
         default_exact_distance=round(default_exact, digits=2),
+        polished_greedy_distance=round(polished_greedy, digits=2),
         clustering_improvement_pct=pct_improve(naive_greedy, default_greedy), # naive:greedy -> default:greedy
         ordering_improvement_pct=pct_improve(default_greedy, default_exact), # default:greedy -> default:exact
+        polish_improvement_pct=pct_improve(default_greedy, polished_greedy), # default:greedy -> polished:greedy
     )
 end
 
@@ -70,9 +75,10 @@ function main()
         result = run_one(pattern, density, seed)
         println("pattern=$(result.pattern) density=$(result.density) seed=$(result.seed) " *
                 "n_items=$(result.n_items) naive_batches=$(result.naive_n_batches) " *
-                "default_batches=$(result.default_n_batches) " *
+                "default_batches=$(result.default_n_batches) polished_batches=$(result.polished_n_batches) " *
                 "clustering_improvement=$(result.clustering_improvement_pct)% " *
-                "ordering_improvement=$(result.ordering_improvement_pct)%")
+                "ordering_improvement=$(result.ordering_improvement_pct)% " *
+                "polish_improvement=$(result.polish_improvement_pct)%")
         push!(rows, result)
     end
 

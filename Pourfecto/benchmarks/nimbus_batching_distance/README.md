@@ -2,8 +2,10 @@
 
 Measures how much of the Nimbus head's dispense-to-dispense travel distance is saved by
 distance-aware batch clustering (`Pourfecto.cluster_batches`,
-`Pourfecto/src/compiler/batching.jl`) versus a naive capacity-only packer, and separately how much
-`batch_ordering=:exact` saves over the default `:greedy` within-batch ordering.
+`Pourfecto/src/compiler/batching.jl`) versus a naive capacity-only packer, separately how much
+`batch_ordering=:exact` saves over the default `:greedy` within-batch ordering, and separately how
+much an exchange/local-search polishing pass (`Pourfecto.polish_batches`) saves on top of
+`cluster_batches` alone.
 
 ## Why no solver is needed
 
@@ -25,11 +27,14 @@ buys, holding batch count roughly constant between the two (see `naive_n_batches
 
 For each set of batches, `total_distance` sums `grid_distance` between consecutive dispenses
 *within* each batch, after ordering with `order_batch(batch, method)` -- exactly what
-`order_greedy`/`order_exact` themselves optimize (Euclidean distance in `(row,col)` grid-index
-space, no physical pitch scaling). Two axes are swept independently:
+`order_greedy`/`order_exact`/`polish_batches` themselves optimize (Euclidean distance in
+`(row,col)` grid-index space, no physical pitch scaling). Three axes are swept, each isolating one
+algorithmic choice by holding the others fixed:
 
 - **Clustering**: `naive_cluster_batches` vs. `cluster_batches`, both ordered with `:greedy`.
 - **Ordering**: `cluster_batches`'s output ordered with `:greedy` vs. `:exact`.
+- **Polish**: `cluster_batches`'s output, vs. that same output passed through
+  `polish_batches` (default `max_iterations`), both then ordered with `:greedy`.
 
 ## Instances
 
@@ -112,3 +117,56 @@ never worse, often substantially better, and doesn't cost extra aspirates), and 
 `batch_ordering=:exact` is worth adopting as a future default where batch sizes stay within its
 tractable range -- though `:greedy` remains the safe default today given `:exact`'s size cap and
 the brute-force cost near it.
+
+## Polish pass
+
+`polish_improvement_pct` measures `cluster_batches` alone vs. `cluster_batches` +
+`polish_batches`, both under `:greedy` ordering -- holding ordering fixed isolates the
+clustering-quality gain the same way the main results isolate naive-vs-distance-aware clustering
+from ordering method. Same 35-instance sweep, mean over seeds by pattern and density:
+
+| pattern | density | mean polish improvement |
+|---|---|---|
+| uniform_random  | 0.1  | 3.6%  |
+| uniform_random  | 0.25 | 10.6% |
+| uniform_random  | 0.5  | 20.6% |
+| uniform_random  | 0.75 | 18.6% |
+| uniform_random  | 1.0  | 24.9% |
+| clustered_block | 0.1  | 29.8% |
+| clustered_block | 0.25 | 0.0%  |
+| clustered_block | 0.5  | 11.6% |
+| clustered_block | 0.75 | 10.6% |
+| clustered_block | 1.0  | 10.2% |
+| row_fill        | 0.1  | 0.0%  |
+| row_fill        | 0.25 | 15.2% |
+| row_fill        | 0.5  | 14.1% |
+| row_fill        | 0.75 | 8.1%  |
+| row_fill        | 1.0  | 10.2% |
+
+Averaged across all densities, per pattern:
+
+| pattern | mean polish improvement |
+|---|---|
+| uniform_random  | 15.7% |
+| clustered_block | 12.4% |
+| row_fill        | 9.5%  |
+
+Overall (35 instances): mean polish improvement **13.4%** on top of `cluster_batches` alone,
+**never negative** at any sweep point (minimum **0.0%**) -- the defensive cost-divergence
+fallback in `polish_batches` was never triggered.
+
+This is a meaningfully larger gain than `polish_batches` merely "squeezing remaining slack" would
+suggest -- roughly comparable in magnitude to the `:greedy`-to-`:exact` ordering gain (11.1% mean),
+and largest exactly where `cluster_batches`'s single greedy pass has the most room to have made a
+locally-suboptimal seed/pull choice (`uniform_random` at higher densities, where more items compete
+for the same batches: 18.6-24.9% at density ≥ 0.5). `polished_n_batches` equals `default_n_batches`
+at every sweep point in this benchmark -- consistent with the earlier finding that beneficial
+relocate moves rarely empty a batch under a pure-distance objective (see `polish_batches`'s
+docstring): the gains here come from better membership within a fixed batch count, not fewer
+aspirates.
+
+These results support `polish_clustering=true` as a low-risk quality knob (never worse, no extra
+aspirates, and its cost is modest at these instance sizes -- see `polish_batches`'s complexity
+notes) for callers who want the extra distance reduction and can afford the added compile-time
+search, though it remains opt-in (`false` by default) pending a decision on whether the gain is
+worth making it the default.
