@@ -4,12 +4,13 @@ version = "0.1.0"
 authors = ["Ben David <66976120+bmdavid2@users.noreply.github.com>"]
 
 [workspace]
-projects = ["CHESSCore", "CHESSDatabase", "CHESSLabConstants", "Pourfecto", "PlateArrays", "docs"]
+projects = ["CHESSCore", "CHESSDatabase", "CHESSLabConstants", "Pourfecto", "PlateArrays", "CHESSParsers", "docs"]
 
 [deps]
 CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
 CHESSDatabase = "a378c3a1-3085-4ba8-9ece-5d836f51da24"
 CHESSLabConstants = "51347251-55e0-4e7d-9685-600600911616"
+CHESSParsers = "c41996af-383d-4049-9b52-09a73c86e265"
 PlateArrays = "52f550af-10d2-4094-8a84-3f014d56cfcb"
 Pourfecto = "82aece00-2e0a-4aa7-b3de-eea0746b1d2e"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
@@ -20,6 +21,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 CHESSCore = {path = "CHESSCore"}
 CHESSDatabase = {path = "CHESSDatabase"}
 CHESSLabConstants = {path = "CHESSLabConstants"}
+CHESSParsers = {path = "CHESSParsers"}
 PlateArrays = {path = "PlateArrays"}
 Pourfecto = {path = "Pourfecto"}
 

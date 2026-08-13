@@ -38,7 +38,10 @@ Packages that plan and schedule lab operations against the CHESS engine's data m
 ### Data Processing
 
 Packages for processing and analyzing data recorded through CHESS (e.g. reads and measurements).
-No packages yet.
+
+| Package | Description | Docs |
+|---|---|---|
+| [`CHESSParsers`](CHESSParsers) | Parses instrument-exported data files (starting with BioTek plate readers/incubators: Epoch2, Synergy, Cytation, BioSpa) into a `DataFrame`, `CHESSCore.Read`s, or JSON, through a generic, pluggable per-instrument-format interface. | -- |
 
 ### Quality Control
 
