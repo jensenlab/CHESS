@@ -140,6 +140,7 @@
 # cosmetically inconsistent, but doesn't affect the pH solve (moles/charges, not absolute masses,
 # drive that). Revisit if CHESSCore ever gains a first-class "purity/assay" concept on Reagent.
 @reagent lactose "D-lactose" Solid 342.3u"g/mol" missing 6134
+@reagent lactulose "Lactulose" Solid 342.3u"g/mol" missing 11333
 @reagent lb "LB Broth" Solid missing missing missing
 @reagent leucine "L-leucine" Solid 131.17u"g/mol" 1.293u"g/mL" 6106
 @reagent lincomycin "lincomycin" Solid 406.5u"g/mol" missing 3000540
