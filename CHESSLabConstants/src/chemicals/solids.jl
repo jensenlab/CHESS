@@ -49,11 +49,10 @@
 @reagent carnitine "D,L-Carnitine" Solid 161.2u"g/mol" missing 288
 @reagent ceftriaxone "ceftriaxone" Solid 554.6u"g/mol" missing 5479530
 @reagent cellobiose "cellobiose (maltose)" Solid 342.3u"g/mol" missing 294
-@reagent cellulose "Cellulose Triacetate" Solid missing missing missing
-# ^ Thermo Scientific/Acros AC177822500 -- vendor listing names this "cellulose" but the catalog
-# number is actually cellulose triacetate (CAS 9012-09-3, repeat unit (C24H32O16)n), not plain
-# cellulose -- registered under the product's real identity per the catalog. Polymer, no PubChem
-# CID/fixed MW; no CompositionRule/AcidBaseSystem (same non-discrete-material treatment as arabinan/
+@reagent cellulose_triacetate "Cellulose Triacetate" Solid missing missing missing
+# ^ Thermo Scientific/Acros AC177822500 (CAS 9012-09-3, repeat unit (C24H32O16)n) -- lab_id/name
+# reflect the actual product on the shelf, not plain cellulose. Polymer, no PubChem CID/fixed MW;
+# no CompositionRule/AcidBaseSystem (same non-discrete-material treatment as arabinan/
 # hydrolyzed_mucin below).
 @reagent chloramphenicol "chloramphenicol" Solid 323.13u"g/mol" missing 5959
 @reagent chlortetracycline "chlortetracycline" Solid 515.3u"g/mol" missing 54682468
