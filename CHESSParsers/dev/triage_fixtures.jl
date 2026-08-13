@@ -19,10 +19,19 @@ else
         path = joinpath(datadir, f)
         print(rpad(f, 50))
         try
-            lrs = parse_instrument_file(path)
-            plates = length(unique(lr.metadata["plate"] for lr in lrs))
-            rows = sum(nrow(lr.data) for lr in lrs)
-            println("OK    plates=$plates  channels=$(length(lrs))  rows=$rows")
+            results = parse_instrument_file(path)
+            rows = sum(nrow(r.data) for r in results)
+            if !isempty(results) && haskey(first(results).metadata, "plate")
+                # LabwareRead (Gen5 family): one "plate" per result
+                plates = length(unique(r.metadata["plate"] for r in results))
+                println("OK    plates=$plates  channels=$(length(results))  rows=$rows")
+            elseif !isempty(results) && haskey(first(results).metadata, "plates")
+                # EnvironmentLog (BioSpa): a shared plate-mapping table in metadata, not one per result
+                plates = nrow(first(results).metadata["plates"])
+                println("OK    plates=$plates  readings=$(length(results))  rows=$rows")
+            else
+                println("OK    results=$(length(results))  rows=$rows")
+            end
         catch e
             println("FAIL  ", sprint(showerror, e))
         end

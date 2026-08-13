@@ -271,4 +271,118 @@ end
         end
     end
 
+    @testset "BioSpa: biospa_environment_log.SES (chamber-level environment log)" begin
+        # A .SES session is XML, not Gen5's .xlsx -- chamber-level (no wells) time series, so it
+        # produces EnvironmentLog, not LabwareRead. This fixture is downsampled (~100 of the real
+        # file's ~12000 samples) and includes some of BioSpa's "unset" trailing sentinel entries
+        # (0001-01-01, pre-allocated but never written), which parse_raw must truncate away.
+        els = parse_instrument_file(joinpath(fixturedir, "biospa_environment_log.SES"))
+        @test els isa Vector{EnvironmentLog}
+        @test length(els) == 4 # one per reading kind
+        @test sort([el.metadata["read_kind"] for el in els]) == ["CO2", "Humidity", "O2", "Temperature"]
+        @test all(el -> el.metadata["format"] === BioSpaFormat, els)
+
+        temp = only(filter(el -> el.metadata["read_kind"] == "Temperature", els))
+        @test temp.metadata["unit"] == "°C"
+        @test temp.metadata["setpoint"] == 37.0
+        humidity = only(filter(el -> el.metadata["read_kind"] == "Humidity", els))
+        @test ismissing(humidity.metadata["setpoint"]) # no chamber setpoint for humidity in this file
+
+        # every reading kind must truncate to the same number of real (non-sentinel) samples
+        @test length(unique(nrow(el.data) for el in els)) == 1
+        @test nrow(temp.data) > 0 && nrow(temp.data) < 100 # real fraction of the downsampled file
+
+        plates = temp.metadata["plates"]
+        @test names(plates) == ["id", "slot", "experiment_name", "gen5_plate_number"]
+        @test nrow(plates) == 8
+        @test sort(plates.id) == ["SIM0000$i" for i in 1:8]
+        @test sort(plates.gen5_plate_number) == 1:8
+
+        df = DataFrame(temp)
+        @test names(df) == ["time", "value"]
+        @test issorted(df.time)
+
+        j = environmentlog_to_json(temp)
+        temp2 = json_to_environmentlog(j)
+        @test temp2.metadata["read_kind"] == "Temperature"
+        @test temp2.metadata["plates"] == plates
+        @test DataFrame(temp2).value == df.value
+    end
+
+    @testset "Take3Trio: nucleic_acid_read.xlsx (Blank Read + Sample Read)" begin
+        # A Take3 Trio nucleic-acid quant export -- structurally unrelated to the Gen5 plate-grid
+        # family ("Gen5 version" header, not "Software Version"). "Blank Read" is a real-well-indexed
+        # endpoint grid; "Sample Read #1" has no well at all, only Gen5's generic "SPL#" sample
+        # tokens spread across 3 "Slide" sub-blocks that must be merged into one set of channels
+        # (not 3), and includes a ng/µL concentration channel captured as Gen5 computed it (not
+        # re-derived -- see src/instruments/take3trio.jl for why that's not possible exactly).
+        lrs = parse_instrument_file(joinpath(fixturedir, "nucleic_acid_read.xlsx"))
+        @test length(lrs) == 6 # Blank Read: 260/280/320; Sample Read #1: 260/280/Concentration
+        @test all(lr -> lr.metadata["format"] === Take3TrioFormat, lrs)
+        @test all(lr -> lr.metadata["reader_type"] == "Epoch 2", lrs)
+        @test all(lr -> lr.metadata["accessory"] == "Take3 Trio (423933)", lrs)
+
+        blank = filter(lr -> lr.metadata["plate"] == "Blank Read", lrs)
+        @test length(blank) == 3
+        @test sort([lr.metadata["wavelength"] for lr in blank]) == [260, 280, 320]
+        @test all(lr -> nrow(lr.data) == 48, blank) # the trailing "[AVE]" aggregate row must not appear as a well
+        @test all(lr -> "[AVE]" ∉ lr.data.well, blank)
+        blank320 = only(filter(lr -> lr.metadata["wavelength"] == 320, blank))
+        @test only(blank320.data.value[blank320.data.well.=="H9"]) == 0.026
+
+        sample = filter(lr -> lr.metadata["plate"] == "Sample Read #1", lrs)
+        @test length(sample) == 3
+        abs260 = only(filter(lr -> lr.metadata["read_kind"] == "Absorbance" && lr.metadata["wavelength"] == 260, sample))
+        abs280 = only(filter(lr -> lr.metadata["read_kind"] == "Absorbance" && lr.metadata["wavelength"] == 280, sample))
+        conc = only(filter(lr -> lr.metadata["read_kind"] == "Concentration", sample))
+        expected_spls = Set("SPL$i" for i in 1:48)
+        @test all(lr -> nrow(lr.data) == 48 && Set(lr.data.well) == expected_spls, (abs260, abs280, conc))
+        # all 3 slides merged into one channel each, not kept as 3 separate 16-sample channels
+        @test only(abs280.data.value[abs280.data.well.=="SPL48"]) == 0.001
+        @test conc.metadata["unit"] == "ng/µL"
+        @test conc.metadata["sample_type"] == "dsDNA"
+        @test only(conc.data.value[conc.data.well.=="SPL1"]) == 20.023
+        @test only(conc.data.value[conc.data.well.=="SPL48"]) == 0.929
+    end
+
+    @testset "BioSpa: mismatched series lengths is an error, not a silent zip" begin
+        # No committed fixture demonstrates this naturally (every real file has 5 series of equal
+        # length) -- built as a small synthetic .SES, mirroring the Gen5 synthetic-file tests above.
+        mktemp() do path, io
+            sespath = path * ".SES"
+            write(sespath, """
+            <?xml version="1.0" encoding="utf-8"?>
+            <Session>
+              <Plates>
+                <PlateDetails>
+                  <ID>SIM00001</ID>
+                  <Slot>1</Slot>
+                  <Data>
+                    <ExperimentName>test</ExperimentName>
+                    <Gen5PlateNumber>1</Gen5PlateNumber>
+                  </Data>
+                </PlateDetails>
+              </Plates>
+              <Environment>
+                <TempValue>37</TempValue>
+                <O2Value>10</O2Value>
+                <CO2Value>5</CO2Value>
+              </Environment>
+              <SessionActualStartTime>2020-01-01T09:00:00</SessionActualStartTime>
+              <CurrentIndex>2</CurrentIndex>
+              <TimeStamps>2020-01-01T09:00:00</TimeStamps>
+              <TimeStamps>2020-01-01T09:01:00</TimeStamps>
+              <DataSeriesO2>20.0</DataSeriesO2>
+              <DataSeriesO2>20.1</DataSeriesO2>
+              <DataSeriesTemp>37.0</DataSeriesTemp>
+              <DataSeriesCO2>5.0</DataSeriesCO2>
+              <DataSeriesCO2>5.1</DataSeriesCO2>
+              <DataSeriesHumidity>60.0</DataSeriesHumidity>
+              <DataSeriesHumidity>60.1</DataSeriesHumidity>
+            </Session>
+            """)
+            @test_throws ErrorException parse_instrument_file(sespath; format=BioSpaFormat)
+        end
+    end
+
 end

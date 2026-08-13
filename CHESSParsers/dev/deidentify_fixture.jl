@@ -13,7 +13,7 @@
 #   julia --project=CHESSParsers CHESSParsers/dev/deidentify_fixture.jl <source.xlsx> <dest.xlsx>
 
 using CHESSParsers, XLSX, Random, Dates
-import CHESSParsers: _gen5_is_plate_sheet, _gen5_findlabel
+import CHESSParsers: _gen5_is_plate_sheet, _gen5_findlabel, _TAKE3TRIO_SAMPLE_SHEET_RE, _take3trio_findcell
 
 const PLACEHOLDER_DATE = Date(2020, 1, 1)
 const PLACEHOLDER_TIME = Dates.Time(9, 0, 0)
@@ -91,6 +91,48 @@ function _scrub_pivot_sheet!(ws, M, r0, c0, rng)
     end
 end
 
+# Take3 Trio sheets ("Blank Read"/"Sample Read #N") don't have the "Software Version"/"Procedure
+# Details" structure the generic Gen5 scrub relies on, so they get their own pair of scrub functions.
+# Blank Read: fuzz every Real cell after the "Location" header row except the Location column itself
+# (a real well ID, not a measurement). Sample Read: fuzz only the two SPL#-value columns of each
+# slide, never the marker column immediately after them (bare 260/280 Reals there are structural --
+# they select which channel a row feeds, the same role a Gen5 endpoint block's column-index header or
+# bare-wavelength label column plays) or the letter/SPL# columns (strings, not measurements).
+function _take3trio_scrub_blank_sheet!(ws, M, r0, c0, rng)
+    _scrub_header!(ws, M, r0, c0)
+    loc = _take3trio_findcell(M, "Location")
+    isnothing(loc) && return
+    header_row, loc_col = loc
+    for i in (header_row+1):size(M, 1), j in 1:size(M, 2)
+        j == loc_col && continue
+        v = M[i, j]
+        v isa Real || continue
+        ws[_wscoord(r0, c0, i, j)...] = _fuzz(rng, v)
+    end
+end
+
+function _take3trio_scrub_sample_sheet!(ws, M, r0, c0, rng)
+    _scrub_header!(ws, M, r0, c0)
+    slide_row = nothing
+    letter_cols = Int[]
+    for i in 1:size(M, 1)
+        for j in 1:size(M, 2)
+            v = M[i, j]
+            if v isa AbstractString && occursin(r"^Slide \d+$", v)
+                slide_row = something(slide_row, i)
+                push!(letter_cols, j)
+            end
+        end
+        !isnothing(slide_row) && break
+    end
+    isnothing(slide_row) && return
+    for letter_col in letter_cols, j in (letter_col+1):(letter_col+2), i in (slide_row+1):size(M, 1)
+        v = M[i, j]
+        v isa Real || continue
+        ws[_wscoord(r0, c0, i, j)...] = _fuzz(rng, v)
+    end
+end
+
 function _synthetic_plate_name(original::AbstractString, idx::Int)
     occursin(r"^Plate \d+( - Sheet\d*)?$", original) && return original # already generic Gen5 default
     return "SIM" * lpad(string(idx), 5, '0')
@@ -114,6 +156,14 @@ function deidentify_fixture(src::AbstractString, dest::AbstractString)
             M = ws[:]
             d = XLSX.get_dimension(ws)
             r0, c0 = d.start.row_number, d.start.column_number
+
+            if sn == "Blank Read"
+                _take3trio_scrub_blank_sheet!(ws, M, r0, c0, rng)
+                continue
+            elseif occursin(_TAKE3TRIO_SAMPLE_SHEET_RE, sn)
+                _take3trio_scrub_sample_sheet!(ws, M, r0, c0, rng)
+                continue
+            end
 
             if !_gen5_is_plate_sheet(M)
                 _scrub_pivot_sheet!(ws, M, r0, c0, rng)

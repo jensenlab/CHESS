@@ -25,10 +25,12 @@ must implement this method; there is no fallback.
 function detect end
 
 """
-    parse_raw(::Type{T}, path::AbstractString; kwargs...) where T<:InstrumentFormat -> Vector{LabwareRead}
+    parse_raw(::Type{T}, path::AbstractString; kwargs...) where T<:InstrumentFormat -> Vector
 
-Parse the file at `path`, known to be a `T` export, into one [`LabwareRead`](@ref) per (plate,
-channel) found in it. Every concrete [`InstrumentFormat`](@ref) must implement this method; there is
+Parse the file at `path`, known to be a `T` export, into a vector of result objects -- one
+[`LabwareRead`](@ref) per (plate, channel) for the well-shaped Gen5 formats, or one
+[`EnvironmentLog`](@ref) per reading kind for chamber-level formats like `BioSpaFormat` that have no
+per-well data at all. Every concrete [`InstrumentFormat`](@ref) must implement this method; there is
 no fallback.
 """
 function parse_raw end
@@ -59,6 +61,32 @@ Fields:
 See also: [`DataFrame(::LabwareRead)`](@ref), [`record_reads!`](@ref), [`labwareread_to_json`](@ref).
 """
 struct LabwareRead
+    metadata::Dict{String,Any}
+    data::DataFrame
+end
+
+"""
+    struct EnvironmentLog
+        metadata::Dict{String,Any}
+        data::DataFrame
+    end
+
+The canonical result of parsing one *reading kind* of a chamber-level environmental log (e.g. a
+BioSpa incubator session's temperature/O2/CO2/humidity history) -- data that has no well to attach
+to at all, unlike [`LabwareRead`](@ref)'s per-plate-per-channel well measurements. A session logs
+several reading kinds at once; [`parse_raw`](@ref)/[`parse_instrument_file`](@ref) return one
+`EnvironmentLog` per kind, mirroring how `LabwareRead` splits by (plate, channel).
+
+Fields:
+- `metadata`: everything constant for this one reading kind -- at minimum `metadata["format"]`,
+  `metadata["read_kind"]` (e.g. `"Temperature"`; informational only, not a registered
+  `CHESSCore.ReadKind`), plus whatever else the format exposes (unit, setpoint, session start time,
+  a plate slot/barcode mapping table, ...).
+- `data`: a tidy `DataFrame` with exactly two columns -- `time::DateTime`, `value::Float64`.
+
+See also: [`DataFrame(::EnvironmentLog)`](@ref), [`environmentlog_to_json`](@ref).
+"""
+struct EnvironmentLog
     metadata::Dict{String,Any}
     data::DataFrame
 end
