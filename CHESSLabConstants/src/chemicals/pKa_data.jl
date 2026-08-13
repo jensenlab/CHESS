@@ -230,6 +230,27 @@
 # is one of the most well-established weak acids in aqueous chemistry (conjugate acid of ammonia).
 @chemical NH3 "NH3" 0 17.031u"g/mol" # PubChem CID 222
 
+# butyric_acid/succinic_acid/l_malic_acid/d_malic_acid are new free-acid reagents added alongside
+# the existing sodium_butyrate/sodium_succinate_hexahydrate/malic_acid salts -- same conjugate
+# chemistry, so they reuse the ButyricAcid/SuccinicAcid/HMalate-/Malate2- Chemicals already defined
+# above rather than duplicating them. Only ethanolamine/putrescine/hypoxanthine below are genuinely
+# new conjugate endpoints.
+@chemical EthanolamineCation "Ethanolamine(cation)" 1 62.092u"g/mol"
+@chemical PutrescineDication "Putrescine(dication)" 2 90.166u"g/mol"
+@chemical PutrescineCation "Putrescine(cation)" 1 89.158u"g/mol"
+@chemical HypoxanthineAnion "Hypoxanthine(anion)" -1 135.10u"g/mol"
+
+# Glutathione (reduced): 4 ionizable groups (gamma-Glu carboxyl, Gly carboxyl, Cys thiol, alpha-amino).
+# pKa's are the well-established Rabenstein 1973 values (13C-NMR titration; widely cited in
+# biochemistry references since), same [cation,identity,anion,dianion,trianion] chain shape as
+# aspartic_acid/glutamic_acid above -- identity's net-neutral state is the physiological zwitterion
+# (NH3+, gamma-COO-, SH, Gly-COOH), matching how _identity's charge-0/stored-MW convention is already
+# used for those two-carboxyl amino acids.
+@chemical GSHCation "Glutathione(cation)" 1 308.338u"g/mol"
+@chemical GSHAnion "Glutathione(anion)" -1 306.322u"g/mol"
+@chemical GSHDianion "Glutathione(dianion)" -2 305.314u"g/mol"
+@chemical GSHTrianion "Glutathione(trianion)" -3 304.306u"g/mol"
+
 function _register_acid_base_systems!()
     # Phosphoric acid family: H3PO4 ⇌ H2PO4⁻ ⇌ HPO4²⁻ ⇌ PO4³⁻ -- pKa1/pKa2/pKa3 = 2.148/7.198/12.375
     # (CRC Handbook, 25°C). Shared across all four phosphate salts -- same conjugate family regardless
@@ -270,8 +291,12 @@ function _register_acid_base_systems!()
     # the comment above the Chemical definitions).
     _identity(r::Reagent) = CHESSCore.Chemical(name(r),0,molecular_weight(r))
 
-    set_acid_base_system!(citric_acid,AcidBaseSystem(
-        [_identity(citric_acid),H2Citrate⁻,HCitrate²⁻,Citrate³⁻],[3.13,4.76,6.40]))
+    citric_acid_system = AcidBaseSystem([_identity(citric_acid),H2Citrate⁻,HCitrate²⁻,Citrate³⁻],[3.13,4.76,6.40])
+    set_acid_base_system!(citric_acid,citric_acid_system)
+    # sodium_citrate_dihydrate is the same conjugate family from the fully-deprotonated end (its
+    # CompositionRule, electrolytes.jl, already dissociates it straight to Citrate3-) -- shared
+    # AcidBaseSystem instance, same pattern as acetic_acid/sodium_acetate below.
+    set_acid_base_system!(sodium_citrate_dihydrate,citric_acid_system)
     set_acid_base_system!(lactic_acid,AcidBaseSystem(
         [_identity(lactic_acid),Lactate⁻],[3.86]))
     set_acid_base_system!(oxalic_acid,AcidBaseSystem(
@@ -389,6 +414,29 @@ function _register_acid_base_systems!()
     set_acid_base_system!(biotin,AcidBaseSystem([_identity(biotin),BiotinAnion],[4.5]))
     # literature range ≈4.7-5.4; representative value, not a single universally-agreed constant.
     set_acid_base_system!(lipoic_acid,AcidBaseSystem([_identity(lipoic_acid),LipoateAnion],[4.8]))
+
+    # Free-acid counterparts of already-registered salts, reusing the same conjugate chain/pKa (see
+    # the Chemical definitions' comment above) -- these reagents' identity is the plain neutral acid
+    # (matches composition()'s default), unlike the pyruvate/butyrate/tartrate salts just above.
+    set_acid_base_system!(butyric_acid,AcidBaseSystem([_identity(butyric_acid),ButyrateAnion],[4.82]))
+    set_acid_base_system!(succinic_acid,AcidBaseSystem(
+        [_identity(succinic_acid),SuccinateMonoanion,C4H4O4²⁻],[4.21,5.64]))
+    set_acid_base_system!(l_malic_acid,AcidBaseSystem([_identity(l_malic_acid),HMalate⁻,Malate²⁻],[3.40,5.20]))
+    set_acid_base_system!(d_malic_acid,AcidBaseSystem([_identity(d_malic_acid),HMalate⁻,Malate²⁻],[3.40,5.20]))
+    # ethanolamine: conjugate acid pKa 9.50 (CRC Handbook), same [cation,identity] shape as ammonium.
+    set_acid_base_system!(ethanolamine,AcidBaseSystem([EthanolamineCation,_identity(ethanolamine)],[9.50]))
+    # putrescine (1,4-butanediamine): two amines, pKa1=9.35/pKa2=10.80 (CRC Handbook), same
+    # low-then-high chain shape as agmatine above.
+    set_acid_base_system!(putrescine,AcidBaseSystem(
+        [PutrescineDication,PutrescineCation,_identity(putrescine)],[9.35,10.80]))
+    # hypoxanthine: only the well-established acidic N-H deprotonation (pKa 8.94, CRC Handbook) is
+    # registered; its weak ring-nitrogen basicity (pKa~2, low confidence/less consistently reported)
+    # is left out, same documented-scope-boundary spirit as folic_acid/fusidic_acid.
+    set_acid_base_system!(hypoxanthine,AcidBaseSystem([_identity(hypoxanthine),HypoxanthineAnion],[8.94]))
+    # glutathione: Rabenstein (1973) J. Am. Chem. Soc. 95, 2797 -- gamma-Glu-COOH 2.05, Gly-COOH 3.53,
+    # Cys-SH 8.66, alpha-NH3+ 9.42.
+    set_acid_base_system!(glutathione,AcidBaseSystem(
+        [GSHCation,_identity(glutathione),GSHAnion,GSHDianion,GSHTrianion],[2.05,3.53,8.66,9.42]))
 
     # Cluster C: antibiotics.
     # Sulfonamides (aniline-type amine + acidic sulfonamide N-H, same family as paba):

@@ -20,7 +20,15 @@
 @reagent ammonium_sulfate "Ammonium Sulfate" Solid missing 1.78u"g/mL" 6097028
 @reagent amoxicillin "amoxicillin" Solid 365.4u"g/mol" missing 33613
 @reagent ampicillin "ampicllin" Solid 349.4u"g/mol" missing 6249
-@reagent arabinose "Arabinose" Solid 230.11u"g/mol" missing 188324
+@reagent arabinan "Arabinan" Solid missing missing missing
+# ^ Sigma-Aldrich AABH9BD89ECE-250MG (sugar-beet arabinan). Polydisperse polysaccharide, no PubChem
+# CID/fixed MW exists -- registered for identity/inventory purposes only (same pattern as agar/
+# dextrin/tryptone: a real, named lab reagent with no single-molecule MW to report).
+@reagent arabinose "D-Arabinose" Solid 150.13u"g/mol" missing 66308
+# ^ fixed 2026-08-13: was incorrectly CID 188324 (D-Arabinose 5-phosphate, MW 230.11), a different,
+# phosphorylated compound -- corrected to plain D-Arabinose (CID 66308) while registering l_arabinose
+# alongside it.
+@reagent arbutin "Arbutin" Solid 272.25u"g/mol" missing 440936
 @reagent arginine "L-arginine" Solid 174.2u"g/mol" missing 6322
 @reagent ascorbate "L-Ascorbic Acid" Solid 176.12u"g/mol" missing 54670067
 @reagent asparagine "L-asparagine" Solid 132.12u"g/mol" 1.543u"g/mL" 6267
@@ -29,16 +37,24 @@
 @reagent beef_extract "Beef Extract" Solid missing missing missing
 @reagent beef_heart "Beef Heart" Solid missing missing missing
 @reagent benzamadine "benzamadine" Solid 120.15u"g/mol" missing 2332
+@reagent beta_methyl_d_glucoside "Methyl-beta-D-glucopyranoside" Solid 194.18u"g/mol" missing 445238
 @reagent bhi "Brain Heart Infusion Broth" Solid missing missing missing
 @reagent biotin "biotin" Solid 244.31u"g/mol" missing 171548
 @reagent bleomycin "bleomycin" Solid 1415.6u"g/mol" missing 5360373
 @reagent boric_acid "Boric Acid" Solid 61.84u"g/mol" 1.435u"g/mL" 7628
 @reagent sodium_butyrate "Sodium Butyrate" Solid 110.09u"g/mol" missing 5222465
 @reagent calcium_chloride "calcium chloride dihydrate" Solid missing 1.85u"g/mL" 6093260
+@reagent calcium_l_threonate "Calcium L-threonate" Solid 310.27u"g/mol" missing 13388558
 @reagent carbenicillin "carbenicillin" Solid 378.4u"g/mol" missing 20824
 @reagent carnitine "D,L-Carnitine" Solid 161.2u"g/mol" missing 288
 @reagent ceftriaxone "ceftriaxone" Solid 554.6u"g/mol" missing 5479530
 @reagent cellobiose "cellobiose (maltose)" Solid 342.3u"g/mol" missing 294
+@reagent cellulose "Cellulose Triacetate" Solid missing missing missing
+# ^ Thermo Scientific/Acros AC177822500 -- vendor listing names this "cellulose" but the catalog
+# number is actually cellulose triacetate (CAS 9012-09-3, repeat unit (C24H32O16)n), not plain
+# cellulose -- registered under the product's real identity per the catalog. Polymer, no PubChem
+# CID/fixed MW; no CompositionRule/AcidBaseSystem (same non-discrete-material treatment as arabinan/
+# hydrolyzed_mucin below).
 @reagent chloramphenicol "chloramphenicol" Solid 323.13u"g/mol" missing 5959
 @reagent chlortetracycline "chlortetracycline" Solid 515.3u"g/mol" missing 54682468
 @reagent choline "Choline" Solid 104.17u"g/mol" missing 305
@@ -55,8 +71,23 @@
 @reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing 23462
 @reagent cystine "L-cystine" Solid 240.3u"g/mol" missing 67678
 @reagent cytosine "cytosine" Solid 111.1u"g/mol" missing 597
+@reagent d_arabitol "D-Arabitol" Solid 152.15u"g/mol" missing 94154
+@reagent d_galactarate "D-Galactaric Acid (Mucic Acid)" Solid 210.14u"g/mol" missing 3037582
+@reagent d_galactonate "Calcium D-Galactonate" Solid 430.37u"g/mol" missing 90475372
+@reagent d_galacturonate "D-Galacturonic Acid" Solid 194.14u"g/mol" missing 439215
+@reagent d_glucarate "Calcium D-Glucarate (Calcium Saccharate)" Solid 248.2u"g/mol" missing 154911
+@reagent d_gluconate "Potassium D-Gluconate" Solid 234.25u"g/mol" missing 16760467
+@reagent d_glucosamine "D-Glucosamine Hydrochloride" Solid 215.63u"g/mol" missing 91431
+@reagent d_glucuronate "D-Glucuronic Acid" Solid 194.14u"g/mol" missing 94715
+@reagent d_malic_acid "D-Malic Acid" Solid 134.09u"g/mol" missing 92824
+@reagent d_psicose "D-Psicose" Solid 180.16u"g/mol" missing 441036
+@reagent d_ribose "D-Ribose" Solid 150.13u"g/mol" missing 10975657
+@reagent d_serine "D-Serine" Solid 105.09u"g/mol" missing 71077
+@reagent d_tagatose "D-Tagatose" Solid 180.16u"g/mol" missing 439312
 @reagent dextrin "dextrin from corn" Solid 504.4u"g/mol" missing 62698
+@reagent dihydroxyacetone "Dihydroxyacetone" Solid 90.08u"g/mol" missing 670
 @reagent doxycycline "doxycycline" Solid 480.9u"g/mol" missing 54685920
+@reagent dulcitol "Dulcitol (Galactitol)" Solid 182.17u"g/mol" missing 11850
 @reagent ectoine "Ectoine" Solid 142.16u"g/mol" missing 126041
 @reagent edta "EDTA" Solid 292.24u"g/mol" 0.86u"g/mL" 6049
 @reagent erythromycin "erythromycin" Solid 733.9u"g/mol" missing 12560
@@ -73,17 +104,29 @@
 @reagent glucose "D-glucose" Solid 180.16u"g/mol" 1.2u"g/mL" 5793
 @reagent glutamic_acid "L-glutamic_acid" Solid 147.13u"g/mol" 1.538u"g/mL" 33032
 @reagent glutamine "L-glutamine" Solid 146.14u"g/mol" 1.364u"g/mL" 5961
+@reagent glutathione "L-Glutathione (reduced)" Solid 307.33u"g/mol" missing 124886
 @reagent glycine "glycine" Solid 75.07u"g/mol" 1.1607u"g/mL" 750
 @reagent guanidine "guanidine" Solid 59.07u"g/mol" missing 3520
 @reagent guanine "guanine hydrochloride" Solid 187.59u"g/mol" missing 135436483
 @reagent guanosine "guanosine" Solid 283.24u"g/mol" missing 135398635
 @reagent histidine "L-histidine" Solid 155.15u"g/mol" missing 6274
+@reagent hydrolyzed_mucin "Mucin from porcine stomach (Type III)" Solid missing missing missing
+# ^ Sigma M1778 (CAS 84082-64-4), bound sialic acid 0.5-1.5%, partially purified powder. A
+# heterogeneous glycoprotein (monomer ~640 kDa, polymeric mucin ~4000-5500 kDa) -- no PubChem
+# CID/fixed MW; registered for identity/inventory purposes only, same as arabinan above.
+@reagent hypoxanthine "Hypoxanthine" Solid 136.11u"g/mol" missing 135398638
 @reagent inosine "inosine" Solid 268.23u"g/mol" missing 135398641
 @reagent iron_chloride "Iron Chloride (Ferric Chloride)" Solid missing 2.8u"g/mL" 24380
 @reagent iron_nitrate "iron (III) nitrate" Solid missing 1.68u"g/mL" 16211566
 @reagent iron_sulfate "iron (II) sulfate" Solid missing 1.895u"g/mL" 62662
 @reagent isoleucine "L-isoleucine" Solid 131.17u"g/mol" missing 6306
 @reagent kanamycin "kanamycin" Solid 484.5u"g/mol" missing 6032
+@reagent l_alanine "L-Alanine" Solid 89.09u"g/mol" 1.432u"g/mL" 5950
+@reagent l_arabinose "L-Arabinose" Solid 150.13u"g/mol" missing 439195
+@reagent l_fucose "L-Fucose" Solid 164.16u"g/mol" missing 17106
+@reagent l_lyxose "L-Lyxose" Solid 150.13u"g/mol" missing 644176
+@reagent l_malic_acid "L-Malic Acid" Solid 134.09u"g/mol" missing 222656
+@reagent l_sorbose "L-Sorbose" Solid 180.16u"g/mol" missing 439192
 @reagent lactic_acid "Lactic Acid (85% w/w solution)" Solid 105.976u"g/mol" 1.2u"g/mL" 612
 # ^ real product is Sigma-Aldrich W261114, "Lactic acid, natural, >=85%" -- a LIQUID (85% w/w aqueous
 # solution, remainder water + oligomers), dosed by weight in practice (confirmed with the lab), so
@@ -105,6 +148,7 @@
 @reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid missing 1.68u"g/mL" 24843
 @reagent malic_acid "Malic Acid" Solid 134.09u"g/mol" 1.601u"g/mL" 525
 @reagent maltodextrin "maltodextrin" Solid missing missing missing
+@reagent maltose "Maltose" Solid 342.3u"g/mol" missing 439186
 @reagent manganese_chloride "Manganese (II) Chloride" Solid missing 2.01u"g/mL" 643989
 @reagent manganese_sulfate "manganese sulfate monohydrate" Solid missing 2.95u"g/mL" 177577
 @reagent mannitol "D-mannitol" Solid 182.17u"g/mol" 1.489u"g/mL" 6251
@@ -118,6 +162,8 @@
 @reagent mrs_broth "MRS broth" Solid missing missing missing
 @reagent mops "MOPS" Solid 209.26u"g/mol" missing 70807
 @reagent myo_inositol "myo-inositol" Solid 180.16u"g/mol" missing 892
+@reagent n_acetylgalactosamine "N-Acetyl-D-Galactosamine" Solid 221.21u"g/mol" missing 35717
+@reagent n_acetylneuraminate "N-Acetylneuraminic Acid" Solid 309.27u"g/mol" missing 439197
 @reagent neomycin "neomycin" Solid 146.18u"g/mol" 0.98u"g/mL" 8738
 @reagent niacinamide "niacinamide (nicotinamide)" Solid 122.12u"g/mol" 1.4u"g/mL" 936
 @reagent nickel_chloride "Nickel (II) Chloride)" Solid missing 3.55u"g/mL" 24385
@@ -127,6 +173,7 @@
 @reagent oxacillin "oxacillin" Solid 401.4u"g/mol" missing 6196
 @reagent oxalic_acid "Oxalic Acid" Solid 90.03u"g/mol" 1.9u"g/mL" 971
 @reagent paba "4-aminobenzoic acid" Solid 137.14u"g/mol" 1.37u"g/mL" 978
+@reagent palatinose "Palatinose (Isomaltulose)" Solid 342.3u"g/mol" missing 83686
 @reagent pantothenate "calcium pantothenate" Solid 476.5u"g/mol" missing 443753
 @reagent paromomycin "paromomycin" Solid 615.6u"g/mol" missing 165580
 @reagent penicillin_g "penicillin_g" Solid 334.4u"g/mol" missing 5904
@@ -140,6 +187,7 @@
 @reagent proline "L-proline" Solid 115.13u"g/mol" 1.064u"g/mL" 145742
 @reagent promethazine "promethazine" Solid 284.4u"g/mol" missing 4927
 @reagent propionic_acid "Propionic Acid" Solid 74.08u"g/mol" 0.995u"g/mL" 1032
+@reagent putrescine "Putrescine" Solid 88.15u"g/mol" 0.877u"g/mL" 1045
 @reagent pyridoxal "pyridoxal hydrochloride" Solid 203.62u"g/mol" missing 6171
 @reagent pyridoxamine "pyridoxamine dihydrochloride" Solid 241.11u"g/mol" missing 10664
 @reagent sodium_pyruvate "Sodium Pyruvate" Solid 110.04u"g/mol" missing 23662274
@@ -157,6 +205,11 @@
 @reagent sodium_bicarbonate "sodium bicarbonate" Solid missing 2.159u"g/mL" 516892
 @reagent sodium_carbonate "Sodium Carbonate" Solid missing 2.54u"g/mL" 10340
 @reagent sodium_chloride "Sodium Chloride" Solid missing missing 5324
+@reagent sodium_citrate_dihydrate "Sodium Citrate Dihydrate" Solid missing missing 71474
+# ^ Fisherbrand S279-500. Vendor listing says "citrate buffer solution" but the product is actually
+# the raw salt, Sodium Citrate Dihydrate (trisodium citrate dihydrate, CAS 6132-04-3) -- not a
+# premixed buffer. molecular_weight is `missing` and derived instead from its CompositionRule
+# (electrolytes.jl: 3*Na+ + Citrate3- + 2*H2O), matching sodium_acetate_trihydrate's convention.
 @reagent sodium_dichromate "sodium_dichromate" Solid missing 2.35u"g/mL" 25408
 @reagent sodium_molybdate "Sodium Molybdate" Solid missing 3.78u"g/mL" 61424
 @reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid missing missing 6096963
@@ -169,6 +222,7 @@
 @reagent spectinomycin "spectinomycin" Solid 332.35u"g/mol" missing 15541
 @reagent spermidine "Spermidine" Solid 145.25u"g/mol" missing 1102
 @reagent streptomycin "streptomycin" Solid 581.6u"g/mol" missing 19649
+@reagent succinic_acid "Succinic Acid" Solid 118.09u"g/mol" 1.572u"g/mL" 1110
 @reagent sucrose "sucrose" Solid 342.3u"g/mol" 1.59u"g/mL" 5988
 @reagent sulfadiazine "sulfadiazine" Solid 250.28u"g/mol" missing 5215
 @reagent sulfamethazine "sulfamethazine" Solid 278.33u"g/mol" 1.4655u"g/mL" 5327
