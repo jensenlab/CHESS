@@ -1,18 +1,29 @@
 
 
 
-function random_platearray(wells::BitMatrix,P::Int,N::Int)
+"""
+    random_platearray(wells::BitMatrix,P::Int,N::Int;rng::AbstractRNG=Random.default_rng())
+
+Generate a `PlateArray` with `P` positive and `N` negative controls placed at uniformly random
+active wells.
+
+# Keyword Arguments
+- `rng`: the random number generator used to draw well positions. Pass an explicit RNG (e.g.
+  `Random.Xoshiro(1234)`) for reproducible output.
+
+"""
+function random_platearray(wells::BitMatrix,P::Int,N::Int;rng::AbstractRNG=Random.default_rng())
     availables=findall(x->x==true,wells)
     R,C=size(wells)
     pos=falses(R,C)
     neg=falses(R,C)
-    pos_idx=sample(availables,P;replace=false)
-    pos[pos_idx] .=true 
+    pos_idx=sample(rng,availables,P;replace=false)
+    pos[pos_idx] .=true
     neg_available=findall(x->x==true, wells .&& .!pos)
-    neg_idx=sample(neg_available,N;replace=false)
+    neg_idx=sample(rng,neg_available,N;replace=false)
     neg[neg_idx].=true
     return PlateArray(wells,pos,neg)
-end 
+end
 
 
 

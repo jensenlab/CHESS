@@ -3,7 +3,7 @@
 
 
 """
-    function MILP(P::Int,N::Int,wells::BitMatrix;objective::Function=hybrid,minimize=true,timelimit=100,optimizer=_default_optimizer[])
+    function MILP(P::Int,N::Int,wells::BitMatrix;objective::Function=hybrid,minimize=true,timelimit=100,optimizer=_default_optimizer[],rng::AbstractRNG=Random.default_rng())
 
 MILP solver for control placment.
 
@@ -17,9 +17,10 @@ MILP solver for control placment.
 - `timelimit`: time limit in seconds for the solver to return a suboptimal solution if it hasn't found an optimal one
 - `minimize`: if true, the solver minimizes the distance from experiment wells to control wells. if false, it will maximize (this is not useful for practical purposes but is helpful for assessing performance)
 - `optimizer`: the JuMP-compatible optimizer used to solve the model, defaulting to `Gurobi.Optimizer` (requires a Gurobi license). A license-free alternative such as `HiGHS.Optimizer` can be passed instead.
+- `rng`: the random number generator used by the `objective=hybrid` bound computation (via `random_platearray`). Pass an explicit RNG (e.g. `Random.Xoshiro(1234)`) for reproducible results.
 
 """
-function MILP(wells::BitMatrix,P::Int,N::Int;objective::Function=hybrid,minimize=true,timelimit=100,optimizer=_default_optimizer[])
+function MILP(wells::BitMatrix,P::Int,N::Int;objective::Function=hybrid,minimize=true,timelimit=100,optimizer=_default_optimizer[],rng::AbstractRNG=Random.default_rng())
 
     in(objective,[hybrid,minimax]) ? nothing : throw(ArgumentError("the objective for the MILP Solver must either be 'minimax' or 'hybrid'"))
     R,C=size(wells)
@@ -46,7 +47,7 @@ function MILP(wells::BitMatrix,P::Int,N::Int;objective::Function=hybrid,minimize
     M=max(R,C)
 
     if objective==hybrid
-        epr,epc,enr,enc=expected_LHS(random_platearray(wells,P,N)) # given the plate shape, find the expected number of controls per row and column in a uniformly distributed array of controls. 
+        epr,epc,enr,enc=expected_LHS(random_platearray(wells,P,N;rng=rng)) # given the plate shape, find the expected number of controls per row and column in a uniformly distributed array of controls.
 
         #constrain the number of controls to be as close as possible to the expected LHS 
         for row in 1:R

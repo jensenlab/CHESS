@@ -1,4 +1,4 @@
-using Test , PlateArrays, DataFrames, JSON
+using Test , PlateArrays, DataFrames, JSON, Random
 
 import PlateArrays: OccupancyError,margins,expected_LHS,neighbors, hybrid, minimax, LHS, exchange, MILP
 import PlateArrays: letter_code, wellnames, alphabet_code, manhattan_distance, neighboring_ring,
@@ -222,6 +222,16 @@ end
     overlapping = JSON.parse(JSON.json(Dict(TYPEKEY=>"PlateArray",
         "wells"=>lower_bitmatrix(plate.wells), "positives"=>pos_json, "negatives"=>pos_json)))
     @test_throws OccupancyError raise_platearray(overlapping)
+end
+
+@testset "Reproducibility" begin
+    @test random_platearray(trues(8,12),8,8;rng=Xoshiro(1)) == random_platearray(trues(8,12),8,8;rng=Xoshiro(1))
+
+    @test exchange(trues(8,12),8,8;restarts=1,iterations=50,rng=Xoshiro(1)) ==
+          exchange(trues(8,12),8,8;restarts=1,iterations=50,rng=Xoshiro(1))
+
+    @test MILP(trues(4,4),2,2;objective=hybrid,timelimit=10,rng=Xoshiro(1)) ==
+          MILP(trues(4,4),2,2;objective=hybrid,timelimit=10,rng=Xoshiro(1))
 end
 
 
