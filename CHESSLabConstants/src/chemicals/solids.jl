@@ -140,6 +140,13 @@
 @reagent guanine "guanine hydrochloride" Solid 187.59u"g/mol" missing 135436483
 @reagent guanosine "guanosine" Solid 283.24u"g/mol" missing 135398635
 @reagent histidine "L-histidine" Solid 155.15u"g/mol" missing 6274
+@reagent hs_com "2-Mercaptoethanesulfonate Sodium Salt (Coenzyme M)" Solid 164.18u"g/mol" missing 23662354
+# ^ PubChem's canonical entry for this compound is titled "Mesna" (its pharmaceutical name), CID
+# 23662354, the anhydrous sodium salt -- a monohydrate exists commercially under a different CAS but
+# isn't what's registered here (no catalog number on hand to confirm). No density data on PubChem.
+# No AcidBaseSystem: the sulfonate is a strong acid (always ionized, same as other strong-acid
+# conjugate bases here); the only thiol pKa's found (7.4, 9.2) are enzyme-active-site-bound values
+# from CoM-transferase studies, not the free compound in solution, so not used here.
 @reagent hydrolyzed_mucin "Mucin from porcine stomach (Type III)" Solid missing missing missing
 # ^ Sigma M1778 (CAS 84082-64-4), bound sialic acid 0.5-1.5%, partially purified powder. A
 # heterogeneous glycoprotein (monomer ~640 kDa, polymeric mucin ~4000-5500 kDa) -- no PubChem
