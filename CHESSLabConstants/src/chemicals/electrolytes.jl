@@ -32,8 +32,9 @@ function _register_electrolyte_compositions!()
     set_composition!(sodium_bicarbonate,CompositionRule((Na⁺+HCO3⁻).composition))
     set_composition!(sodium_carbonate,CompositionRule((2*Na⁺+CO3²⁻).composition))
     set_composition!(tin_fluoride,CompositionRule((Sn²⁺+2*F⁻).composition))
+    # zinc_chloride: checked 2026-08-14 against the lab's stocklist (Sigma Z0152-100G, plain "ZINC
+    # CHLORIDE CELL CULTURE", no hydrate noted) -- confirmed anhydrous, unlike zinc_sulfate below.
     set_composition!(zinc_chloride,CompositionRule((Zn²⁺+2*Cl⁻).composition))
-    set_composition!(zinc_sulfate,CompositionRule((Zn²⁺+SO4²⁻).composition))
     set_composition!(sodium_acetate_anhydrous,CompositionRule((Na⁺+OAc⁻).composition))
     set_composition!(potassium_phosphate_di,CompositionRule((2*K⁺+HPO4²⁻).composition))
     set_composition!(potassium_phosphate_mono,CompositionRule((K⁺+H2PO4⁻).composition))
@@ -62,6 +63,10 @@ function _register_electrolyte_compositions!()
     set_composition!(sodium_dichromate,CompositionRule((2*Na⁺+Cr2O7²⁻+2*H2O).composition)) # dihydrate
     set_composition!(sodium_molybdate,CompositionRule((2*Na⁺+MoO4²⁻+2*H2O).composition)) # dihydrate
     set_composition!(sodium_tungstate,CompositionRule((2*Na⁺+WO4²⁻+2*H2O).composition)) # dihydrate
+    # zinc_sulfate: fixed 2026-08-14 -- was registered anhydrous, but its stored density matched the
+    # heptahydrate's (not the anhydrous form's) real density, and the lab's own purchase record
+    # confirms "ZINC SULFATE HEPTAHYDRATE" (Sigma Z0251-100G). See solids.jl for the density evidence.
+    set_composition!(zinc_sulfate,CompositionRule((Zn²⁺+SO4²⁻+7*H2O).composition)) # heptahydrate
     set_composition!(magnesium_sulfate,CompositionRule((Mg²⁺+SO4²⁻+7*H2O).composition)) # heptahydrate
     set_composition!(manganese_chloride,CompositionRule((Mn²⁺+2*Cl⁻+4*H2O).composition)) # tetrahydrate
     set_composition!(manganese_sulfate,CompositionRule((Mn²⁺+SO4²⁻+H2O).composition)) # monohydrate

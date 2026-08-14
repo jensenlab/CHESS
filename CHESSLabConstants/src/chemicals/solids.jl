@@ -312,4 +312,9 @@
 @reagent xylose "xlyose" Solid 150.13u"g/mol" 1.525u"g/mL" 135191
 @reagent yeast_extract "yeast_extract" Solid missing missing missing
 @reagent zinc_chloride "Zinc (II) Chloride" Solid missing 2.91u"g/mL" 5727
-@reagent zinc_sulfate "Zinc Sulphate" Solid missing 1.96u"g/mL" 24424
+@reagent zinc_sulfate "Zinc Sulfate Heptahydrate" Solid missing 1.97u"g/mL" 62640
+# ^ fixed 2026-08-14: was registered anhydrous (CID 24424, real anhydrous density ~3.8 g/mL) -- the
+# stored density (1.96) actually matched the heptahydrate's, and the lab's own purchase record
+# (Reagent_StockList.xlsx: Sigma Z0251-100G, "ZINC SULFATE HEPTAHYDRATE") confirms it. Corrected to
+# the heptahydrate CID (62640); molecular_weight derives from the CompositionRule (electrolytes.jl),
+# now including 7 H2O.
