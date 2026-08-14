@@ -126,14 +126,16 @@ end
 end
 
 @testset "Dissociation chemistry: derived molecular weights, hydrates, recipe/total_concentration" begin
-    # anhydrous salt: derived weight matches the stored value
-    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 159.61u"g/mol" atol=0.01u"g/mol"
+    # copper_sulfate is the pentahydrate (fixed 2026-08-14 -- see solids.jl/electrolytes.jl), so its
+    # derived weight includes 5 waters of hydration, not the anhydrous salt's 159.61
+    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 249.69u"g/mol" atol=0.01u"g/mol"
 
     # hydrate: waters of hydration keep the derived weight at the hydrate value, not the anhydrous one
     @test CHESSCore.molecular_weight(CHESSLabConstants.calcium_chloride) ≈ 147.01u"g/mol" atol=0.01u"g/mol"
 
-    # pre-existing data bug in the ported PubChem cache (NaCl stored as 214.25u"g/mol") is corrected
-    # by composition-derivation, which takes precedence over the stored field
+    # pre-existing data bug in the ported PubChem cache (NaCl stored as 214.25u"g/mol", matching the
+    # wrong CID it was linked to -- since fixed in solids.jl) is masked by composition-derivation,
+    # which takes precedence over the stored field regardless
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_chloride) ≈ 58.44u"g/mol" atol=0.01u"g/mol"
 
     # recipe()/total_concentration() see the real ionic composition

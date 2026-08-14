@@ -20,20 +20,17 @@ function _register_electrolyte_compositions!()
     set_composition!(NaOH,CompositionRule((Na⁺+CHESSCore.OH⁻).composition))
     set_composition!(sodium_chloride,CompositionRule((Na⁺+Cl⁻).composition))
     set_composition!(potassium_chloride,CompositionRule((K⁺+Cl⁻).composition))
-    set_composition!(cobalt_chloride,CompositionRule((Co²⁺+2*Cl⁻).composition))
-    set_composition!(cobalt_nitrate,CompositionRule((Co²⁺+2*NO3⁻).composition))
-    set_composition!(copper_chloride,CompositionRule((Cu²⁺+2*Cl⁻).composition))
-    set_composition!(copper_sulfate,CompositionRule((Cu²⁺+SO4²⁻).composition))
+    # iron_chloride/nickel_chloride/sodium_selenite: checked 2026-08-14 against the lab's actual
+    # stocklist (Reagent_StockList.xlsx) and/or stored-density self-consistency -- confirmed genuinely
+    # anhydrous (nickel_chloride: Sigma N6136-100G "anhydrous"; sodium_selenite: Sigma 71950-100G
+    # "ANHYDROUS"; iron_chloride: not in the stocklist, but its stored density matches the anhydrous
+    # reference value cleanly, unlike the hydrates fixed below).
     set_composition!(iron_chloride,CompositionRule((Fe³⁺+3*Cl⁻).composition))
     set_composition!(nickel_chloride,CompositionRule((Ni²⁺+2*Cl⁻).composition))
-    set_composition!(potassium_aluminum_sulfate,CompositionRule((K⁺+Al³⁺+2*SO4²⁻).composition))
+    set_composition!(sodium_selenite,CompositionRule((2*Na⁺+SeO3²⁻).composition))
     set_composition!(silver_nitrate,CompositionRule((Ag⁺+NO3⁻).composition))
     set_composition!(sodium_bicarbonate,CompositionRule((Na⁺+HCO3⁻).composition))
     set_composition!(sodium_carbonate,CompositionRule((2*Na⁺+CO3²⁻).composition))
-    set_composition!(sodium_dichromate,CompositionRule((2*Na⁺+Cr2O7²⁻).composition))
-    set_composition!(sodium_molybdate,CompositionRule((2*Na⁺+MoO4²⁻).composition))
-    set_composition!(sodium_selenite,CompositionRule((2*Na⁺+SeO3²⁻).composition))
-    set_composition!(sodium_tungstate,CompositionRule((2*Na⁺+WO4²⁻).composition))
     set_composition!(tin_fluoride,CompositionRule((Sn²⁺+2*F⁻).composition))
     set_composition!(zinc_chloride,CompositionRule((Zn²⁺+2*Cl⁻).composition))
     set_composition!(zinc_sulfate,CompositionRule((Zn²⁺+SO4²⁻).composition))
@@ -49,6 +46,22 @@ function _register_electrolyte_compositions!()
 
     # hydrates -- waters of hydration included so derived molecular_weight still matches the stored value
     set_composition!(calcium_chloride,CompositionRule((Ca²⁺+2*Cl⁻+2*H2O).composition)) # dihydrate
+    # cobalt_chloride/copper_chloride/copper_sulfate/potassium_aluminum_sulfate: fixed 2026-08-14 --
+    # each was registered anhydrous, but its own stored density matched a hydrate's (not the
+    # anhydrous form's) real density; see solids.jl for the per-reagent evidence.
+    set_composition!(cobalt_chloride,CompositionRule((Co²⁺+2*Cl⁻+6*H2O).composition)) # hexahydrate
+    set_composition!(copper_chloride,CompositionRule((Cu²⁺+2*Cl⁻+2*H2O).composition)) # dihydrate
+    set_composition!(copper_sulfate,CompositionRule((Cu²⁺+SO4²⁻+5*H2O).composition)) # pentahydrate
+    set_composition!(potassium_aluminum_sulfate,CompositionRule((K⁺+Al³⁺+2*SO4²⁻+12*H2O).composition)) # dodecahydrate
+    # cobalt_nitrate/sodium_dichromate/sodium_molybdate/sodium_tungstate: fixed 2026-08-14 -- each was
+    # registered anhydrous, corrected against the lab's actual purchase records (Reagent_StockList.xlsx:
+    # Sigma 230375-100G "COBALT(II) NITRATE HEXAHYDRATE"; Sigma 398063-100G "Sodium dichromate
+    # dihydrate"; catalog 243655-100G "Sodium molybdate dihydrate"; Sigma 223336-100G "SODIUM TUNGSTATE
+    # DIHYDRATE"). See solids.jl for each reagent's density evidence.
+    set_composition!(cobalt_nitrate,CompositionRule((Co²⁺+2*NO3⁻+6*H2O).composition)) # hexahydrate
+    set_composition!(sodium_dichromate,CompositionRule((2*Na⁺+Cr2O7²⁻+2*H2O).composition)) # dihydrate
+    set_composition!(sodium_molybdate,CompositionRule((2*Na⁺+MoO4²⁻+2*H2O).composition)) # dihydrate
+    set_composition!(sodium_tungstate,CompositionRule((2*Na⁺+WO4²⁻+2*H2O).composition)) # dihydrate
     set_composition!(magnesium_sulfate,CompositionRule((Mg²⁺+SO4²⁻+7*H2O).composition)) # heptahydrate
     set_composition!(manganese_chloride,CompositionRule((Mn²⁺+2*Cl⁻+4*H2O).composition)) # tetrahydrate
     set_composition!(manganese_sulfate,CompositionRule((Mn²⁺+SO4²⁻+H2O).composition)) # monohydrate
