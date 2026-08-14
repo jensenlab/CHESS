@@ -129,6 +129,11 @@
 @reagent glucose "D-glucose" Solid 180.16u"g/mol" 1.2u"g/mL" 5793
 @reagent glutamic_acid "L-glutamic_acid" Solid 147.13u"g/mol" 1.538u"g/mL" 33032
 @reagent glutamine "L-glutamine" Solid 146.14u"g/mol" 1.364u"g/mL" 5961
+# ^ note 2026-08-14: the lab's actual stocklist (Reagent_StockList.xlsx) shows l-glutamine purchased
+# both as this solid (Sigma G3126-100G) and as Gibco's 200mM aqueous solution (25-030-081) -- this
+# reagent correctly represents the solid form; a Stock built from the Gibco bottle should be dosed
+# as a solution (by volume/molarity), not by weighing this reagent. Same situation as sodium_pyruvate
+# below (see its own comment).
 @reagent glutathione "L-Glutathione (reduced)" Solid 307.33u"g/mol" missing 124886
 @reagent glycine "glycine" Solid 75.07u"g/mol" 1.1607u"g/mL" 750
 @reagent guanidine "guanidine" Solid 59.07u"g/mol" missing 3520
@@ -231,6 +236,12 @@
 @reagent shikimic_acid "Shikimic Acid" Solid 174.15u"g/mol" missing 8742
 @reagent silver_nitrate "silver_nitrate" Solid missing 4.35u"g/mL" 24470
 @reagent sodium_acetate_anhydrous "sodium acetate" Solid missing 1.528u"g/mL" 517045
+# ^ note 2026-08-14: a purchase logged as "acetate" (catalog "S28625-500 G") was originally assumed
+# to be this anhydrous salt, but S28625 isn't a real Sigma catalog number -- checked against the
+# lab's actual stocklist (Reagent_StockList.xlsx), which lists the same item (same price, same
+# size) under catalog S8625-500G with formula CH3COONa.3H2O, i.e. sodium_acetate_trihydrate below.
+# Digit-transposition typo in the original purchase log, not a registry error -- no code change
+# needed since both reagents already existed; flagged so future stock-building uses the right one.
 @reagent sodium_acetate_trihydrate "sodium acetate trihydrate" Solid missing 1.528u"g/mL" 23665404
 @reagent sodium_bicarbonate "sodium bicarbonate" Solid missing 2.159u"g/mL" 516892
 @reagent sodium_carbonate "Sodium Carbonate" Solid missing 2.54u"g/mL" 10340
