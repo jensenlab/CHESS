@@ -4,10 +4,17 @@ using CHESS
 using CHESS.CHESSCore
 using CHESS.CHESSDatabase
 using CHESS.CHESSLabConstants
+using CHESSParsers # not re-exported by CHESS (like Pourfecto/PlateArrays), so used directly
+
+# register_format!'s jldoctest example (src/registry.jl) refers to CHESSParsers/register_format!/
+# format_registry without importing them itself -- innocuous while CHESSParsers was outside
+# `modules` (its doctests never ran), but now that it's included, Documenter needs this DocTestSetup
+# to give the doctest's Main the same `using CHESSParsers` context a real user session would have.
+Documenter.DocMeta.setdocmeta!(CHESSParsers, :DocTestSetup, :(using CHESSParsers); recursive=true)
 
 makedocs(
     sitename="CHESS.jl",
-    modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants],
+    modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants, CHESSParsers],
     checkdocs=:none, # the manual/API pages are being built up incrementally -- don't fail the
     # build over docstring coverage gaps (CHESSLabConstants in particular is mostly generated
     # data with few standalone docstrings by design, see manual/registering-lab-constants.md)
@@ -37,6 +44,7 @@ makedocs(
                 "Wells: Depositing & Transferring Material" => "manual/wells.md",
             ],
             "Reads & Instrument Measurements" => "manual/reads.md",
+            "Parsing Instrument Files" => "manual/parsing-instrument-files.md",
             "Registering Lab Constants" => "manual/registering-lab-constants.md",
             "CHESS Databases" => [
                 "Database Architecture" => "manual/db-architecture.md",
@@ -54,6 +62,7 @@ makedocs(
             "CHESSCore" => "api/core.md",
             "CHESSDatabase" => "api/database.md",
             "CHESSLabConstants" => "api/labconstants.md",
+            "CHESSParsers" => "api/parsers.md",
         ],
     ],
 )
