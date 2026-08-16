@@ -23,6 +23,12 @@ println("testing cache repair tools...")
 include("test_cache_repair.jl")
 println("cache repair complete")
 
+include("test_reconstruct_contents_bootstrap.jl")
+
+include("test_reconstruct_encumbrances.jl")
+
+include("test_reconstruct_contents_ancestor_closure.jl")
+
 # Fixtures used by testsets below that originally relied on core_runtests.jl's script-level bindings
 # (b = a Mixture stock; Cl⁻ = a test-local dissociation Chemical) -- now that CHESSCore and
 # CHESSDatabase are separate packages with independent test processes, these need their own copy here.

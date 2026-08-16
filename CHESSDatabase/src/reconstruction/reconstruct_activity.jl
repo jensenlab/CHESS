@@ -91,7 +91,7 @@ function get_activity_caches(location_id::Integer,starting::Integer=0,ending::In
         ),
         
             y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,IsActive)
-        AS(SELECT e.ID, 0,$(get_last_sequence_id())+e.EncumbranceID,e.EncumbranceID, v.LocationID,v.IsActive
+        AS(SELECT e.EncumbranceID, 0,$(get_last_sequence_id())+e.EncumbranceID,e.EncumbranceID, v.LocationID,v.IsActive
             FROM encumbrance_subset e INNER JOIN EncumberedCachedLockActivity v ON e.EncumbranceID = v.EncumbranceID 
         UNION ALL 
             SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.IsActive
@@ -131,7 +131,7 @@ function get_activity(location_ids::Vector{<:Integer},starting::Integer=0,ending
 
         ),
          y (LedgerID,SequenceID,EncumbranceID, LocationID,IsActive)
-        AS(SELECT 0,$(get_last_sequence_id())+v.EncumbranceID, v.EncumbranceID, v.LocationID,v.IsActive
+        AS(SELECT 0,$(get_last_sequence_id())+v.EncumbranceID, v.EncumbranceID, v.LocationID,v.Activate
             FROM encumbrance_subset e INNER JOIN EncumberedActivity v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
             SELECT c.LedgerID,l.SequenceID,0, c.LocationID,c.IsActive

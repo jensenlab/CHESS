@@ -102,7 +102,7 @@ function get_parent_caches(location_id::Integer,starting::Integer=0,ending::Inte
         ),
         
             y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,ParentID)
-        AS(SELECT e.ID,0,$(get_last_sequence_id())+e.EncumbranceID,e.EncumbranceID, v.LocationID,v.ParentID
+        AS(SELECT e.EncumbranceID,0,$(get_last_sequence_id())+e.EncumbranceID,e.EncumbranceID, v.LocationID,v.ParentID
             FROM encumbrance_subset e INNER JOIN EncumberedCachedAncestors v ON e.EncumbranceID = v.EncumbranceID 
         UNION ALL 
             SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.ParentID

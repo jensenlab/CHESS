@@ -98,7 +98,7 @@ function get_attribute_caches(location_id::Integer,starting::Integer=0,ending::I
             ),
             
                 y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,AttributeSetID)
-            AS(SELECT e.ID,0,$(get_last_sequence_id())+e.EncumbranceID,e.EncumbranceID, v.LocationID,v.AttributeSetID
+            AS(SELECT e.EncumbranceID,0,$(get_last_sequence_id())+e.EncumbranceID,e.EncumbranceID, v.LocationID,v.AttributeSetID
                 FROM encumbrance_subset e INNER JOIN EncumberedCachedEnvironments v ON e.EncumbranceID = v.EncumbranceID 
             UNION ALL 
                 SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.AttributeSetID

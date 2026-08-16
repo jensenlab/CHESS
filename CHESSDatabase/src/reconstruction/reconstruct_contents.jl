@@ -118,8 +118,8 @@ function get_content_caches(location_id::Integer, starting::Integer=0, ending::I
         ),
         
             y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,StockID,Cost)
-        AS(SELECT e.ID,0,0,e.EncumbranceID,v.LocationID, v.StockID,v.Cost
-            FROM encumbrance_subset e INNER JOIN EncumberedCachedContents v ON e.EncumbranceID = v.EncumbranceID 
+        AS(SELECT e.EncumbranceID,0,0,e.EncumbranceID,v.LocationID, v.StockID,v.Cost
+            FROM encumbrance_subset e INNER JOIN EncumberedCachedContents v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
             SELECT Max(c.ID),c.LedgerID,l.SequenceID,0,c.LocationID,c.StockID,c.Cost
             FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.Time <= $ledger_time Group By l.SequenceID) 
@@ -144,12 +144,31 @@ end
 # y grabs all of the regular and encumbered transfers using ledger_subset and encumbrance_subset respectively 
 # x does a recursive search to grab all of the transfers from y that play a role in reconstrucint locs 
 
+"""
+    get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+
+Find every transfer relevant to reconstructing `locs`' contents between `starting` and `ending`
+sequence points.
+
+The result has a `Core` column (`1`/`0`). `Core=1` rows are the genuine ancestor closure: `locs`
+themselves plus every location transitively feeding them (found the traditional way, recursively
+following `Source = <already-found Source>.Destination`). `Core=0` ("collateral") rows are *other*
+outgoing transfers of a `Core=1` location, to a destination that never itself feeds back into the
+closure -- needed so replay can correctly account for stock a core location sent away to something
+`reconstruct_contents` doesn't otherwise care about (see the module docs above `x`'s definition for
+why this ever mattered). Collateral destinations never need their own correct reconstruction --
+`reconstruct_contents` bootstraps them as bare `Empty()` stubs instead of recursing, which is what
+keeps a busy/shared well's reconstruction from pulling in a large, mostly-irrelevant slice of the
+whole ledger's history: the *query* still has to look at every collateral edge (that's inherent to
+correctly zeroing out a core well's balance), but no collateral destination ever triggers its own
+expensive reconstruction.
+"""
 function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
-    if encumbrances 
-        x= 
+    if encumbrances
+        x=
         """
                     WITH RECURSIVE ledger_subset (ID,SequenceID,Time)
         AS(
@@ -165,7 +184,7 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
          y (LedgerID,SequenceID,EncumbranceID,Source,Destination,Quantity,Unit)
         AS(SELECT 0,$(get_last_sequence_id())+c.EncumbranceID, c.EncumbranceID, c.Source,c.Destination,c.Quantity,c.Unit
             FROM encumbrance_subset e INNER JOIN EncumberedTransfers c ON e.EncumbranceID = c.EncumbranceID
-        UNION ALL 
+        UNION ALL
             SELECT t.LedgerID,l.SequenceID,0,t.Source, t.Destination, t.Quantity, t.Unit
             FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID ) ,
         x (LedgerID,SequenceID,EncumbranceID,Source,Destination,Quantity,Unit)
@@ -173,14 +192,24 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
          SELECT y.LedgerID,y.SequenceID,y.EncumbranceID, Source,Destination,y.Quantity,y.Unit
             FROM y
             WHERE Destination in $entry OR Source in $entry
-        UNION ALL
+        UNION
         SELECT y.LedgerID,y.SequenceID,y.EncumbranceID,y.Source,y.Destination,y.Quantity,y.Unit
             FROM y  ,x
             WHERE x.Source = y.Destination
+        ),
+        ancestor_wells (LocationID) AS (
+            SELECT Source FROM x UNION SELECT Destination FROM x
+        ),
+        full_set (LedgerID,SequenceID,EncumbranceID,Source,Destination,Quantity,Unit,Core) AS (
+            SELECT *, 1 FROM x
+            UNION
+            SELECT y.LedgerID,y.SequenceID,y.EncumbranceID,y.Source,y.Destination,y.Quantity,y.Unit, 0
+                FROM y INNER JOIN ancestor_wells ON y.Source = ancestor_wells.LocationID
+                WHERE NOT EXISTS (SELECT 1 FROM x WHERE x.LedgerID = y.LedgerID AND x.EncumbranceID = y.EncumbranceID)
         )
-        SELECT DISTINCT  * FROM x ORDER BY SequenceID
+        SELECT DISTINCT * FROM full_set ORDER BY SequenceID
         """
-    else 
+    else
         x=
         """
             WITH RECURSIVE ledger_subset (ID,SequenceID,Time)
@@ -193,17 +222,29 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
         SELECT Transfers.LedgerID, Source,Destination,Transfers.Quantity,Transfers.Unit
             FROM Transfers
             WHERE Destination in $entry OR Source in $entry
-        UNION ALL
+        UNION
         SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit
             FROM Transfers t  ,x
             WHERE x.Source = t.Destination
+        ),
+        ancestor_wells (LocationID) AS (
+            SELECT Source FROM x UNION SELECT Destination FROM x
+        ),
+        full_set (LedgerID,Source,Destination,Quantity,Unit,Core) AS (
+            SELECT *, 1 FROM x
+            UNION
+            SELECT Transfers.LedgerID, Source, Destination, Transfers.Quantity, Transfers.Unit, 0
+                FROM Transfers INNER JOIN ancestor_wells ON Transfers.Source = ancestor_wells.LocationID
+                WHERE NOT EXISTS (SELECT 1 FROM x WHERE x.LedgerID = Transfers.LedgerID)
         )
-        SELECT DISTINCT  * FROM x INNER JOIN ledger_subset ON x.LedgerID = ledger_subset.ID  ORDER BY SequenceID
+        SELECT full_set.LedgerID,Source,Destination,Quantity,Unit,Max(Core) AS Core,ledger_subset.SequenceID
+            FROM full_set INNER JOIN ledger_subset ON full_set.LedgerID = ledger_subset.ID
+            GROUP BY full_set.LedgerID ORDER BY ledger_subset.SequenceID
         """
 
-    end 
+    end
 return query_db(x)
-end 
+end
 
 function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
@@ -234,14 +275,14 @@ function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,en
          SELECT y.LedgerID,y.SequenceID,y.EncumbranceID, Source,Destination,y.Quantity,y.Unit
             FROM y
             WHERE Destination in $entry OR Source in $entry
-        UNION ALL
+        UNION
         SELECT y.LedgerID,y.SequenceID,y.EncumbranceID,y.Source,y.Destination,y.Quantity,y.Unit
             FROM y  ,x
             WHERE y.Source = x.Destination
         )
         SELECT DISTINCT  * FROM x ORDER BY SequenceID
         """
-    else 
+    else
         x=
         """
             WITH RECURSIVE ledger_subset (ID,SequenceID,Time)
@@ -254,7 +295,7 @@ function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,en
         SELECT Transfers.LedgerID,0, Source,Destination,Transfers.Quantity,Transfers.Unit
             FROM Transfers
             WHERE Destination in $entry OR Source in $entry
-        UNION ALL
+        UNION
         SELECT t.LedgerID,0,t.Source,t.Destination,t.Quantity,t.Unit
             FROM Transfers t  ,x
             WHERE t.Source = x.Destination
@@ -287,47 +328,53 @@ end
 
 
 
-function fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time=DateTime=Dates.now();encumbrances=false)
-    caches=get_content_caches(location_id,starting,ending,time;encumbrances=encumbrances) 
-    stock_id=missing
-    foot=0
-    cost=0
-    if nrow(caches) > 0 
-        row=caches[end,:]
-        stock_id=row.StockID
-        foot=row.SequenceID
-        cost=row.Cost
-    else
-        return Empty() ,0 ,0
-    
-    end 
-    
+"""
+    fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time::DateTime=Dates.now();encumbrances=false)
+
+Look up `location_id`'s most recent cached [`Stock`](@ref) within `starting..ending`. Returns
+`(stock, cost, foot)`.
+
+`stock` is `nothing` when no `CachedContents` row exists in that window at all -- distinct from a
+row that exists and legitimately caches an empty stock (which returns `Empty()`, not `nothing`).
+Callers (see [`reconstruct_contents`](@ref)) rely on this distinction: `nothing` means "we don't
+actually know this location's content here, go reconstruct it," while `Empty()` means "confirmed
+empty as of this cache point."
+"""
+function fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time::DateTime=Dates.now();encumbrances=false)
+    caches=get_content_caches(location_id,starting,ending,time;encumbrances=encumbrances)
+    nrow(caches) == 0 && return nothing, 0, 0
+
+    row=caches[end,:]
+    stock_id=row.StockID
+    foot=row.SequenceID
+    cost=row.Cost
+
     stock=Empty()
     if !ismissing(stock_id)
         stock=get_stock(stock_id)
-    end 
+    end
 
     return stock , cost, foot
-end 
+end
 
 
 
-function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_df::DataFrame = location_reconstruction_df;encumbrances=false)
-    all_locs=deepcopy(loc_df)
+function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false)
+    all_locs=deepcopy(loc_index)
     cache_feet=[]
     for loc_id in location_ids
         n,t=get_location_info(loc_id)
         loc=t(loc_id,n)
         if !(loc isa CHESSCore.Well)
-            push!(all_locs,(loc_id,0,loc))
-            continue 
-        end 
+            push_location!(all_locs,loc_id,0,loc)
+            continue
+        end
         stock,cost,cache_foot = fetch_content_cache(loc_id,0,max_cache,time;encumbrances=encumbrances)
         if !isnothing(stock)
             deposit!(loc,stock,cost)
         end
 
-        push!(all_locs,(CHESSCore.location_id(loc),cache_foot,loc))
+        push_location!(all_locs,CHESSCore.location_id(loc),cache_foot,loc)
         push!(cache_feet,cache_foot)
 
 
@@ -340,49 +387,83 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
 
 
 
+    # locations that are part of the genuine ancestor closure (Core=1 in some row) need a real,
+    # possibly-recursive bootstrap below. Locations that only appear because a core location's
+    # *other* outgoing transfer happened to land on them ("collateral", Core=0 everywhere they
+    # appear) never get read back out of this call -- see get_transfer_ancestors's docstring --
+    # so they're built as bare Empty() stubs instead, without ever touching the cache tables or
+    # recursing. This is what keeps a busy/shared well's reconstruction from cascading into a large,
+    # mostly-irrelevant slice of the ledger just because get_transfer_ancestors had to look at it.
+    core_locs=Set{Integer}()
+    if nrow(transfers) > 0 && hasproperty(transfers,:Core)
+        for row in eachrow(transfers)
+            if row.Core == 1
+                push!(core_locs,row.Source)
+                push!(core_locs,row.Destination)
+            end
+        end
+    end
+
     # grab the sequence id of each location we need to complete this set of transfers
     cache_dict=Dict{Integer,Integer}()
     for row in reverse(eachrow(transfers))
 
         seq_id=min(row.SequenceID-1,sequence_id)
         # set it back to the sequence id we are looking at if the transfer is encumbered
-    
+
 
         cache_dict[row.Source]=seq_id
         cache_dict[row.Destination]=seq_id
-    end 
+    end
     reconstructions_needed=Set{Integer}()
     for loc_id in keys(cache_dict)
+
+        if !(loc_id in core_locs)
+            n,t=get_location_info(loc_id)
+            push_location!(all_locs,loc_id,foot,t(loc_id,n))
+            continue
+        end
 
         new_stock,new_cost,new_foot=fetch_content_cache(loc_id,foot,cache_dict[loc_id],time;encumbrances=false)
         n,t=get_location_info(loc_id)
         new_loc=t(loc_id,n)
         if !isnothing(new_stock)
             deposit!(new_loc,new_stock,new_cost)
-            push!(all_locs,(loc_id,new_foot,new_loc))
+            push_location!(all_locs,loc_id,new_foot,new_loc)
         else
             push!(reconstructions_needed,loc_id)
-        end 
+        end
     end
-    if length(reconstructions_needed) > 0 
+    if length(reconstructions_needed) > 0
         locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs)
-        for loc in locs 
-            push!(all_locs,(CHESSCore.location_id(loc),foot,loc))
-        end 
-    end 
+        for loc in locs
+            push_location!(all_locs,CHESSCore.location_id(loc),foot,loc)
+        end
+    end
 
     #start simulation
 
     for row in eachrow(transfers)
         seq_id=row.SequenceID -1
-        dest =find_most_recent_location(all_locs,row.Destination,seq_id)
-
-        src = find_most_recent_location(all_locs,row.Source,seq_id)
         quant= row.Quantity * Unitful.uparse(row.Unit)
+        src = find_most_recent_location(all_locs,row.Source,seq_id)
+
+        if row.Core == 0
+            # Collateral: this row exists only so a *core* location's balance is correctly reduced
+            # by whatever it sent elsewhere -- the destination itself is never read back out of this
+            # call (see get_transfer_ancestors's docstring), so there's no need to find, deepcopy, or
+            # track it at all. Just withdraw from a copy of the source and discard the rest.
+            new_src = deepcopy(src)
+            withdraw!(new_src,quant)
+            push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
+            continue
+        end
+
+        dest = find_most_recent_location(all_locs,row.Destination,seq_id)
         new_src,new_dest=_reconstruction_transfer(src,dest,quant)
-        push!(all_locs,(CHESSCore.location_id(dest),seq_id+1,new_dest))
-        push!(all_locs,(CHESSCore.location_id(src),seq_id+1,new_src))
-    end 
+        push_location!(all_locs,CHESSCore.location_id(dest),seq_id+1,new_dest)
+        push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
+    end
 
     final_out = find_most_recent_location.((all_locs,), location_ids)
 
@@ -390,16 +471,16 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
     return final_out
 end 
 
-function reconstruct_contents(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_df::DataFrame=location_reconstruction_df;encumbrances=false)
-    return reconstruct_contents([location_id],sequence_id,time,max_cache,loc_df;encumbrances=encumbrances)[1]
-end 
-    
+function reconstruct_contents(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)
+    return reconstruct_contents([location_id],sequence_id,time,max_cache,loc_index;encumbrances=encumbrances)[1]
+end
 
 
-function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_df::DataFrame=location_reconstruction_df;encumbrances=false)
+
+function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)
 
 
-    parallel_locs=reconstruct_contents(location_id.(locations),sequence_id,time,max_cache,loc_df,encumbrances=encumbrances)
+    parallel_locs=reconstruct_contents(location_id.(locations),sequence_id,time,max_cache,loc_index,encumbrances=encumbrances)
 
     for i in eachindex(locations)
         if locations[i] isa CHESSCore.Well
@@ -412,8 +493,8 @@ function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Intege
     return nothing
 end 
 
-function reconstruct_contents!(location::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_df::DataFrame=location_reconstruction_df;encumbrances=false)
-    parallel_loc=reconstruct_contents(location_id(location),sequence_id,time,max_cache,loc_df,encumbrances=encumbrances)
+function reconstruct_contents!(location::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)
+    parallel_loc=reconstruct_contents(location_id(location),sequence_id,time,max_cache,loc_index,encumbrances=encumbrances)
     if location isa CHESSCore.Well
         location.stock=CHESSCore.stock(parallel_loc)
         location.cost=CHESSCore.cost(parallel_loc)
