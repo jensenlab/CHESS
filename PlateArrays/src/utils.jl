@@ -41,22 +41,34 @@ end
 
 
 """
-    assign_run_index(p::PlateArray; run_order::String="ordered", rng::AbstractRNG=Random.default_rng())
+    assign_run_index(p::PlateArray; run_order::String="ordered", rng::AbstractRNG=Random.default_rng(),
+                      indices::Union{Nothing,AbstractVector{<:Integer}}=nothing)
 
-Return a new `PlateArray` with `run_index` populated over `p`'s run wells (`1:N`, `N` = number of runs).
-Always recomputed from scratch, so this can also be used to re-shuffle an already-indexed `PlateArray`.
+Return a new `PlateArray` with `run_index` populated over `p`'s run wells. Always recomputed from
+scratch, so this can also be used to re-shuffle (or re-assign) an already-indexed `PlateArray`.
 
 # Keyword Arguments
-- `run_order`: `"ordered"` (default) assigns `1:N` in column-major well order (the same order
-  `wellnames`/the DataFrame interface use); `"random"` assigns a uniformly random permutation of `1:N`
-  using `rng`.
+- `indices`: if given, assign these exact values (in order) to the run wells (column-major order) instead
+  of computing `run_order`/`rng` -- must have exactly one value per run well. This is the primitive for
+  assigning an arbitrary slice of a larger sequence (e.g. one plate's share of a multi-plate experiment's
+  `1:total_runs`, as `arrayer` does) rather than a fresh, plate-local `1:N`.
+- `run_order`: ignored when `indices` is given. `"ordered"` (default) assigns `1:N` in column-major well
+  order (the same order `wellnames`/the DataFrame interface use); `"random"` assigns a uniformly random
+  permutation of `1:N` using `rng`.
 - `rng`: the random number generator used when `run_order="random"`. Pass an explicit RNG (e.g.
   `Random.Xoshiro(1234)`) for a reproducible ordering.
 """
-function assign_run_index(p::PlateArray; run_order::String="ordered", rng::AbstractRNG=Random.default_rng())
-    run_order in ("ordered","random") || throw(ArgumentError("run_order must be \"ordered\" or \"random\""))
+function assign_run_index(p::PlateArray; run_order::String="ordered", rng::AbstractRNG=Random.default_rng(),
+        indices::Union{Nothing,AbstractVector{<:Integer}}=nothing)
     idxs = findall(runs(p))
-    order = run_order == "random" ? shuffle(rng,1:length(idxs)) : collect(1:length(idxs))
+    if indices !== nothing
+        length(indices) == length(idxs) || throw(ArgumentError(
+            "indices must have one value per run well ($(length(idxs)) run wells, got $(length(indices)))"))
+        order = collect(indices)
+    else
+        run_order in ("ordered","random") || throw(ArgumentError("run_order must be \"ordered\" or \"random\""))
+        order = run_order == "random" ? shuffle(rng,1:length(idxs)) : collect(1:length(idxs))
+    end
     run_index = Matrix{Union{Missing,Int}}(missing,size(p.wells))
     run_index[idxs] .= order
     return PlateArray(p.wells,p.positives,p.negatives,run_index)

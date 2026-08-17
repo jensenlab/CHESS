@@ -40,6 +40,11 @@ end
     valid = reshape(Union{Missing,Int}[1,2,3,4],2,2)
     @test PlateArray(w,falses(2,2),falses(2,2),valid) isa PlateArray
 
+    # a non-1-starting distinct-positive range is also valid -- this is exactly what a plate holding one
+    # slice of a larger multi-plate experiment needs (see the "arrayer multi-plate run_index" testset)
+    offset_range = reshape(Union{Missing,Int}[5,6,7,8],2,2)
+    @test PlateArray(w,falses(2,2),falses(2,2),offset_range) isa PlateArray
+
     pos = falses(2,2); pos[1,1]=true
     index_on_control = reshape(Union{Missing,Int}[1,missing,2,3],2,2) # index at [1,1], now a control well
     @test_throws RunIndexError PlateArray(w,pos,falses(2,2),index_on_control)
@@ -50,6 +55,9 @@ end
     duplicated = reshape(Union{Missing,Int}[1,1,1,1],2,2)
     @test_throws RunIndexError PlateArray(w,falses(2,2),falses(2,2),duplicated)
 
+    non_positive = reshape(Union{Missing,Int}[0,1,2,3],2,2)
+    @test_throws RunIndexError PlateArray(w,falses(2,2),falses(2,2),non_positive)
+
     ordered = assign_run_index(p;run_order="ordered")
     @test ordered.run_index == reshape(Union{Missing,Int}[1,2,3,4],2,2)
 
@@ -59,6 +67,10 @@ end
     @test sort(collect(skipmissing(random1.run_index))) == [1,2,3,4]
 
     @test_throws ArgumentError assign_run_index(p;run_order="bogus")
+
+    explicit = assign_run_index(p;indices=[5,6,7,8])
+    @test explicit.run_index == reshape(Union{Missing,Int}[5,6,7,8],2,2)
+    @test_throws ArgumentError assign_run_index(p;indices=[1,2,3]) # wrong length
 
     indexed = assign_run_index(p)
     df = DataFrame(indexed)
@@ -234,6 +246,34 @@ end
     arrays3 = arrayer(wells,e1,e2,e3)
     @test size(arrays3,1) == 3
     @test sum(sum(runs(pa)) for pa in arrays3) == e1.runs + e2.runs + e3.runs
+end
+
+@testset "arrayer multi-plate run_index" begin
+    # a single experiment too big for one plate (10 runs + 2 controls on an 8-well plate) forces
+    # assign_plates to split it across >=2 plates -- each plate must carry a distinct slice of
+    # 1:total_runs, not its own independent 1:N restarting from 1 (the bug that was reported)
+    wells = trues(2,4)
+    e = Experiment(10,1,1)
+
+    arrays = arrayer(wells,e)
+    all_indices = Int[]
+    for pa in arrays
+        n = sum(runs(pa))
+        vals = collect(skipmissing(pa.run_index))
+        @test length(vals) == n
+        append!(all_indices,vals)
+    end
+    @test sort(all_indices) == collect(1:e.runs)
+    @test length(unique(all_indices)) == length(all_indices) # no duplicates across plates
+    @test size(arrays,2) >= 2 # confirms the split actually happened
+
+    arrays_random = arrayer(wells,e;run_order="random",rng=Xoshiro(1))
+    all_random = Int[]
+    for pa in arrays_random
+        append!(all_random,collect(skipmissing(pa.run_index)))
+    end
+    @test sort(all_random) == collect(1:e.runs)
+    @test length(unique(all_random)) == length(all_random)
 end
 
 @testset "visualization" begin

@@ -7,7 +7,10 @@ end
     struct RunIndexError <: Exception
 
 Thrown when a `PlateArray`'s `run_index` field is neither fully unassigned (`missing` everywhere) nor a
-valid schedule (a permutation of `1:N` over exactly the run wells, `missing` elsewhere).
+valid schedule (distinct positive integers over exactly the run wells, `missing` elsewhere). Note this
+does *not* require the values to form a contiguous `1:N` range starting at 1 -- a plate holding one slice
+of a larger, multi-plate experiment legitimately carries a non-1-starting range (e.g. `{7,8,9,10}`); see
+[`assign_run_index`](@ref)'s `indices` keyword.
 """
 struct RunIndexError <: Exception
     msg::AbstractString
@@ -23,9 +26,11 @@ end
     end
 
     A PlateArray object describes the layout of a microwell plate that includes the active experimental
-    wells and controls, plus an optional schedule of integer run indices (`1:N`, `N` = number of run
-    wells) over the non-control active ("run") wells. `run_index` is `missing` everywhere when
-    unassigned -- see [`assign_run_index`](@ref) to populate it.
+    wells and controls, plus an optional schedule of distinct positive integer run indices over the
+    non-control active ("run") wells (not necessarily a contiguous `1:N` range starting at 1 -- a plate
+    holding one slice of a larger, multi-plate experiment carries whichever range that experiment assigned
+    it). `run_index` is `missing` everywhere when unassigned -- see [`assign_run_index`](@ref) to
+    populate it.
 """
 struct PlateArray
     wells::BitMatrix # indicator for which wells are active on the plate
@@ -42,8 +47,9 @@ struct PlateArray
         assigned = .!ismissing.(run_index)
         if any(assigned)
             assigned == run_mask || throw(RunIndexError("run_index must be assigned at exactly the run wells (non-control active wells)"))
-            vals = sort(collect(skipmissing(run_index)))
-            vals == collect(1:sum(run_mask)) || throw(RunIndexError("run_index values must be a permutation of 1:N over the run wells"))
+            vals = collect(skipmissing(run_index))
+            all(v -> v >= 1, vals) || throw(RunIndexError("run_index values must be positive integers"))
+            length(vals) == length(unique(vals)) || throw(RunIndexError("run_index values must be unique"))
         end
 
         return new(wells,positives,negatives,run_index)
