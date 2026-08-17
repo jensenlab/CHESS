@@ -32,6 +32,46 @@ PlateArrays._default_optimizer[] = HiGHS.Optimizer
     @test_throws ErrorException PlateArray(DataFrame(a=[1,2],b=[3,4]))
 end
 
+@testset "run_index" begin
+    w = trues(2,2)
+    p = PlateArray(w,falses(2,2),falses(2,2))
+    @test all(ismissing,p.run_index)
+
+    valid = reshape(Union{Missing,Int}[1,2,3,4],2,2)
+    @test PlateArray(w,falses(2,2),falses(2,2),valid) isa PlateArray
+
+    pos = falses(2,2); pos[1,1]=true
+    index_on_control = reshape(Union{Missing,Int}[1,missing,2,3],2,2) # index at [1,1], now a control well
+    @test_throws RunIndexError PlateArray(w,pos,falses(2,2),index_on_control)
+
+    partial = reshape(Union{Missing,Int}[1,2,3,missing],2,2)
+    @test_throws RunIndexError PlateArray(w,falses(2,2),falses(2,2),partial)
+
+    duplicated = reshape(Union{Missing,Int}[1,1,1,1],2,2)
+    @test_throws RunIndexError PlateArray(w,falses(2,2),falses(2,2),duplicated)
+
+    ordered = assign_run_index(p;run_order="ordered")
+    @test ordered.run_index == reshape(Union{Missing,Int}[1,2,3,4],2,2)
+
+    random1 = assign_run_index(p;run_order="random",rng=Xoshiro(1))
+    random2 = assign_run_index(p;run_order="random",rng=Xoshiro(1))
+    @test random1 == random2
+    @test sort(collect(skipmissing(random1.run_index))) == [1,2,3,4]
+
+    @test_throws ArgumentError assign_run_index(p;run_order="bogus")
+
+    indexed = assign_run_index(p)
+    df = DataFrame(indexed)
+    @test "run_index" in names(df)
+    @test indexed == PlateArray(df)
+
+    df_no_idx = select(df, Not(:run_index))
+    reconstructed = PlateArray(df_no_idx)
+    @test all(ismissing, reconstructed.run_index)
+
+    @test json_to_platearray(platearray_to_json(indexed)) == indexed
+end
+
 
 wells=trues(8,12)
 wells[1:4,1].=false
@@ -71,12 +111,18 @@ plate=PlateArray(wells,pos,neg)
 end
 
 @testset "place_controls" begin
-    @test place_controls(trues(8,12),8,8) isa PlateArray
+    pc_default = place_controls(trues(8,12),8,8)
+    @test pc_default isa PlateArray
+    @test sort(collect(skipmissing(pc_default.run_index))) == collect(1:80)
     @test place_controls(trues(8,12),8,8,solver="MILP",timelimit=10) isa PlateArray
     @test place_controls(trues(8,12),8,8,objective="LHS") isa PlateArray
     @test place_controls(trues(8,12),8,8,objective="minimax") isa PlateArray
     @test place_controls(plate) isa PlateArray
     @test place_controls(trues(8,12), Experiment(0,8,8)) isa PlateArray
+
+    pc_random = place_controls(trues(8,12),8,8;restarts=1,iterations=50,run_order="random",rng=Xoshiro(1))
+    @test sort(collect(skipmissing(pc_random.run_index))) == collect(1:80)
+    @test_throws ArgumentError place_controls(trues(8,12),8,8;run_order="bogus")
 end
 
 @testset "Experiment" begin
@@ -173,6 +219,14 @@ end
     @test all(pa -> pa isa PlateArray, arrays)
     @test all(pa -> size(pa) == size(wells), arrays)
     @test sum(sum(runs(pa)) for pa in arrays) == e1.runs + e2.runs
+    for pa in arrays
+        n = sum(runs(pa))
+        if n > 0
+            @test sort(collect(skipmissing(pa.run_index))) == collect(1:n)
+        else
+            @test all(ismissing,pa.run_index)
+        end
+    end
 
     # a small third experiment that doesn't need every plate, to exercise the
     # zero-assignment (experiment absent from a given plate) branch

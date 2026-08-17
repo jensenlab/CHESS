@@ -36,9 +36,9 @@ include("./arrayer/arrayer.jl")
 
 
 #types.jl
-export PlateArray,Experiment,Expt,OccupancyError
+export PlateArray,Experiment,Expt,OccupancyError,RunIndexError
 #utils.jl
-export runs, random_platearray,active_indices
+export runs, random_platearray,active_indices,assign_run_index
 #place_controls.jl
 export place_controls, solvers, objectives 
 #arrayer.jl

@@ -37,7 +37,30 @@ Compute the non-control active wells of a PlateArray.
 """
 function runs(platearray::PlateArray)
     return platearray.wells .&& .!platearray.positives .&& .!platearray.negatives
-end 
+end
+
+
+"""
+    assign_run_index(p::PlateArray; run_order::String="ordered", rng::AbstractRNG=Random.default_rng())
+
+Return a new `PlateArray` with `run_index` populated over `p`'s run wells (`1:N`, `N` = number of runs).
+Always recomputed from scratch, so this can also be used to re-shuffle an already-indexed `PlateArray`.
+
+# Keyword Arguments
+- `run_order`: `"ordered"` (default) assigns `1:N` in column-major well order (the same order
+  `wellnames`/the DataFrame interface use); `"random"` assigns a uniformly random permutation of `1:N`
+  using `rng`.
+- `rng`: the random number generator used when `run_order="random"`. Pass an explicit RNG (e.g.
+  `Random.Xoshiro(1234)`) for a reproducible ordering.
+"""
+function assign_run_index(p::PlateArray; run_order::String="ordered", rng::AbstractRNG=Random.default_rng())
+    run_order in ("ordered","random") || throw(ArgumentError("run_order must be \"ordered\" or \"random\""))
+    idxs = findall(runs(p))
+    order = run_order == "random" ? shuffle(rng,1:length(idxs)) : collect(1:length(idxs))
+    run_index = Matrix{Union{Missing,Int}}(missing,size(p.wells))
+    run_index[idxs] .= order
+    return PlateArray(p.wells,p.positives,p.negatives,run_index)
+end
 
 
 """
