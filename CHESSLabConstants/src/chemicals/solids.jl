@@ -89,6 +89,10 @@
 @reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing 23462
 @reagent cystine "L-cystine" Solid 240.3u"g/mol" missing 67678
 @reagent cytosine "cytosine" Solid 111.1u"g/mol" missing 597
+@reagent d_alanine "D-Alanine" Solid 89.09u"g/mol" missing 71080
+# ^ distinct from the existing alanine (DL, CID 602) and l_alanine (CID 5950) -- same formula/MW
+# as its stereoisomers, but no density data on PubChem for this specific CID (not assumed to match
+# l_alanine's 1.432 g/mL just because enantiomers share physical properties -- no per-CID citation).
 @reagent d_arabitol "D-Arabitol" Solid 152.15u"g/mol" missing 94154
 @reagent d_galactarate "D-Galactaric Acid (Mucic Acid)" Solid 210.14u"g/mol" missing 3037582
 @reagent d_galactonate "Calcium D-Galactonate Monohydrate" Solid 448.39u"g/mol" missing 129700926

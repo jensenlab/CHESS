@@ -354,6 +354,10 @@ function _register_acid_base_systems!()
 
     # Cluster A: amino acids. Simple pair (alpha-COOH, alpha-NH3+), chain [cation,identity,anion]:
     set_acid_base_system!(alanine,AcidBaseSystem([AlanineCation,_identity(alanine),AlanineAnion],[2.34,9.69]))
+    # d_alanine: same conjugate acid/base chemistry as its DL/L stereoisomers (stereochemistry
+    # doesn't affect pKa), reusing AlanineCation/AlanineAnion -- same pattern as l_malic_acid/
+    # d_malic_acid reusing HMalate-/Malate2- above.
+    set_acid_base_system!(d_alanine,AcidBaseSystem([AlanineCation,_identity(d_alanine),AlanineAnion],[2.34,9.69]))
     set_acid_base_system!(valine,AcidBaseSystem([ValineCation,_identity(valine),ValineAnion],[2.32,9.62]))
     set_acid_base_system!(leucine,AcidBaseSystem([LeucineCation,_identity(leucine),LeucineAnion],[2.36,9.60]))
     set_acid_base_system!(isoleucine,AcidBaseSystem([IsoleucineCation,_identity(isoleucine),IsoleucineAnion],[2.36,9.68]))
