@@ -1,4 +1,4 @@
-module ControlMaps
+module RunMaps
 
 using DataFrames, JSON, JuMP, Gurobi
 
@@ -12,23 +12,26 @@ include("scheduling/defaults.jl")
 include("scheduling/greedy.jl")
 include("scheduling/MILP.jl")
 include("scheduling/uniform_controls.jl")
+include("scheduling/duplicates.jl")
+include("scheduling/pooled_controls.jl")
 include("dataframe_interface.jl")
 include("json_interface.jl")
 
 # types.jl
-export ControlMap
+export RunMap
 # mutation.jl
-export add_run!, add_control!, link!, unlink!, remove_run!, remove_control!, set_metadata!
+export add_run!, link!, unlink!, remove_run!, set_metadata!
 # query.jl
-export controls, runs, control_types, roles, has_run, has_control, has_link, edge_metadata, edges,
-       n_runs, n_controls, n_edges
+export linked_runs, linking_runs, runs, relation_types, roles, has_run, has_link, edge_metadata, edges,
+       n_runs, n_edges
 # components.jl
 export components, n_components, n_nodes, component_sizes
 # scheduling/
-export schedule_uniform_controls, group_solvers, default_control_id_factory
+export schedule_uniform_controls, group_solvers, default_linked_run_id_factory,
+       schedule_duplicates, default_duplicate_id_factory, schedule_controls!
 # dataframe_interface.jl
 export DataFrame
 # json_interface.jl
-export controlmap_to_json, json_to_controlmap, write_json, read_controlmap_json
+export runmap_to_json, json_to_runmap, write_json, read_runmap_json
 
-end # module ControlMaps
+end # module RunMaps

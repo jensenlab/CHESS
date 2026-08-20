@@ -5,5 +5,6 @@ set -e
 (cd CHESSLabConstants && julia --project=. -e 'using Pkg; Pkg.test()')
 (cd PlateArrays && julia --project=. -e 'using Pkg; Pkg.test()')
 (cd CHESSParsers && julia --project=. -e 'using Pkg; Pkg.test()')
-(cd ControlMaps && julia --project=. -e 'using Pkg; Pkg.test()')
+(cd RunMaps && julia --project=. -e 'using Pkg; Pkg.test()')
+(cd PlateMaps && julia --project=. -e 'using Pkg; Pkg.test()')
 julia --project=. -e 'using Pkg; Pkg.test()'

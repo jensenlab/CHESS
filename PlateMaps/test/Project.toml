@@ -1,0 +1,12 @@
+[deps]
+CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+RunMaps = "4727e467-4cb1-465a-9422-666f2dae70b6"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+HiGHS = "1.24.1"

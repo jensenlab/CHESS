@@ -10,32 +10,32 @@ const group_solvers = Dict(
 )
 
 """
-    default_control_id_factory(group_index::Int, role::Symbol, replicate_index::Int) -> Symbol
+    default_linked_run_id_factory(group_index::Int, role::Symbol, replicate_index::Int) -> Symbol
 
-Default `control_id_factory` for [`schedule_uniform_controls`](@ref). Produces
-a readable, debuggable `Symbol` of the form `role_gGROUP_REPLICATE`, e.g.
-`:positive_g1_1`, `:positive_g1_2`, `:negative_g3_1`.
+Default `linked_run_id_factory` for [`schedule_uniform_controls`](@ref).
+Produces a readable, debuggable `Symbol` of the form `role_gGROUP_REPLICATE`,
+e.g. `:positive_g1_1`, `:positive_g1_2`, `:negative_g3_1`.
 
 `group_index` is the group's 1-based position in the canonical, contiguously
 renumbered group ordering used by [`schedule_uniform_controls`](@ref), not
 necessarily any raw id returned by the underlying group-assignment solver.
 `replicate_index` ranges over `1:role_counts[role]` within that group/role.
 """
-default_control_id_factory(group_index::Int, role::Symbol, replicate_index::Int) =
+default_linked_run_id_factory(group_index::Int, role::Symbol, replicate_index::Int) =
     Symbol("$(role)_g$(group_index)_$(replicate_index)")
 
 """
     schedule_uniform_controls(runs::Vector{R}, role_counts, cap::Int;
                                solver::String="greedy",
-                               control_id_factory::Function=default_control_id_factory,
-                               kwargs...) where {R} -> ControlMap{R,C}
+                               linked_run_id_factory::Function=default_linked_run_id_factory,
+                               kwargs...) where {R} -> RunMap{N}
 
-Build a brand-new `ControlMap` implementing "uniform shared controls"
+Build a brand-new `RunMap` implementing "uniform shared controls"
 scheduling: partition `runs` into groups capped at `cap` total nodes each
 (matching [`n_nodes`](@ref)/[`component_sizes`](@ref)), and within each group
 create `sum(values(role_counts))` new control nodes (counts given per role,
-e.g. `Dict(:positive=>1, :negative=>1)`) linked to *every* run in that group
-(dense bipartite within the group).
+e.g. `Dict(:positive=>1, :negative=>1)`) linked from *every* run in that
+group (dense within the group).
 
 Controls are never shared across groups, so each resulting group is
 automatically its own connected component -- recover the grouping later via
@@ -57,17 +57,25 @@ on the map for this purpose.
   For the homogeneous/unweighted runs handled here both are exact and
   produce the same number of groups; MILP is provided as an extensible
   scaffold rather than a better answer -- see [`assign_groups_MILP`](@ref).
-- `control_id_factory`: `(group_index::Int, role::Symbol, replicate_index::Int) -> C`
+- `linked_run_id_factory`: `(group_index::Int, role::Symbol, replicate_index::Int) -> id`
   called once per control node to create; defaults to
-  [`default_control_id_factory`](@ref).
+  [`default_linked_run_id_factory`](@ref).
 - `kwargs...`: forwarded to the chosen solver (e.g. `optimizer`, `timelimit`
   for `"MILP"`).
+
+# Node type resolution
+The resulting `RunMap{N}` uses `N = promote_type(eltype(runs), typeof(first
+generated id))`, falling back to `Any` whenever the run type and the
+generated-id type don't coincide (e.g. `Int` runs with the default
+`Symbol`-returning factory build `RunMap{Any}`) -- a single node pool cannot
+hold both types under a narrower parameterization. When `runs` is empty, no
+id is ever generated, so the result is typed `RunMap{R}` directly.
 
 See also: [`group_solvers`](@ref), [`components`](@ref).
 """
 function schedule_uniform_controls(runs::Vector{R}, role_counts::AbstractDict, cap::Int;
                                     solver::String="greedy",
-                                    control_id_factory::Function=default_control_id_factory,
+                                    linked_run_id_factory::Function=default_linked_run_id_factory,
                                     kwargs...) where {R}
     isempty(role_counts) && throw(ArgumentError("role_counts must not be empty"))
     canon = Dict{Symbol,Int}()
@@ -86,7 +94,7 @@ function schedule_uniform_controls(runs::Vector{R}, role_counts::AbstractDict, c
         "cap ($cap) must exceed the total controls per group ($C_count); got group_capacity = $group_capacity"))
 
     if isempty(runs)
-        return ControlMap{R,Any}()
+        return RunMap{R}()
     end
 
     solver_fun = group_solvers[solver]
@@ -96,17 +104,18 @@ function schedule_uniform_controls(runs::Vector{R}, role_counts::AbstractDict, c
     group_index_of = Dict(g => i for (i, g) in enumerate(group_ids))
 
     first_role = sorted_roles[1][1]
-    cached_first_id = control_id_factory(1, first_role, 1)
-    C = typeof(cached_first_id)
+    cached_first_id = linked_run_id_factory(1, first_role, 1)
+    id_type = typeof(cached_first_id)
+    N = promote_type(R, id_type)
 
-    map = ControlMap{R,C}()
+    map = RunMap{N}()
 
     for g in group_ids
         gi = group_index_of[g]
         group_runs = [runs[i] for i in eachindex(runs) if raw_groups[i] == g]
         for (role, count) in sorted_roles
             for rep in 1:count
-                cid = (gi == 1 && role == first_role && rep == 1) ? cached_first_id : control_id_factory(gi, role, rep)
+                cid = (gi == 1 && role == first_role && rep == 1) ? cached_first_id : linked_run_id_factory(gi, role, rep)
                 for r in group_runs
                     link!(map, r, cid, role)
                 end

@@ -1,0 +1,54 @@
+name: PlateMaps Documentation
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'PlateMaps/**'
+      - '.github/workflows/docs-platemaps.yml'
+  pull_request:
+    paths:
+      - 'PlateMaps/**'
+      - '.github/workflows/docs-platemaps.yml'
+
+concurrency:
+  group: docs-platemaps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: PlateMaps
+      - name: Install GitHubActions.jl logger
+        run: |
+          using Pkg
+          Pkg.activate("docs-logger-env"; shared=true)
+          Pkg.add(Pkg.PackageSpec(name="GitHubActions", version="0.1"))
+        shell: julia --color=yes {0}
+      - name: Instantiate PlateMaps docs environment
+        run: julia --project=PlateMaps/docs -e 'using Pkg; Pkg.instantiate()'
+      - name: Build and deploy PlateMaps docs
+        run: |
+          julia --project=PlateMaps/docs -e '
+              @eval Module() begin
+                  push!(LOAD_PATH, "@docs-logger-env")
+                  import Logging, GitHubActions
+                  Logging.global_logger(GitHubActions.GitHubActionsLogger())
+                  pop!(LOAD_PATH)
+              end
+              include("PlateMaps/docs/make.jl")'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
