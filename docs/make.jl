@@ -4,7 +4,7 @@ using CHESS
 using CHESS.CHESSCore
 using CHESS.CHESSDatabase
 using CHESS.CHESSLabConstants
-using CHESSParsers # not re-exported by CHESS (like Pourfecto/PlateArrays), so used directly
+using CHESSParsers # not re-exported by CHESS (like Pourfecto/PlateMaps), so used directly
 
 # register_format!'s jldoctest example (src/registry.jl) refers to CHESSParsers/register_format!/
 # format_registry without importing them itself -- innocuous while CHESSParsers was outside

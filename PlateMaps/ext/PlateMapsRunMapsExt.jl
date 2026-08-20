@@ -37,7 +37,7 @@ on one `wells` plate, this returns one `PlateMap` per plate needed (see the core
 function PlateMaps.schedule_platemap(wells::BitMatrix,rm::RunMap,placeable_roles;kwargs...)
     edges = _as_platemaps_edges(rm)
     placeable = _placeable_nodes(rm,placeable_roles)
-    fixed_nodes = collect(setdiff(PlateMaps.edge_nodes(edges),placeable))
+    fixed_nodes = collect(setdiff(RunMaps.runs(rm),placeable))
     return PlateMaps.schedule_platemap(wells,edges,fixed_nodes;kwargs...)
 end
 

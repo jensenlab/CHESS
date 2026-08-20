@@ -1,0 +1,31 @@
+name = "CHESSExperiments"
+uuid = "9a6e6b5e-3b8b-4f1a-9c1a-7a6a2c1d4e2f"
+version = "0.1.0"
+authors = ["Ben David <66976120+bmdavid2@users.noreply.github.com>"]
+
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+[weakdeps]
+PlateMaps = "959c7cfa-264f-46b3-a453-ad157d8748d9"
+RunMaps = "4727e467-4cb1-465a-9422-666f2dae70b6"
+
+[extensions]
+CHESSExperimentsRunMapsExt = ["PlateMaps", "RunMaps"]
+
+[compat]
+DataFrames = "1.8.1"
+Dates = "1.11.0"
+PlateMaps = "0.1.0"
+RunMaps = "0.1.0"
+julia = "1.12"
+
+[extras]
+PlateMaps = "959c7cfa-264f-46b3-a453-ad157d8748d9"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+RunMaps = "4727e467-4cb1-465a-9422-666f2dae70b6"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["PlateMaps", "RunMaps", "Random", "Test"]

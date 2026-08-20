@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [CHESSCore, CHESSDatabase, CHESSLabConstants, Pourfecto, PlateArrays, CHESSParsers, RunMaps, PlateMaps, .]
+        project: [CHESSCore, CHESSDatabase, CHESSLabConstants, Pourfecto, CHESSParsers, RunMaps, PlateMaps, CHESSExperiments, CHESSQC, .]
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2

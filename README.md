@@ -33,7 +33,6 @@ Packages that plan and schedule lab operations against the CHESS engine's data m
 | Package | Description | Docs |
 |---|---|---|
 | [`Pourfecto`](Pourfecto) | Plans and schedules automated liquid-handling workflows -- turns source stocks, target compositions, labware, and instrument configurations into an executable protocol. See [`Pourfecto/README.md`](Pourfecto/README.md) for its own install/quickstart notes (it has extra solver-license setup CHESS itself doesn't need). | [dev](https://jensenlab.github.io/CHESS/pourfecto/dev/) |
-| [`PlateArrays`](PlateArrays) | Schedules microplate layouts and places optimal controls for detecting errors in microplate experiments. See [`PlateArrays/README.md`](PlateArrays/README.md) for usage details. | [dev](https://jensenlab.github.io/CHESS/platearrays/dev/) |
 | [`PlateMaps`](PlateMaps) | Schedules physical plate layouts (which node occupies which well, across one or more plates) from an edge-linked relationship structure -- pairs naturally with `RunMaps` for the run/control side. | [dev](https://jensenlab.github.io/CHESS/platemaps/dev/) |
 
 ### Data Processing
