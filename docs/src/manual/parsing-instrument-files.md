@@ -73,8 +73,8 @@ spectrum-scan reads, single- or multi-plate, single- or multi-channel workbooks 
 
 `DataFrame(lr)` (or `DataFrame(el)`) returns the tidy measurement table directly.
 
-[`record_reads!(labware, lr; well_map=identity, instrument=nothing)`](@ref) records every row of a
-`LabwareRead` onto a `Labware` as a [`Read`](@ref), via [`record_read!`](@ref) (see
+[`record_reads!(labware, lr; well_map=identity, instrument=nothing, layout=nothing)`](@ref) records
+every row of a `LabwareRead` onto a `Labware` as a [`Read`](@ref), via [`record_read!`](@ref) (see
 [Reads & Instrument Measurements](reads.md) for the underlying single-read mechanics) -- `well_map`
 converts a row's `well` value to the well name used on `labware`, for when the instrument's own
 well-naming convention differs. It also accepts a `Vector{LabwareRead}` directly, recording every
@@ -84,6 +84,11 @@ element against the same `labware`:
 plate = build_location(loc"WP96")
 record_reads!(plate, lrs) # lrs :: Vector{LabwareRead}
 ```
+
+`record_reads!` is provided by CHESSParsers' `CHESSCore` package extension, not CHESSParsers itself
+-- `CHESSCore` is a weak dependency, so parsing a file never requires it, but recording the result
+onto a `Labware` does. `using CHESSCore` (alongside whatever registers the `ReadKind`s involved, e.g.
+`using CHESSLabConstants`) activates it.
 
 `labwareread_to_json`/`json_to_labwareread` (and their `environmentlog_to_json`/
 `json_to_environmentlog` counterparts) round-trip a result through a plain JSON string, for handing

@@ -38,7 +38,8 @@ log, since that data has no well to attach to at all:
   `CHESSCore.Read`s (also accepts a `Vector{LabwareRead}` directly, looping over it); no
   `EnvironmentLog` equivalent yet -- chamber-level data isn't a well-level `CHESSCore.Read`, and
   registering new time-series `ReadKind`s for it is a deliberately deferred design decision (see
-  Status).
+  Status). `CHESSCore` is a weak dependency (see `ext/CHESSParsersCHESSCoreExt.jl`) -- parsing a file
+  never requires it, but `record_reads!` only has methods once `using CHESSCore` has run.
 - `labwareread_to_json(lr)` / `json_to_labwareread(j)` -- JSON round-trip for `LabwareRead`
 - `environmentlog_to_json(el)` / `json_to_environmentlog(j)` -- JSON round-trip for `EnvironmentLog`
 

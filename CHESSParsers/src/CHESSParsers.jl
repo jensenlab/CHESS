@@ -1,8 +1,6 @@
 module CHESSParsers
 
 using
-    CHESSCore, # Labware/Location/Read/record_read! and the read_kinds registry
-    CHESSLabConstants, # registers the Absorbance/Fluorescence ReadKinds instrument reads use
     DataFrames, # LabwareRead's tabular payload
     JSON, # JSON interface
     JSONTables, # DataFrame <-> JSON table interop
