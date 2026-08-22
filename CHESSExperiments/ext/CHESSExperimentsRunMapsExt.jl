@@ -18,7 +18,12 @@ The `:layout` metadata this produces keeps `CHESSExperiments.LAYOUT_COLUMNS`' ex
 """
 module CHESSExperimentsRunMapsExt
 
-using CHESSExperiments, RunMaps, PlateMaps, DataFrames
+using CHESSExperiments, RunMaps, PlateMaps, DataFrames, CHESSCore
+
+function __init__()
+    CHESSExperiments.register_parameter!(:run_map, Vector; default = RunMaps.RunMap[])
+    CHESSExperiments.register_parameter!(:plate_maps, Vector; default = Pair[])
+end
 
 _has_role(::Missing, ::Symbol) = false
 _has_role(roles, role::Symbol) = role in roles
@@ -62,7 +67,9 @@ function CHESSExperiments.schedule_layout(experiment::CHESSExperiments.Experimen
     lay.location_id = Vector{Union{Int,Missing}}(missing, DataFrames.nrow(lay))
     lay.metadata = [Dict{Symbol,Any}() for _ in 1:DataFrames.nrow(lay)]
 
-    return CHESSExperiments.with_parameter(experiment, :layout, lay)
+    result = CHESSExperiments.with_parameter(experiment, :layout, lay)
+    result = CHESSExperiments.with_parameter(result, :run_map, [rm])
+    return CHESSExperiments.with_parameter(result, :plate_maps, collect(plates))
 end
 
 """
@@ -93,6 +100,135 @@ function CHESSExperiments.schedule_layout(experiment::CHESSExperiments.Experimen
     length(names) == length(pms) || throw(ArgumentError(
         "labware_names has $(length(names)) entries but schedule_platemap returned $(length(pms)) plates"))
     return CHESSExperiments.schedule_layout(experiment, Pair.(names, pms), rm)
+end
+
+"""
+    _duplicate_count(design, i) -> Int
+
+Total physical wells design row `i` should get, including its own anchor well -- `missing`/`1` (or
+`:duplicates` absent entirely) means just the one well.
+"""
+function _duplicate_count(design, i)
+    hasproperty(design, :duplicates) || return 1
+    n = design[i, :duplicates]
+    return ismissing(n) ? 1 : n
+end
+
+"""
+    _build_partition_runmap(design, rows) -> RunMaps.RunMap
+
+Build one blocking-partition's `RunMap` directly from the (already-expanded) design, replacing the
+old `RunMaps.schedule_uniform_controls`-based synthesis. Every row in `rows` (sample or control alike)
+gets its own node, using its plain design-row index -- unchanged from the original node-identity
+convention. A row with `_duplicate_count > 1` gets `n-1` extra auxiliary nodes (a `(row, copy)` named
+tuple -- can never collide with a real `Int` row index), each linked to the row's own node via a
+`:duplicate`-typed edge; `CHESSProcessing.aggregate` already knows how to collapse these
+(`RunMaps.linked_runs(run_map, anchor; type=:duplicate)`), no new grouping mechanism needed. Every
+control row (`control_role` non-missing) gets linked to every *sample* row in the same partition,
+labeled with its own role -- the same dense every-run-to-every-control linking
+`schedule_uniform_controls` already did, just sourced from real, user-designated rows.
+"""
+function _build_partition_runmap(design, rows)
+    rm = RunMaps.RunMap{Any}()
+    samples = Int[]
+    controls = Int[]
+    for i in rows
+        RunMaps.add_run!(rm, i)
+        role = CHESSExperiments.control_role(design, i)
+        ismissing(role) ? push!(samples, i) : push!(controls, i)
+
+        n = _duplicate_count(design, i)
+        for copy_idx in 2:n
+            dup_node = (row = i, copy = copy_idx)
+            RunMaps.add_run!(rm, dup_node)
+            RunMaps.link!(rm, i, dup_node, :duplicate)
+        end
+    end
+
+    for c in controls, s in samples
+        RunMaps.link!(rm, c, s, CHESSExperiments.control_role(design, c))
+    end
+
+    return rm
+end
+
+"""
+    schedule_blocked_layout(experiment::CHESSExperiments.Experiment, wells::BitMatrix, placeable_roles;
+                             plate_solver="greedy", reagent_context=CHESSCore, org_context=CHESSCore,
+                             kwargs...) -> CHESSExperiments.Experiment
+
+Expand every control template (see [`CHESSExperiments.expand_control_templates`](@ref)), partition the
+result by every blocking `Factor` (see [`CHESSExperiments.partition_by_blocking`](@ref)), and schedule
+each blocking-homogeneous group independently -- its own `RunMap` (built directly from the design's
+`:control_role`/`:duplicates` columns, see [`_build_partition_runmap`](@ref)) and its own
+`PlateMaps.schedule_platemap` call, which may itself split one group across multiple physical plates
+on capacity grounds. Since every node (including duplicate/control auxiliary nodes) is already
+identified by its real (expanded) design-row index -- or a `(row, copy)` tuple for a duplicate well --
+no local-to-global renumbering is needed merging groups back together, unlike the old
+`schedule_uniform_controls`-based approach.
+
+Returns a new `Experiment` (built from the *expanded* design, since control templates may have
+produced more rows than the original) with `:layout`, `:plate_conditions` (one entry per resulting
+`labware`, holding that group's shared blocking-factor values), `:run_map`/`:plate_maps` (one `RunMap`
+per partition, one `labware => PlateMap` pair per resulting plate -- persisted rather than discarded,
+since `CHESSProcessing.aggregate` needs the *same* `RunMap` later to know what to average), and
+`:well_conditions` (via [`CHESSExperiments.populate_well_conditions`](@ref)) all set.
+
+A blocking group that can't be scheduled (a control linked to samples spanning more physical wells
+than `wells`' capacity allows even after splitting across plates, say) surfaces as an `ArgumentError`
+naming which group failed, wrapping whatever `RunMaps`/`PlateMaps` raised -- no new feasibility
+pre-check is done; those functions already refuse to silently misplace anything.
+"""
+function CHESSExperiments.schedule_blocked_layout(experiment::CHESSExperiments.Experiment,
+        wells::BitMatrix, placeable_roles; plate_solver::String = "greedy",
+        reagent_context = CHESSCore, org_context = CHESSCore, kwargs...)
+    expanded = CHESSExperiments.expand_control_templates(experiment)
+    design = expanded.design
+    n_total = DataFrames.nrow(design)
+    blocking_cols, groups = CHESSExperiments.partition_by_blocking(expanded)
+
+    run_maps = RunMaps.RunMap[]
+    plate_maps = Pair[]
+    layouts = DataFrames.DataFrame[]
+    plate_conditions = Dict{Any,Dict{Symbol,Any}}()
+
+    for (gi, group) in enumerate(groups)
+        try
+            rm = _build_partition_runmap(design, group.rows)
+            pms = PlateMaps.schedule_platemap(wells, rm, placeable_roles; plate_solver = plate_solver, kwargs...)
+            names = ["g$(gi)_p$(pi)" for pi in 1:length(pms)]
+
+            for (name, pm) in zip(names, pms)
+                push!(layouts, _layout_from_platemap(pm, rm, n_total, name))
+                push!(plate_maps, name => pm)
+            end
+            push!(run_maps, rm)
+
+            cond = Dict{Symbol,Any}(zip(blocking_cols, group.key))
+            for name in names
+                plate_conditions[name] = cond
+            end
+        catch e
+            throw(ArgumentError("blocking group $gi (key $(group.key)) could not be scheduled: $(sprint(showerror, e))"))
+        end
+    end
+
+    merged = reduce(vcat, layouts)
+    merged.location_id = Vector{Union{Int,Missing}}(missing, DataFrames.nrow(merged))
+    merged.metadata = [Dict{Symbol,Any}() for _ in 1:DataFrames.nrow(merged)]
+
+    n_placed = count(merged.run)
+    n_placed == n_total || throw(ArgumentError(
+        "scheduled $n_placed run wells across all blocking groups but experiment.design has $n_total rows -- they must match"))
+    assigned = sort(collect(skipmissing(merged.run_index)))
+    assigned == collect(1:n_total) || throw(ArgumentError(
+        "run_index values across all blocking groups must be exactly 1:$(n_total) with no gaps, overlaps, or duplicates -- got $assigned"))
+
+    result = CHESSExperiments.with_parameter(expanded, :layout, merged)
+    result = CHESSExperiments.with_parameter(result, :plate_conditions, plate_conditions)
+    result = CHESSExperiments.with_parameter(result, :run_map, run_maps)
+    result = CHESSExperiments.with_parameter(result, :plate_maps, plate_maps)
+    return CHESSExperiments.populate_well_conditions(result; reagent_context = reagent_context, org_context = org_context)
 end
 
 end # module CHESSExperimentsRunMapsExt
