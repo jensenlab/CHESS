@@ -76,6 +76,40 @@ end
             record_reads!(plate2, only(lrs)) # singular method still works directly
             @test CHESSCore.quantity(only(CHESSCore.reads(plate2["A1"]))) == 0.123u"OD"
         end
+
+        @testset "record_reads! carries metadata onto a layout row instead of dropping it" begin
+            plate3 = build_location(loc"WP96")
+            lr = only(parse_instrument_file(mockpath))
+
+            # A2 deliberately has no row -- confirms it's still recorded, just with no metadata attached anywhere
+            layout = DataFrame(well = ["A1"], metadata = [Dict{Symbol,Any}()])
+
+            record_reads!(plate3, lr; layout)
+
+            @test CHESSCore.quantity(only(CHESSCore.reads(plate3["A2"]))) == 0.456u"OD" # unaffected by the missing layout row
+            a1_metadata = only(layout.metadata)
+            @test a1_metadata[Symbol("chessparsers.format")] == MockFormat
+            @test a1_metadata[Symbol("chessparsers.source")] == mockpath
+            @test !haskey(a1_metadata, Symbol("chessparsers.read_kind")) # read_kind is consumed structurally as a ReadKind, not duplicated into metadata
+        end
+
+        @testset "record_reads! disambiguates by labware when a layout spans multiple plates" begin
+            # well "A1" appears on both plates -- only plate_b's row (matching this call's own labware)
+            # should get metadata; matching on well alone would have hit plate_a's row first
+            plate_a = build_location(loc"WP96", "plate_a")
+            plate_b = build_location(loc"WP96", "plate_b")
+            lr = only(parse_instrument_file(mockpath))
+
+            layout = DataFrame(
+                well = ["A1", "A1"], labware = ["plate_a", "plate_b"],
+                metadata = [Dict{Symbol,Any}(), Dict{Symbol,Any}()],
+            )
+
+            record_reads!(plate_b, lr; layout)
+
+            @test isempty(layout.metadata[1]) # plate_a's row untouched
+            @test layout.metadata[2][Symbol("chessparsers.format")] == MockFormat
+        end
     end
 
     # Every fixture below is a de-identified copy of a real BioTek export (see
