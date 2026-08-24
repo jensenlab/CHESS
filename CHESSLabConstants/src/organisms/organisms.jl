@@ -7,3 +7,5 @@
 
 @organism SMU_T8 "Streptococcus" "mutans" "T8"
 @organism SMU_LAR01 "Streptococcus" "mutans" "LAR01"
+
+@organism SSO_6715 "Streptococcus" "sobrinus" "6715"
