@@ -369,6 +369,37 @@ end
     @test nrow(expand_control_templates(single).design) == 2
 end
 
+@testset "expand_control_templates: partial wildcard keeps its own fixed values, joins via :_block_key" begin
+    # a "no carbon source" style negative control: wildcards only atmosphere_test, but its own
+    # temperature_test is fixed at 0.0 -- a value no sample shares -- yet it must still join every
+    # real (atmosphere_test, temperature_test) block, not end up in its own dead-end partition.
+    matrix = DataFrame(
+        atmosphere_test = [:aerobic, :anaerobic, missing],
+        temperature_test = [37.0, 30.0, 0.0],
+        control_role = [missing, missing, :negative],
+    )
+    experiment = Experiment(matrix)
+    expanded = expand_control_templates(experiment)
+    @test nrow(expanded.design) == 4 # 2 samples + 2 expanded control copies (one per real block)
+
+    controls = filter(r -> !ismissing(r.control_role), eachrow(expanded.design))
+    @test length(controls) == 2
+    # temperature_test stays fixed at 0.0 on every expanded copy -- never overwritten
+    @test all(r -> r.temperature_test == 0.0, controls)
+    # atmosphere_test (the true wildcard) varies to match each real block
+    @test Set(r.atmosphere_test for r in controls) == Set([:aerobic, :anaerobic])
+    # :_block_key records which REAL block each control joins, even though its own temperature_test
+    # disagrees with that block's real value
+    keys = Set(r._block_key for r in controls)
+    @test keys == Set([(:aerobic, 37.0), (:anaerobic, 30.0)])
+
+    blocking_cols, groups = partition_by_blocking(expanded)
+    @test length(groups) == 2 # 2 real blocks, NOT 4 (which plain value-equality grouping would give)
+    for g in groups
+        @test length(g.rows) == 2 # one sample + one control per block
+    end
+end
+
 @testset "schedule_blocked_layout with duplicates and real controls" begin
     matrix = DataFrame(
         atmosphere_test = [:aerobic, :aerobic, missing],
@@ -390,7 +421,11 @@ end
     @test length(rms) == 1 # one blocking group -- only :aerobic appears after expansion
     rm = only(rms)
     @test length(RunMaps.linked_runs(rm, 1; type = :duplicate)) == 1
-    @test length(RunMaps.linked_runs(rm, 3; type = :positive)) == 2 # control row 3 linked to both samples
+    # edges run sample -> control (not control -> sample), since aggregate/normalize/flag query
+    # linked_runs with the SAMPLE as anchor to find its control group
+    @test RunMaps.linked_runs(rm, 1; type = :positive) == [3]
+    @test RunMaps.linked_runs(rm, 2; type = :positive) == [3]
+    @test length(RunMaps.linking_runs(rm, 3; type = :positive)) == 2 # control row 3 is linked-to by both samples
 
     pms = get_parameter(scheduled, :plate_maps)
     @test length(pms) == 1

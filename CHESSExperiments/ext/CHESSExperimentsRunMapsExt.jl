@@ -123,30 +123,51 @@ gets its own node, using its plain design-row index -- unchanged from the origin
 convention. A row with `_duplicate_count > 1` gets `n-1` extra auxiliary nodes (a `(row, copy)` named
 tuple -- can never collide with a real `Int` row index), each linked to the row's own node via a
 `:duplicate`-typed edge; `CHESSProcessing.aggregate` already knows how to collapse these
-(`RunMaps.linked_runs(run_map, anchor; type=:duplicate)`), no new grouping mechanism needed. Every
-control row (`control_role` non-missing) gets linked to every *sample* row in the same partition,
-labeled with its own role -- the same dense every-run-to-every-control linking
-`schedule_uniform_controls` already did, just sourced from real, user-designated rows.
+(`RunMaps.linked_runs(run_map, anchor; type=:duplicate)`), no new grouping mechanism needed.
+
+Every sample row gets linked *to* every one of a control row's replicate nodes -- the control's own
+anchor *and* every one of its duplicate nodes, not just the anchor -- labeled with the control's own
+role. Both parts of this matter:
+- **Direction**: `RunMaps.linked_runs(map, anchor; type)` returns nodes `anchor` points *to*
+  (`RunMaps/src/query.jl`'s own docstring: "`run` is the subject of the edge"), and
+  `CHESSProcessing.aggregate`/`normalize`/`flag` all query with the *sample* as `anchor` -- so the edge
+  must run sample -> control, not control -> sample, for a sample's control group to be discoverable
+  at all.
+- **Full replicate set, not just the anchor**: if a sample only saw the control's anchor node, its
+  `:positive`/`:negative`-linked "group" would have exactly one member -- `normalize` would then use
+  only one of the control's 12 replicate wells (not their mean) as the control value, and `flag`'s
+  `cv_threshold` rule (which needs >=2 values to compute a CV at all) would see nothing to judge. Every
+  sample must see the whole replicate set directly for both to work as intended.
+
+This is the same dense every-run-to-every-control linking `schedule_uniform_controls` already did,
+just sourced from real, user-designated rows, covering their full duplicate set, and pointed the
+direction `CHESSProcessing` expects.
 """
 function _build_partition_runmap(design, rows)
     rm = RunMaps.RunMap{Any}()
     samples = Int[]
-    controls = Int[]
+    control_nodes = Dict{Int,Vector{Any}}() # control row index -> [anchor, dup_node, dup_node, ...]
     for i in rows
         RunMaps.add_run!(rm, i)
         role = CHESSExperiments.control_role(design, i)
-        ismissing(role) ? push!(samples, i) : push!(controls, i)
 
+        nodes = Any[i]
         n = _duplicate_count(design, i)
         for copy_idx in 2:n
             dup_node = (row = i, copy = copy_idx)
             RunMaps.add_run!(rm, dup_node)
             RunMaps.link!(rm, i, dup_node, :duplicate)
+            push!(nodes, dup_node)
         end
+
+        ismissing(role) ? push!(samples, i) : (control_nodes[i] = nodes)
     end
 
-    for c in controls, s in samples
-        RunMaps.link!(rm, c, s, CHESSExperiments.control_role(design, c))
+    for s in samples, (c, nodes) in control_nodes
+        role = CHESSExperiments.control_role(design, c)
+        for node in nodes
+            RunMaps.link!(rm, s, node, role)
+        end
     end
 
     return rm

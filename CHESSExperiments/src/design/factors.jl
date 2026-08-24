@@ -32,8 +32,12 @@ registered `Factor` -- the same "fixed, recognized schema" status `LAYOUT_COLUMN
 - `:duplicates`: `missing`/`1` = one physical well (no extra copies); `N` = `N` total physical wells
   for this row (the row's own well plus `N-1` extra duplicates), aggregated back into one data point
   downstream by `CHESSProcessing`. Applies to any row, sample or control alike.
+- `:_block_key`: internal -- set by `expand_control_templates` on an expanded control-template copy
+  to record which blocking partition it's meant to join, when that differs from what its own
+  (deliberately fixed) column values would otherwise group it into. `missing`/absent on every
+  ordinary row. See `expand_control_templates`/`partition_by_blocking`.
 """
-const RESERVED_DESIGN_COLUMNS = (:control_role, :duplicates)
+const RESERVED_DESIGN_COLUMNS = (:control_role, :duplicates, :_block_key)
 
 """
     struct CategoricalFactor <: Factor
