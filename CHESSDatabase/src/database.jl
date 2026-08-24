@@ -16,18 +16,53 @@ function create_db(path)
     """
     
     create_Runs= """
-    CREATE TABLE Runs ( 
+    CREATE TABLE Runs (
         ID INTEGER PRIMARY KEY NOT NULL ,
-        ExperimentID INTEGER, 
+        ExperimentID INTEGER,
         LocationID INTEGER,
-        Controls Text, 
+        Controls Text,
         Blanks Text,
         FOREIGN KEY (ExperimentID) REFERENCES Experiments(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY (LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
     );
-    
+
     """
-    
+
+    # Persists CHESSExperiments.Experiment's design matrix + metadata -- both open-ended (arbitrary
+    # factor columns / arbitrary keys), so stored as JSON rather than a normalized schema.
+    create_Designs = """
+    CREATE TABLE Designs (
+        ID INTEGER PRIMARY KEY NOT NULL,
+        ExperimentID INTEGER,
+        Name TEXT,
+        MatrixJSON TEXT,
+        MetadataJSON TEXT,
+        FOREIGN KEY (ExperimentID) REFERENCES Experiments(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
+    # Persists CHESSExperiments' :layout metadata: one row per physical well, once scheduled.
+    # This is the literal fusion point between CHESSExperiments' language and CHESSCore's -- LocationID
+    # (nullable until the well is actually committed) links a layout row to a physical CHESSCore.Location.
+    create_RunAssignments = """
+    CREATE TABLE RunAssignments (
+        ID INTEGER PRIMARY KEY NOT NULL,
+        DesignID INTEGER,
+        Well TEXT NOT NULL,
+        Row INTEGER NOT NULL,
+        Col INTEGER NOT NULL,
+        IsRun INTEGER NOT NULL,
+        IsPositive INTEGER NOT NULL,
+        IsNegative INTEGER NOT NULL,
+        RunIndex INTEGER,
+        Labware TEXT,
+        LocationID INTEGER,
+        MetadataJSON TEXT,
+        FOREIGN KEY (DesignID) REFERENCES Designs(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        FOREIGN KEY (LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
 
     create_Components="""
         CREATE TABLE Components(
@@ -590,6 +625,8 @@ function create_db(path)
     # experiments and encumbrances
     DBInterface.execute(db, create_Experiments)
     DBInterface.execute(db, create_Runs)
+    DBInterface.execute(db, create_Designs)
+    DBInterface.execute(db, create_RunAssignments)
     DBInterface.execute(db,create_Protocols)
     DBInterface.execute(db,create_ProtocolEnforcement)
     DBInterface.execute(db,create_Encumbrances)

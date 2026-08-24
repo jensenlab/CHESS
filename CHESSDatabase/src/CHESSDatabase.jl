@@ -2,12 +2,14 @@ module CHESSDatabase
 
 using CHESSCore
 import CHESSCore: children, parent, location_id, name # extend rather than shadow (Barcode/Run also define these)
+import CHESSExperiments # kept qualified (CHESSExperiments.Run etc.) -- CHESSDatabase's own Run/uploads already use those names for the per-plate Controls/Blanks concept
 using
     SQLite, # database framework CHESS uses.
     DBInterface, # standard interface for database connections
     DataFrames, # for SQL returns
     UUIDs, # used for generating default location names
     Dates, # used for converting time objects.
+    JSON, # serializing CHESSExperiments.Experiment fields (design matrix, metadata, layout) into TEXT columns
     Unitful # unit tracking for transfer quantities, timestamps, etc.
 
 include("./database.jl")
@@ -23,6 +25,7 @@ include("./commit_location.jl")
 include("./barcode_queries.jl")
 include("./experiment_run_queries.jl")
 include("./instrument_settings.jl")
+include("./chess_experiments_interface.jl")
 
 include("./encumbrances.jl")
 
@@ -91,5 +94,7 @@ export upload_protocol,upload_experiment, encumber, upload_encumbrance,encumber_
 export get_run, get_all_runs
 # runs
 export Run
+# CHESSExperiments interface (chess_experiments_interface.jl)
+export upload_design, get_design, commit_run_location!
 
 end # module CHESSDatabase

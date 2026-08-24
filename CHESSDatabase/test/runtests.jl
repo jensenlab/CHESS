@@ -1,4 +1,5 @@
 using CHESSCore, CHESSDatabase, Test, Unitful, UUIDs, SQLite, DataFrames, Dates
+import CHESSExperiments # kept qualified -- CHESSDatabase already exports its own unrelated `Run`
 
 @testset "db_utils: not-connected error stubs" begin
     # the only point in this process where connect_SQLite hasn't run yet -- once it does (via
@@ -333,6 +334,44 @@ end
 
     @test CHESSDatabase.get_last_experiment_id() >= CHESSDatabase.experiment_id(testrun)
     @test CHESSDatabase.get_last_run_id() >= run_id
+end
+
+@testset "CHESSExperiments fusion: Designs / RunAssignments" begin
+    matrix = DataFrames.DataFrame(carbon_source = ["glucose", "acetate"])
+    layout = DataFrames.DataFrame(
+        well = ["A1", "A2", "A3"], row = [1, 1, 1], col = [1, 2, 3],
+        run = [true, true, false], positive = [false, false, true], negative = [false, false, false],
+        run_index = Union{Int,Missing}[1, 2, missing],
+        labware = Union{String,Missing}["plate1", "plate1", "plate1"],
+        location_id = Union{Int,Missing}[missing, missing, missing],
+        metadata = [Dict{Symbol,Any}(), Dict{Symbol,Any}(), Dict{Symbol,Any}()],
+    )
+    experiment = CHESSExperiments.Experiment(
+        matrix; name = "growth_curve", metadata = Dict(:layout => layout, :incubation_hours => 24, :qc_methods => [:gp_correction]),
+    )
+
+    design_id = upload_design(experiment, exp_id)
+    fetched = get_design(design_id)
+    @test CHESSExperiments.get_parameter(fetched, :name) == "growth_curve"
+    @test fetched.design.carbon_source == matrix.carbon_source
+    @test fetched.metadata[:incubation_hours] == 24
+    @test fetched.metadata[:qc_methods] == ["gp_correction"] # round-tripped through JSON as strings, not Symbols
+    fetched_layout = CHESSExperiments.layout(fetched)
+    @test nrow(fetched_layout) == 3
+    @test fetched_layout.well == layout.well
+    @test fetched_layout.run == layout.run
+    @test fetched_layout.positive == layout.positive
+    @test collect(skipmissing(fetched_layout.run_index)) == [1, 2]
+
+    real_well = plate1[1, 1]
+    commit_run_location!(design_id, "plate1", "A1", location_id(real_well))
+
+    refetched_layout = CHESSExperiments.layout(get_design(design_id))
+    a1_row = only(eachrow(refetched_layout[refetched_layout.well.=="A1", :]))
+    @test a1_row.location_id == location_id(real_well) # the fusion point: a real CHESSCore.Location id
+    a3_row = only(eachrow(refetched_layout[refetched_layout.well.=="A3", :]))
+    @test ismissing(a3_row.location_id) # never committed
+    @test a3_row.positive
 end
 
 @testset "db_utils misc" begin
