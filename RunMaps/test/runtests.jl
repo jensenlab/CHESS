@@ -613,4 +613,15 @@ end
         @test n_edges(map3) == n_edges(map)
         @test Set(runs(map3)) == Set(runs(map))
     end
+
+    # (row=,copy=) composite node identifiers must round-trip as NamedTuples,
+    # not raw Dicts (see RunMaps/bug_reports/runmaps_json_bug.md).
+    map4 = RunMap()
+    add_run!(map4, (row=1, copy=1))
+    add_run!(map4, (row=1, copy=2))
+    link!(map4, (row=1, copy=1), (row=1, copy=2), :duplicate)
+
+    map4b = json_to_runmap(runmap_to_json(map4))
+    @test all(r -> r isa NamedTuple, runs(map4b))
+    @test linked_runs(map4b, (row=1, copy=1); type=:duplicate) == [(row=1, copy=2)]
 end

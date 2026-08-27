@@ -8,6 +8,14 @@ function JSON.lower(map::RunMap)
     )
 end
 
+_fixup_node(v) = v
+function _fixup_node(v::AbstractDict)
+    if length(v) == 2 && haskey(v, "row") && haskey(v, "copy")
+        return (row=Int(v["row"]), copy=Int(v["copy"]))
+    end
+    return v
+end
+
 """
     RunMap(d::AbstractDict) -> RunMap
 
@@ -19,17 +27,20 @@ list (so orphan nodes round-trip) plus an `"edges"` list of
 Since JSON has no native type system beyond string/number/bool/array/object,
 a node that was e.g. a `Symbol` or `UUID` before serialization comes back as
 a `String` -- `N` is inferred from the parsed values' actual types, same as
-the `DataFrame` reverse constructor.
+the `DataFrame` reverse constructor. The one exception is a `(row=, copy=)`
+composite node (used for duplicated-well identifiers), which parses to a
+`Dict("row"=>..,"copy"=>..)` with no residual type information; that shape
+is special-cased back into a `NamedTuple` so it round-trips correctly.
 """
 function RunMap(d::AbstractDict)
     map = RunMap()
     for r in d["runs"]
-        add_run!(map, r)
+        add_run!(map, _fixup_node(r))
     end
     for e in d["edges"]
         raw_meta = get(e, "metadata", Dict())
         md = isempty(raw_meta) ? nothing : Dict(Symbol(k) => v for (k, v) in raw_meta)
-        link!(map, e["run"], e["linked_run"], e["relation_type"]; metadata=md)
+        link!(map, _fixup_node(e["run"]), _fixup_node(e["linked_run"]), e["relation_type"]; metadata=md)
     end
     return map
 end
