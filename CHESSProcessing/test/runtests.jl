@@ -1,5 +1,5 @@
 using Test, CHESSProcessing, CHESSExperiments, RunMaps, PlateMaps, CHESSParsers, CHESSCore, CHESSLabConstants,
-    DataFrames, Dates, Statistics, Unitful, GaussianProcesses
+    DataFrames, Dates, Statistics, Unitful, GaussianProcesses, LabwarePlotting, Plots
 
 const NO_PLATES = Pair{String,PlateMap{Int}}[]
 
@@ -390,6 +390,40 @@ end
 
     @testset "missing role_masks entry throws" begin
         @test_throws ArgumentError correct(toy_experiment(1), rm, ["Plate1" => pm], raw; method=GPCorrection(), relations=[:positive])
+    end
+end
+
+@testset "CHESSProcessingPlottingExt: plot_plate_data / plot_control_data" begin
+    # Same 4x4 fixture as the GPExt testset: corners are controls, the rest are "run" wells.
+    occ = reshape(Union{Missing,Int}[1:16;], 4, 4)
+    pm = toy_plate(occ)
+    rm = RunMap{Int}()
+    link!(rm, 0, 1, :negative)
+    link!(rm, 0, 4, :negative)
+    link!(rm, 0, 13, :positive)
+    link!(rm, 0, 16, :positive)
+
+    raw = Dict{Int,Union{Missing,Float64}}(i => Float64(i) for i in 1:16)
+
+    plate_plots = plot_plate_data(rm, ["Plate1" => pm], raw)
+    @test Set(keys(plate_plots)) == Set(["Plate1"])
+    @test plate_plots["Plate1"] isa Plots.Plot
+
+    control_plots = plot_control_data(rm, ["Plate1" => pm], raw)
+    @test Set(keys(control_plots)) == Set(["Plate1"])
+    @test control_plots["Plate1"] isa Plots.Plot
+
+    @testset "a plate with nothing resolvable is omitted" begin
+        empty_pm = toy_plate(Matrix{Union{Missing,Int}}(missing, 4, 4))
+        plots = plot_plate_data(rm, ["Plate1" => pm, "Plate2" => empty_pm], raw)
+        @test Set(keys(plots)) == Set(["Plate1"])
+    end
+
+    @testset "control plot's role colors are deterministic and distinct per role" begin
+        colors1 = LabwarePlotting.role_palette([:positive,:negative,:run])
+        colors2 = LabwarePlotting.role_palette([:positive,:negative,:run])
+        @test colors1 == colors2 # same role set -> same mapping, every time, every caller
+        @test length(unique(values(colors1))) == 3
     end
 end
 

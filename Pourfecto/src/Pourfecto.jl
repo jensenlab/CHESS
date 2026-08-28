@@ -1,12 +1,13 @@
 module Pourfecto
 
-using Unitful, CHESSCore, CHESSLabConstants, AbstractTrees, DataFrames , JuMP , Gurobi , JSON, Plots, Random, CSV , Dates, TextWrap, Preferences
+using Unitful, CHESSCore, CHESSLabConstants, AbstractTrees, DataFrames , JuMP , Gurobi , JSON, Plots, LabwarePlotting, Random, CSV , Dates, TextWrap, Preferences
 
 import InteractiveUtils: subtypes
 import JSONTables: objecttable, jsontable
 import StructUtils: lowerkey
 import UUIDs: uuid4
 import Plots: plot
+import LabwarePlotting: circle, square, place_shape!, letter_code
 
 
 
@@ -180,7 +181,7 @@ export Pourcast, flows, transfers , slacks , planned_stocks , target_stocks, sou
 
 export json_to_pourcast, pourcast_to_json # json interface 
 
-export plot , plot_flows # visualization 
+export plot , plot_labware , plot_flows # visualization
 
 export compile # compiler 
 

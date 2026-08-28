@@ -1,6 +1,6 @@
 module PlateMapsRunMapsExt
 
-using PlateMaps, RunMaps, DataFrames, ColorBrewer, Plots
+using PlateMaps, RunMaps, DataFrames, LabwarePlotting, Plots
 
 # --- edges adapter -----------------------------------------------------------------------------
 # RunMap.edges() returns (run, linked_run, relation_type, metadata) NamedTuples -- almost exactly
@@ -80,38 +80,24 @@ from a palette unless overridden via `role_colors`.
 """
 function PlateMaps.plot(pm::PlateMap,rm::RunMap;role_colors::Dict{Symbol,<:Any}=Dict{Symbol,Any}(),
         inactive="darkgray",empty_color="white",default_color="steelblue")
-    R,C = size(pm.wells)
     all_roles = Symbol[]
     for n in PlateMaps.nodes(pm)
         append!(all_roles,RunMaps.roles(rm,n))
     end
     unique!(all_roles)
-    palette = ColorBrewer.palette("Set2",max(3,min(8,length(all_roles))))
-    colors = Dict(r => get(role_colors,r,palette[mod1(i,length(palette))]) for (i,r) in enumerate(all_roles))
+    colors = LabwarePlotting.role_palette(all_roles;overrides=role_colors)
 
-    plt = Plots.plot()
-    Plots.xlims!((0.5,C+0.5)); Plots.ylims!((0.5,R+0.5))
-    for I in CartesianIndices(pm.wells)
-        r,c = Tuple(I)
-        color = if !pm.wells[I]
+    fillcolors = map(CartesianIndices(pm.wells)) do I
+        if !pm.wells[I]
             inactive
         elseif ismissing(pm[I])
             empty_color
         else
-            node = pm[I]
-            rs = RunMaps.roles(rm,node)
+            rs = RunMaps.roles(rm,pm[I])
             isempty(rs) ? default_color : colors[first(rs)]
         end
-        Plots.plot!(PlateMaps.rectangle(c-0.5,r-0.5,1,1),fillcolor=color)
     end
-    for line in collect(0:R) .+ 0.5
-        Plots.hline!([line],color="black")
-    end
-    for line in collect(0:C) .+ 0.5
-        Plots.vline!([line],color="black")
-    end
-    Plots.plot!(title="",legend=false,grid=false,yflip=true,yticks=(collect(1:R),PlateMaps.letter_code.(1:R)),
-                ytickdirection=:none,xticks=collect(1:C),xmirror=true,xtickdirection=:none)
+    return LabwarePlotting.plot_grid(pm.wells;fillcolors=fillcolors)
 end
 
 # --- joined DataFrame view -------------------------------------------------------------------------

@@ -8,59 +8,30 @@
 # harmless by construction.
 const plotting_wellplate_kinds = Set([:WP96,:WP384,:DeepWP96,:DeepReservoir,:DeepWellColumn,:DeepWellRow,:brPCR96])
 
-function plot(l::Labware;well_heatmap=false,kwargs...)
-    is_wellplate_like = kind(l).name in plotting_wellplate_kinds
+"""
+    plot_labware(l::Labware; well_heatmap=false, kwargs...)
 
-    nrow,ncol = CHESSCore.shape(l)
+Pourfecto's decorated view of a `Labware`: `CHESSCore`'s base grid plot (`plot(l)`, the canonical
+`Labware` view shared across the CHESS ecosystem) plus Pourfecto-specific decoration -- a circle/square
+marker per well for non-wellplate-like kinds (Bottle/Conical), and an optional stock-quantity heatmap
+overlay.
 
-    plt= plot()
-    xlims!((0.5,ncol+0.5))
-    ylims!((0.5,nrow+0.5))
-
-    hlines=collect(0:nrow) .+ 0.5
-    vlines=collect(0:ncol) .+ 0.5
-    if well_heatmap
-        plot_well_heatmap!(plt,l)
-    end
-    for line in hlines
-        hline!([line],color="black")
-    end
-    for line in vlines
-        vline!([line],color="black")
-    end
-
-    if is_wellplate_like
-        plot!(plt,title="$(CHESSCore.name(l))",legend=false,grid=false,yflip=true,yticks=(collect(1:nrow),plate_alphabet[1:nrow]),ytickdirection=:none,xticks=collect(1:ncol),xmirror=true,xtickdirection=:none)
-    else # Bottle/Conical -- draw a circle marker for each well
-        for r in 1:nrow
-            for c in 1:ncol
-                plot!(circle(r,c,1),color="black")
-            end
+This is a distinct, Pourfecto-owned entry point rather than a `plot(::Labware)` override: `CHESSCore`
+already defines the canonical `plot(::Labware)` method (via `CHESSCoreLabwarePlottingExt`), and a
+second, conflicting definition of the exact same method signature in `Pourfecto` would be a real
+collision, not just duplication.
+"""
+function plot_labware(l::Labware;well_heatmap::Bool=false,kwargs...)
+    plt = plot(l;kwargs...)
+    if !(kind(l).name in plotting_wellplate_kinds)
+        nrow,ncol = CHESSCore.shape(l)
+        shape = labware_plotting_shape(l)
+        for r in 1:nrow, c in 1:ncol
+            place_shape!(plt,shape,c,r,1;color="black")
         end
-
-        plot!(plt,title="$(CHESSCore.name(l))",legend=false,grid=false,yflip=true,yticks=(collect(1:nrow),plate_alphabet[1:nrow]),ytickdirection=:none,xticks=collect(1:ncol),xmirror=true,xtickdirection=:none)
-
-        return plt
     end
-end
-
-
-
-
-
-function circle(x,y,d)
-    r=d/2
-    θ=LinRange(0,2*π,500)
-    x .+ r*sin.(θ), y .+ r*cos.(θ)
-end 
-
-function square(x,y,d)
-    return x .+ [0,d,d,0] .-d/2 ,y .+ [0,0,d,d].- d/2
-end 
-
-function slas_rectangle(x,y,d)
-    w = 3/2*d
-    return  x .+ [0,w,w,0] .-w/2 ,y .+ [0,0,d,d].- d/2
+    well_heatmap && plot_well_heatmap!(plt,l)
+    return plt
 end
 
 function labware_plotting_shape(l::Labware)
@@ -73,41 +44,24 @@ function labware_plotting_shape(l::Labware)
 end
 
 
-function plot_well_heatmap!(p::Plots.Plot,l::Labware ,kwargs...)
-
-    stocks = stock.(children(l))
-
-    quants = map(x-> x isa Empty ? 0 : ustrip(uconvert(u"µL",CHESSCore.quantity(x))),stocks)
-
-
-    heatmap!(p,quants,color=Plots.cgrad([:white,:dodgerblue]))
-
-    return p 
-end 
-
-
-
-
-
-
 function plot(a::FlowNode;shape::Function = circle ,kwargs...)
 
-    l = labware(a.mask) 
+    l = labware(a.mask)
 
 
-    a_plt = plot(l)
+    a_plt = plot_labware(l)
 
-    wells= well_connections(a) 
+    wells= well_connections(a)
     names= map(x->x[2],wells)
 
     for idx in CartesianIndices(children(l))
-        if CHESSCore.name(children(l)[idx]) in names 
-            plot!(a_plt,Shape(shape(idx[2],idx[1],1)...),fill="red")
-        end 
+        if CHESSCore.name(children(l)[idx]) in names
+            place_shape!(a_plt,shape,idx[2],idx[1],1;fill="red")
+        end
 
-    end 
-    return a_plt 
-end 
+    end
+    return a_plt
+end
 
 
 
@@ -130,12 +84,12 @@ function plot_flow(a::AspNode, d::DispNode, vol::Real;kwargs...)
 
     asp = plot(a;kwargs...)
     disp= plot(d;kwargs...)
-    
+
     c = a.configuration
 
     p = plot(asp,disp, aspect_ratio=1, plot_title= "Configuration: $(typeof(c)) Volume: $vol µL",size=(1600,800);kwargs...)
-    return p 
-end 
+    return p
+end
 
 
 
@@ -157,54 +111,54 @@ This function:
 # See also
 [`flows`](@ref), [`plot_flow`](@ref)
 """
-function plot_flows(pc::Pourcast;threshold::Real= 1e-4) 
+function plot_flows(pc::Pourcast;threshold::Real= 1e-4)
 
     asp_nodes = compute_flow_nodes(AspNode,configs(pc),source_labware(pc))
 
     disp_nodes = compute_flow_nodes(DispNode,configs(pc),target_labware(pc))
 
-    flws = flows(pc) 
+    flws = flows(pc)
     plts = []
 
-    for idx in CartesianIndices(flws) 
+    for idx in CartesianIndices(flws)
         if flws[idx] >= threshold
             p = plot_flow(asp_nodes[idx[1]],disp_nodes[idx[2]],flws[idx])
             push!(plts,p)
-        end 
-    end 
-    return plts 
-end 
+        end
+    end
+    return plts
+end
 
 
 
 
-function plot(pos::ConstrainedPosition;plot_size = (1200,800),titlefontsize=18,tickfontsize=18,kwargs...) 
+function plot(pos::ConstrainedPosition;plot_size = (1200,800),titlefontsize=18,tickfontsize=18,kwargs...)
     r,c = slots(pos)
-    plot(grid=false,size=plot_size,yflip=true,legend=false,xticks=1:c,yticks=(1:r,plate_alphabet[1:r]),xmirror=true,tickdirection=:none,tickfontsize=tickfontsize,margin=(5,:mm))
-end 
+    plot(grid=false,size=plot_size,yflip=true,legend=false,xticks=1:c,yticks=(1:r,letter_code.(1:r)),xmirror=true,tickdirection=:none,tickfontsize=tickfontsize,margin=(5,:mm))
+end
 
 function plot(pos::EmptyPosition;plot_size = (1200,800) ,titlefontsize=18,tickfontsize=18,kwargs...)
     r,c=(1,1)
     plot(showaxis=false,grid=false,size=plot_size,yflip=true,legend=false,ticks=:none,margin=(5,:mm))
-end 
+end
 
 function plot(pos::UnconstrainedPosition;plot_size = (1200,800),titlefontsize=18,tickfontsize=18,kwargs...)
     r,c= slots(pos)
     plot(grid=false,yflip=false,size = plot_size,legend=false,xticks=1:c,yticks=(1:r),xmirror=true,tickdirection=:none,tickfontsize=tickfontsize,margin=(5,:mm))
-end 
+end
 
 slotting_shape=Dict(
     "circle" => circle,
     "rectangle" => square
 )
 
-function plotting_shape(d::Deck) 
-    if d isa AbstractVector 
+function plotting_shape(d::Deck)
+    if d isa AbstractVector
         return (length(d),1)
     else
         return size(d)
     end
-end 
+end
 
 
 """
@@ -264,7 +218,7 @@ function plot_slotting(deck::Deck, slotting::SlottingDict;
                 annotate!(x, y,
                           text(TextWrap.wrap(vals[y, x], width=wrapwidth),
                                :center, fontsize))
-                plot!(shape(x, y, 1), color="black")
+                place_shape!(plt,shape,x,y,1;color="black")
             end
         end
         plot!(ylims=(0.5, r + 0.5), xlims=(0.5, c + 0.5))

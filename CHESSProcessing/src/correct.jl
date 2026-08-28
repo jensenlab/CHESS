@@ -49,6 +49,46 @@ GPCorrection(; negative::Symbol=:negative, positive::Symbol=:positive,
     GPCorrection(negative, positive, lengthscale, lb_lengthscale, ub_lengthscale)
 
 """
+    _plate_role_data(pm::PlateMap, run_map::RunMap, values::AbstractDict{N,V},
+                      relation_types::AbstractVector{Symbol}, allowed::Union{Nothing,Set{N}})
+        -> (data::Matrix{Float64}, present::BitMatrix, role_masks::Dict{Symbol,BitMatrix},
+            node_at::Dict{Tuple{Int,Int},N}) where {N,V}
+
+Shared per-plate extraction: resolves one plate's occupants against `values` and `run_map`'s
+relation-membership into the `(data, present, role_masks)` shape [`apply_correction`](@ref)
+consumes, plus a `node_at` lookup for scattering results back to node keys. Factored out of
+[`correct`](@ref) so plotting functions (see `CHESSProcessingPlottingExt`) can build the exact same
+per-plate view without duplicating this extraction.
+"""
+function _plate_role_data(pm::PlateMap, run_map::RunMap, values::AbstractDict{N,V},
+                           relation_types::AbstractVector{Symbol},
+                           allowed::Union{Nothing,Set{N}}) where {N,V}
+    df = PlateMaps.DataFrame(pm)
+    R, C = size(pm.wells)
+    data = zeros(Float64, R, C)
+    present = falses(R, C)
+    role_masks = Dict(r => falses(R, C) for r in relation_types)
+    node_at = Dict{Tuple{Int,Int},N}()
+
+    for row in eachrow(df)
+        ismissing(row.occupant) && continue
+        node = row.occupant
+        allowed !== nothing && !(node in allowed) && continue
+        v = get(values, node, missing)
+        ismissing(v) && continue
+        node_at[(row.row, row.col)] = node
+        data[row.row, row.col] = v
+        present[row.row, row.col] = true
+        node_roles = RunMaps.roles(run_map, node)
+        for r in relation_types
+            r in node_roles && (role_masks[r][row.row, row.col] = true)
+        end
+    end
+
+    return data, present, role_masks, node_at
+end
+
+"""
     correct(experiment::Experiment, run_map::RunMap, plate_maps::AbstractVector{<:Pair},
             values::AbstractDict{N,V}; method::CorrectionMethod, relations=[:positive, :negative],
             nodes=nothing) -> (Experiment, Dict{N,Union{Missing,V}}) where {N,V}
@@ -89,27 +129,7 @@ function correct(experiment::Experiment, run_map::RunMap, plate_maps::AbstractVe
     end
 
     for (_, pm) in plate_maps
-        df = PlateMaps.DataFrame(pm)
-        R, C = size(pm.wells)
-        data = zeros(Float64, R, C)
-        present = falses(R, C)
-        role_masks = Dict(r => falses(R, C) for r in relation_types)
-        node_at = Dict{Tuple{Int,Int},N}()
-
-        for row in eachrow(df)
-            ismissing(row.occupant) && continue
-            node = row.occupant
-            allowed !== nothing && !(node in allowed) && continue
-            v = get(values, node, missing)
-            ismissing(v) && continue
-            node_at[(row.row, row.col)] = node
-            data[row.row, row.col] = v
-            present[row.row, row.col] = true
-            node_roles = RunMaps.roles(run_map, node)
-            for r in relation_types
-                r in node_roles && (role_masks[r][row.row, row.col] = true)
-            end
-        end
+        data, present, role_masks, node_at = _plate_role_data(pm, run_map, values, relation_types, allowed)
 
         any(present) || continue # nothing resolvable on this plate
 

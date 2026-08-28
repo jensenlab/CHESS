@@ -43,6 +43,14 @@ Packages for processing and analyzing data recorded through CHESS (e.g. reads an
 |---|---|---|
 | [`CHESSParsers`](CHESSParsers) | Parses instrument-exported data files (starting with BioTek plate readers/incubators: Epoch2, Synergy, Cytation, BioSpa) into a `DataFrame`, `CHESSCore.Read`s, or JSON, through a generic, pluggable per-instrument-format interface. | -- |
 
+### Visualization
+
+Shared plotting utilities consumed by packages across the other categories.
+
+| Package | Description | Docs |
+|---|---|---|
+| [`LabwarePlotting`](LabwarePlotting) | Shared grid/plate plotting primitives -- gridlines, lettered rows, shape markers, heatmap overlays, and role-based coloring -- used by `CHESSCore`, `PlateMaps`, `Pourfecto`, and `CHESSProcessing`. | [dev](https://jensenlab.github.io/CHESS/labwareplotting/dev/) |
+
 ### Quality Control
 
 Packages for QC/validation workflows built on CHESS data. No packages yet.

@@ -15,6 +15,7 @@ include("normalize.jl")
 include("flag.jl")
 include("resolve.jl")
 include("correct.jl")
+include("plotting.jl")
 include("merge.jl")
 
 function __init__()
@@ -35,6 +36,8 @@ export flag, cv_threshold
 export resolve
 # correct.jl
 export CorrectionMethod, apply_correction, correct, GPCorrection
+# plotting.jl
+export plot_plate_data, plot_control_data
 # merge.jl
 export merge
 

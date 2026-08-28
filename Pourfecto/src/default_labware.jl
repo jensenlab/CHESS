@@ -1,11 +1,11 @@
 ## Well-name <-> grid-position helpers.
 ##
-## Deliberately not moved to CHESSCore: CHESSCore's own name generator (`plate_namer`, used by
-## `build_location`) wraps past column 26 by *repeating* a single letter (..., Y, Z, AA, BB, CC, ...)
-## rather than incrementing a two-letter code (..., Y, Z, AA, AB, AC, ...) the way `plate_alphabet`
-## does here. No labware kind Pourfecto uses has more than 16 rows, so the difference is latent, but
-## the two are not equivalent in general -- keeping this implementation local avoids silently
-## changing well-naming behavior for any future >26-row labware kind.
+## Row lettering is `LabwarePlotting.letter_code` (bijective base-26: A..Z, AA, AB, ..., AZ, BA, ...),
+## the scheme shared across the CHESS ecosystem's plate/grid plotting. This is deliberately distinct
+## from `CHESSCore.plate_namer` (used by `build_location` for default naming), which wraps past column
+## 26 by *repeating* a single letter (..., Y, Z, AA, BB, CC, ...) -- the two are not equivalent in
+## general, so `well_to_cartesian`/`cartesian_to_well` (row/column <-> well-name conversion for actual
+## well lookups) intentionally use `letter_code`, not `plate_namer`.
 ##
 ## The labware kinds Pourfecto used to define locally via `@labware` (WP96, WP384, DeepWP96,
 ## DeepReservoir, DeepWellColumn, DeepWellRow, brPCR96, Bottle1L/500mL/250mL, Conical50/15) are now
@@ -16,8 +16,21 @@
 ## labware-filling conveniences with no JLIMS/Pourfecto-specific logic; `length(lw::Labware)` was
 ## dropped outright since `CHESSCore.Labware` already defines it.
 
-const plate_alphabet = vcat(["$l" for l in 'A':'Z' ],["A$l" for l in 'A':'Z'])
+"""
+    letter_code_to_int(s::AbstractString) -> Int
 
+Inverse of `LabwarePlotting.letter_code`: decode a bijective base-26 row label ("A" -> 1, "Z" -> 26,
+"AA" -> 27, ...) back to its row index. Local to Pourfecto since `well_to_cartesian` is currently the
+only caller needing the inverse direction.
+"""
+function letter_code_to_int(s::AbstractString)
+    n = 0
+    for ch in s
+        ('A' <= ch <= 'Z') || throw(DomainError(s,"well row letters must be A-Z"))
+        n = n*26 + (Int(ch)-Int('A')+1)
+    end
+    return n
+end
 
 function well_to_cartesian(well::AbstractString)
     strs= String.(split(well, r"(?<=\d)(?=\D)|(?<=\D)(?=\d)"))
@@ -25,15 +38,12 @@ function well_to_cartesian(well::AbstractString)
     if  length(strs) != 2
         throw(ArgumentError("well name: $well not in expected format, eg. A1, H12"))
     end
-    letter_idx = findfirst(x-> x == strs[1], plate_alphabet)
-    if isnothing(letter_idx)
-        throw(DomainError("Well row not within supplied plate row alphabet"))
-    end
+    letter_idx = letter_code_to_int(strs[1])
     number_idx = parse(Int64,strs[2])
     return CartesianIndex(letter_idx,number_idx)
 end
 
 
 function cartesian_to_well(idx::CartesianIndex)
-    return "$(plate_alphabet[idx[1]])$(idx[2])"
+    return "$(letter_code(idx[1]))$(idx[2])"
 end

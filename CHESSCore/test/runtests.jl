@@ -1,4 +1,5 @@
-using CHESSCore, Test, Unitful, AbstractTrees, DataFrames, Dates
+using CHESSCore, Test, Unitful, AbstractTrees, DataFrames, Dates, LabwarePlotting
+import Plots
 
 include("core_fixtures.jl")
 
@@ -1238,4 +1239,14 @@ end
         @test stock(plate2[row,col]) == stock(plate1[row,col])
         @test cost(plate2[row,col]) == cost(plate1[row,col])
     end
+end
+
+@testset "CHESSCoreLabwarePlottingExt: plot(l::Labware)" begin
+    plate = build_location(WP96,"Plotting Test Plate")
+    plt = Plots.plot(plate)
+    @test plt isa Plots.Plot
+
+    deposit!(plate[1,1],10u"µL"*rgt"water",0)
+    plt2 = plot_well_heatmap!(Plots.plot(plate),plate)
+    @test plt2 isa Plots.Plot
 end

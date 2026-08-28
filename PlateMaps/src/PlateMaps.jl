@@ -4,7 +4,7 @@ using Random,
 DataFrames,
 JSON,
 Plots,
-ColorBrewer,
+LabwarePlotting,
 JuMP,
 Gurobi
 

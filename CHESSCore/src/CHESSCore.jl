@@ -68,6 +68,7 @@ include("./stocks/Recipe.jl")
 include("./locations/Well.jl")
 include("./locations/LocationDisplay.jl")
 include("./locations/build_location.jl")
+include("./locations/plotting.jl")
 
 include("./operations/movement.jl")
 include("./operations/transfer.jl")
@@ -118,7 +119,7 @@ export parent_cost, child_cost, occupancy, occupancy_cost , children, children_n
 # `parent` generic (see the comment above Base.parent(x::Location) in Location.jl).
 export can_move_into, move_into!
 #labware
-export shape, vendor, catalog, wells, stocks, add_stock!
+export shape, vendor, catalog, wells, stocks, add_stock!, plot_well_heatmap!
 #wells
 export wellcapacity, stock, cost,  sterilize!,transfer!, drain!,deposit!,withdraw!
 # dataframe interop

@@ -26,7 +26,8 @@ srcs1_lvc_units = CSV.read("test_stocks/sources1_lvc_units.csv",DataFrame)
     @testset "Well Conversion" begin 
         @test well_to_cartesian("A1") == CartesianIndex(1,1)
         @test well_to_cartesian("J16") == CartesianIndex(10,16)
-        @test_throws DomainError well_to_cartesian("ZY10") 
+        @test well_to_cartesian("ZY10") == CartesianIndex(701,10) # bijective base-26 row naming is unbounded -- "ZY" (701) is a valid row now, unlike the old 52-row-capped scheme
+        @test_throws DomainError well_to_cartesian("a1") # lowercase row letters are still rejected
         @test_throws ArgumentError well_to_cartesian("1")
         @test_throws ArgumentError well_to_cartesian("")
         @test cartesian_to_well(CartesianIndex(1,1)) == "A1"

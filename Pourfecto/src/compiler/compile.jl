@@ -82,11 +82,10 @@ function compile(directory::AbstractString,pourcast::Pourcast; packing_method::F
         mkdir(plt_image_dir)
     end 
 
-    for target in targets 
-        p = plot(target)
-        plot_well_heatmap!(p,target)
+    for target in targets
+        p = plot_labware(target;well_heatmap=true)
         savefig(p,joinpath(plt_image_dir,"$(CHESSCore.name(target)).png"))
-    end 
+    end
 
     
     C = length(configs(pourcast))
