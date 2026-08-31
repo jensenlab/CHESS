@@ -27,7 +27,7 @@ function plot_labware(l::Labware;well_heatmap::Bool=false,kwargs...)
         nrow,ncol = CHESSCore.shape(l)
         shape = labware_plotting_shape(l)
         for r in 1:nrow, c in 1:ncol
-            place_shape!(plt,shape,c,r,1;color="black")
+            place_shape!(plt,shape,c,r,1;color="black",fillalpha=0)
         end
     end
     well_heatmap && plot_well_heatmap!(plt,l)
@@ -218,7 +218,7 @@ function plot_slotting(deck::Deck, slotting::SlottingDict;
                 annotate!(x, y,
                           text(TextWrap.wrap(vals[y, x], width=wrapwidth),
                                :center, fontsize))
-                place_shape!(plt,shape,x,y,1;color="black")
+                place_shape!(plt,shape,x,y,1;color="black",fillalpha=0)
             end
         end
         plot!(ylims=(0.5, r + 0.5), xlims=(0.5, c + 0.5))
