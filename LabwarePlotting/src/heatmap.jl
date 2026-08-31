@@ -4,8 +4,12 @@
 Overlay a continuous-value heatmap of `values` onto `plt` (typically called after [`plot_grid!`](@ref)
 so the heatmap sits inside the grid/gridline/lettered-row skeleton). Use `NaN` in `values` for cells
 that should render as the colormap's zero/blank end rather than a real measurement.
+
+Redraws the black well-grid lines on top of the heatmap fill afterward, since `heatmap!`'s opaque
+per-cell coloring would otherwise paint over and hide any gridlines already drawn by `plot_grid!`.
 """
 function plot_heatmap!(plt,values::AbstractMatrix;colormap=cgrad([:white,:dodgerblue]),kwargs...)
     heatmap!(plt,values;color=colormap,kwargs...)
+    _gridlines!(plt,size(values)...)
     return plt
 end

@@ -1,14 +1,15 @@
 """
-    role_palette(roles::AbstractVector{Symbol}; overrides::Dict{Symbol,<:Any}=Dict{Symbol,Any}())
-        -> Dict{Symbol,Any}
+    role_palette(keys::AbstractVector; palette::String="Set2", overrides::Dict=Dict())
+        -> Dict{eltype(keys),Any}
 
-A consistent role-to-color mapping for any distinct set of role symbols, built from a `ColorBrewer`
-"Set2" palette (clamped to 3-8 colors) and cycled via `mod1` for larger role sets. `overrides` pins
-specific roles to specific colors, taking precedence over the palette assignment. Shared by every
-package that colors wells/nodes by role, so the same role always renders the same color everywhere in
-the CHESS ecosystem.
+A consistent category-to-color mapping for any distinct set of keys (relation-type roles, group/component
+indices, ...), built from a named `ColorBrewer` palette (clamped to 3-8 colors) and cycled via `mod1` for
+larger key sets. `overrides` pins specific keys to specific colors, taking precedence over the palette
+assignment. Shared by every package that colors wells/nodes categorically, so the same key always renders
+the same color everywhere in the CHESS ecosystem -- e.g. `palette="Set2"` (the default) for relation-type
+roles, `palette="Pastel2"` for separable-group coloring.
 """
-function role_palette(roles::AbstractVector{Symbol};overrides::Dict{Symbol,<:Any}=Dict{Symbol,Any}())
-    palette = ColorBrewer.palette("Set2",max(3,min(8,length(roles))))
-    return Dict(r=>get(overrides,r,palette[mod1(i,length(palette))]) for (i,r) in enumerate(roles))
+function role_palette(keys::AbstractVector;palette::String="Set2",overrides::Dict=Dict())
+    colors = ColorBrewer.palette(palette,max(3,min(8,length(keys))))
+    return Dict(k=>get(overrides,k,colors[mod1(i,length(colors))]) for (i,k) in enumerate(keys))
 end

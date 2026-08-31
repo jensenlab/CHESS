@@ -71,21 +71,26 @@ PlateMaps.describe(pm::PlateMap,rm::RunMap,i,j) = PlateMaps.describe(pm,rm,Carte
 # --- role-aware visualization ---------------------------------------------------------------------
 
 """
-    plot(pm::PlateMap, rm::RunMap; role_colors=Dict{Symbol,Any}(), inactive="darkgray",
-         empty_color="white", default_color="steelblue")
+    plot(pm::PlateMap, rm::RunMap; role_color_dict=Dict(:positive=>"blue",:negative=>"red",:blank=>"black"),
+         inactive="darkgray", empty_color="white", default_color="steelblue",
+         group_palette::String="Pastel2")
 
-Role-aware layout visualization: colors each occupied well by its (first) incoming role per `rm`
-(`RunMaps.roles(rm,node)`, empty for a node nothing links to), or `default_color` otherwise. Auto-assigned
-from a palette unless overridden via `role_colors`.
+Group-and-control-aware layout visualization: every occupied well is filled with its separable
+group's color (one color per `RunMaps.components(rm)`, from `group_palette` -- runs sharing a control
+land in the same component/color, by design, since `RunMaps` doesn't distinguish "shared" controls
+structurally). Any well serving a role that's a key of `role_color_dict` (default `:positive`/
+`:negative`/`:blank`) additionally gets a fixed-color halo frame (see [`LabwarePlotting.plot_grid!`]
+(@ref)) in that role's color, regardless of which group it belongs to -- so controls are always
+recognizable by a consistent color, with the group color still visible in the halo's inset. An
+occupant that isn't a registered `rm` node at all (no group to assign) falls back to `default_color`.
 """
-function PlateMaps.plot(pm::PlateMap,rm::RunMap;role_colors::Dict{Symbol,<:Any}=Dict{Symbol,Any}(),
-        inactive="darkgray",empty_color="white",default_color="steelblue")
-    all_roles = Symbol[]
-    for n in PlateMaps.nodes(pm)
-        append!(all_roles,RunMaps.roles(rm,n))
-    end
-    unique!(all_roles)
-    colors = LabwarePlotting.role_palette(all_roles;overrides=role_colors)
+function PlateMaps.plot(pm::PlateMap,rm::RunMap;
+        role_color_dict::Dict{Symbol,<:Any}=Dict{Symbol,Any}(:positive=>"blue",:negative=>"red",:blank=>"black"),
+        inactive="darkgray",empty_color="white",default_color="steelblue",
+        group_palette::String="Pastel2")
+    comps = RunMaps.components(rm)
+    group_of = Dict(n=>i for (i,comp) in enumerate(comps) for n in RunMaps.runs(comp))
+    group_colors = LabwarePlotting.role_palette(1:length(comps);palette=group_palette)
 
     fillcolors = map(CartesianIndices(pm.wells)) do I
         if !pm.wells[I]
@@ -93,11 +98,19 @@ function PlateMaps.plot(pm::PlateMap,rm::RunMap;role_colors::Dict{Symbol,<:Any}=
         elseif ismissing(pm[I])
             empty_color
         else
-            rs = RunMaps.roles(rm,pm[I])
-            isempty(rs) ? default_color : colors[first(rs)]
+            node = pm[I]
+            haskey(group_of,node) ? group_colors[group_of[node]] : default_color
         end
     end
-    return LabwarePlotting.plot_grid(pm.wells;fillcolors=fillcolors)
+
+    haloframe = map(CartesianIndices(pm.wells)) do I
+        (!pm.wells[I] || ismissing(pm[I])) && return nothing
+        rs = RunMaps.roles(rm,pm[I])
+        idx = findfirst(r->haskey(role_color_dict,r),rs)
+        idx === nothing ? nothing : role_color_dict[rs[idx]]
+    end
+
+    return LabwarePlotting.plot_grid(pm.wells;fillcolors=fillcolors,haloframe=haloframe)
 end
 
 # --- joined DataFrame view -------------------------------------------------------------------------

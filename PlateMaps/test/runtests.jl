@@ -275,11 +275,12 @@ end
             push!(run_nodes,r)
             RunMaps.link!(rm,r,Symbol("pos$g"),:positive)
             RunMaps.link!(rm,r,Symbol("neg$g"),:negative)
+            RunMaps.link!(rm,r,Symbol("blank$g"),:blank)
         end
     end
 
     wells = trues(4,6)
-    pms = schedule_platemap(wells,rm,(:positive,:negative);restarts=3,iterations=200,rng=Xoshiro(1))
+    pms = schedule_platemap(wells,rm,(:positive,:negative,:blank);restarts=3,iterations=200,rng=Xoshiro(1))
     @test pms isa Vector{PlateMap}
     @test length(pms) == 1 # both groups fit comfortably on one 24-well plate
     pm = only(pms)
@@ -314,8 +315,26 @@ end
     df = DataFrame(pm,rm)
     @test all(in(names(df)),["registered","outgoing_roles","incoming_roles"])
 
-    # plot smoke test
+    # plot: group-and-control-aware -- smoke test plus the underlying semantics it relies on
     @test plot(pm,rm) isa Plots.Plot
+    @test plot(pm,rm;role_color_dict=Dict(:positive=>"cyan")) isa Plots.Plot
+    @test_throws MethodError plot(pm,rm;control_colors=Dict(:positive=>"green")) # renamed keyword
+    @test_throws MethodError plot(pm,rm;role_colors=Dict(:positive=>"green")) # dropped keyword
+
+    # group 1 (r1_*, pos1, neg1, blank1) and group 2 (r2_*, pos2, neg2, blank2) never share a control,
+    # so they land in separate RunMaps.components -- exactly what plot(pm,rm) colors by
+    comps = RunMaps.components(rm)
+    group_of = Dict(n=>i for (i,comp) in enumerate(comps) for n in RunMaps.runs(comp))
+    @test group_of[:r1_1] == group_of[:pos1] == group_of[:neg1] == group_of[:blank1]
+    @test group_of[:r2_1] == group_of[:pos2] == group_of[:neg2] == group_of[:blank2]
+    @test group_of[:r1_1] != group_of[:r2_1]
+
+    # :pos1/:neg1/:blank1 are exactly the nodes plot(pm,rm) halos -- confirmed via the same
+    # RunMaps.roles accessor the extension uses, and :blank is a default role_color_dict key too
+    @test :positive in RunMaps.roles(rm,:pos1)
+    @test :negative in RunMaps.roles(rm,:neg1)
+    @test :blank in RunMaps.roles(rm,:blank1)
+    @test isempty(RunMaps.roles(rm,:r1_1)) # run nodes never serve a control role themselves
 
     # chaining schedule_duplicates/schedule_controls! into schedule_platemap
     dup_map = RunMaps.schedule_duplicates([:A,:B],1)
