@@ -8,5 +8,5 @@ set -e
 (cd PlateMaps && julia --project=. -e 'using Pkg; Pkg.test()')
 (cd LabwarePlotting && julia --project=. -e 'using Pkg; Pkg.test()')
 (cd CHESSExperiments && julia --project=. -e 'using Pkg; Pkg.test()')
-(cd CHESSQC && julia --project=. -e 'using Pkg; Pkg.test()')
+(cd CHESSProcessing && julia --project=. -e 'using Pkg; Pkg.test()')
 julia --project=. -e 'using Pkg; Pkg.test()'

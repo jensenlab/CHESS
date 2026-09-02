@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
-for pkg in CHESSCore CHESSDatabase CHESSLabConstants RunMaps PlateMaps LabwarePlotting CHESSExperiments CHESSQC; do
+for pkg in CHESSCore CHESSDatabase CHESSLabConstants RunMaps PlateMaps LabwarePlotting CHESSExperiments CHESSProcessing; do
     echo "=== $pkg ==="
     (cd "$pkg" && julia --project=. -e 'using Pkg; Pkg.test(coverage=true)')
 done
 
 julia -e '
 using Coverage
-for pkg in ("CHESSCore", "CHESSDatabase", "CHESSLabConstants", "RunMaps", "PlateMaps", "LabwarePlotting", "CHESSExperiments", "CHESSQC")
+for pkg in ("CHESSCore", "CHESSDatabase", "CHESSLabConstants", "RunMaps", "PlateMaps", "LabwarePlotting", "CHESSExperiments", "CHESSProcessing")
     cd(pkg) do
         cov = process_folder("src")
         covered, total = get_summary(cov)
