@@ -1,4 +1,4 @@
-import Pourfecto: convert_design, batch_design, nimbus_waste_conical, nimbus_waste_slot, nimbus_waste_target, tuberack50mL_0006
+import Pourfecto: convert_design, batch_design, nimbus_waste_conical, nimbus_waste_slot, nimbus_waste_target, nimbus_well, tuberack50mL_0006
 
 @testset "Nimbus Batching" begin
 
@@ -390,6 +390,24 @@ import Pourfecto: convert_design, batch_design, nimbus_waste_conical, nimbus_was
         plain_source = build_location(location_kinds[:WP96],"nimbus_waste_reservation_unrelated")
         other_slotting = slotting_greedy(Labware[plain_source],other_config)
         @test !(nimbus_waste_conical in keys(other_slotting))
+    end
+
+    @testset "nimbus_well translation" begin
+        # slot 5 on a (2,3) rack is column-major CartesianIndex(1,3) -> well "A3"
+        @test nimbus_well(tuberack50mL_0006,nimbus_waste_slot) == "A3"
+        @test nimbus_waste_target == ("TubeRack50ML_WellNames_0006","A3")
+
+        # a tube-rack source/destination surfaces as a well string, not a bare integer, in the
+        # compiled design -- this is the fix for the physical mis-pipetting bug caused by an
+        # undocumented row-major/column-major convention on the old integer slot
+        config = configurations["nimbus"]
+        source = build_location(location_kinds[:Conical50],"nimbus_well_translation_source")
+        target = build_location(location_kinds[:DeepWP96],"nimbus_well_translation_target")
+        slotting = slotting_greedy(Labware[source,target],config)
+        design = zeros(1,96); design[1,1] = 10.0
+        df = convert_design(DataFrame(design,:auto),[source],[target],slotting,config)
+        @test df[1,"Source Position ID"] isa AbstractString
+        @test occursin(r"^[A-Z]+\d+$",df[1,"Source Position ID"])
     end
 
     @testset "polish_clustering integration" begin

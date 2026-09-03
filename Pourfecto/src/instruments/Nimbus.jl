@@ -14,14 +14,14 @@ nimbus_head = Head{Nimbus}([piston_nimbus],nimbus_channels, nimbus_head_mask)
 
 # Define our available racks
 #15 mL tube
-tuberack15mL_0001=ConstrainedPosition("TubeRack15ML_0001",Set([:Conical15]),(4,6),true,true,"circle")
+tuberack15mL_0001=ConstrainedPosition("TubeRack15ML_WellNames_0001",Set([:Conical15]),(4,6),true,true,"circle")
 # 50 mL tube
-tuberack50mL_0001=ConstrainedPosition("TubeRack50ML_0001",Set([:Conical50]),(2,3),true,true,"circle")
-tuberack50mL_0002=ConstrainedPosition("TubeRack50ML_0002",Set([:Conical50]),(2,3),true,true,"circle")
-tuberack50mL_0003=ConstrainedPosition("TubeRack50ML_0003",Set([:Conical50]),(2,3),true,true,"circle")
-tuberack50mL_0004=ConstrainedPosition("TubeRack50ML_0004",Set([:Conical50]),(2,3),true,true,"circle")
-tuberack50mL_0005=ConstrainedPosition("TubeRack50ML_0005",Set([:Conical50]),(2,3),true,true,"circle")
-tuberack50mL_0006=ConstrainedPosition("TubeRack50ML_0006",Set([:Conical50]),(2,3),true,true,"circle")
+tuberack50mL_0001=ConstrainedPosition("TubeRack50ML_WellNames_0001",Set([:Conical50]),(2,3),true,true,"circle")
+tuberack50mL_0002=ConstrainedPosition("TubeRack50ML_WellNames_0002",Set([:Conical50]),(2,3),true,true,"circle")
+tuberack50mL_0003=ConstrainedPosition("TubeRack50ML_WellNames_0003",Set([:Conical50]),(2,3),true,true,"circle")
+tuberack50mL_0004=ConstrainedPosition("TubeRack50ML_WellNames_0004",Set([:Conical50]),(2,3),true,true,"circle")
+tuberack50mL_0005=ConstrainedPosition("TubeRack50ML_WellNames_0005",Set([:Conical50]),(2,3),true,true,"circle")
+tuberack50mL_0006=ConstrainedPosition("TubeRack50ML_WellNames_0006",Set([:Conical50]),(2,3),true,true,"circle")
 
 # 2 mL deep well plate
 # Explicit kind names, not CHESSCore.LocationKind categories. This constant removes a literal-Set
@@ -52,23 +52,43 @@ mask_rules_for(::Configuration{Nimbus}) = nimbus_mask_rules
 
 
 
+"""
+    nimbus_well(position::DeckPosition, slot::Int) -> String
+
+Translate a bare linear slot index (as produced by the shared, `Int`-typed
+[`slotting_greedy`](@ref)/`SlottingDict` machinery) into an unambiguous well-name string (`"A1"`,
+`"B3"`, ...) using `position`'s `(rows,cols)` grid shape. This is the fix for a physical
+mis-pipetting bug: a bare integer slot number had no documented row-major/column-major convention
+tying it to a real tube position on the deck, so it could mean different physical slots to
+Pourfecto than to a human reading the Nimbus software/deck layout. Uses the same
+`CartesianIndices`/[`cartesian_to_well`](@ref) convention already applied to plate wells elsewhere
+in this file (`convert_design`'s `CartesianIndices(CHESSCore.children(...))`), so a rack slot `i`
+and a plate well `i` are numbered consistently.
+"""
+nimbus_well(position::DeckPosition,slot::Int) = cartesian_to_well(CartesianIndices(slots(position))[slot])
+
 ## Nimbus Waste Conical
 #
 # One slot on the physical Nimbus deck permanently holds a Conical50 tube used as liquid waste for
 # the Blowout path (see batch_design's insert_blowouts) -- a real, always-present piece of hardware,
-# not something chosen per-protocol. TubeRack50ML_0006, slot 5 is the slot nearest the tip rack and
-# waste area on the real deck. This is reserved unconditionally (every Nimbus compile, whether or not
-# that particular protocol uses insert_blowouts), since the tube is physically there regardless.
-
+# not something chosen per-protocol. TubeRack50ML_WellNames_0006, well A3 is the slot nearest the tip
+# rack and waste area on the real deck. This is reserved unconditionally (every Nimbus compile,
+# whether or not that particular protocol uses insert_blowouts), since the tube is physically there
+# regardless.
+#
+# nimbus_waste_slot stays a plain Int: it's only used to pin the reserved slot in the shared,
+# Int-typed SlottingDict (see slotting_greedy override below). nimbus_waste_target is the value that
+# actually reaches the compiled CSV (as a Blowout row's position), so it's translated to a well
+# string via nimbus_well.
 const nimbus_waste_conical = build_location(CHESSCore.location_kinds[:Conical50],"NimbusWasteConical")
 const nimbus_waste_slot = 5
-const nimbus_waste_target = (tuberack50mL_0006.name,nimbus_waste_slot)
+const nimbus_waste_target = (tuberack50mL_0006.name,nimbus_well(tuberack50mL_0006,nimbus_waste_slot))
 
 """
     slotting_greedy(labware::Vector{<:Labware}, config::Configuration{Nimbus}) -> SlottingDict
 
 Nimbus-specific override: pins [`nimbus_waste_conical`](@ref) to its fixed physical slot
-(`TubeRack50ML_0006`, slot `$(nimbus_waste_slot)`, nearest the tip rack) before delegating
+(`TubeRack50ML_WellNames_0006`, well `$(nimbus_well(tuberack50mL_0006,nimbus_waste_slot))`, nearest the tip rack) before delegating
 everything else to the generic [`slotting_greedy`](@ref). That slot is a permanent fixture on the
 real Nimbus deck -- excluded from ordinary source/target slotting on every compile, independent of
 whether the protocol actually uses the Blowout path, exactly like [`Cobra`](@ref)'s
@@ -108,8 +128,8 @@ function convert_design(design::DataFrame,sources::Vector{<:Labware},targets::Ve
                 continue # skip if no volume transferred 
             end 
             push!(source_id,s_slot.name)
-            if length(source) ==1 
-                push!(source_position,s_pos)
+            if length(source) ==1
+                push!(source_position,nimbus_well(s_slot,s_pos))
             else
                 pos = cartesian_to_well(CartesianIndices(CHESSCore.children(source))[with_src_index[row]])
                 push!(source_position,pos)
@@ -118,8 +138,8 @@ function convert_design(design::DataFrame,sources::Vector{<:Labware},targets::Ve
             destination =targets[tgt_idx[col]]
             d_slot,d_pos = slotting[destination]
             push!(destination_id,d_slot.name)
-            if length(destination) == 1 
-                push!(destination_position,d_pos)
+            if length(destination) == 1
+                push!(destination_position,nimbus_well(d_slot,d_pos))
             else
                 pos = cartesian_to_well(CartesianIndices(CHESSCore.children(destination))[within_tgt_index[col]])
                 push!(destination_position,pos)
@@ -187,7 +207,7 @@ tip (no tip change between them) gets a trailing `Blowout` row at `waste_target`
 `dead_volume_buffer` before the next aspirate -- that batch's own aspirate volume is then sized to
 cover its dispenses *plus* the buffer (the blowout is the last value in its cycle, so it absorbs
 the rounding remainder). `waste_target` defaults to [`nimbus_waste_target`](@ref) -- the
-permanently-reserved waste conical (`TubeRack50ML_0006`, slot `$(nimbus_waste_slot)`, see
+permanently-reserved waste conical (`TubeRack50ML_WellNames_0006`, well `$(nimbus_well(tuberack50mL_0006,nimbus_waste_slot))`, see
 [`slotting_greedy`](@ref)'s `Configuration{Nimbus}` override) -- so callers using the default deck
 layout don't need to supply it; pass a different `(labware id, position)` tuple to target something
 else. A positive `dead_volume_buffer` (in µL, `< capacity`, default `20.0`) is required when
