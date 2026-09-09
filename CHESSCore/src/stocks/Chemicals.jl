@@ -14,9 +14,10 @@ All `Reagent` subtypes have four fields utilized by CHESSCore:
 4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) connects the reagent to registered substances in the pubchem database. the [`@reagent`](@ref) macro uses `pubchemid` to query the PubChem database for the reagent's properties automatically.
 
 See also: [`Chemical`](@ref) for the separate *chemical identity* axis (what a reagent behaves as once
-dissolved).
+dissolved), and [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Reagent` shares
+with [`Organism`](@ref).
 """
-abstract type Reagent end
+abstract type Reagent <: StockComponent end
 
 
 

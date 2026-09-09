@@ -59,6 +59,7 @@ include("./locations/Occupancy.jl")
 include("./environments/Environment.jl")
 include("./operations/capability.jl")
 include("./locations/Labware.jl")
+include("./stocks/StockComponent.jl")
 include("./stocks/Chemicals.jl")
 include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")
@@ -89,6 +90,7 @@ export AttributeKind, attribute_kinds, Unknown, UnknownValue, isunknown
 export Read, ReadKind, read_kinds, @read, @read_str, read_kind, read_unit, read_time, reads, record_read!
 export is_quantitative, is_qualitative
 export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
+export StockComponent # common dispatch/gathering ancestor for Reagent and Organism
 export Reagent,Solid,Liquid,Gas # physical-form types
 export Chemical,H⁺,OH⁻,Formula # chemical-identity types
 export charge, CompositionRule, composition, set_composition!, composition_rules
@@ -127,7 +129,7 @@ export df_to_stock, stock_to_df, df_to_labware, labware_to_df
 # location <-> dict interop (JSON-safe, for tools outside CHESS)
 export location_to_dict, dict_to_location, stock_to_dict, dict_to_stock
 export attribute_to_dict, dict_to_attribute, read_to_dict, dict_to_read
-export string_to_reagent, reagent_to_string, reagent_df, all_reagents, concentration
+export string_to_reagent, reagent_to_string, reagent_df, all_reagents, all_components, concentration
 export vc_to_stock, stock_to_vc, q_to_stock, stock_to_q
 export registry_summary
 end # module CHESSCore

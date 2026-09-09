@@ -7,18 +7,19 @@
 
 A unique species (and strain). organisms can be combined with [`Stock`](@ref) objects to create [`Culture`](@ref) objects
 
-`Organsim` objects have three properties: 
+`Organsim` objects have three properties:
 1) `genus`: The strain's taxonomic genus
 2) `species`: The Strains taxonomic species
 3) `strain`: The strain's identifier
 
-
+See also: [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Organism` shares with
+[`Reagent`](@ref).
 """
-struct Organism
+struct Organism <: StockComponent
     genus::String
     species::String
     strain::String
-end 
+end
 
 """
     macro organism(labsymb, genus, species, strain)

@@ -195,6 +195,26 @@ function all_reagents(stocks::Vector{<:CHESSCore.Stock})
     return collect(union(all_reagents.(stocks)...))
 end
 
+"""
+    all_components(stock::Stock) -> Vector{<:StockComponent}
+    all_components(stocks::Vector{<:Stock}) -> Vector{<:StockComponent}
+
+Like [`all_reagents`](@ref), but also includes any [`Organism`](@ref)s present -- gathers every
+[`StockComponent`](@ref) (reagent or organism) a `Stock` (or collection of `Stock`s) contains.
+`all_reagents` itself is unchanged and remains organism-blind; use `all_components` wherever
+organisms should participate in the enumeration.
+"""
+function all_components(stock::CHESSCore.Stock)
+    solids = reagents(CHESSCore.solids(stock))
+    liqs = reagents(CHESSCore.liquids(stock))
+    orgs = reagents(CHESSCore.organisms(stock))
+    return collect(union(solids,liqs,orgs))
+end
+
+function all_components(stocks::Vector{<:CHESSCore.Stock})
+    return collect(union(all_components.(stocks)...))
+end
+
 
 
 
