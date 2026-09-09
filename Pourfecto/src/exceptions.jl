@@ -10,9 +10,9 @@
 
 
 
-    struct ChemicalShortageError <: Exception
+    struct ComponentShortageError <: Exception
         msg::AbstractString
-        balances::Dict{CHESSCore.Reagent,Unitful.Quantity}
+        balances::Dict{CHESSCore.StockComponent,Unitful.Quantity}
     end
     
     

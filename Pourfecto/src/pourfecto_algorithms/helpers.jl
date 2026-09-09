@@ -82,9 +82,22 @@ function planning_concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Liq
     return uconvert(u"percent",liquids(stock)[ingredient]/CHESSCore.quantity(stock))
 end
 
+"""
+    planning_concentration(stock::CHESSCore.Stock, ingredient::CHESSCore.Organism)
+
+`CHESSCore.concentration` is unambiguous for organisms: `Biomass` (`OD*mL`) never shares a stock's
+plain Mass/Volume total dimension, so it always takes the cross-dimension ratio branch and
+deterministically returns plain `OD` -- already the fixed unit `normalize_inputs` needs. This
+method still forces the unit explicitly, for symmetry with the `Solid`/`Liquid` cases above.
+"""
+function planning_concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Organism)
+    ingredient in stock || return 0*u"OD"
+    return uconvert(u"OD",CHESSCore.concentration(stock,ingredient))
+end
+
 function normalize_inputs(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESSCore.Stock})
 
-    chems = union(all_reagents(sources),all_reagents(targets))
+    chems = union(all_components(sources),all_components(targets))
     ns = length(sources)
     nt=length(targets)
     nc = length(chems)
@@ -109,16 +122,16 @@ end
 
 
 
-function total_quantity(stocks::Vector{<:CHESSCore.Stock},chem::CHESSCore.Reagent)
+function total_quantity(stocks::Vector{<:CHESSCore.Stock},chem::CHESSCore.StockComponent)
 
     return sum(map(x->quantity(x,chem),stocks))
-end 
+end
 
 
 function input_balance(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESSCore.Stock})
 
-    chems= union(all_reagents(sources),all_reagents(targets))
-    balances= Dict{CHESSCore.Reagent,Unitful.Quantity}()
+    chems= union(all_components(sources),all_components(targets))
+    balances= Dict{CHESSCore.StockComponent,Unitful.Quantity}()
     for chem in chems 
 
         balances[chem] = total_quantity(sources,chem) - total_quantity(targets,chem) 
@@ -133,7 +146,7 @@ function check_inputs(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESS
     shortages = filter(x-> ustrip(balances[x]) < 0,collect(keys(balances)))
     if length(shortages) > 0 
         bals = map(x-> balances[x],shortages)
-        throw(ChemicalShortageError("there is a shortage of the following chemicals:",Dict(shortages .=> bals)))
+        throw(ComponentShortageError("there is a shortage of the following components:",Dict(shortages .=> bals)))
     end 
 
     return nothing 
@@ -142,8 +155,8 @@ end
     
 function update_priority(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESSCore.Stock},priority::PriorityDict)
     new_priority=PriorityDict()
-    src_chems= all_reagents(sources)
-    tgt_chems = all_reagents(targets) 
+    src_chems= all_components(sources)
+    tgt_chems = all_components(targets)
         # Update priorities: priority increases with decreasing level
 
     # Level 0: All level 0 ingredeients are blocked from the design. They may not appear in the stock. 
@@ -442,7 +455,7 @@ function solution_quality_report(p::Pourcast)
     sources = source_stocks(p)
     targets = target_stocks(p) 
 
-    chems= union(all_reagents(sources),all_reagents(targets))
+    chems= union(all_components(sources),all_components(targets))
     s = slacks(p)
 
     quality_flag = solution_quality(p)

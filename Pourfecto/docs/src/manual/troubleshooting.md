@@ -3,15 +3,16 @@
 Pourfecto's planning and scheduling models can fail in a few distinct ways. This page describes
 each failure mode, what error it raises, and how to read the resulting message.
 
-## `ChemicalShortageError`
+## `ComponentShortageError`
 
-Raised by `check_inputs` before any model is built, when the *total* supply of a chemical across
-all sources is less than the *total* demand across all targets. This is a coarse, aggregate check
--- it can pass even when the per-well plan is still infeasible (see `InfeasibleSolveError` below),
-because it doesn't account for which source can reach which target.
+Raised by `check_inputs` before any model is built, when the *total* supply of a component (a
+chemical reagent or an organism) across all sources is less than the *total* demand across all
+targets. This is a coarse, aggregate check -- it can pass even when the per-well plan is still
+infeasible (see `InfeasibleSolveError` below), because it doesn't account for which source can
+reach which target.
 
-The error carries a `balances` field: a `Dict{Reagent,Unitful.Quantity}` of the shortfall for each
-chemical that failed the check.
+The error carries a `balances` field: a `Dict{StockComponent,Unitful.Quantity}` of the shortfall
+for each component that failed the check.
 
 ## `InfeasibleSolveError`
 

@@ -47,8 +47,8 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         JuMP.set_attribute(model,"dual_feasibility_tolerance",1e-4)
     end
 
-    S,T = normalize_inputs(sources,targets) 
-    chems = union(all_reagents(sources),all_reagents(targets))
+    S,T = normalize_inputs(sources,targets)
+    chems = union(all_components(sources),all_components(targets))
 
     N_s , N_c = size(S)
     N_t , N_c = size(T)
@@ -297,9 +297,9 @@ function solve_planning_model(
         kwargs...)
 
 
-    params[:slack_tol]=slack_tol 
+    params[:slack_tol]=slack_tol
 
-    chems = union(all_reagents(sources),all_reagents(targets))
+    chems = union(all_components(sources),all_components(targets))
 
 
     priority = params[:priority]

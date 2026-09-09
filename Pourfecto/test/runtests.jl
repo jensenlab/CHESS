@@ -33,7 +33,7 @@ import Pourfecto: # dataframe_interface.jl (Pourfecto-only composites)
     vc_to_q, q_to_vc
 
 import Pourfecto: # pourfecto_algorithms/helpers.jl
-    normalize_inputs , check_inputs, well_connections, compute_flow_nodes
+    normalize_inputs , check_inputs, well_connections, compute_flow_nodes, planning_concentration
 
 
 
@@ -52,12 +52,25 @@ function all_planned_approx_target(p::Pourcast;kwargs...)
     return all([isapprox(ps[i],ts[i];kwargs...) for i in eachindex(ps)])
 end
 
+@testset "Planning Concentration (Organism)" begin
+    organism = Organism("Genus","species","strain")
+    water = string_to_component("water",Liquid)
+    culture = 5u"OD*mL" * organism + 100u"mL" * water
+
+    @test planning_concentration(culture,organism) ≈ 0.05u"OD"
+    @test planning_concentration(culture,organism) == uconvert(u"OD",CHESSCore.concentration(culture,organism)) # symmetric with concentration, unlike the Solid/Liquid cases, since Biomass is never dimension-ambiguous against a stock total
+
+    empty_stock = 100u"mL" * water
+    @test planning_concentration(empty_stock,organism) == 0u"OD" # organism absent from stock
+end
+
 include("test_problems/test_compilation.jl")
 include("test_problems/nimbus_batching.jl")
 
 if RUN_SOLVER_TESTS
     include("json_interface.jl")
     include("test_problems/checkerboard.jl")
+    include("test_problems/organism_scheduling.jl")
     #include("test_problems/combinatorial_media.jl")
     include("test_problems/labware_stamping.jl")
     include("test_problems/mantis_pcr.jl")
