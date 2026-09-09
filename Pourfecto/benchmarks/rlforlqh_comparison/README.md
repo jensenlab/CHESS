@@ -11,10 +11,15 @@ from scratch per grid size/reagent count, with no published checkpoint.
 ## Problem mapping
 
 - rlforlqh's grid cell = a well; its integer "amount" per type = microliters of that reagent.
-- Pourfecto's source labware = the init grid, target labware = the goal grid, one reagent per
-  occupied cell, `single_channel` instrument config (one well-to-well pipetting operation at a
-  time, matching rlforlqh's one-tip model), `objective="min_active_flow"` (minimize count of
-  nonzero transfers), `priority=0` on every reagent (exact match required, no slack).
+- Pourfecto runs in **planning-only** mode (`Pourfecto.planner(sources, targets; ...)`, via
+  `to_pourfecto_stocks.jl`): one `Stock` per occupied init cell (source) and per occupied goal cell
+  (target), `priority=0` on every reagent (exact match required, no slack). No `Labware`/instrument
+  config/scheduling is built at all -- an earlier version of this benchmark ran Pourfecto's
+  scheduling layer with a `single_channel` instrument config, which models physical
+  pipette-head/deck geometry that rlforlqh's greedy/beam-search have no equivalent of (they only
+  ever decide which cell to move liquid between next, never reason about a physical instrument).
+  Planning-only puts both sides on the same footing: does an exact-match sequence of transfers
+  exist, and can you find it.
 - Every generated instance keeps each occupied cell to a single reagent type (see
   `generate_instances.py`'s docstring): a cell mixing two types can strand liquid that no
   single-reagent target can use, which makes the instance genuinely infeasible under real mixing
@@ -22,88 +27,130 @@ from scratch per grid size/reagent count, with no published checkpoint.
   independently agreed an instance was unsolvable. Restricting to single-type cells guarantees a
   feasible rearrangement always exists, so a solver's failure means the heuristic missed it, not
   that the problem was impossible.
+- Both `greedy.py` and beam search's tie-breaking are deterministic in the original rlforlqh code
+  (the only randomization in `greedy.py`, `np.random.randint(0, 1)`, always evaluates to 0). This
+  benchmark adds seeded random tie-breaking to both (see `run_greedy.py`'s and
+  `beam_search_lib.py`'s module docstrings) and runs each instance across 100 random seeds, to
+  measure each heuristic's run-to-run variance rather than a single deterministic outcome. Pourfecto
+  is unaffected: an exact solver has no tie-breaking to randomize, and none was added.
 
 ## Running the sweep
 
 ```bash
 # 1. generate paired instances (writes benchmarks/rlforlqh_comparison/instances/*.json)
-python3 generate_instances.py --sizes 5 8 10 15 20 --n-types 1 2 4 --seeds 0 1 2
+python3 generate_instances.py --sizes 4 6 8 10 12 14 16 18 20 --n-types 1 2 4 \
+    --seeds 0 1 2 3 4 5 6 7 8 9
 
 # 2. (optional) archive rlforlqh's own text format, for manual reproduction
 python3 to_rlforlqh_format.py
 
-# 3. run each solver
-python3 run_greedy.py
-python3 run_beam_search.py --timeout 60
-julia --project=../.. run_pourfecto.jl instances results/pourfecto.csv 90   # from this directory
+# 3. run each solver -- greedy and beam search run 100 randomized restarts per instance
+python3 run_greedy.py --restarts 100
+python3 run_beam_search.py --restarts 100 --timeout 2       # parallelized across --workers (default: all cores)
+julia --project=../.. run_pourfecto.jl instances results/pourfecto.csv 60   # from this directory, deterministic, one pass
 
 # 4. compare
 python3 compare_results.py
+python3 plot_success_rate.py
 ```
 
 `run_pourfecto.jl` needs the Pourfecto Julia environment instantiated (`julia --project=Pourfecto
 -e 'using Pkg; Pkg.instantiate()'` from the CHESS repo root, one-time). It solves with SCIP (free,
-open-source, and the only bundled optimizer that supports `min_active_flow`'s indicator constraints
-without a Gurobi license -- see `docs/src/manual/pourfecto_method.md`'s solver comparison table).
-Swap in `optimizer=Gurobi.Optimizer` in `run_pourfecto.jl` if a license is available; it should only
-change wall-clock time, not the plan found.
+open-source; Pourfecto defaults to Gurobi, which needs a commercial or academic license this
+benchmark shouldn't assume is present). Swap in `optimizer=Gurobi.Optimizer` in `run_pourfecto.jl`
+if a license is available.
+
+`run_beam_search.py` is the slow part: some (grid size, reagent count) cells fail almost every
+restart, and a failing restart can run close to the full `--timeout` before giving up. At 270
+instances x 100 restarts, a single process would take on the order of hours; work is split across
+instances with a process pool (`ProcessPoolExecutor`, `--workers` default: all cores). The full
+270-instance x 100-restart sweep took ~69 minutes on an 8-core machine with `--timeout 2`.
 
 ## Metrics
 
-- **success**: did the plan reach the goal grid exactly.
-- **n_transfers**: discrete well-to-well transfer operations. Comparable across all three solvers
-  by construction (Pourfecto's nonzero active-flow count under `single_channel`; greedy's
-  pickup/dropoff cycles; beam search's dispense-command count -- see `run_beam_search.py` for why
-  dispense count, not raw protocol length, is the fairest match).
-- **distance**: total Manhattan distance traveled by the pipette head. Not an objective Pourfecto
-  optimizes for here (only `n_transfers` is), so this isn't a metric stacked in Pourfecto's favor.
-- **wall_time_s**: time to produce the full plan.
+- **success_rate**: fraction of the 100 randomized restarts that reached the goal grid exactly
+  (greedy, beam search), or 1.0/0.0 for Pourfecto's single deterministic outcome. On equal footing
+  across all three solvers -- this and wall-clock time are the only metrics that are.
+- **mean_time_s**: mean wall-clock time per restart (greedy, beam search) or the single solve time
+  (Pourfecto).
+- **mean_transfers**/**std_transfers**, **mean_distance**/**std_distance**: discrete source-to-target
+  transfers, and total Manhattan distance between them, computed over the *successful* restarts only
+  (std is 0 for Pourfecto -- nothing to vary). Comparable *as observations* -- greedy's
+  pickup/dropoff cycles, beam search's dispense-command count (see `run_beam_search.py`), and
+  Pourfecto's nonzero entries in the solved transfer matrix -- but **not comparable as an
+  optimization target** on the Pourfecto side in this mode: `Pourfecto.planner` only minimizes
+  weighted slack (zero at the optimum whenever an exact match is feasible), not transfer count, so
+  the number of active source->target pairs it returns is just whatever the LP/QP solver happened to
+  pick among equally valid, zero-slack solutions. In practice this means Pourfecto's
+  `mean_transfers` here is often *higher* than the heuristics' (see results below) -- the expected
+  cost of dropping the scheduling-layer objective that used to minimize it, not a regression in
+  solution quality (the underlying plan is still exact).
 
-## Results (39-instance sweep: grid_n in {5,8,10,15,20}, n_types in {1,2,4}, 2-3 seeds each)
+## Results (270-instance sweep: grid_n in {4,6,...,20}, n_types in {1,2,4}, 10 seeds each, 100 restarts per instance for greedy/beam search)
 
-Full per-instance and per-(grid_n, n_types) tables in `results/comparison.csv`. Summary of success
-rate (fraction of instances solved) by (grid_n, n_types):
+Full per-instance and per-(grid_n, n_types) tables in `results/comparison.csv`; success rate plotted
+in `results/success_rate.png`. Mean success rate by (grid_n, n_types):
 
 | grid_n | n_types | greedy | beam_search | pourfecto |
 |---|---|---|---|---|
-| 5  | 1 | 1.00 | 1.00 | 1.00 |
-| 5  | 2 | 0.67 | 0.67 | 1.00 |
-| 5  | 4 | 0.00 | 0.00 | 1.00 |
-| 8  | 1 | 0.67 | 1.00 | 1.00 |
-| 8  | 2 | 1.00 | 0.00 | 1.00 |
-| 8  | 4 | 0.00 | 0.00 | 1.00 |
-| 10 | 1 | 0.67 | 1.00 | 1.00 |
-| 10 | 2 | 1.00 | 0.00 | 1.00 |
-| 10 | 4 | 0.00 | 0.00 | 1.00 |
-| 15 | 1 | 1.00 | 1.00 | 1.00 |
-| 15 | 2 | 0.50 | 0.00 | 1.00 |
-| 15 | 4 | 0.00 | 0.00 | 1.00 |
-| 20 | 1 | 1.00 | 1.00 | 1.00 |
-| 20 | 2 | 0.00 | 0.00 | 1.00 |
-| 20 | 4 | 0.00 | 0.00 | 1.00 |
+| 4  | 1 | 0.900 | 1.000 | 1.000 |
+| 4  | 2 | 0.652 | 0.283 | 1.000 |
+| 4  | 4 | 0.024 | 0.000 | 1.000 |
+| 6  | 1 | 0.900 | 1.000 | 1.000 |
+| 6  | 2 | 0.551 | 0.196 | 1.000 |
+| 6  | 4 | 0.155 | 0.000 | 1.000 |
+| 8  | 1 | 0.900 | 1.000 | 1.000 |
+| 8  | 2 | 0.600 | 0.007 | 1.000 |
+| 8  | 4 | 0.076 | 0.000 | 1.000 |
+| 10 | 1 | 0.900 | 1.000 | 1.000 |
+| 10 | 2 | 0.779 | 0.014 | 1.000 |
+| 10 | 4 | 0.093 | 0.000 | 1.000 |
+| 12 | 1 | 1.000 | 1.000 | 1.000 |
+| 12 | 2 | 0.749 | 0.055 | 1.000 |
+| 12 | 4 | 0.097 | 0.000 | 1.000 |
+| 14 | 1 | 0.900 | 1.000 | 1.000 |
+| 14 | 2 | 0.824 | 0.000 | 1.000 |
+| 14 | 4 | 0.249 | 0.000 | 1.000 |
+| 16 | 1 | 0.900 | 0.133 | 1.000 |
+| 16 | 2 | 0.530 | 0.000 | 1.000 |
+| 16 | 4 | 0.002 | 0.000 | 1.000 |
+| 18 | 1 | 1.000 | 0.000 | 1.000 |
+| 18 | 2 | 0.832 | 0.000 | 1.000 |
+| 18 | 4 | 0.128 | 0.000 | 1.000 |
+| 20 | 1 | 1.000 | 0.000 | 1.000 |
+| 20 | 2 | 0.469 | 0.000 | 1.000 |
+| 20 | 4 | 0.143 | 0.000 | 1.000 |
 
-Pourfecto's exact MILP solve reached **100% success on all 39 instances**. Both rlforlqh heuristics
-are perfect at `n_types=1` (a pure sorting problem, easy for greedy nearest-excess/nearest-need
-matching) but collapse as reagent-type count rises -- both hit 0% at `n_types=4` by grid size 8, and
-beam search is at 0% for every `n_types=2` instance at grid_n >= 8. Neither heuristic backtracks: one
-early wrong pickup-or-placement choice with the wrong reagent composition can strand the rest of the
-grid in an unrecoverable state.
+Pourfecto's planning-only solve reached **100% success on all 270 instances** (deterministic, no
+restarts needed). Averaged over 100 randomized restarts per instance:
 
-Where a heuristic does succeed, transfer counts are close to Pourfecto's optimum (e.g. at
-grid_n=20, n_types=1: greedy 10, beam search 10, Pourfecto 10 -- all tied), but total travel
-**distance is consistently higher** for both heuristics (e.g. same instance: greedy 205, beam
-search 91.5, Pourfecto 146.5, averaged over 2 seeds) since neither optimizes for it -- expected,
-since only Pourfecto's objective (`min_active_flow`) targets transfer count, and distance is a
-reported-only metric on all three sides.
+- **Greedy** holds up reasonably well at `n_types=1` (0.9-1.0 across every grid size) and degrades
+  gradually at `n_types=2` (0.83 down to 0.47, noisily, as grid size grows), but collapses at
+  `n_types=4` (0.00-0.25 everywhere) -- consistent with the earlier single-run finding, now with a
+  real success-rate estimate instead of one 0/1 sample per instance.
+- **Beam search is far more fragile than the earlier deterministic run suggested.** With the
+  original code's tie-breaking, a single run happened to succeed at `n_types=1` for every grid size
+  tested. Randomizing tie-breaking reveals that was partly luck: success rate at `n_types=1` holds
+  at 1.0 only through grid_n=14, then falls off a cliff -- 0.133 at 16x16 and **0.0 at 18x18 and
+  20x20**. At `n_types>=2` it is at or near 0.0 for grid_n>=8. Its one-cell-at-a-time transition
+  function, without backtracking, is evidently much more sensitive to early tie-breaking choices
+  than the original single deterministic trace let on -- exactly the kind of finding restart-based
+  evaluation is for.
+- Neither heuristic backtracks: an unlucky early pickup/placement choice can strand the rest of the
+  grid regardless of how many restarts are tried, which is why success rate plateaus well below 1.0
+  rather than approaching it as restarts accumulate.
 
-**Wall-clock time is where Pourfecto's MILP shows a real cost.** Both heuristics stay under ~10s
-even at 20x20/4 types. Pourfecto is faster than both at grid_n<=10 (sub-second to a few seconds),
-comparable at 15x15 (~14-16s), but jumps to **~150-172s at 20x20** regardless of `n_types` --
-consistent with `min_active_flow`'s indicator-constraint MILP scaling with well count (400 wells)
-rather than reagent count. None of these runs hit the 90s `solver_timelimit` passed to
-`run_pourfecto.jl`'s wrapper call itself timing out with an error -- the ~150-170s wall times reflect
-`pourfecto()`'s two internal sequential solves (planning, then scheduling) each allotted up to that
-budget, plus JuMP model-construction overhead that the timelimit doesn't bound. This is the
-concrete manifestation of the fairness caveat above: Pourfecto's guarantee of an exact, optimal
-answer costs two orders of magnitude more wall-clock time at the largest scale than either
-heuristic, which return fast, best-effort (and, in this problem regime, mostly failing) answers.
+**Wall-clock time is no longer a meaningful cost for Pourfecto** now that scheduling/MILP is out of
+the picture: mean solve time across all 270 instances is a few tens of milliseconds, comparable to
+or faster than a single greedy restart and far faster than beam search (which needs a `--timeout`
+per restart specifically because some instances are slow to resolve).
+
+**Transfer count/distance no longer favor Pourfecto**, and often run the other way: e.g. at
+grid_n=20, n_types=4, greedy's mean transfer count among its successful restarts is 39.0 vs.
+Pourfecto's 113.2 -- consistent with the metrics caveat above. This is expected, not a
+solution-quality regression: planning mode has no notion of "minimize the number of pipetting
+operations," so its LP/QP solve is free to spread a transfer across more source/target pairs than
+strictly necessary as long as the target composition matches exactly. Read `mean_transfers`/
+`mean_distance` here as "what a valid exact plan looked like," not as a claim about which solver
+produces a more efficient protocol -- success rate and wall-clock time are the only metrics
+genuinely on equal footing between planning-only Pourfecto and rlforlqh's heuristics.

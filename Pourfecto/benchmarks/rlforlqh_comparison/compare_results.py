@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Join results/{greedy,beam_search,pourfecto}.csv into one comparison table.
 
-Prints a per-instance table and a per-(grid_n, n_types) summary (success rate, mean transfers/
-distance/time among successes, since failed runs have no plan to measure). See the benchmark
-README for the fairness caveats this comparison is subject to (Pourfecto is an exact solver, the
-heuristics are not; beam search's "n_transfers" counts dispense ops rather than pickup/dropoff
-pairs -- see run_beam_search.py).
+greedy.csv and beam_search.csv hold restart-aggregated stats (success_rate over --restarts seeded
+runs per instance, plus mean/std transfers and distance among the successful restarts -- see
+run_greedy.py / run_beam_search.py). pourfecto.csv holds a single deterministic outcome per instance
+(Pourfecto has nothing to restart), normalized here to the same success_rate/mean_*/std_* shape
+(std_* always 0 -- there is no variance to report).
+
+Prints a per-instance table and a per-(grid_n, n_types) summary (mean success rate, mean
+transfers/distance/time among instances with a solution). See the benchmark README for the
+fairness caveats: Pourfecto is an exact solver, the heuristics are not; Pourfecto's transfer count
+is informational only in planning mode, not something it minimizes (see run_pourfecto.jl).
 """
 import argparse
 import csv
@@ -31,6 +36,30 @@ def to_num(v):
         return None
 
 
+def normalize_row(solver, r):
+    """Map a raw per-instance row from either schema (restart-aggregated for greedy/beam_search,
+    single-shot for pourfecto) onto one common shape: success_rate, mean/std transfers, mean/std
+    distance, mean_time_s."""
+    if solver == "pourfecto":
+        success = to_bool(r["success"])
+        return {
+            "success_rate": 1.0 if success else 0.0,
+            "mean_transfers": to_num(r.get("n_transfers", "")) if success else None,
+            "std_transfers": 0.0 if success else None,
+            "mean_distance": to_num(r.get("distance", "")) if success else None,
+            "std_distance": 0.0 if success else None,
+            "mean_time_s": to_num(r.get("wall_time_s", "")),
+        }
+    return {
+        "success_rate": to_num(r.get("success_rate", "")) or 0.0,
+        "mean_transfers": to_num(r.get("mean_transfers", "")),
+        "std_transfers": to_num(r.get("std_transfers", "")),
+        "mean_distance": to_num(r.get("mean_distance", "")),
+        "std_distance": to_num(r.get("std_distance", "")),
+        "mean_time_s": to_num(r.get("mean_wall_time_s", "")),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--results-dir", default=os.path.join(os.path.dirname(__file__), "results"))
@@ -49,9 +78,11 @@ def main():
         int(name.split("_")[0][1:]), int(name.split("_")[1][1:]), name,
     ))
 
+    metrics = ["success_rate", "mean_transfers", "std_transfers", "mean_distance", "std_distance", "mean_time_s"]
     header = ["instance", "grid_n", "n_types"]
     for s in solvers:
-        header += [f"{s}_success", f"{s}_transfers", f"{s}_distance", f"{s}_time_s"]
+        header += [f"{s}_{m}" for m in metrics]
+
     out_rows = []
     for name in instances:
         entry = by_instance[name]
@@ -59,16 +90,10 @@ def main():
         row = {"instance": name, "grid_n": any_row["grid_n"], "n_types": any_row["n_types"]}
         for s in solvers:
             r = entry.get(s)
-            if r is None:
-                row[f"{s}_success"] = ""
-                row[f"{s}_transfers"] = ""
-                row[f"{s}_distance"] = ""
-                row[f"{s}_time_s"] = ""
-            else:
-                row[f"{s}_success"] = to_bool(r["success"])
-                row[f"{s}_transfers"] = r.get("n_transfers", "")
-                row[f"{s}_distance"] = r.get("distance", "")
-                row[f"{s}_time_s"] = r.get("wall_time_s", "")
+            normalized = normalize_row(s, r) if r is not None else {m: "" for m in metrics}
+            for m in metrics:
+                v = normalized.get(m, "")
+                row[f"{s}_{m}"] = "" if v is None else v
         out_rows.append(row)
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
@@ -86,7 +111,7 @@ def main():
         print(" | ".join(str(r[h]).ljust(col_widths[h]) for h in header))
 
     # per-(grid_n, n_types) summary
-    print("\nSummary by (grid_n, n_types): success rate, mean transfers/distance/time_s among successes\n")
+    print("\nSummary by (grid_n, n_types): mean success rate, mean transfers/distance/time_s where solved\n")
     groups = defaultdict(list)
     for r in out_rows:
         groups[(int(r["grid_n"]), int(r["n_types"]))].append(r)
@@ -101,12 +126,11 @@ def main():
         group = groups[key]
         row = {"grid_n": grid_n, "n_types": n_types, "n_instances": len(group)}
         for s in solvers:
-            successes = [r for r in group if r[f"{s}_success"] is True]
-            n_with_data = sum(1 for r in group if r[f"{s}_success"] != "")
-            rate = len(successes) / n_with_data if n_with_data else None
-            row[f"{s}_success_rate"] = f"{rate:.2f}" if rate is not None else ""
-            for metric, key_name in [("transfers", "mean_transfers"), ("distance", "mean_distance"), ("time_s", "mean_time_s")]:
-                vals = [to_num(r[f"{s}_{metric}"]) for r in successes]
+            rates = [to_num(r[f"{s}_success_rate"]) for r in group]
+            rates = [v for v in rates if v is not None]
+            row[f"{s}_success_rate"] = f"{sum(rates)/len(rates):.3f}" if rates else ""
+            for metric, key_name in [("mean_transfers", "mean_transfers"), ("mean_distance", "mean_distance"), ("mean_time_s", "mean_time_s")]:
+                vals = [to_num(r[f"{s}_{metric}"]) for r in group]
                 vals = [v for v in vals if v is not None]
                 row[f"{s}_{key_name}"] = f"{sum(vals)/len(vals):.2f}" if vals else ""
         summary_rows.append(row)

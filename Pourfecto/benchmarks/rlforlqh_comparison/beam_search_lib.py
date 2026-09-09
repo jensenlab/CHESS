@@ -16,6 +16,14 @@ unmodified from the notebook. Two additions, both clearly marked below:
      the input text file) beam search is free to leave leftover content there and still call it
      solved. run_beam_search.py builds `goal` with a zero-array entry for every column up front so
      "solved" means the same thing -- exact full-grid match -- for every solver in this benchmark.
+  3. RANDOMIZED RESTARTS (added by this benchmark, not part of the original): the original has no
+     randomization anywhere. Ties in the per-iteration combined score are broken by Python's stable
+     `sorted()`, which always keeps the original, deterministic column-iteration order among tied
+     candidates -- this matters at the `beam_size` truncation boundary. `BeamSearch`/`beam_search`
+     now accept an optional `rng` (a `random.Random` instance); when given, the candidate list is
+     shuffled before sorting each iteration, so tied candidates are kept/dropped in a random order
+     instead of always favoring lower column indices. `rng=None` (the default) reproduces the
+     original's deterministic behavior exactly.
 """
 import copy
 import math
@@ -34,7 +42,7 @@ class Machine:
         pass
 
     def BeamSearch(self, start, goal, beam_size=3, N=5, head_pos=(0, 0), tip_cap=100,
-                    well_cap=500, num_sol=2, deadline=None):
+                    well_cap=500, num_sol=2, deadline=None, rng=None):
         self.N = N
         self.head_pos = head_pos
         self.tip_cap = tip_cap
@@ -46,7 +54,7 @@ class Machine:
         self.goal = copy.deepcopy(goal)
 
         s = time.time()
-        self.solutions = self.beam_search(self.status, beam_size, deadline=deadline)
+        self.solutions = self.beam_search(self.status, beam_size, deadline=deadline, rng=rng)
         t = time.time()
         self.timing = t - s
 
@@ -67,7 +75,7 @@ class Machine:
                     manipulated.append(col)
             return manipulated
 
-    def beam_search(self, curr_status, beam_size, mc=1, ac=0, dc=0, zc=0, deadline=None):
+    def beam_search(self, curr_status, beam_size, mc=1, ac=0, dc=0, zc=0, deadline=None, rng=None):
         self.mc = mc
         self.ac = ac
         self.dc = dc
@@ -101,6 +109,8 @@ class Machine:
             for i, new_beam in enumerate(new_beams):
                 new_beam.score = score_Arr[i, :]
 
+            if rng is not None:  # addition (see module docstring, "RANDOMIZED RESTARTS")
+                rng.shuffle(new_beams)
             new_beams = sorted(new_beams, key=lambda x: x.score[0] + x.score[1] + 0.1 * x.score[2] + 0.1 * x.score[3])
             k = min(beam_size, len(new_beams))
             new_beams = new_beams[:k]
