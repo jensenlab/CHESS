@@ -124,6 +124,7 @@ end
 """
     concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Solid)
     concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Liquid)
+    concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Organism)
 
 Return the concentration of an ingredient relative to the stock's own total (`CHESSCore.quantity(stock)`)
 via [`_relative_amount`](@ref) — a mass for `Mixture`, a volume for `Solution`/`Culture`. This is what
@@ -133,6 +134,10 @@ amount-per-unit-of-total ratio otherwise (e.g. a solid's mass within a Solution'
 g/mL). Not `volume_estimate` -- that's a different, only-partially-defined physical-volume estimate
 used elsewhere (`Well.jl` capacity checks, `pH`), not the right denominator for a relative
 concentration.
+
+For an `Organism`, [`Biomass`](@ref)'s dimension (`OD*Volume`) never matches the volume total's, so
+this always takes the cross-dimension branch and returns a plain `Biomass/total` ratio in `OD` --
+i.e. the culture's current, on-demand-derived optical density, never a stored value.
 """
 function concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Solid)
     total = CHESSCore.quantity(stock)
@@ -151,13 +156,21 @@ function concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Liquid)
     return _relative_amount(get(liquids(stock),ingredient,0u"mL"),total)
 end
 
+function concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Organism)
+    total = CHESSCore.quantity(stock)
+    ismissing(total) && return 0*u"OD"
+    return _relative_amount(get(organisms(stock),ingredient,0u"OD*mL"),total)
+end
+
 
 
 """
     quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Solid)
     quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Liquid)
+    quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Organism)
 
-Return the quantity of an ingredient in a stock using the preferred units for that ingredient
+Return the quantity of an ingredient in a stock using the preferred units for that ingredient (an
+organism's [`Biomass`](@ref) in `OD*mL`).
 
 """
 function quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Solid)
@@ -179,6 +192,14 @@ function quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Liquid)
         return uconvert(u"µl",liquids(stock)[ingredient])
     else
         return 0*u"µL"
+    end
+end
+
+function quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Organism)
+    if ingredient in stock
+        return uconvert(u"OD*mL",organisms(stock)[ingredient])
+    else
+        return 0*u"OD*mL"
     end
 end
 
