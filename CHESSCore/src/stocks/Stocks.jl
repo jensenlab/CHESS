@@ -7,6 +7,18 @@ prefquantunits(::Liquid)=u"mL"
 SolidDict=Dict{Solid,Unitful.Mass}
 LiquidDict=Dict{Liquid,Unitful.Volume}
 
+"""
+    const Biomass
+
+Quantity type for tracking how much of an [`Organism`](@ref) is present in a [`Culture`](@ref).
+Dimensionally `OD * Volume` (reusing [`JensenLabUnits.AbsorbanceVolume`](@ref)), so `biomass/volume`
+recovers an OD reading by construction. `Biomass` is an absolute, conserved quantity -- like
+`Unitful.Mass` for a [`Solid`](@ref) -- not a value derived from a Culture's current liquid volume.
+"""
+const Biomass = JensenLabUnits.AbsorbanceVolume
+
+OrganismDict=Dict{Organism,Biomass}
+
 
 """
     abstract type Stock end 
@@ -70,28 +82,35 @@ struct Solution <: Stock
 end 
 
 """
-    struct Culture <: Stock 
+    struct Culture <: Stock
 
-`Culture` objects are stocks that contain at least one [`Organism`](@ref). Cultures may contain any number of [`Solid`](@ref) or [`Liquid`](@ref) components.
+`Culture` objects are stocks that contain at least one [`Organism`](@ref), each carrying a
+[`Biomass`](@ref) quantity. Cultures may contain any number of [`Solid`](@ref) or [`Liquid`](@ref)
+components, and may have zero liquid volume (biomass is an absolute quantity, not derived from the
+Culture's current volume).
 """
-struct Culture <: Stock 
-    organisms::Set{Organism}
+struct Culture <: Stock
+    organisms::OrganismDict
     solids::SolidDict
     liquids::LiquidDict
-    function Culture(organisms,solids,liquids)  
-        # test for issues 
+    function Culture(organisms,solids,liquids)
+        # test for issues
         for solid in reagents(solids)
             x=ustrip(solids[solid])
-            x >= 0 || throw(DomainError(x,"$solid must have a non-negative mass")) 
+            x >= 0 || throw(DomainError(x,"$solid must have a non-negative mass"))
         end
         for liquid in reagents(liquids)
             x=ustrip(liquids[liquid])
-            x >= 0 || throw(DomainError(x,"$liquid must have a non-negative volume")) 
+            x >= 0 || throw(DomainError(x,"$liquid must have a non-negative volume"))
+        end
+        for org in reagents(organisms)
+            x=ustrip(organisms[org])
+            x >= 0 || throw(DomainError(x,"$org must have a non-negative biomass"))
         end
         length(organisms) >= 1 || throw(DomainError(length(organisms),"solutions must contain at least one liquid"))
         return new(organisms, solids,liquids)
     end
-end 
+end
 
 """
     solids(::Stock)
@@ -149,10 +168,11 @@ end
 
 
 """
-    organisms(::Stock) 
-return the `organisms` property of a Stock. If no organisms, are present, return Set{Organism}(). 
+    organisms(::Stock)
+return the `organisms` property of a Stock (an [`OrganismDict`](@ref) mapping each present
+[`Organism`](@ref) to its [`Biomass`](@ref)). If no organisms are present, return `OrganismDict()`.
 """
-organisms(c::Stock)=Set{Organism}()
+organisms(c::Stock)=OrganismDict()
 organisms(c::Culture)=c.organisms
 
 
@@ -169,6 +189,7 @@ function Stock(organisms,solids,liquids)
     # stock by 0) would be typed Solution/Mixture with an all-zero component instead of Empty().
     solids = filter(kv -> ustrip(kv[2]) != 0, solids)
     liquids = filter(kv -> ustrip(kv[2]) != 0, liquids)
+    organisms = filter(kv -> ustrip(kv[2]) != 0, organisms)
     o=length(organisms)
     s=length(solids)
     l=length(liquids)
@@ -187,14 +208,14 @@ end
 
 
 """
-    reagents(x::Union{SolidDict,LiquidDict})
+    reagents(x::Union{SolidDict,LiquidDict,OrganismDict})
 
-a wrapper for `collect(keys(x))` that returns an array of the chemical keys.
+a wrapper for `collect(keys(x))` that returns an array of the chemical/organism keys.
 """
-function reagents(x::Union{SolidDict,LiquidDict})
+function reagents(x::Union{SolidDict,LiquidDict,OrganismDict})
 
     return collect(keys(x))
-end 
+end
 
 
 # trivial constructors for mixtures and solutions 
@@ -208,7 +229,7 @@ end
 Overload the `*` operator to construct a Mixture from a molar quantity of a solid. 
 """
 function *(quantity::Unitful.Amount,chemical::Solid)
-    return Stock(Set{Organism}(),SolidDict(chemical => convert(prefquantunits(chemical),quantity,chemical)),LiquidDict())
+    return Stock(OrganismDict(),SolidDict(chemical => convert(prefquantunits(chemical),quantity,chemical)),LiquidDict())
 end
 
 """
@@ -217,7 +238,7 @@ end
 Overload the `*` operator to construct a Mixture from a mass of a solid.
 """
 function *(quantity::Unitful.Mass,chemical::Solid)
-    return Stock(Set{Organism}(),SolidDict(chemical => uconvert(prefquantunits(chemical),quantity)),LiquidDict())
+    return Stock(OrganismDict(),SolidDict(chemical => uconvert(prefquantunits(chemical),quantity)),LiquidDict())
 end
 """
     *(quantity::Unitful.Volume,chemical::Liquid)
@@ -225,27 +246,41 @@ end
 Overload the `*` operator to construct a Solution from a volume of a liquid.
 """
 function *(quantity::Unitful.Volume,chemical::Liquid)
-    return Stock(Set{Organism}(),SolidDict(),LiquidDict(chemical=>uconvert(prefquantunits(chemical),quantity)))
-end 
+    return Stock(OrganismDict(),SolidDict(),LiquidDict(chemical=>uconvert(prefquantunits(chemical),quantity)))
+end
+
+"""
+    *(quantity::Biomass,organism::Organism)
+
+Overload the `*` operator to construct a Culture from a [`Biomass`](@ref) quantity of an
+[`Organism`](@ref). This is the standard way to write an inoculum, e.g. `5u"OD*mL" * ecoli`.
+"""
+function *(quantity::Biomass,organism::Organism)
+    return Stock(OrganismDict(organism=>quantity),SolidDict(),LiquidDict())
+end
 
 
 
 """
     *(num::Real,stock::Stock)
 
-Overload the `*` operator to multiply the chemicals of a Stock by a scalar. Returns a new Stock with all chemical quantities scaled by a factor of `num`. 
+Overload the `*` operator to multiply the chemicals and organisms of a Stock by a scalar. Returns a new Stock with all chemical/biomass quantities scaled by a factor of `num`.
 """
 function *(num::Real,stock::Stock)
     new_solids=Dict{Solid,Unitful.Mass}()
     new_liquids=Dict{Liquid,Unitful.Volume}()
+    new_organisms=OrganismDict()
     for solid in reagents(solids(stock))
-        new_solids[solid]=solids(stock)[solid] * num 
-    end 
+        new_solids[solid]=solids(stock)[solid] * num
+    end
     for liquid in reagents(liquids(stock))
         new_liquids[liquid]=liquids(stock)[liquid]*num
-    end 
-    return Stock(organisms(stock),new_solids,new_liquids)
-end 
+    end
+    for org in reagents(organisms(stock))
+        new_organisms[org]=organisms(stock)[org]*num
+    end
+    return Stock(new_organisms,new_solids,new_liquids)
+end
 
 *(stock::Stock,num::Real) = *(num,stock)
 
@@ -331,8 +366,8 @@ end
 
 
 function Base.in(str::Organism,stock::Stock)
-    return str in organisms(stock)
-end 
+    return haskey(organisms(stock),str)
+end
 
 function Base.in(sol::Solid,stock::Stock)
     return sol in reagents(solids(stock))
@@ -349,18 +384,23 @@ function isapprox(a::Stock,b::Stock;kwargs...)
         return false 
     end 
     if keys(liquids(a)) != keys(liquids(b))
-        return false 
-    end 
-    if organisms(a) != organisms(b)
-        return false 
-    end 
-    for solid in reagents(solids(a)) 
+        return false
+    end
+    if keys(organisms(a)) != keys(organisms(b))
+        return false
+    end
+    for solid in reagents(solids(a))
         if !isapprox(solids(a)[solid],solids(b)[solid];kwargs...)
-            return false 
-        end 
-    end 
+            return false
+        end
+    end
     for liquid in reagents(liquids(a))
         if !isapprox(liquids(a)[liquid],liquids(b)[liquid];kwargs...)
+            return false
+        end
+    end
+    for org in reagents(organisms(a))
+        if !isapprox(organisms(a)[org],organisms(b)[org];kwargs...)
             return false
         end
     end

@@ -175,6 +175,7 @@ end
 @testset "Factor types and registry" begin
     @test_throws ArgumentError ContinuousFactor(:bad_dest_test; destination = :organism)
     @test_throws ArgumentError CategoricalFactor(:bad_dest_test2; levels = () -> (:a, :b), destination = :reagent)
+    @test_throws ArgumentError CategoricalFactor(:bad_dest_test3; levels = () -> (:a, :b), destination = :organism) # :organism columns are resolved structurally now, not a CategoricalFactor destination
 
     atmosphere = CategoricalFactor(:atmosphere_test; levels = () -> (:aerobic, :anaerobic), blocking = true, destination = :condition)
     register_factor!(atmosphere)
@@ -186,19 +187,18 @@ end
     @test_throws KeyError get_factor(:never_registered_factor_test)
 
     register_factor!(ContinuousFactor(:temperature_test; blocking = true, destination = :condition))
-    register_factor!(CategoricalFactor(:strain_test; levels = () -> (:SMU_UA159,), blocking = false, destination = :organism))
 end
 
 @testset "factor classification" begin
     @test factor_destination(:alanine; reagent_context = test_reagent_context) == :reagent
     @test factor_destination(:atmosphere_test; reagent_context = test_reagent_context) == :condition
-    @test factor_destination(:strain_test; reagent_context = test_reagent_context) == :organism
-    @test_throws ArgumentError factor_destination(:never_a_factor_or_reagent; reagent_context = test_reagent_context)
+    @test factor_destination(:SMU_UA159; org_context = test_org_context) == :organism
+    @test_throws ArgumentError factor_destination(:never_a_factor_or_reagent; reagent_context = test_reagent_context, org_context = test_org_context)
 
-    cols = classify_columns([:alanine, :atmosphere_test, :strain_test]; reagent_context = test_reagent_context)
+    cols = classify_columns([:alanine, :atmosphere_test, :SMU_UA159]; reagent_context = test_reagent_context, org_context = test_org_context)
     @test cols.reagent == [:alanine]
     @test cols.condition == [:atmosphere_test]
-    @test cols.organism == [:strain_test]
+    @test cols.organism == [:SMU_UA159]
 end
 
 @testset "resolve_stock: absolute mass/volume/molarity" begin
@@ -236,18 +236,21 @@ end
 end
 
 @testset "resolve_stock: organism promotes to Culture" begin
-    row = (alanine = 10.0, strain_test = "SMU_UA159")
-    stock, orgs = resolve_stock(row, [:alanine], [:strain_test];
-        units = Dict(:alanine => "g"), reagent_context = test_reagent_context, org_context = test_org_context)
+    # organism factors work like reagent factors now: the column name (:SMU_UA159) IS the organism,
+    # and the cell value is a Biomass magnitude (paired with a unit), not a strain-name string.
+    row = (alanine = 10.0, SMU_UA159 = 0.5)
+    stock, orgs = resolve_stock(row, [:alanine], [:SMU_UA159];
+        units = Dict(:alanine => "g", :SMU_UA159 => "OD*mL"), reagent_context = test_reagent_context, org_context = test_org_context)
     @test stock isa CHESSCore.Culture
-    @test TestFactorLab.SMU_UA159 in CHESSCore.organisms(stock)
-    @test orgs[:strain_test] == "SMU_UA159"
+    @test haskey(CHESSCore.organisms(stock), TestFactorLab.SMU_UA159)
+    @test CHESSCore.organisms(stock)[TestFactorLab.SMU_UA159] == 0.5u"OD*mL"
+    @test orgs[:SMU_UA159] == 0.5
 
-    row_missing = (alanine = 10.0, strain_test = missing)
-    stock_no_org, orgs2 = resolve_stock(row_missing, [:alanine], [:strain_test];
-        units = Dict(:alanine => "g"), reagent_context = test_reagent_context, org_context = test_org_context)
+    row_missing = (alanine = 10.0, SMU_UA159 = missing)
+    stock_no_org, orgs2 = resolve_stock(row_missing, [:alanine], [:SMU_UA159];
+        units = Dict(:alanine => "g", :SMU_UA159 => "OD*mL"), reagent_context = test_reagent_context, org_context = test_org_context)
     @test stock_no_org isa CHESSCore.Mixture
-    @test ismissing(orgs2[:strain_test])
+    @test ismissing(orgs2[:SMU_UA159])
 end
 
 @testset "resolve_conditions" begin
@@ -263,22 +266,23 @@ end
 @testset "parse_design" begin
     mktempdir() do dir
         path = joinpath(dir, "design.csv")
-        write(path, "Ala (g),Strain\n10,SMU_UA159\n5,SMU_UA159\n")
+        write(path, "Ala (g),SMU_UA159 (OD*mL)\n10,0.5\n5,1.0\n")
 
+        # organism columns are resolved structurally now (like reagents): the column name IS the
+        # organism, and its unit lives in `units` rather than a `values` string-translation.
         cmap = DesignColumnMap(
-            columns = Dict("Ala (g)" => :alanine, "Strain" => :strain_test),
-            values = Dict(:strain_test => Dict("SMU_UA159" => :SMU_UA159)),
-            units = Dict(:alanine => "g"),
+            columns = Dict("Ala (g)" => :alanine, "SMU_UA159 (OD*mL)" => :SMU_UA159),
+            units = Dict(:alanine => "g", :SMU_UA159 => "OD*mL"),
         )
-        expt = parse_design(path; column_map = cmap, reagent_context = test_reagent_context)
-        @test Set(propertynames(expt.design)) == Set([:alanine, :strain_test])
+        expt = parse_design(path; column_map = cmap, reagent_context = test_reagent_context, org_context = test_org_context)
+        @test Set(propertynames(expt.design)) == Set([:alanine, :SMU_UA159])
         @test expt.design.alanine == [10, 5]
-        @test expt.design.strain_test == [:SMU_UA159, :SMU_UA159]
+        @test expt.design.SMU_UA159 == [0.5, 1.0]
         @test get_parameter(expt, :column_map) === cmap
 
         bad_path = joinpath(dir, "bad.csv")
         write(bad_path, "Mystery,Ala (g)\nfoo,10\n")
-        @test_throws ArgumentError parse_design(bad_path; column_map = cmap, reagent_context = test_reagent_context)
+        @test_throws ArgumentError parse_design(bad_path; column_map = cmap, reagent_context = test_reagent_context, org_context = test_org_context)
     end
 end
 
@@ -306,9 +310,12 @@ end
 @testset "schedule_blocked_layout" begin
     matrix = DataFrame(
         atmosphere_test = [:aerobic, :aerobic, :anaerobic, :anaerobic],
-        strain_test = ["SMU_UA159", "SMU_UA159", "SMU_UA159", missing],
+        SMU_UA159 = [0.5, 0.5, 0.5, missing],
     )
-    experiment = Experiment(matrix; metadata = Dict(:positive_controls => 1, :negative_controls => 1))
+    experiment = Experiment(matrix; metadata = Dict(
+        :positive_controls => 1, :negative_controls => 1,
+        :column_map => DesignColumnMap(units = Dict(:SMU_UA159 => "OD*mL")),
+    ))
 
     wells = trues(2, 4) # 8 wells/plate
     scheduled = schedule_blocked_layout(experiment, wells, (:positive, :negative);
@@ -325,13 +332,13 @@ end
 
     wcond = get_parameter(scheduled, :well_conditions)
     @test length(wcond) == 4
-    @test all(haskey(v, :strain_test) for v in values(wcond))
+    @test all(haskey(v, :SMU_UA159) for v in values(wcond))
 
     row4 = only(filter(r -> !ismissing(r.run_index) && r.run_index == 4, eachrow(lay)))
-    @test ismissing(wcond[(row4.labware, row4.well)][:strain_test])
+    @test ismissing(wcond[(row4.labware, row4.well)][:SMU_UA159])
 
     row1 = only(filter(r -> !ismissing(r.run_index) && r.run_index == 1, eachrow(lay)))
-    @test wcond[(row1.labware, row1.well)][:strain_test] == "SMU_UA159"
+    @test wcond[(row1.labware, row1.well)][:SMU_UA159] == 0.5
 
     # an infeasible group (zero usable wells, but rows to place) errors clearly, naming the group
     huge = Experiment(DataFrame(atmosphere_test = fill(:aerobic, 20)); metadata = Dict(:positive_controls => 0, :negative_controls => 0))
@@ -403,7 +410,6 @@ end
 @testset "schedule_blocked_layout with duplicates and real controls" begin
     matrix = DataFrame(
         atmosphere_test = [:aerobic, :aerobic, missing],
-        strain_test = ["SMU_UA159", "SMU_UA159", "SMU_UA159"],
         control_role = [missing, missing, :positive],
         duplicates = [2, missing, missing],
     )

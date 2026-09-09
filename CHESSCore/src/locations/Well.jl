@@ -137,7 +137,7 @@ mutating `x`, see [`reconstruct_location`](@ref)/[`build_location`](@ref).
 """
 function sterilize!(x::Well)
     st=stock(x);
-    st_new=Stock(Set{Organism}(),solids(st),liquids(st));
+    st_new=Stock(OrganismDict(),solids(st),liquids(st));
     check_capacity(st_new,x)
     x.stock=st_new;
     nothing

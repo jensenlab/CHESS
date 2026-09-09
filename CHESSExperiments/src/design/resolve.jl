@@ -16,34 +16,53 @@ function is_registered_reagent(name::Symbol; reagent_context = CHESSCore)
 end
 
 """
-    factor_destination(name::Symbol; reagent_context=CHESSCore) -> Symbol
+    is_registered_organism(name::Symbol; org_context=CHESSCore) -> Bool
 
-Resolution order for a canonical column name: is it one of [`RESERVED_DESIGN_COLUMNS`](@ref) (returns
-`:reserved`)? else is it a reagent CHESSCore already knows? else is it a registered [`Factor`](@ref)?
-Throws `ArgumentError` otherwise -- an unregistered column is a hard error, a deliberate departure
-from [`ParameterKind`](@ref)'s lenient "unregistered keys are just a raw lookup" stance, since a
-design has to be fully understood before it's usable.
+Structural check: is `name` an organism CHESSCore already knows about (via
+`CHESSCore.orgparse`/`org_context`)? Mirrors [`is_registered_reagent`](@ref) -- this is how an
+`:organism`-destination column is recognized, by the *column name* itself identifying the
+organism/strain, not by a registered `Factor`.
 """
-function factor_destination(name::Symbol; reagent_context = CHESSCore)
-    name in RESERVED_DESIGN_COLUMNS && return :reserved
-    is_registered_reagent(name; reagent_context = reagent_context) && return :reagent
-    haskey(factor_registry, name) && return destination(factor_registry[name])
-    throw(ArgumentError("column :$name is not a registered reagent or Factor"))
+function is_registered_organism(name::Symbol; org_context = CHESSCore)
+    try
+        CHESSCore.orgparse(string(name); org_context = org_context)
+        return true
+    catch
+        return false
+    end
 end
 
 """
-    classify_columns(names::Vector{Symbol}; reagent_context=CHESSCore)
+    factor_destination(name::Symbol; reagent_context=CHESSCore, org_context=CHESSCore) -> Symbol
+
+Resolution order for a canonical column name: is it one of [`RESERVED_DESIGN_COLUMNS`](@ref) (returns
+`:reserved`)? else is it a reagent CHESSCore already knows (`:reagent`)? else is it an organism
+CHESSCore already knows (`:organism`)? else is it a registered [`Factor`](@ref)? Throws
+`ArgumentError` otherwise -- an unregistered column is a hard error, a deliberate departure from
+[`ParameterKind`](@ref)'s lenient "unregistered keys are just a raw lookup" stance, since a design
+has to be fully understood before it's usable.
+"""
+function factor_destination(name::Symbol; reagent_context = CHESSCore, org_context = CHESSCore)
+    name in RESERVED_DESIGN_COLUMNS && return :reserved
+    is_registered_reagent(name; reagent_context = reagent_context) && return :reagent
+    is_registered_organism(name; org_context = org_context) && return :organism
+    haskey(factor_registry, name) && return destination(factor_registry[name])
+    throw(ArgumentError("column :$name is not a registered reagent, organism, or Factor"))
+end
+
+"""
+    classify_columns(names::Vector{Symbol}; reagent_context=CHESSCore, org_context=CHESSCore)
         -> (reagent=Vector{Symbol}, organism=Vector{Symbol}, condition=Vector{Symbol})
 
 Group a design's (already-canonicalized) column names by [`factor_destination`](@ref).
 [`RESERVED_DESIGN_COLUMNS`](@ref) are recognized (don't error) but land in none of these three lists.
 """
-function classify_columns(names::AbstractVector{Symbol}; reagent_context = CHESSCore)
+function classify_columns(names::AbstractVector{Symbol}; reagent_context = CHESSCore, org_context = CHESSCore)
     reagent = Symbol[]
     organism = Symbol[]
     condition = Symbol[]
     for n in names
-        d = factor_destination(n; reagent_context = reagent_context)
+        d = factor_destination(n; reagent_context = reagent_context, org_context = org_context)
         d === :reagent && push!(reagent, n)
         d === :organism && push!(organism, n)
         d === :condition && push!(condition, n)
@@ -97,7 +116,8 @@ factor to a `Stock`, not an independent per-factor resolve step (matches how a `
 is inherently a whole-row concept, and how `vc`/`q`-style tables are conventionally resolved as one
 unit in CHESSCore itself).
 
-`units` is a `Dict{Symbol,String}` (one unit per reagent factor -- see [`DesignColumnMap`](@ref)).
+`units` is a `Dict{Symbol,String}` (one unit per reagent *and* organism factor -- see
+[`DesignColumnMap`](@ref)).
 
 `total_volume`/`solvent` implement the solvent shortcut: `solvent` (a reagent name, e.g. `:water`)
 fills whatever's left of `total_volume` after every other explicit liquid reagent factor already
@@ -105,10 +125,15 @@ present is accounted for -- so a design doesn't have to spell out its solvent as
 just to "bring to volume." If a reagent factor needs a total volume (a concentration or molar
 amount) and none is supplied, resolution errors rather than silently failing.
 
+Organism factors work like reagent factors: `oname` (an entry of `organism_names`) IS the
+organism/strain identity (resolved via `orgparse`), and `row[oname]` is a `CHESSCore.Biomass`
+magnitude (paired with `units[oname]`) fed into `CHESSCore`'s `Biomass * Organism` constructor --
+`missing` means no inoculum for that organism in this row.
+
 Returns the built `Stock` (promoted to a `Culture` if any organism factor resolved) and a
-`Dict{Symbol,Any}` recording each organism factor's resolved value per-well -- since Pourfecto
-doesn't schedule inoculation, this is what a technician-facing `:well_conditions` record is built
-from.
+`Dict{Symbol,Any}` recording each organism factor's resolved biomass value per-well -- since
+Pourfecto doesn't schedule inoculation, this is what a technician-facing `:well_conditions` record is
+built from.
 """
 function resolve_stock(
     row,
@@ -148,8 +173,13 @@ function resolve_stock(
             organism_record[oname] = missing
             continue
         end
-        organism = CHESSCore.orgparse(string(value); org_context = org_context)
-        stock += organism
+        haskey(units, oname) || throw(ArgumentError("no unit specified for organism factor :$oname"))
+        organism = CHESSCore.orgparse(string(oname); org_context = org_context)
+        # unit_context has to include JensenLabUnits explicitly for Biomass units like "OD*mL" --
+        # Unitful.uparse (the function form, unlike the u"..." macro) doesn't search globally
+        # registered unit modules automatically.
+        qty = value * Unitful.uparse(units[oname]; unit_context = [Unitful, CHESSCore.JensenLabUnits])
+        stock += qty * organism
         organism_record[oname] = value
     end
 
@@ -198,8 +228,11 @@ function populate_well_conditions(experiment::Experiment; reagent_context = CHES
     lay === nothing && throw(ArgumentError("experiment has no :layout yet -- schedule it first"))
 
     design = experiment.design
-    cols = classify_columns(propertynames(design); reagent_context = reagent_context)
+    cols = classify_columns(propertynames(design); reagent_context = reagent_context, org_context = org_context)
     non_blocking_conditions = [c for c in cols.condition if !is_blocking(get_factor(c))]
+    # only touch :column_map (a required parameter with no default) when there's actually an
+    # organism column to resolve -- most experiments have none.
+    units = isempty(cols.organism) ? Dict{Symbol,String}() : get_parameter(experiment, :column_map).units
 
     well_conditions = Dict{Any,Dict{Symbol,Any}}()
     for row in eachrow(lay)
@@ -207,7 +240,7 @@ function populate_well_conditions(experiment::Experiment; reagent_context = CHES
         i = row.run_index
         record = Dict{Symbol,Any}()
         if !isempty(cols.organism)
-            _, organism_record = resolve_stock(design[i, :], Symbol[], cols.organism; org_context = org_context)
+            _, organism_record = resolve_stock(design[i, :], Symbol[], cols.organism; units = units, org_context = org_context)
             merge!(record, organism_record)
         end
         isempty(non_blocking_conditions) || merge!(record, resolve_conditions(design[i, :], non_blocking_conditions))

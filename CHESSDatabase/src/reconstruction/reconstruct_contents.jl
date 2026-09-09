@@ -93,9 +93,12 @@ function get_stock(stock_id::Integer)
         component= get_component(r.ComponentID)
         if ismissing(r.Quantity) 
             out_stock += component
-        else 
-            out_stock +=  (r.Quantity * Unitful.uparse(r.Unit)) * component
-        end 
+        else
+            # unit_context has to include JensenLabUnits explicitly for Biomass units like "OD mL"
+            # -- Unitful.uparse (the function form) doesn't search globally registered unit
+            # modules automatically the way the u"..." macro does.
+            out_stock +=  (r.Quantity * Unitful.uparse(r.Unit;unit_context=[Unitful,CHESSCore.JensenLabUnits])) * component
+        end
     end 
     return out_stock
 end 

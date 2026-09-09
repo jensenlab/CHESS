@@ -8,8 +8,12 @@ different question: where a resolved value ends up.
 
 `destination` values in use:
 - `:reagent` (`ContinuousFactor` only) -- feeds `Stock`-building (see [`resolve_stock`](@ref)).
-- `:organism` (`CategoricalFactor` only) -- promotes the row's `Stock` to a `Culture`, and is also
-  recorded per-well (`:well_conditions`) since Pourfecto doesn't schedule inoculation.
+- `:organism` -- like `:reagent`, but for organisms: the *column name* identifies the organism/strain
+  (resolved structurally via `orgparse`, mirroring how a reagent column is recognized), and the *cell
+  value* is a `Biomass` quantity (paired with a per-column unit) fed into `resolve_stock`, promoting
+  the row's `Stock` to a `Culture`. Also recorded per-well (`:well_conditions`) since Pourfecto doesn't
+  schedule inoculation. Not a `CategoricalFactor`/`ContinuousFactor` destination -- like `:reagent`,
+  organism columns need no per-column `Factor` registration at all (see `is_registered_organism`).
 - `:condition` (either subtype) -- a plain recorded value (e.g. temperature, atmosphere), never a
   `CHESSCore.Attribute` -- recorded per-plate (`:plate_conditions`).
 
@@ -53,8 +57,8 @@ struct CategoricalFactor <: Factor
     blocking::Bool
     destination::Symbol
     function CategoricalFactor(name::Symbol, levels::Function, blocking::Bool, destination::Symbol)
-        destination in (:organism, :condition) ||
-            throw(ArgumentError("CategoricalFactor destination must be :organism or :condition, got :$destination"))
+        destination === :condition ||
+            throw(ArgumentError("CategoricalFactor destination must be :condition, got :$destination"))
         return new(name, levels, blocking, destination)
     end
 end
@@ -93,7 +97,8 @@ is_blocking(f::Factor) = f.blocking
 """
     destination(f::Factor) -> Symbol
 
-Where a resolved value for `f` ends up -- `:reagent`, `:organism`, or `:condition`.
+Where a resolved value for `f` ends up -- `:reagent` or `:condition` (`:organism` columns are
+resolved structurally, like reagent columns, and never go through a registered `Factor`).
 """
 destination(f::Factor) = f.destination
 

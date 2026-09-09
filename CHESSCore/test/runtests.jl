@@ -81,7 +81,7 @@ a=100u"mL"*rgt"water" #solution
 b=10u"g"*rgt"paba" # mixture
 c=5u"g"*rgt"iron_nitrate" #mixture
 d=10u"mL"*rgt"glycerol" #solution
-e=Empty()+org"SMU_UA159"
+e=1u"OD*mL"*org"SMU_UA159"
 
 @testset "Stocks" begin
     @test a isa Solution
@@ -130,9 +130,9 @@ end
     @test 3*a == a+a+a # scalar multiplication
     @test a * 3 == 3 * a # scalar multiplication  commutative property
     @test a/3 == 1/3 * a # scalar division
-    @test 3*(a+e) == a+a+a+e+e+e # there is no quantity to track for e in this case, but it does contribute to the organismal contents
-    @test e+a-e !=a # identity property does not hold for cultures
-    @test e-e != Empty() # ' '
+    @test 3*(a+e) == a+a+a+e+e+e # scalar multiplication also scales organism biomass
+    @test e+a-e == a # biomass fully cancels, so identity holds for cultures too
+    @test e-e == Empty() # biomass can now be fully removed, unlike the old presence-only model
     @test quantity(10u"mL"*a) == 10u"mL" # quantity multiplcation
     @test quantity(10u"mL"*((10/3)*a)) == 10u"mL" # floating point quantity multiplication
     @test 10u"mL" *a == a * 10u"mL" # commutative property
@@ -979,7 +979,7 @@ end
     # reagent_display(::Culture) -- currently-untested three-tuple path with organisms populated
     out_solids,out_liquids,out_organisms = reagent_display(e)
     @test isempty(out_solids) && isempty(out_liquids)
-    @test out_organisms == [org"SMU_UA159"]
+    @test out_organisms["Streptococcus mutans UA159"]["Amount"] == (1.0,"mL*OD")
 
     # show variants not covered by the Mixture-only check in "reagent_display / show consolidation"
     for x in (a, e, Empty())

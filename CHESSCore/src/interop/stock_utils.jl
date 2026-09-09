@@ -12,11 +12,13 @@ const unit_string_substitution = Dict(values(string_unit_substitution) .=> keys(
 ## String Conversion
 
 function string_to_unit(str::AbstractString)
-
+    # unit_context has to include JensenLabUnits explicitly -- Unitful.uparse only searches
+    # globally *registered* unit modules automatically via the `u"..."` macro, not via this
+    # function form, so a custom unit like OD (used by Biomass) would otherwise fail to parse here.
     if str in keys(string_unit_substitution)
-        return Unitful.uparse(string_unit_substitution[str])
+        return Unitful.uparse(string_unit_substitution[str];unit_context=[Unitful,JensenLabUnits])
     else
-        return Unitful.uparse(str)
+        return Unitful.uparse(str;unit_context=[Unitful,JensenLabUnits])
     end
 end
 

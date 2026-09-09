@@ -48,7 +48,10 @@ function stock_to_dict(s::Stock; reagent_context=CHESSCore, org_context=CHESSCor
     for (r, q) in liquids(s)
         liq[reagent_to_string(r; reagent_context, kwargs...)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
     end
-    org = [_organism_to_string(o; org_context) for o in organisms(s)]
+    org = Dict{String,Any}()
+    for (o, q) in organisms(s)
+        org[_organism_to_string(o; org_context)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
+    end
     return Dict{String,Any}("solids" => sol, "liquids" => liq, "organisms" => org)
 end
 
@@ -66,7 +69,10 @@ function dict_to_stock(d::Dict; reagent_context=CHESSCore, org_context=CHESSCore
     for (n, amt) in d["liquids"]
         liq[string_to_reagent(n, Liquid; reagent_context, kwargs...)] = amt["amount"] * string_to_unit(amt["unit"])
     end
-    org = Set{Organism}(_string_to_organism(s; org_context) for s in d["organisms"])
+    org = OrganismDict()
+    for (n, amt) in d["organisms"]
+        org[_string_to_organism(n; org_context)] = amt["amount"] * string_to_unit(amt["unit"])
+    end
     return Stock(org, sol, liq)
 end
 

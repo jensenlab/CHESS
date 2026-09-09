@@ -20,14 +20,16 @@ function _relative_amount(amt, total; digits=nothing)
 end
 
 """
-    _reagent_table(dict::Union{SolidDict,LiquidDict}, total; digits=2)
+    _reagent_table(dict::Union{SolidDict,LiquidDict,OrganismDict}, total; digits=2)
 
 Shared display logic behind both `show(::MIME"text/plain",::Stock)` and [`reagent_display`](@ref):
 sort `dict`'s reagents by name and compute each one's raw amount and concentration relative to
 `total` (the stock's overall `quantity`/`volume_estimate`), via [`_relative_amount`](@ref). Returns
-`(sorted_reagents, amounts, concentrations)`, all empty if `dict` is empty.
+`(sorted_reagents, amounts, concentrations)`, all empty if `dict` is empty. For an `OrganismDict`,
+"concentration" comes out as `Biomass/total` -- i.e. the current, on-demand-derived OD -- since
+`Biomass`'s dimension differs from `total`'s (see [`_relative_amount`](@ref)).
 """
-function _reagent_table(dict::Union{SolidDict,LiquidDict}, total; digits=2)
+function _reagent_table(dict::Union{SolidDict,LiquidDict,OrganismDict}, total; digits=2)
     arr = sort(reagents(dict), by=name)
     isempty(arr) && return arr, Unitful.Quantity[], Unitful.Quantity[]
     amounts = round.([dict[x] for x in arr]; digits=digits)
@@ -66,8 +68,8 @@ function Base.show(io::IO,::MIME"text/plain",s::Culture;digits::Integer=2)
     q=quantity(s)
     printstyled(io,round(q;digits=digits)," ";bold=true)
     printstyled(io, "$typstr ($(length(solids(s))+length(liquids(s))) reagent(s))\n";bold=true)
-    arr_org=sort(collect(organisms(s)),by=name)
-    df_org=DataFrame(Organisms=arr_org)
+    arr_org,amt_org,conc_org=_reagent_table(organisms(s),q;digits=digits)
+    df_org=DataFrame(Organisms=arr_org,Name=name.(arr_org),Biomass=amt_org,OD=conc_org)
     show(io,df_org;eltypes=false,show_row_number=false,summary=false)
     print(io,"\n\n")
     if length(solids(s)) > 0
@@ -103,22 +105,22 @@ end
 """
     reagent_display(s::Stock; digits=2)
 
-Return `(solids, liquids, organisms)` for `s`: `solids`/`liquids` are `Dict{String,Dict{String,Tuple}}`
-keyed by reagent name, each holding `"Amount"`/`"Concentration"` (value, unit) tuples computed by
-[`_reagent_table`](@ref) (the same logic `show(::MIME"text/plain",::Stock)` uses); `organisms` lists
-the stock's organisms.
+Return `(solids, liquids, organisms)` for `s`: all three are `Dict{String,Dict{String,Tuple}}` keyed
+by name, each holding `"Amount"`/`"Concentration"` (value, unit) tuples computed by
+[`_reagent_table`](@ref) (the same logic `show(::MIME"text/plain",::Stock)` uses). For `organisms`,
+`"Amount"` is each organism's [`Biomass`](@ref) and `"Concentration"` is its current, on-demand OD.
 """
 function reagent_display(s::Empty;digits=2)
     out_solids=Dict{String,Dict{String,Tuple{Number,String}}}()
     out_liquids=Dict{String,Dict{String,Tuple{Number,String}}}()
-    out_organisms=Vector{String}[]
+    out_organisms=Dict{String,Dict{String,Tuple{Number,String}}}()
     return out_solids,out_liquids,out_organisms
 end
 
 function reagent_display(s::Mixture;digits=2)
     out_solids=Dict{String,Dict{String,Tuple{Number,String}}}()
     out_liquids=Dict{String,Dict{String,Tuple{Number,String}}}()
-    out_organisms=Vector{String}[]
+    out_organisms=Dict{String,Dict{String,Tuple{Number,String}}}()
     q=quantity(s)
     arr_sol,amt_sol,conc_sol=_reagent_table(solids(s),q;digits=digits)
     out_solids=out_dict(arr_sol,amt_sol,conc_sol)
@@ -128,7 +130,7 @@ end
 function reagent_display(s::Solution;digits=2)
     out_solids=Dict{String,Dict{String,Tuple{Number,String}}}()
     out_liquids=Dict{String,Dict{String,Tuple{Number,String}}}()
-    out_organisms=Vector{String}[]
+    out_organisms=Dict{String,Dict{String,Tuple{Number,String}}}()
     q=quantity(s)
     if length(solids(s))>0
         arr_sol,amt_sol,conc_sol=_reagent_table(solids(s),q;digits=digits)
@@ -142,7 +144,7 @@ end
 function reagent_display(s::Culture;digits=2)
     out_solids=Dict{String,Dict{String,Tuple{Number,String}}}()
     out_liquids=Dict{String,Dict{String,Tuple{Number,String}}}()
-    out_organisms=Vector{String}[]
+    out_organisms=Dict{String,Dict{String,Tuple{Number,String}}}()
     q=quantity(s)
     if length(solids(s))>0
         arr_sol,amt_sol,conc_sol=_reagent_table(solids(s),q;digits=digits)
@@ -152,6 +154,9 @@ function reagent_display(s::Culture;digits=2)
         arr_liq,amt_liq,conc_liq=_reagent_table(liquids(s),q;digits=digits)
         out_liquids=out_dict(arr_liq,amt_liq,conc_liq)
     end
-    out_organisms=sort(collect(organisms(s)),by=name)
+    if length(organisms(s))>0
+        arr_org,amt_org,conc_org=_reagent_table(organisms(s),q;digits=digits)
+        out_organisms=out_dict(arr_org,amt_org,conc_org)
+    end
     return out_solids,out_liquids,out_organisms
 end

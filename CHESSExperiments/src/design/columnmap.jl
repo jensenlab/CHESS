@@ -13,9 +13,10 @@ Fields:
 - `values::Dict{Symbol,Dict{String,Symbol}}`: canonical factor name -> (raw value -> canonical
   value). Only matters for factors whose *values* are themselves free text needing translation
   (open-vocabulary categorical factors like organism/strain) -- not for numeric reagent quantities.
-- `units::Dict{Symbol,String}`: canonical factor name -> unit string, one entry per `:reagent`-
-  destination factor (confirmed sufficient: one unit per factor, never per-row/per-cell). Feeds the
-  unit half of what [`resolve_stock`](@ref) needs to convert a raw value into a real quantity.
+- `units::Dict{Symbol,String}`: canonical factor name -> unit string, one entry per `:reagent`- or
+  `:organism`-destination factor (confirmed sufficient: one unit per factor, never per-row/per-cell).
+  Feeds the unit half of what [`resolve_stock`](@ref) needs to convert a raw value into a real
+  quantity (a `Biomass` for `:organism` factors).
 """
 struct DesignColumnMap
     columns::Dict{String,Symbol}

@@ -131,9 +131,12 @@ function cache(s::Stock)
             execute_db("INSERT OR IGNORE INTO CachedComponents(StockID,ComponentID,Quantity,Unit) Values(?,?,?,?)",
                 (id,liq_id,Float64(ustrip(quant)),string(unit(quant))))
         end
-        for org in organisms(s)
+        orgs=organisms(s)
+        for org in reagents(orgs)
             org_id=get_component_id(org)  # uploads a new organism if necessary
-            execute_db("INSERT INTO CachedComponents(StockID,ComponentID) Values(?,?)",(id,org_id))
+            quant=orgs[org]
+            execute_db("INSERT OR IGNORE INTO CachedComponents(StockID,ComponentID,Quantity,Unit) Values(?,?,?,?)",
+                (id,org_id,Float64(ustrip(quant)),string(unit(quant))))
         end
         return id
 

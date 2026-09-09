@@ -4,7 +4,9 @@ A [`Stock`](@ref) is a combination of organisms and chemicals -- what actually l
 `Well`. `Stock` is an abstract type; which concrete subtype you get is determined by what it
 contains, not chosen directly: [`Empty`](@ref) (nothing), [`Mixture`](@ref) (solids only),
 [`Solution`](@ref) (at least one liquid, any solids), [`Culture`](@ref) (at least one organism, any
-solids/liquids -- covered in [Organisms & Cultures](organisms-cultures.md)). The generic
+solids/liquids -- including zero liquid, since an organism's [`Biomass`](@ref) is an absolute
+quantity, not one derived from the stock's own volume -- covered in
+[Organisms & Cultures](organisms-cultures.md)). The generic
 [`Stock(organisms,solids,liquids)`](@ref) constructor automatically picks the right one,
 checking in order whether any organisms, then liquids, then solids are present:
 
@@ -69,8 +71,9 @@ julia> volume_estimate(salt)
 
 ## Scaling
 
-`*`/`/` by a plain number scales every reagent proportionally; multiplying by a *quantity* instead
-scales the whole stock to hit that quantity as its new total:
+`*`/`/` by a plain number scales every reagent (and any organism's [`Biomass`](@ref)) proportionally;
+multiplying by a *quantity* instead scales the whole stock to hit that quantity as its new total --
+this is how diluting a `Culture` to a target volume also dilutes its organism content:
 
 ```julia-repl
 julia> double = 2*saline
@@ -96,7 +99,10 @@ julia> tenmL = 10u"mL" * saline
 
 ## The non-negativity constraint
 
-`-` mixes by subtraction, and throws [`MixingError`](@ref) if any reagent would go negative:
+`-` mixes by subtraction, and throws [`MixingError`](@ref) if any reagent would go negative. This
+applies identically to organism [`Biomass`](@ref) -- an organism's biomass can be reduced or fully
+removed via `-`, the same way a chemical amount can (see
+[Removing organisms](organisms-cultures.md#Removing-organisms)):
 
 ```julia-repl
 julia> saline - double

@@ -1,7 +1,7 @@
 register_parameter!(:column_map, DesignColumnMap)
 
 """
-    parse_design(path::AbstractString; column_map=DesignColumnMap(), reagent_context=CHESSCore) -> Experiment
+    parse_design(path::AbstractString; column_map=DesignColumnMap(), reagent_context=CHESSCore, org_context=CHESSCore) -> Experiment
 
 Read a CSV design at `path` into an `Experiment`. Applies `column_map`'s header translation (raw
 header -> canonical factor name) and value translation (raw value -> canonical value, for
@@ -13,7 +13,7 @@ just a raw lookup" stance, since a design has to be fully understood before it's
 `column_map` itself is stored as `:column_map` metadata on the returned `Experiment`, so a persisted
 design's raw-string interpretation stays auditable rather than known only at parse time.
 """
-function parse_design(path::AbstractString; column_map::DesignColumnMap = DesignColumnMap(), reagent_context = CHESSCore)
+function parse_design(path::AbstractString; column_map::DesignColumnMap = DesignColumnMap(), reagent_context = CHESSCore, org_context = CHESSCore)
     raw = CSV.read(path, DataFrame)
 
     design = DataFrame()
@@ -24,7 +24,7 @@ function parse_design(path::AbstractString; column_map::DesignColumnMap = Design
 
     factor_names = propertynames(design)
     for name in factor_names
-        factor_destination(name; reagent_context = reagent_context) # throws on an unregistered column
+        factor_destination(name; reagent_context = reagent_context, org_context = org_context) # throws on an unregistered column
     end
 
     for (cname, valuemap) in column_map.values
