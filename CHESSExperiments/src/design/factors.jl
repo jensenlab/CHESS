@@ -11,9 +11,10 @@ different question: where a resolved value ends up.
 - `:organism` -- like `:reagent`, but for organisms: the *column name* identifies the organism/strain
   (resolved structurally via `orgparse`, mirroring how a reagent column is recognized), and the *cell
   value* is a `Biomass` quantity (paired with a per-column unit) fed into `resolve_stock`, promoting
-  the row's `Stock` to a `Culture`. Also recorded per-well (`:well_conditions`) since Pourfecto doesn't
-  schedule inoculation. Not a `CategoricalFactor`/`ContinuousFactor` destination -- like `:reagent`,
-  organism columns need no per-column `Factor` registration at all (see `is_registered_organism`).
+  the row's `Stock` to a `Culture`. Also recorded per-well (`:well_conditions`) as a technician-facing
+  readout independent of scheduling. Not a `CategoricalFactor`/`ContinuousFactor` destination -- like
+  `:reagent`, organism columns need no per-column `Factor` registration at all (see
+  `is_registered_organism`).
 - `:condition` (either subtype) -- a plain recorded value (e.g. temperature, atmosphere), never a
   `CHESSCore.Attribute` -- recorded per-plate (`:plate_conditions`).
 

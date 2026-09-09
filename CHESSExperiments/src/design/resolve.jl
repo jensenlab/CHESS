@@ -131,9 +131,9 @@ magnitude (paired with `units[oname]`) fed into `CHESSCore`'s `Biomass * Organis
 `missing` means no inoculum for that organism in this row.
 
 Returns the built `Stock` (promoted to a `Culture` if any organism factor resolved) and a
-`Dict{Symbol,Any}` recording each organism factor's resolved biomass value per-well -- since
-Pourfecto doesn't schedule inoculation, this is what a technician-facing `:well_conditions` record is
-built from.
+`Dict{Symbol,Any}` recording each organism factor's resolved biomass value per-well -- this is what
+a technician-facing `:well_conditions` record is built from, independent of whether the same
+biomass value also reaches a scheduler via the returned `Stock`.
 """
 function resolve_stock(
     row,
