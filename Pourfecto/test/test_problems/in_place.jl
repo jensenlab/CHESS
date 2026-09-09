@@ -1,9 +1,9 @@
 using Pourfecto, CHESSCore, Unitful, HiGHS
 
-water = string_to_reagent("water",Liquid)
-X = string_to_reagent("X",Liquid) # a reagent already present in the "existing" well content
-Y = string_to_reagent("Y",Liquid) # a trace reagent present only in a source, never restated in any target
-NaOH = string_to_reagent("NaOH",Liquid) # the reagent being added in place
+water = string_to_component("water",Liquid)
+X = string_to_component("X",Liquid) # a reagent already present in the "existing" well content
+Y = string_to_component("Y",Liquid) # a trace reagent present only in a source, never restated in any target
+NaOH = string_to_component("NaOH",Liquid) # the reagent being added in place
 
 @testset "in-place planning: diagonal pin, off-diagonal zero, capacity" begin
     s1 = 150u"µL"*water + 50u"µL"*X   # well A existing content, 200µL total

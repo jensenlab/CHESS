@@ -244,7 +244,7 @@ end
 ## My old code 
 
 
-StructUtils.lowerkey(::JSON.JSONWriteStyle, x::CHESSCore.Reagent) = JSON.json(reagent_to_string(x))
+StructUtils.lowerkey(::JSON.JSONWriteStyle, x::CHESSCore.Reagent) = JSON.json(component_to_string(x))
 StructUtils.lowerkey(::JSON.JSONWriteStyle, x::CHESSCore.Organism) = JSON.json(x)
 StructUtils.lowerkey(::JSON.JSONWriteStyle, x::CHESSCore.Attribute) = JSON.json(x)
 StructUtils.lowerkey(::JSON.JSONWriteStyle, x::DataType) = JSON.json(x)

@@ -169,7 +169,7 @@ export configurations, objectives # constants
 
 export set_cobra_path!, JENSENLAB_COBRA_PATH # persistent instrument-specific settings
 
-export reagent_to_string, string_to_reagent # string interface for reagents
+export component_to_string, string_to_component # string interface for reagents/organisms
 
 export df_to_stock, stock_to_df, df_to_labware, labware_to_df # dataframe interface 
 

@@ -37,35 +37,58 @@ end
 
 
 
-function string_to_reagent(str::AbstractString,unit::Unitful.Units;reagent_context=CHESSCore,kwargs...)
+"""
+    string_to_component(str::AbstractString, unit::Unitful.Units;
+                        reagent_context=CHESSCore, org_context=CHESSCore, kwargs...) -> StockComponent
+
+Infer a `StockComponent` from `str` and the dimension of `unit` -- used by the "vc"/"q" DataFrame
+format, where a column's identity has to be guessed from its unit when it isn't otherwise
+registered. Tries `reagentparse(str)` first; on failure, dispatches on `unit`'s dimension: a bare
+`OD` dimension (vc's organism "concentration") or a `Biomass` dimension (`OD*Volume`, q's organism
+quantity) both delegate to [`string_to_component(str,::Type{Organism})`](@ref); mass/molarity/
+density/amount dimensions assume an unregistered `Solid`; dimensionless/volume dimensions assume an
+unregistered `Liquid`.
+"""
+function string_to_component(str::AbstractString,unit::Unitful.Units;reagent_context=CHESSCore,org_context=CHESSCore,kwargs...)
 
     try
         return reagentparse(str;reagent_context=reagent_context)
     catch
     end
-    @warn("reagent $str not registered. parsing $str assuming it is a chemical. No chemical properties known.")
-    if unit isa Unitful.DensityUnits || unit isa Unitful.MassUnits || unit isa Unitful.AmountUnits || unit isa Unitful.MolarityUnits
+    if dimension(unit) == dimension(u"OD*mL") || dimension(unit) == dimension(u"OD")
+        # an organism's OD-based "concentration" in vc format, or its Biomass in q format
+        return string_to_component(str, Organism; org_context=org_context, kwargs...)
+    elseif unit isa Unitful.DensityUnits || unit isa Unitful.MassUnits || unit isa Unitful.AmountUnits || unit isa Unitful.MolarityUnits
         # a solid mass concentration in vc format or a mass in q format
+        @warn("reagent $str not registered. parsing $str assuming it is a chemical. No chemical properties known.")
         return Solid(str,missing,missing,missing)
     elseif unit isa Unitful.DimensionlessUnits || unit isa Unitful.VolumeUnits # a %v/v concentration in vc format or a volume in q format
+        @warn("reagent $str not registered. parsing $str assuming it is a chemical. No chemical properties known.")
         return Liquid(str,missing,missing,missing)
     end
 
 end
 
 """
-    string_to_reagent(str::AbstractString, chem_type::Type{<:Reagent};
-                      reagent_context=CHESSCore, kwargs...) -> Reagent
+    string_to_component(str::AbstractString, chem_type::Type{<:Reagent};
+                        reagent_context=CHESSCore, kwargs...) -> Reagent
+    string_to_component(str::AbstractString, ::Type{Organism};
+                        org_context=CHESSCore, kwargs...) -> Organism
 
-Convert a string into a `Reagent` instance.
+Convert a string into a `Reagent` or `Organism` instance.
 
-The function first attempts to parse `str` using `CHESSCore.reagentparse`, which may
+The `Reagent` method first attempts to parse `str` using `CHESSCore.reagentparse`, which may
 return a registered reagent object from `reagent_context`. If parsing fails, it
 emits a warning and falls back to constructing a new reagent of type `chem_type`
 using `str` as the identifier/name and `missing` for unknown properties.
 
+The `Organism` method first attempts `CHESSCore.orgparse` (`org_context`); if that fails, it
+emits a warning and falls back to splitting `str` into `"genus species strain"` form -- errors if
+`str` doesn't have exactly three space-separated parts, since (unlike `Reagent`) `Organism` has no
+`missing`-tolerant fields to build a permissive fallback from a single unstructured string.
+
 # Arguments
-- `str::AbstractString`: The reagent identifier to parse (e.g., a registered name,
+- `str::AbstractString`: The reagent/organism identifier to parse (e.g., a registered name,
   alias, or other parseable representation).
 - `chem_type::Type{<:Reagent}`: Concrete `Reagent` subtype to instantiate if
   `str` is not registered / cannot be parsed.
@@ -73,20 +96,25 @@ using `str` as the identifier/name and `missing` for unknown properties.
 # Keyword Arguments
 - `reagent_context=CHESSCore`: Module or list of modules to search for registered
   reagents during parsing (forwarded to `reagentparse`).
+- `org_context=CHESSCore`: Module or list of modules to search for registered
+  organisms during parsing (forwarded to `orgparse`).
 
 # Returns
 - A `Reagent` object. If `reagentparse` succeeds, the parsed/registered object is
   returned; otherwise, a new `chem_type(str, missing, missing, missing)` is returned.
+- An `Organism` object. If `orgparse` succeeds, the parsed/registered object is returned;
+  otherwise, `str` is split into `Organism(genus, species, strain)`.
 
 # Notes
-This function is intentionally permissive: unknown reagents do not error, but are
+The `Reagent` method is intentionally permissive: unknown reagents do not error, but are
 treated as reagents with unspecified properties (`missing`), which may affect
-downstream calculations that require those properties.
+downstream calculations that require those properties. The `Organism` method is not --
+an unregistered, malformed organism string errors rather than guessing.
 
-See also: [`reagent_to_string`](@ref)
+See also: [`component_to_string`](@ref)
 
 """
-function string_to_reagent(str::AbstractString,chem_type::Type{<:Reagent};reagent_context=CHESSCore,kwargs...)
+function string_to_component(str::AbstractString,chem_type::Type{<:Reagent};reagent_context=CHESSCore,kwargs...)
     try
         return reagentparse(str;reagent_context=reagent_context)
     catch
@@ -95,27 +123,48 @@ function string_to_reagent(str::AbstractString,chem_type::Type{<:Reagent};reagen
     return chem_type(str,missing,missing,missing)
 end
 
+function string_to_component(str::AbstractString, ::Type{Organism}; org_context=CHESSCore, kwargs...)
+    try
+        return orgparse(str; org_context=org_context)
+    catch
+    end
+    @warn("organism $str not registered. parsing $str assuming \"genus species strain\" form.")
+    parts = split(str)
+    length(parts) == 3 || error("cannot parse organism \"$str\" -- not registered and not in \"genus species strain\" form")
+    return Organism(parts[1], parts[2], parts[3])
+end
+
 
 
 """
-    reagent_to_string(r::CHESSCore.Reagent; reagent_context=CHESSCore, kwargs...) -> String
+    component_to_string(r::CHESSCore.Reagent; reagent_context=CHESSCore, kwargs...) -> String
+    component_to_string(o::CHESSCore.Organism; org_context=CHESSCore, kwargs...) -> String
 
-Convert a `CHESSCore.Reagent` into a stable string identifier.
+Convert a `CHESSCore.Reagent` or `CHESSCore.Organism` into a stable string identifier.
 
-Returns the *registered symbol* for `r` (via [`symbol`](@ref)) when it can be found in
-`reagent_context` — this is useful because a registered reagent's display name
-(`CHESSCore.name(r)`) is not necessarily the same string that [`reagentparse`](@ref) expects
-to resolve it. If `r` isn't found (e.g. an ad hoc reagent built on the fly), falls back
-to `CHESSCore.name(r)`, which is sufficient to reconstruct such reagents.
+Returns the *registered symbol* for the argument (via [`symbol`](@ref)) when it can be found in
+`reagent_context`/`org_context` — this is useful because a registered component's display name
+(`CHESSCore.name(x)`) is not necessarily the same string that [`reagentparse`](@ref)/[`orgparse`](@ref)
+expect to resolve it. If not found (e.g. an ad hoc reagent/organism built on the fly), falls back
+to `CHESSCore.name(x)`, which is sufficient to reconstruct such components.
 
-See also: [`string_to_reagent`](@ref)
+See also: [`string_to_component`](@ref)
 """
-function reagent_to_string(r::CHESSCore.Reagent; reagent_context=CHESSCore,kwargs...)
+function component_to_string(r::CHESSCore.Reagent; reagent_context=CHESSCore,kwargs...)
     try
         return string(symbol(r; context=reagent_context))
     catch e
         e isa ArgumentError || rethrow()
         return name(r)
+    end
+end
+
+function component_to_string(o::CHESSCore.Organism; org_context=CHESSCore, kwargs...)
+    try
+        return string(symbol(o; context=org_context))
+    catch e
+        e isa ArgumentError || rethrow()
+        return name(o)
     end
 end
 
@@ -145,7 +194,7 @@ function concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Solid)
     # Solution/Culture case (a solid's mass relative to a volume total, matching the common case
     # this "vc" dataframe format is used for), since a Mixture-total (percent) can't be assumed for
     # a stock with no total at all. Mixing 0-percent and 0-g/mL rows for the same reagent column
-    # breaks reagent_dict's row-1-only unit classification in get_vc_reagents/vc_to_stock.
+    # breaks component_dict's row-1-only unit classification in get_vc_components/vc_to_stock.
     ismissing(total) && return 0*u"g/mL"
     return _relative_amount(get(solids(stock),ingredient,0u"g"),total)
 end
@@ -249,7 +298,28 @@ function reagent_df(stocks::Vector{<:CHESSCore.Stock};measure::Function=concentr
             for s in stocks
                 push!(vals,measure(s,i))
             end
-            out[:,reagent_to_string(i;kwargs...)]=vals
+            out[:,component_to_string(i;kwargs...)]=vals
+        end
+
+    return out
+end
+
+"""
+    component_df(stocks::Vector{<:Stock}; measure::Function=concentration, kwargs...) -> DataFrame
+
+Like [`reagent_df`](@ref), but gathers via [`all_components`](@ref) instead of [`all_reagents`](@ref),
+so organisms are included as columns alongside reagents (`measure` -- `concentration` or `quantity`
+-- already has `Organism` methods).
+"""
+function component_df(stocks::Vector{<:CHESSCore.Stock};measure::Function=concentration,kwargs...)
+    ingredients = all_components(stocks)
+    out=DataFrame()
+        for i in ingredients
+            vals=Any[]
+            for s in stocks
+                push!(vals,measure(s,i))
+            end
+            out[:,component_to_string(i;kwargs...)]=vals
         end
 
     return out

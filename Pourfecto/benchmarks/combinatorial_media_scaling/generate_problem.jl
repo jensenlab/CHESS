@@ -24,8 +24,8 @@ Returns `(source_labware, target_plates, priority, reagents)`.
 function build_problem(n_plates::Int; seed::Int=48207531)
     rng = Random.MersenneTwister(seed)
 
-    reagents = [string_to_reagent("R$i", Solid) for i in 1:N_REAGENTS]
-    water = string_to_reagent("water", Liquid)
+    reagents = [string_to_component("R$i", Solid) for i in 1:N_REAGENTS]
+    water = string_to_component("water", Liquid)
 
     # One concentrated "unit" solution per reagent. `*(::Unitful.Volume, ::Stock)` rescales this
     # to any target volume while preserving the reagent:water ratio, so the same definition is

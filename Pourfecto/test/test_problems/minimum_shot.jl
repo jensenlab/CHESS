@@ -2,8 +2,8 @@ using Pourfecto, CHESSCore, Unitful
 # small, single-source/single-target problem specifically to exercise the enforce_minimum_shot=true
 # MIQP branch (adds binary QI variables) with a solver that supports it (SCIP) -- kept tiny so the
 # MIQP solve stays fast.
-A = string_to_reagent("A",Solid)
-water = string_to_reagent("water",Liquid)
+A = string_to_component("A",Solid)
+water = string_to_component("water",Liquid)
 
 source = build_location(location_kinds[:Conical15],"A source")
 st = Empty()

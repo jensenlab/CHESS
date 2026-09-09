@@ -118,9 +118,9 @@ end
 end
 
 @testset "DataFrame interop" begin
-    # reagent_to_string / string_to_reagent round-trip a registered reagent by symbol, not name
-    @test reagent_to_string(rgt"water";reagent_context=[CHESSCore,TestChemOrg]) == "water"
-    @test string_to_reagent("water",u"percent";reagent_context=[CHESSCore,TestChemOrg]) == rgt"water"
+    # component_to_string / string_to_component round-trip a registered reagent by symbol, not name
+    @test component_to_string(rgt"water";reagent_context=[CHESSCore,TestChemOrg]) == "water"
+    @test string_to_component("water",u"percent";reagent_context=[CHESSCore,TestChemOrg]) == rgt"water"
 
     # concentration(::Stock,::Solid) is now relative to quantity(stock) (a mass for Mixture), via
     # _relative_amount -- same-dimension (mass/mass here) means percent, not a density-style ratio

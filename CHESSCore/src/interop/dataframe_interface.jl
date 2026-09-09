@@ -1,23 +1,23 @@
-function get_vc_reagents(vc::DataFrame,units::DataFrame;kwargs...)
+function get_vc_components(vc::DataFrame,units::DataFrame;kwargs...)
     colnames =names(vc)
-    # in the vc format, each column other than the "volume" column is a reagent
-    reagent_names = setdiff(colnames,["volume"])
-    # take units from first row to supply to the reagent parser
-    un = units[1,reagent_names]
+    # in the vc format, each column other than the "volume" column is a reagent or organism
+    component_names = setdiff(colnames,["volume"])
+    # take units from first row to supply to the parser
+    un = units[1,component_names]
 
-    reagents = string_to_reagent.(reagent_names,string_to_unit.(collect(un));kwargs...)
+    components = string_to_component.(component_names,string_to_unit.(collect(un));kwargs...)
 
-    return Dict(reagent_names .=> reagents)
+    return Dict(component_names .=> components)
 end
 
-function get_quant_reagents(quant::DataFrame,units::DataFrame;kwargs...)
-    reagent_names  =names(quant)
-    # take units from first row to supply to the reagent parser
-    un = units[1,reagent_names]
+function get_quant_components(quant::DataFrame,units::DataFrame;kwargs...)
+    component_names  =names(quant)
+    # take units from first row to supply to the parser
+    un = units[1,component_names]
 
-    reagents = string_to_reagent.(reagent_names,string_to_unit.(collect(un));kwargs...)
+    components = string_to_component.(component_names,string_to_unit.(collect(un));kwargs...)
 
-    return Dict(reagent_names .=> reagents)
+    return Dict(component_names .=> components)
 end
 
 
@@ -53,7 +53,7 @@ function vc_to_stock(vc::DataFrame,units::DataFrame;kwargs...)
 
     single_unit = is_single_row(units)
 
-    reagent_dict = get_vc_reagents(vc,units;kwargs...)
+    component_dict = get_vc_components(vc,units;kwargs...)
     N = nrow(vc)
     stocks = Stock[]
     urow = 1 # assume single unit by default
@@ -64,17 +64,18 @@ function vc_to_stock(vc::DataFrame,units::DataFrame;kwargs...)
 
         st = Empty()
         vol = vc[row,"volume"] * string_to_unit(units[urow,"volume"]) # parse the volume
-        for r in keys(reagent_dict)
+        for r in keys(component_dict)
             un = string_to_unit(units[urow,r])
-            if un isa Unitful.MassUnits || un isa Unitful.VolumeUnits || un isa Unitful.AmountUnits
+            if un isa Unitful.MassUnits || un isa Unitful.VolumeUnits || un isa Unitful.AmountUnits || dimension(un) == dimension(u"OD*mL")
                 error("units provided are in a quantity format, did you mean to use the quantity (q) format?")
             end
-            reagent = reagent_dict[r]
-            expected = reagent isa Liquid ? dimension(u"mL") : dimension(u"g")
+            component = component_dict[r]
+            expected = component isa Organism ? dimension(u"OD*mL") : component isa Liquid ? dimension(u"mL") : dimension(u"g")
+            kind = component isa Organism ? "biomass" : component isa Liquid ? "volume" : "mass"
             dimension(un)*dimension(unit(vol)) == expected || error(
-                "concentration unit $un for reagent $r is not dimensionally consistent with a total of $(unit(vol)) -- expected units that combine to a $(reagent isa Liquid ? "volume" : "mass")")
+                "concentration unit $un for $(component isa Organism ? "organism" : "reagent") $r is not dimensionally consistent with a total of $(unit(vol)) -- expected units that combine to a $kind")
             quant = ((vc[row,r] * un) *vol)
-            st +=  quant * reagent_dict[r]
+            st +=  quant * component_dict[r]
         end
         push!(stocks,st)
     end
@@ -84,7 +85,7 @@ end
 
 
 function stock_to_vc(stocks::Vector{<:CHESSCore.Stock}; kwargs...)
-    concs = reagent_df(stocks;measure=concentration,kwargs...)
+    concs = component_df(stocks;measure=concentration,kwargs...)
     vols = CHESSCore.quantity.(stocks)
     vols = map(x-> ismissing(x) ? 0u"ml" : x,vols)
 
@@ -104,7 +105,7 @@ function q_to_stock(quant::DataFrame,units::DataFrame;kwargs...)
     check_csv_inputs(quant,units)
     single_unit = is_single_row(units)
 
-    reagent_dict = get_quant_reagents(quant,units;kwargs...)
+    component_dict = get_quant_components(quant,units;kwargs...)
     N = nrow(quant)
     stocks = Stock[]
     urow = 1 # assume single unit by default
@@ -114,13 +115,13 @@ function q_to_stock(quant::DataFrame,units::DataFrame;kwargs...)
         end
 
         st = Empty()
-        for r in keys(reagent_dict)
+        for r in keys(component_dict)
             un = string_to_unit(units[urow,r])
-            if un isa Unitful.DensityUnits || un isa Unitful.DimensionlessUnits || un isa Unitful.MolarityUnits
+            if un isa Unitful.DensityUnits || un isa Unitful.DimensionlessUnits || un isa Unitful.MolarityUnits || dimension(un) == dimension(u"OD")
                 error("units provided are in a concentration format, did you mean to use the volume concentration (vc) format?")
             end
             q = quant[row,r] * un
-            st +=  q * reagent_dict[r]
+            st +=  q * component_dict[r]
         end
         push!(stocks,st)
     end
@@ -128,7 +129,7 @@ function q_to_stock(quant::DataFrame,units::DataFrame;kwargs...)
 end
 
 function stock_to_q(stocks::Vector{<:CHESSCore.Stock};kwargs...)
-    quants = reagent_df(stocks;measure=quantity,kwargs...)
+    quants = component_df(stocks;measure=quantity,kwargs...)
 
     q = ustrip.(quants)
     un = unit_to_string.(unit.(quants) )

@@ -9,27 +9,6 @@
 # (via build_location) -- location_id/parent are omitted, mirroring df_to_labware's design boundary;
 # commit the result yourself (e.g. commit_location! in CHESSDatabase) if you want it tracked.
 
-function _organism_to_string(o::Organism; org_context=CHESSCore, kwargs...)
-    try
-        return string(symbol(o; context=org_context))
-    catch e
-        e isa ArgumentError || rethrow()
-    end
-    return name(o)
-end
-
-function _string_to_organism(str::AbstractString; org_context=CHESSCore, kwargs...)
-    try
-        return orgparse(str; org_context=org_context)
-    catch
-    end
-    # not registered -- fall back to splitting the "genus species strain" display name (mirrors
-    # string_to_reagent's fallback for an unregistered chemical: best-effort, not lossless)
-    parts = split(str)
-    length(parts) == 3 || error("cannot parse organism \"$str\" -- not registered and not in \"genus species strain\" form")
-    return Organism(parts[1], parts[2], parts[3])
-end
-
 """
     stock_to_dict(s::Stock; reagent_context=CHESSCore, org_context=CHESSCore, kwargs...) -> Dict{String,Any}
 
@@ -42,15 +21,15 @@ See also: [`dict_to_stock`](@ref)
 function stock_to_dict(s::Stock; reagent_context=CHESSCore, org_context=CHESSCore, kwargs...)
     sol = Dict{String,Any}()
     for (r, q) in solids(s)
-        sol[reagent_to_string(r; reagent_context, kwargs...)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
+        sol[component_to_string(r; reagent_context, kwargs...)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
     end
     liq = Dict{String,Any}()
     for (r, q) in liquids(s)
-        liq[reagent_to_string(r; reagent_context, kwargs...)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
+        liq[component_to_string(r; reagent_context, kwargs...)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
     end
     org = Dict{String,Any}()
     for (o, q) in organisms(s)
-        org[_organism_to_string(o; org_context)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
+        org[component_to_string(o; org_context, kwargs...)] = Dict("amount" => ustrip(q), "unit" => unit_to_string(unit(q)))
     end
     return Dict{String,Any}("solids" => sol, "liquids" => liq, "organisms" => org)
 end
@@ -63,15 +42,15 @@ Inverse of [`stock_to_dict`](@ref).
 function dict_to_stock(d::Dict; reagent_context=CHESSCore, org_context=CHESSCore, kwargs...)
     sol = SolidDict()
     for (n, amt) in d["solids"]
-        sol[string_to_reagent(n, Solid; reagent_context, kwargs...)] = amt["amount"] * string_to_unit(amt["unit"])
+        sol[string_to_component(n, Solid; reagent_context, kwargs...)] = amt["amount"] * string_to_unit(amt["unit"])
     end
     liq = LiquidDict()
     for (n, amt) in d["liquids"]
-        liq[string_to_reagent(n, Liquid; reagent_context, kwargs...)] = amt["amount"] * string_to_unit(amt["unit"])
+        liq[string_to_component(n, Liquid; reagent_context, kwargs...)] = amt["amount"] * string_to_unit(amt["unit"])
     end
     org = OrganismDict()
     for (n, amt) in d["organisms"]
-        org[_string_to_organism(n; org_context)] = amt["amount"] * string_to_unit(amt["unit"])
+        org[string_to_component(n, Organism; org_context, kwargs...)] = amt["amount"] * string_to_unit(amt["unit"])
     end
     return Stock(org, sol, liq)
 end

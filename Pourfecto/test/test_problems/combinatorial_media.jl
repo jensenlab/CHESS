@@ -1,8 +1,8 @@
 using Pourfecto, CHESSCore, Unitful, Random
 Random.seed!(48207531)
 
-reagents = [string_to_reagent("R$i",Solid) for i in 1:48]
-water = string_to_reagent("water",Liquid)
+reagents = [string_to_component("R$i",Solid) for i in 1:48]
+water = string_to_component("water",Liquid)
 
 
 source_deep_well = build_location(location_kinds[:DeepWP96])

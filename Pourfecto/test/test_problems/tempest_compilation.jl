@@ -1,10 +1,10 @@
 using Pourfecto, CHESSCore, Unitful
 # define four reagents for the problem 
-A = string_to_reagent("A",Solid)
-B = string_to_reagent("B",Solid) 
-C = string_to_reagent("C",Solid)
-D = string_to_reagent("D",Solid)
-water = string_to_reagent("water",Liquid) 
+A = string_to_component("A",Solid)
+B = string_to_component("B",Solid) 
+C = string_to_component("C",Solid)
+D = string_to_component("D",Solid)
+water = string_to_component("water",Liquid) 
 # generate source and target labware
 solids = [A,B,C,D]
 

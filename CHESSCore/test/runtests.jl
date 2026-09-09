@@ -849,12 +849,12 @@ end
 end
 
 @testset "Interop: DataFrame <-> Stock/Labware round-trips" begin
-    # reagent_to_string / string_to_reagent round-trip a registered reagent by symbol, not name
-    @test reagent_to_string(rgt"water";reagent_context=[CHESSCore,TestChemOrg]) == "water"
-    @test string_to_reagent("water",u"percent";reagent_context=[CHESSCore,TestChemOrg]) == rgt"water"
+    # component_to_string / string_to_component round-trip a registered reagent by symbol, not name
+    @test component_to_string(rgt"water";reagent_context=[CHESSCore,TestChemOrg]) == "water"
+    @test string_to_component("water",u"percent";reagent_context=[CHESSCore,TestChemOrg]) == rgt"water"
     # unregistered name falls back to a bare Solid/Liquid with missing properties, with a warning.
     # u"percent" is dimensionless -> the Liquid branch (a %v/v concentration in vc format)
-    unreg = @test_logs (:warn,r"not registered") match_mode=:any string_to_reagent("mystery goo",u"percent";reagent_context=[CHESSCore,TestChemOrg])
+    unreg = @test_logs (:warn,r"not registered") match_mode=:any string_to_component("mystery goo",u"percent";reagent_context=[CHESSCore,TestChemOrg])
     @test unreg isa Liquid && ismissing(molecular_weight(unreg))
 
     # concentration(::Stock,::Solid/::Liquid) relative to quantity(stock)

@@ -1,8 +1,8 @@
 using Pourfecto, CHESSCore, Unitful
 # define three reagents for the problem 
-A = string_to_reagent("A",Solid)
-B = string_to_reagent("B",Solid) 
-water = string_to_reagent("water",Liquid) 
+A = string_to_component("A",Solid)
+B = string_to_component("B",Solid) 
+water = string_to_component("water",Liquid) 
 # generate source and target labware
 A_reservoir = build_location(location_kinds[:DeepReservoir])
 B_reservoir = build_location(location_kinds[:DeepReservoir])

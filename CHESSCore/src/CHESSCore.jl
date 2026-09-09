@@ -129,7 +129,7 @@ export df_to_stock, stock_to_df, df_to_labware, labware_to_df
 # location <-> dict interop (JSON-safe, for tools outside CHESS)
 export location_to_dict, dict_to_location, stock_to_dict, dict_to_stock
 export attribute_to_dict, dict_to_attribute, read_to_dict, dict_to_read
-export string_to_reagent, reagent_to_string, reagent_df, all_reagents, all_components, concentration
+export string_to_component, component_to_string, reagent_df, component_df, all_reagents, all_components, concentration
 export vc_to_stock, stock_to_vc, q_to_stock, stock_to_q
 export registry_summary
 end # module CHESSCore

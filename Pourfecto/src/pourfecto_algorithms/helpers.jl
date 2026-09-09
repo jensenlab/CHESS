@@ -154,12 +154,12 @@ function update_priority(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CH
     end 
 
 
-    for chem in reagent_to_string.(tgt_chems)
+    for chem in component_to_string.(tgt_chems)
         if !in(chem,keys(new_priority))
             new_priority[chem]=UInt64(1)
         end 
     end 
-    for chem in reagent_to_string.(src_chems)
+    for chem in component_to_string.(src_chems)
         if !in(chem,keys(new_priority)) # if the user hasn't specified a source ingredient priority or included it in the targets (see above), assume it is priority 0. (These ingredients will be blocked, regardless of a discrete or continuous robot)
             new_priority[chem]=UInt64(0) 
         end 

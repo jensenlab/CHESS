@@ -29,8 +29,8 @@ Random.seed!(48207531)
 
 # ## Reagents and source labware
 
-reagents = [string_to_reagent("R$i", Solid) for i in 1:48]
-water = string_to_reagent("water", Liquid)
+reagents = [string_to_component("R$i", Solid) for i in 1:48]
+water = string_to_component("water", Liquid)
 
 # The deep 96-well source plate holds each reagent stock twice, in different
 # wells, so the scheduler has more flexibility in which physical well it

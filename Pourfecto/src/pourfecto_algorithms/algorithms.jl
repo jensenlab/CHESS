@@ -74,7 +74,7 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     # constrain slacks to measure target stock error
     balance_constraints = @constraint(model, V'*S .- slacks .== T ) # create the targets with the sources, allowing for some slack. This is a mass/volume balance.
     for t in 1:N_t, c in 1:N_c
-        registry[balance_constraints[t,c]] = (category=:mass_balance, description="mass/volume balance constraint linking source composition to $(target_labels[t]) for chemical \"$(reagent_to_string(chems[c]))\"")
+        registry[balance_constraints[t,c]] = (category=:mass_balance, description="mass/volume balance constraint linking source composition to $(target_labels[t]) for chemical \"$(component_to_string(chems[c]))\"")
     end
 
     #constraints to ensure that we don't overdraft sources
@@ -116,10 +116,10 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
         end
     end
     for c in 1:N_c
-        if full_priority[reagent_to_string(chems[c])] == UInt(0)
+        if full_priority[component_to_string(chems[c])] == UInt(0)
                 cons = @constraint(model, slacks[:,c] .== 0) # priority 0 ingredients must hit the target exactly for each destination. The slack must be zero (because the delivered quantity must be zero)
                 for con in cons
-                    registry[con] = (category=:priority0, description="priority-0 exact-match constraint requires 0 slack for chemical \"$(reagent_to_string(chems[c]))\" across all targets")
+                    registry[con] = (category=:priority0, description="priority-0 exact-match constraint requires 0 slack for chemical \"$(component_to_string(chems[c]))\" across all targets")
                 end
         end
      end
@@ -326,7 +326,7 @@ function solve_planning_model(
 
             chem_weights= falses(N_c)
             for c in 1:N_c
-                    if priority[reagent_to_string(chems[c])] <= level 
+                    if priority[component_to_string(chems[c])] <= level 
                             chem_weights[c]=true # activate the weight term for this ingredient on this pass
                     end 
             end 
