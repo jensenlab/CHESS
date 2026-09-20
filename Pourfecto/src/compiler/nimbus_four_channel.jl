@@ -21,15 +21,26 @@
 #   2. order_windows -- nearest-neighbor tour over the resulting windows (reusing order_batch).
 #   3. assemble_windows -- realize the ordered windows, inserting per-channel capacity-driven
 #      Aspirate/TipPickup/TipDisposal/Blowout events without ever splitting a window's group.
+#      Reload trips are SYNCHRONIZED across channels (compute_synchronized_cycles, Phase 3a):
+#      whenever any channel must reload, every channel with outstanding demand reloads at that same
+#      window -- ending a cycle early, with unused headroom, if that's what it takes to align --
+#      rather than each channel triggering its own isolated trip once its own item happens to come
+#      up later in the shared dispense order. A channel's final TipDisposal is deferred the same
+#      way, piggybacked onto the next reload trip elsewhere (or one final consolidated wave) instead
+#      of firing in isolation. TipPickup/TipDisposal/Blowout always merge across every channel
+#      needing the action at the same point in the walk (their target Labware ID is always the same
+#      constant); Aspirate merges across channels only when they share the same source Labware ID --
+#      none of these four apply the row/column spacing check that Dispense windows use, since
+#      (unlike Dispense's rigid simultaneous 4-channel motion) they're position-per-channel commands
+#      the Nimbus's own internal logic sequences correctly even when not truly simultaneous.
 # This replaced an earlier "opportunistic merge only" baseline (each reagent's own independent
 # cluster_batches/order_batch tour, cross-channel alignment only discovered after the fact by
 # comparing channels' current queue items) once simulation against a real example showed that
 # baseline captured very little of the available parallelism (190 dispense rows vs. 123 achievable
-# via the sweep, further reduced by nearest-neighbor window ordering). Aspirate-side merging (two
-# channels reloading from co-located sources at once) and reagent-to-channel reassignment when
-# reagent count exceeds channel count remain explicit, separate follow-up work -- see a relevant
-# reference on the latter's tractability: PMC12360158, which reports exact routing solves become
-# intractable past ~100 jobs (our own protocols already exceed that).
+# via the sweep, further reduced by nearest-neighbor window ordering). Reagent-to-channel
+# reassignment when reagent count exceeds channel count remains explicit, separate follow-up work --
+# see a relevant reference on its tractability: PMC12360158, which reports exact routing solves
+# become intractable past ~100 jobs (our own protocols already exceed that).
 
 """
     nimbus_4ch_well(position::DeckPosition, slot::Int) -> String
@@ -246,29 +257,98 @@ function channel_event_sequence(ordered_windows::Vector{DispenseWindow}, channel
 end
 
 """
-    pack_into_cycles(events::Vector{Tuple{Int,DispenseItem}}, effective_capacity::Real) -> Vector{Vector{Tuple{Int,DispenseItem}}}
+    compute_synchronized_cycles(ordered_windows, channels, channel_items, effective_capacity) ->
+        (cycles, trigger_window, disposal_window)
 
-Forward-greedy capacity-bounded chunking of an already-ordered event sequence into aspirate
-cycles -- preserves the given order (unlike `cluster_batches`, which reclusters by proximity); the
-order itself was already decided by Phase 1/2, so reclustering here would undo that work. Each
-item is assumed already `<= effective_capacity` (via `split_oversized`), so every cycle gets at
-least one item and the chunking always terminates.
+Phase 3a: jointly compute every channel's aspirate-cycle boundaries in **one pass** over
+`ordered_windows`, instead of packing each channel's own event sequence independently. Whenever any
+channel would run out of pre-loaded capacity for its next item, every channel with outstanding
+demand reloads at that **same window** -- ending its current cycle early, with unused headroom, if
+that's what it takes to align. This is what lets a channel's `TipPickup`/`Aspirate` fire while the
+gantry is already at the tip/source area for another channel, instead of triggering its own later,
+isolated trip once its own first (or next) item happens to come up in the shared dispense order.
+
+A channel that exhausts all its demand becomes disposal-due but is never given its own trigger --
+its final `TipDisposal` is deferred until the next synchronized reload fires for any other channel
+(piggybacked for free), or, if none remains, flushed in one final wave at the last window.
+
+`channel_items[c]` is `channel_event_sequence(ordered_windows,c)` for every channel with any demand
+(precomputed by the caller). Each item is assumed already `<= effective_capacity` (via
+`split_oversized`), so a fresh cycle always accepts at least one item and the walk always
+terminates. Returns `cycles::Dict{Int,Vector{Vector{Tuple{Int,DispenseItem}}}}` (same shape
+`channel_cycle_data` already consumes), `trigger_window::Dict{Int,Vector{Int}}`
+(`trigger_window[c][ci]` is the window at which cycle `ci` of channel `c` starts loading), and
+`disposal_window::Dict{Int,Int}` (the window at which channel `c`'s final tip disposal fires).
 """
-function pack_into_cycles(events::Vector{Tuple{Int,DispenseItem}}, effective_capacity::Real)
-    cycles = Vector{Tuple{Int,DispenseItem}}[]
-    current = Tuple{Int,DispenseItem}[]
-    used = 0.0
-    for (widx,it) in events
-        if !isempty(current) && used + it.volume > effective_capacity
-            push!(cycles,current)
-            current = Tuple{Int,DispenseItem}[]
-            used = 0.0
+function compute_synchronized_cycles(ordered_windows::Vector{DispenseWindow}, channels,
+    channel_items::Dict{Int,Vector{Tuple{Int,DispenseItem}}}, effective_capacity::Real)
+
+    assigned = Dict(c=>0 for c in channels)
+    consumed = Dict(c=>0 for c in channels)
+    current = Dict{Int,Vector{Tuple{Int,DispenseItem}}}(c=>Tuple{Int,DispenseItem}[] for c in channels)
+    current_vol = Dict(c=>0.0 for c in channels)
+    cycles = Dict{Int,Vector{Vector{Tuple{Int,DispenseItem}}}}(c=>Vector{Tuple{Int,DispenseItem}}[] for c in channels)
+    trigger_window = Dict{Int,Vector{Int}}(c=>Int[] for c in channels)
+    disposal_window = Dict{Int,Int}()
+    pending_disposal = Set{Int}()
+
+    function refill!(c::Int, at_window::Int)
+        if !isempty(current[c])
+            push!(cycles[c],current[c])
+            current[c] = Tuple{Int,DispenseItem}[]
+            current_vol[c] = 0.0
         end
-        push!(current,(widx,it))
-        used += it.volume
+        filled = false
+        while assigned[c] < length(channel_items[c])
+            widx,it = channel_items[c][assigned[c]+1]
+            it.volume <= effective_capacity - current_vol[c] || break
+            push!(current[c],(widx,it))
+            current_vol[c] += it.volume
+            assigned[c] += 1
+            filled = true
+        end
+        filled && push!(trigger_window[c],at_window)
     end
-    isempty(current) || push!(cycles,current)
-    return cycles
+
+    function do_sync!(at_window::Int)
+        for c in channels
+            haskey(disposal_window,c) && continue
+            assigned[c] < length(channel_items[c]) && refill!(c,at_window)
+        end
+        for c in pending_disposal
+            disposal_window[c] = at_window
+        end
+        empty!(pending_disposal)
+    end
+
+    for (w_idx,w) in enumerate(ordered_windows)
+        needs_sync = false
+        for (c,it) in w.active
+            consumed[c] += 1
+            consumed[c] > assigned[c] && (needs_sync = true)
+        end
+        # a sync here may itself assign a channel's last remaining items (fully exhausting it), so
+        # exhaustion must be checked AFTER do_sync! updates `assigned`, using the freshest state --
+        # if a sync just happened at this window, resolve the disposal immediately (same window,
+        # piggybacking for free); otherwise defer it to whichever sync (or the final wave) comes next
+        needs_sync && do_sync!(w_idx)
+        for (c,it) in w.active
+            if consumed[c] == assigned[c] == length(channel_items[c]) && !haskey(disposal_window,c) && !(c in pending_disposal)
+                needs_sync ? (disposal_window[c] = w_idx) : push!(pending_disposal,c)
+            end
+        end
+    end
+    for c in channels
+        isempty(current[c]) || push!(cycles[c],current[c])
+    end
+    if !isempty(pending_disposal)
+        final_w = length(ordered_windows)
+        for c in pending_disposal
+            disposal_window[c] = final_w
+        end
+    end
+
+    return cycles, trigger_window, disposal_window
 end
 
 # Per-cycle aspirate volume / rounded dispense volumes / trailing-blowout flag / tip-change flag,
@@ -299,14 +379,26 @@ end
                       aspirate_buffer, max_tip_use, priming, priming_volume, priming_target) -> DataFrame
 
 Phase 3: walk `ordered_windows` (Phase 1/2's globally-ordered, already-grouped dispense sequence)
-and emit the final wide-schema action rows. For each window, any participating channel that's
-about to start a new aspirate cycle (per [`pack_into_cycles`](@ref), computed once per channel
-ahead of this walk) gets its `TipPickup`/`Aspirate`/priming emitted **first**, as its own
-single-channel row(s); the window's own `Dispense` row is then emitted exactly as grouped by
+and emit the final wide-schema action rows. Cycle boundaries are decided **jointly** across all
+channels by [`compute_synchronized_cycles`](@ref) (Phase 3a) before this walk begins: whenever any
+channel needs to reload, every channel with outstanding demand reloads at that same window (ending
+a cycle early, with unused headroom, if needed to align) -- so a channel's `TipPickup`/`Aspirate`
+fires while the gantry is already at the tip/source area for another channel, rather than
+triggering its own later, isolated trip once its own item happens to come up. At each such
+synchronized reload window, a trailing `Blowout` for any channel's just-finished cycle (per
+`has_trailing_blowout`) is emitted first, then `TipDisposal` (mid-run tip changes **and** any
+channel's now-due final disposal, deferred here rather than firing in isolation), then `TipPickup`,
+then `Aspirate`, then priming. The window's own `Dispense` row is then emitted exactly as grouped by
 Phase 1 -- **the group is never split**, only preceded by whichever channels needed a top-up.
-Once a channel finishes its last item in a cycle, a trailing `Blowout` is emitted if that cycle's
-`has_trailing_blowout` flag is set; once a channel finishes its very last cycle, `TipDisposal` is
-emitted immediately (independently per channel, not waiting for the others).
+
+`TipPickup`/`TipDisposal`/`Blowout` always merge across every channel that needs the action at the
+same point in the walk, since their target `Labware ID` is always the same constant (`"None"` for
+tip actions, the fixed `waste_target` labware for blowout). `Aspirate` merges across channels only
+when they share the same source `Labware ID` -- never based on row/column/spacing compatibility;
+unlike `Dispense` (a rigid simultaneous 4-channel motion, hence [`compute_dispense_windows`](@ref)'s
+spacing check), these are position-per-channel commands whose sequencing the Nimbus's own internal
+logic handles when they aren't actually simultaneous. See [`emit_grouped!`](@ref) (local to this
+function).
 
 This supersedes `merge_schedules`'s role: since Phase 1 already decided which channels fire
 together, this assembly step no longer needs to *discover* alignment via a live compatibility
@@ -320,15 +412,18 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
     dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01, max_tip_use::Int,
     priming::Bool=false, priming_volume::Real=50.0, priming_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing)
 
-    cycles = Dict{Int,Vector{Vector{Tuple{Int,DispenseItem}}}}()
-    cdata = Dict{Int,Any}()
-    for c in 1:n_channels
-        haskey(source_keys_by_channel,c) || continue
-        events = channel_event_sequence(ordered_windows,c)
-        isempty(events) && continue
-        cyc = pack_into_cycles(events,effective_capacity)
-        cycles[c] = cyc
-        cdata[c] = channel_cycle_data(cyc,source_keys_by_channel[c],capacity,volume_precision,insert_blowouts,dead_volume_buffer,aspirate_buffer,max_tip_use)
+    channels = [c for c in 1:n_channels if haskey(source_keys_by_channel,c) && !isempty(channel_event_sequence(ordered_windows,c))]
+    channel_items = Dict{Int,Vector{Tuple{Int,DispenseItem}}}(c=>channel_event_sequence(ordered_windows,c) for c in channels)
+    cycles,trigger_window,disposal_window = compute_synchronized_cycles(ordered_windows,channels,channel_items,effective_capacity)
+    cdata = Dict{Int,Any}(c=>channel_cycle_data(cycles[c],source_keys_by_channel[c],capacity,volume_precision,insert_blowouts,dead_volume_buffer,aspirate_buffer,max_tip_use) for c in channels)
+
+    channels_starting_at = Dict{Int,Vector{Tuple{Int,Int}}}()
+    for c in channels, (ci,w_idx) in enumerate(trigger_window[c])
+        push!(get!(channels_starting_at,w_idx,Tuple{Int,Int}[]),(c,ci))
+    end
+    channels_disposing_at = Dict{Int,Vector{Int}}()
+    for (c,w_idx) in disposal_window
+        push!(get!(channels_disposing_at,w_idx,Int[]),c)
     end
 
     out_labware = String[]
@@ -350,6 +445,31 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
         end
     end
 
+    """
+        emit_grouped!(action, entries::Vector{Tuple{Int,String,String,Float64}})
+
+    Emit one row per distinct `labware_id` among `entries` (each `(channel, labware_id, position,
+    volume)`), merging every channel that shares a `labware_id` into the same row -- this is the
+    "same Labware ID merges, otherwise stays separate" rule for `TipPickup`/`TipDisposal`/`Blowout`
+    (constant `labware_id`, always one group) and `Aspirate` (varies by channel's actual source,
+    multiple groups possible) alike. Distinct labware values keep their first-appearance order.
+    """
+    function emit_grouped!(action::AbstractString, entries::Vector{Tuple{Int,String,String,Float64}})
+        isempty(entries) && return
+        order = String[]
+        groups = Dict{String,Dict{Int,Tuple{String,Float64}}}()
+        for (c,labware,pos,vol) in entries
+            if !haskey(groups,labware)
+                groups[labware] = Dict{Int,Tuple{String,Float64}}()
+                push!(order,labware)
+            end
+            groups[labware][c] = (pos,vol)
+        end
+        for labware in order
+            emit_row!(action,labware,groups[labware])
+        end
+    end
+
     # (cycle index, index within that cycle) for a channel's 1-based cumulative progress count
     function locate(c::Int, idx1based::Int)
         cum = 0
@@ -361,39 +481,53 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
     end
 
     progress = zeros(Int,n_channels)
-    for w in ordered_windows
-        for (c,it) in w.active
-            progress[c] += 1
-            ci,within = locate(c,progress[c])
-            within == 1 || continue
-            key = source_keys_by_channel[c]
-            if ci > 1 && cdata[c][ci].tip_change == 1
-                emit_row!("TipDisposal","None",Dict(c=>("Dispose",0.0)))
-                emit_row!("TipPickup","None",Dict(c=>("Pickup",0.0)))
-            elseif ci == 1
-                emit_row!("TipPickup","None",Dict(c=>("Pickup",0.0)))
+    for (w_idx,w) in enumerate(ordered_windows)
+        starts = get(channels_starting_at,w_idx,Tuple{Int,Int}[])
+        disposals = get(channels_disposing_at,w_idx,Int[])
+
+        if !isempty(starts)
+            blowout_entries = Tuple{Int,String,String,Float64}[]
+            dispose_entries = Tuple{Int,String,String,Float64}[]
+            pickup_entries = Tuple{Int,String,String,Float64}[]
+            aspirate_entries = Tuple{Int,String,String,Float64}[]
+            priming_entries = Tuple{Int,String,String,Float64}[]
+            for (c,ci) in starts
+                if ci > 1 && cdata[c][ci-1].has_trailing_blowout
+                    push!(blowout_entries,(c,waste_target[1],string(waste_target[2]),cdata[c][ci-1].rounded[end]))
+                end
+                key = source_keys_by_channel[c]
+                if ci > 1 && cdata[c][ci].tip_change == 1
+                    push!(dispose_entries,(c,"None","Dispose",0.0))
+                    push!(pickup_entries,(c,"None","Pickup",0.0))
+                elseif ci == 1
+                    push!(pickup_entries,(c,"None","Pickup",0.0))
+                end
+                push!(aspirate_entries,(c,key[1],string(key[2]),cdata[c][ci].aspirate_volume))
+                if priming
+                    ptarget = isnothing(priming_target) ? key : priming_target
+                    push!(priming_entries,(c,ptarget[1],string(ptarget[2]),priming_volume))
+                end
             end
-            emit_row!("Aspirate",key[1],Dict(c=>(string(key[2]),cdata[c][ci].aspirate_volume)))
-            if priming
-                ptarget = isnothing(priming_target) ? key : priming_target
-                emit_row!("Dispense",ptarget[1],Dict(c=>(string(ptarget[2]),priming_volume)))
-            end
+            emit_grouped!("Blowout",blowout_entries)
+            emit_grouped!("TipDisposal",dispose_entries)
+            emit_grouped!("TipPickup",pickup_entries)
+            emit_grouped!("Aspirate",aspirate_entries)
+            priming && emit_grouped!("Dispense",priming_entries)
         end
 
         per_channel = Dict{Int,Tuple{String,Float64}}()
         for (c,it) in w.active
+            progress[c] += 1
             ci,within = locate(c,progress[c])
             per_channel[c] = (cartesian_to_well(it.position),cdata[c][ci].rounded[within])
         end
         emit_row!("Dispense",w.labware_id,per_channel)
 
-        for (c,it) in w.active
-            ci,within = locate(c,progress[c])
-            within == length(cycles[c][ci]) || continue
-            if cdata[c][ci].has_trailing_blowout
-                emit_row!("Blowout",waste_target[1],Dict(c=>(string(waste_target[2]),cdata[c][ci].rounded[end])))
-            end
-            ci == length(cycles[c]) && emit_row!("TipDisposal","None",Dict(c=>("Dispose",0.0)))
+        # final disposals fire AFTER this window's own dispense -- a channel's own last item may be
+        # dispensed in this very window, and physically it dispenses first, then the tip is disposed
+        if !isempty(disposals)
+            final_dispose_entries = Tuple{Int,String,String,Float64}[(c,"None","Dispose",0.0) for c in disposals]
+            emit_grouped!("TipDisposal",final_dispose_entries)
         end
     end
 

@@ -1,6 +1,6 @@
 import Pourfecto: convert_design_four_channel, batch_design_four_channel, channel_row,
     four_channel_row_spacing, compute_dispense_windows, order_windows, DispenseWindow,
-    channel_event_sequence, pack_into_cycles, assemble_windows,
+    channel_event_sequence, compute_synchronized_cycles, assemble_windows,
     nimbus_4ch_waste_conical, nimbus_4ch_waste_slot, nimbus_4ch_waste_target, nimbus_4ch_well,
     tuberack50mL_0006_4ch
 
@@ -180,8 +180,20 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
         df = convert_design_four_channel(design,sources,targets,slotting,config)
         action_df = batch_design_four_channel(df,config;insert_blowouts=false)
 
-        @test count(==("TipPickup"),action_df.Action) == 4
-        @test count(==("TipDisposal"),action_df.Action) == 4
+        # all 4 reagents' single cycle starts/ends in lockstep (aligned demand, well within one
+        # cycle's capacity) -- TipPickup/TipDisposal always merge on a shared "None" Labware ID
+        @test count(==("TipPickup"),action_df.Action) == 1
+        @test count(==("TipDisposal"),action_df.Action) == 1
+        pickup_row = only(eachrow(action_df[action_df.Action .== "TipPickup",:]))
+        dispose_row = only(eachrow(action_df[action_df.Action .== "TipDisposal",:]))
+        @test all(c -> pickup_row["Labware Position $c"] == "Pickup", 1:4)
+        @test all(c -> dispose_row["Labware Position $c"] == "Dispose", 1:4)
+
+        # Aspirate merges only across channels sharing the same physical Source Labware ID; with 4
+        # separate conicals, slotting may pack more than one into the same physical rack position
+        # (a real merge opportunity, not a bug), so the expected row count tracks how many distinct
+        # Labware IDs the 4 reagents actually landed on, not a hardcoded 4
+        @test count(==("Aspirate"),action_df.Action) == length(unique(df[!,"Source Labware ID"]))
 
         dispense_rows = action_df[action_df.Action .== "Dispense",:]
         @test nrow(dispense_rows) == C # one merged row per column, all 4 channels together
@@ -190,6 +202,145 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
         end
         total = sum(sum(dispense_rows[!,"Volume $c"]) for c in 1:4)
         @test total == 30.0*4*C
+    end
+
+    @testset "cross-channel action merging: TipPickup/TipDisposal/Blowout always merge, Aspirate only same-labware" begin
+        sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_merge_src$i") for i in 1:2]
+        target = build_location(location_kinds[:DeepWP96],"nimbus4ch_merge_target")
+        targets = Labware[target]
+        config = configurations["nimbus_four_channel"]
+        slotting = slotting_greedy(vcat(sources,targets),config)
+        R,C = size(target)
+        well_col(letter_row,col) = (col-1)*R + letter_row
+
+        # two reagents, perfectly row/column aligned (rows 1 and 3, spacing 2) -- every column
+        design2 = DataFrame(zeros(2,R*C),:auto)
+        for col in 1:C, i in 1:2
+            design2[i,well_col(2i-1,col)] = 30.0
+        end
+        base_df = convert_design_four_channel(design2,sources,targets,slotting,config)
+
+        @testset "different source labware -> Aspirate stays separate" begin
+            # this sub-case is only meaningful if slotting actually put the 2 conicals on 2
+            # distinct physical Labware IDs -- assert that precondition explicitly rather than
+            # assume it, since slotting_greedy could in principle pack both into one shared rack
+            @test length(unique(base_df[!,"Source Labware ID"])) == 2
+
+            action_df = batch_design_four_channel(base_df,config;insert_blowouts=false)
+
+            @test count(==("TipPickup"),action_df.Action) == 1
+            @test count(==("TipDisposal"),action_df.Action) == 1
+            @test count(==("Aspirate"),action_df.Action) == 2
+        end
+
+        @testset "same source labware -> Aspirate also merges" begin
+            # two reagents physically slotted in the same tube rack (real example: distinct
+            # reagents sharing one "TubeRack50ML..." Labware ID at different sub-positions) --
+            # simulated here by overwriting Source Labware ID post-conversion, keeping each
+            # reagent's own distinct Source Position ID, which is exactly what a shared physical
+            # rack looks like in this table's schema.
+            df = copy(base_df)
+            df[!,"Source Labware ID"] .= "SharedTubeRack"
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+
+            @test count(==("TipPickup"),action_df.Action) == 1
+            @test count(==("TipDisposal"),action_df.Action) == 1
+            @test count(==("Aspirate"),action_df.Action) == 1
+            aspirate_row = only(eachrow(action_df[action_df.Action .== "Aspirate",:]))
+            @test all(c -> aspirate_row["Labware Position $c"] != "None", 1:2)
+        end
+
+        @testset "shared source, oversized demand -> mid-run Blowout also merges" begin
+            # scale both reagents up so each needs multiple aspirate cycles (same tip reused
+            # throughout -- no source change, well under max_tip_use -- so this only exercises the
+            # trailing-Blowout-before-reaspirate merge, not a tip-change merge); since both channels
+            # have identical per-item volume and column order, their capacity-driven cycle breaks
+            # land at the exact same window every time
+            design_big = DataFrame(zeros(2,R*C),:auto)
+            for col in 1:C, i in 1:2
+                design_big[i,well_col(2i-1,col)] = 165.0
+            end
+            df = convert_design_four_channel(design_big,sources,targets,slotting,config)
+            df[!,"Source Labware ID"] .= "SharedTubeRack"
+            action_df = batch_design_four_channel(df,config;insert_blowouts=true,dead_volume_buffer=20.0)
+
+            @test count(==("TipPickup"),action_df.Action) == 1
+            @test count(==("TipDisposal"),action_df.Action) == 1
+            # 165uL x 12 columns splits into 3 capacity-bounded cycles for each channel -> 2
+            # mid-run reload boundaries; both channels break at the same boundary every time (same
+            # per-item volume, same column order), so each boundary's Blowout merges to one row
+            blowout_rows = action_df[action_df.Action .== "Blowout",:]
+            @test nrow(blowout_rows) == 2
+            @test all(row["Labware Position $c"] != "None" for row in eachrow(blowout_rows) for c in 1:2)
+        end
+    end
+
+    @testset "synchronized reload trips: back-loaded channel pulled forward, finished channel's disposal deferred" begin
+        @testset "a channel whose own first item comes much later still loads at the earlier channel's trigger" begin
+            sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_syncA_src$i") for i in 1:2]
+            target = build_location(location_kinds[:DeepWP96],"nimbus4ch_syncA_target")
+            targets = Labware[target]
+            config = configurations["nimbus_four_channel"]
+            slotting = slotting_greedy(vcat(sources,targets),config)
+            R,C = size(target)
+            well_col(letter_row,col) = (col-1)*R + letter_row
+
+            # channel 1: tiny demand, columns 1-2 only -- naturally first in the window order.
+            # channel 2: all remaining columns (3..C) -- its own first item is far later in the
+            # order, yet under synchronization it should still load at channel 1's very first trigger
+            design = DataFrame(zeros(2,R*C),:auto)
+            design[1,well_col(1,1)] = 30.0
+            design[1,well_col(1,2)] = 30.0
+            for col in 3:C
+                design[2,well_col(1,col)] = 30.0
+            end
+            df = convert_design_four_channel(design,sources,targets,slotting,config)
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+
+            @test count(==("TipPickup"),action_df.Action) == 1
+            pickup_row = only(eachrow(action_df[action_df.Action .== "TipPickup",:]))
+            @test all(c -> pickup_row["Labware Position $c"] == "Pickup", 1:2)
+            # channel 2's own first actual Dispense (its real destination item) must come strictly
+            # after the shared pickup/aspirate, not the other way around
+            first_dispense_idx = findfirst(row -> row.Action=="Dispense" && row["Labware Position 2"]!="None", eachrow(action_df))
+            pickup_idx = findfirst(==("TipPickup"),action_df.Action)
+            @test pickup_idx < first_dispense_idx
+        end
+
+        @testset "a finished channel's disposal is deferred to a later channel's own reload, not fired immediately" begin
+            sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_syncB_src$i") for i in 1:2]
+            target = build_location(location_kinds[:DeepWP96],"nimbus4ch_syncB_target")
+            targets = Labware[target]
+            config = configurations["nimbus_four_channel"]
+            slotting = slotting_greedy(vcat(sources,targets),config)
+            R,C = size(target)
+            well_col(letter_row,col) = (col-1)*R + letter_row
+
+            # channel 1: tiny demand, row 1 columns 1-2 -- finishes almost immediately
+            # channel 2: large demand, rows 3..R across every column -- forces multiple aspirate
+            # cycles, so it has its own later mid-run reload trigger for channel 1 to piggyback on
+            design = DataFrame(zeros(2,R*C),:auto)
+            design[1,well_col(1,1)] = 30.0
+            design[1,well_col(1,2)] = 30.0
+            for row in 3:R, col in 1:C
+                design[2,well_col(row,col)] = 30.0
+            end
+            df = convert_design_four_channel(design,sources,targets,slotting,config)
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+
+            # channel 2 needs more than one aspirate cycle for this to be a meaningful test
+            @test count(==("Aspirate"),action_df.Action) >= 2
+
+            last_ch1_dispense_idx = findlast(row -> row.Action=="Dispense" && row["Labware Position 1"]!="None", eachrow(action_df))
+            ch1_disposal_idx = findfirst(row -> row.Action=="TipDisposal" && row["Labware Position 1"]=="Dispose", eachrow(action_df))
+            @test !isnothing(ch1_disposal_idx)
+            # deferred well past its own last dispense -- not the very next row -- and not merely
+            # pushed to the very end either (there's an intermediate channel-2 reload to piggyback on)
+            @test ch1_disposal_idx > last_ch1_dispense_idx + 1
+            @test ch1_disposal_idx < nrow(action_df)
+            # channel 2 must still be actively reloading (not yet done) when channel 1 finally disposes
+            @test count(==("Aspirate"),action_df.Action[1:ch1_disposal_idx]) >= 2
+        end
     end
 
     @testset "reagent count exceeding channel count throws" begin
@@ -291,10 +442,17 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
         # every Dispense row has at least one active channel (no all-None rows)
         @test all(>=(1),active_counts)
 
-        # each channel's own tip session is contiguous: TipPickup/TipDisposal counts are sane
-        # (at least 1 pickup and 1 disposal per channel that has any demand)
-        @test count(==("TipPickup"),action_df.Action) >= 1
-        @test count(==("TipDisposal"),action_df.Action) == count(==("TipPickup"),action_df.Action)
+        # each channel's own tip session is contiguous: at least one pickup happened, and every
+        # pickup is eventually matched by exactly one disposal for that channel -- checked at the
+        # entry (per-channel-cell) level, not row count, since merging can now bundle pickups and
+        # disposals into differently-sized rows (e.g. a row mixing a first-time pickup for one
+        # channel with a refresh pickup for another has no matching disposal row of the same size)
+        pickup_rows = action_df[action_df.Action .== "TipPickup",:]
+        dispose_rows = action_df[action_df.Action .== "TipDisposal",:]
+        pickup_entries = sum(count(c -> pickup_rows[i,"Labware Position $c"] == "Pickup",1:4) for i in 1:nrow(pickup_rows))
+        dispose_entries = sum(count(c -> dispose_rows[i,"Labware Position $c"] == "Dispose",1:4) for i in 1:nrow(dispose_rows))
+        @test pickup_entries >= 1
+        @test dispose_entries == pickup_entries
     end
 
     @testset "regression: Nimbus.jl (single-channel) is untouched by this instrument's presence" begin
