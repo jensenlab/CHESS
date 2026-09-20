@@ -66,6 +66,7 @@ end
 
 include("test_problems/test_compilation.jl")
 include("test_problems/nimbus_batching.jl")
+include("test_problems/nimbus_four_channel_batching.jl")
 
 if RUN_SOLVER_TESTS
     include("json_interface.jl")
@@ -78,6 +79,7 @@ if RUN_SOLVER_TESTS
     include("test_problems/tempest_compilation.jl")
     include("test_problems/cobra_compilation.jl")
     include("test_problems/nimbus_compilation.jl")
+    include("test_problems/nimbus_four_channel_compilation.jl")
     include("test_problems/in_place.jl")
 end
 
