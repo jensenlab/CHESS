@@ -307,6 +307,19 @@ reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Po
             first_dispense_idx = findfirst(row -> row.Action=="Dispense" && row["Labware Position 2"]!="None", eachrow(action_df))
             pickup_idx = findfirst(==("TipPickup"),action_df.Action)
             @test pickup_idx < first_dispense_idx
+
+            # with synchronization off, channel 2 picks up on its own trip at its own first window,
+            # after channel 1 has started dispensing, and channel 1 disposes right after its last item
+            unsynced = batch_design_four_channel(df,config;insert_blowouts=false,channel_order=reagent_order(df),synchronize_reloads=false)
+            @test count(==("TipPickup"),unsynced.Action) == 2
+            ch2_pickup = findfirst(r -> r.Action=="TipPickup" && r["Labware Position 2"]=="Pickup", eachrow(unsynced))
+            ch1_first_dispense = findfirst(r -> r.Action=="Dispense" && r["Labware Position 1"]!="None", eachrow(unsynced))
+            @test ch2_pickup > ch1_first_dispense
+            ch1_last_dispense = findlast(r -> r.Action=="Dispense" && r["Labware Position 1"]!="None", eachrow(unsynced))
+            @test unsynced[ch1_last_dispense+1,"Action"] == "TipDisposal"
+            @test unsynced[ch1_last_dispense+1,"Labware Position 1"] == "Dispose"
+            dispensed(a) = sum(sum(a[a.Action .== "Dispense","Volume $c"]) for c in 1:4)
+            @test dispensed(unsynced) == dispensed(action_df)
         end
 
         @testset "a finished channel's disposal is deferred to a later channel's own reload, not fired immediately" begin

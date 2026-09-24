@@ -272,16 +272,22 @@ A channel that exhausts all its demand becomes disposal-due but is never given i
 its final `TipDisposal` is deferred until the next synchronized reload fires for any other channel
 (piggybacked for free), or, if none remains, flushed in one final wave at the last window.
 
+With `synchronized=false` (for benchmarking what synchronization saves), each channel reloads on its
+own schedule instead: a trigger refills only the channel(s) that ran out, and a finished channel
+disposes right after its own last dispense.
+
 `channel_items[c]` is `channel_event_sequence(ordered_windows,c)` for every channel with any demand
 (precomputed by the caller). Each item is assumed already `<= effective_capacity` (via
 `split_oversized`), so a fresh cycle always accepts at least one item and the walk always
 terminates. Returns `cycles::Dict{Int,Vector{Vector{Tuple{Int,DispenseItem}}}}` (same shape
 `channel_cycle_data` already consumes), `trigger_window::Dict{Int,Vector{Int}}`
 (`trigger_window[c][ci]` is the window at which cycle `ci` of channel `c` starts loading), and
-`disposal_window::Dict{Int,Int}` (the window at which channel `c`'s final tip disposal fires).
+`disposal::Dict{Int,Tuple{Int,Bool}}`: channel `c`'s final tip disposal fires at window `w`, after
+that window's dispense if the flag is `true`, or with that window's reload trip (before the
+dispense) if `false`.
 """
 function compute_synchronized_cycles(ordered_windows::Vector{DispenseWindow}, channels,
-    channel_items::Dict{Int,Vector{Tuple{Int,DispenseItem}}}, effective_capacity::Real)
+    channel_items::Dict{Int,Vector{Tuple{Int,DispenseItem}}}, effective_capacity::Real; synchronized::Bool=true)
 
     assigned = Dict(c=>0 for c in channels)
     consumed = Dict(c=>0 for c in channels)
@@ -289,7 +295,7 @@ function compute_synchronized_cycles(ordered_windows::Vector{DispenseWindow}, ch
     current_vol = Dict(c=>0.0 for c in channels)
     cycles = Dict{Int,Vector{Vector{Tuple{Int,DispenseItem}}}}(c=>Vector{Tuple{Int,DispenseItem}}[] for c in channels)
     trigger_window = Dict{Int,Vector{Int}}(c=>Int[] for c in channels)
-    disposal_window = Dict{Int,Int}()
+    disposal = Dict{Int,Tuple{Int,Bool}}()
     pending_disposal = Set{Int}()
 
     function refill!(c::Int, at_window::Int)
@@ -312,42 +318,42 @@ function compute_synchronized_cycles(ordered_windows::Vector{DispenseWindow}, ch
 
     function do_sync!(at_window::Int)
         for c in channels
-            haskey(disposal_window,c) && continue
+            haskey(disposal,c) && continue
             assigned[c] < length(channel_items[c]) && refill!(c,at_window)
         end
         for c in pending_disposal
-            disposal_window[c] = at_window
+            disposal[c] = (at_window,false)
         end
         empty!(pending_disposal)
     end
 
     for (w_idx,w) in enumerate(ordered_windows)
-        needs_sync = false
+        needing = Int[]
         for (c,it) in w.active
             consumed[c] += 1
-            consumed[c] > assigned[c] && (needs_sync = true)
+            consumed[c] > assigned[c] && push!(needing,c)
         end
-        # exhaustion is checked AFTER do_sync! (a sync may itself assign a channel's last items). A
-        # channel that finishes here always waits for a later sync: this window's reload trip happens
-        # before its last dispense, so riding along on it would mean a second trip back to dispose
-        needs_sync && do_sync!(w_idx)
+        if !isempty(needing)
+            synchronized ? do_sync!(w_idx) : foreach(c -> refill!(c,w_idx), needing)
+        end
+        # exhaustion is checked AFTER the reload (it may itself assign a channel's last items). When
+        # synchronized, a channel that finishes here always waits for a later sync: this window's
+        # reload trip happens before its last dispense, so riding along on it would mean a second
+        # trip back to dispose
         for (c,it) in w.active
-            if consumed[c] == assigned[c] == length(channel_items[c]) && !haskey(disposal_window,c) && !(c in pending_disposal)
-                push!(pending_disposal,c)
+            if consumed[c] == assigned[c] == length(channel_items[c]) && !haskey(disposal,c) && !(c in pending_disposal)
+                synchronized ? push!(pending_disposal,c) : (disposal[c] = (w_idx,true))
             end
         end
     end
     for c in channels
         isempty(current[c]) || push!(cycles[c],current[c])
     end
-    if !isempty(pending_disposal)
-        final_w = length(ordered_windows)
-        for c in pending_disposal
-            disposal_window[c] = final_w
-        end
+    for c in pending_disposal
+        disposal[c] = (length(ordered_windows),true)
     end
 
-    return cycles, trigger_window, disposal_window
+    return cycles, trigger_window, disposal
 end
 
 # Per-cycle aspirate volume / rounded dispense volumes / trailing-blowout flag / tip-change flag,
@@ -409,20 +415,23 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
     volume_precision::Int=1, insert_blowouts::Bool=true,
     waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
     dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01, max_tip_use::Int,
-    priming::Bool=false, priming_volume::Real=50.0, priming_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing)
+    priming::Bool=false, priming_volume::Real=50.0, priming_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
+    synchronize_reloads::Bool=true)
 
     channels = [c for c in 1:n_channels if haskey(source_keys_by_channel,c) && !isempty(channel_event_sequence(ordered_windows,c))]
     channel_items = Dict{Int,Vector{Tuple{Int,DispenseItem}}}(c=>channel_event_sequence(ordered_windows,c) for c in channels)
-    cycles,trigger_window,disposal_window = compute_synchronized_cycles(ordered_windows,channels,channel_items,effective_capacity)
+    cycles,trigger_window,disposal = compute_synchronized_cycles(ordered_windows,channels,channel_items,effective_capacity;synchronized=synchronize_reloads)
     cdata = Dict{Int,Any}(c=>channel_cycle_data(cycles[c],source_keys_by_channel[c],capacity,volume_precision,insert_blowouts,dead_volume_buffer,aspirate_buffer,max_tip_use) for c in channels)
 
     channels_starting_at = Dict{Int,Vector{Tuple{Int,Int}}}()
     for c in channels, (ci,w_idx) in enumerate(trigger_window[c])
         push!(get!(channels_starting_at,w_idx,Tuple{Int,Int}[]),(c,ci))
     end
-    channels_disposing_at = Dict{Int,Vector{Int}}()
-    for (c,w_idx) in disposal_window
-        push!(get!(channels_disposing_at,w_idx,Int[]),c)
+    # disposals riding along on a reload trip (before the dispense) vs. after that window's dispense
+    riding_at = Dict{Int,Vector{Int}}()
+    after_at = Dict{Int,Vector{Int}}()
+    for (c,(w_idx,after)) in disposal
+        push!(get!(after ? after_at : riding_at,w_idx,Int[]),c)
     end
 
     out_labware = String[]
@@ -482,11 +491,8 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
     progress = zeros(Int,n_channels)
     for (w_idx,w) in enumerate(ordered_windows)
         starts = get(channels_starting_at,w_idx,Tuple{Int,Int}[])
-        disposals = get(channels_disposing_at,w_idx,Int[])
-        # a disposal deferred onto another channel's reload rides along on that reload trip, before
-        # the dispense; only the end-of-run wave comes after the last window's dispense
-        last_window = w_idx == length(ordered_windows)
-        riding_disposals = last_window ? Int[] : disposals
+        riding_disposals = get(riding_at,w_idx,Int[])
+        after_disposals = get(after_at,w_idx,Int[])
 
         if !isempty(starts) || !isempty(riding_disposals)
             blowout_entries = Tuple{Int,String,String,Float64}[]
@@ -529,11 +535,10 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
         end
         emit_row!("Dispense",w.labware_id,per_channel)
 
-        # the end-of-run wave fires AFTER the last dispense: a channel's own last item may be dispensed
-        # in this very window, and physically it dispenses first, then the tip is disposed
-        if last_window && !isempty(disposals)
-            final_dispose_entries = Tuple{Int,String,String,Float64}[(c,"None","Dispose",0.0) for c in disposals]
-            emit_grouped!("TipDisposal",final_dispose_entries)
+        # the end-of-run wave (or, unsynchronized, a channel's own last item) disposes AFTER the
+        # dispense: physically the tip dispenses first, then is disposed
+        if !isempty(after_disposals)
+            emit_grouped!("TipDisposal",Tuple{Int,String,String,Float64}[(c,"None","Dispose",0.0) for c in after_disposals])
         end
     end
 
@@ -566,6 +571,10 @@ B2 land on channels 1-4 down the head. `channel_order` overrides this with an ex
 source `(labware id, position)` key, chunked the same way; `place_labware` uses it to score candidate
 orders before tubes are moved.
 
+`synchronize_reloads=false` turns off synchronized reload trips (see
+[`compute_synchronized_cycles`](@ref)), so each channel reloads and disposes on its own schedule;
+it exists to benchmark what synchronization saves.
+
 1. [`compute_dispense_windows`](@ref) -- per `(destination labware, destination kind)` target,
    pooling demand across every channel with items there, greedily group into the fewest possible
    simultaneous windows.
@@ -584,7 +593,7 @@ function batch_design_four_channel(df::DataFrame, config::Configuration{NimbusFo
     waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_4ch_waste_target,
     dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01,
     priming::Bool=false, priming_volume::Real=50.0, priming_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
-    channel_order::Union{Nothing,AbstractVector}=nothing)
+    channel_order::Union{Nothing,AbstractVector}=nothing, synchronize_reloads::Bool=true)
 
     capacity, effective_capacity = four_channel_capacities(config;volume_precision,insert_blowouts,waste_target,dead_volume_buffer,aspirate_buffer)
     if priming
@@ -614,7 +623,7 @@ function batch_design_four_channel(df::DataFrame, config::Configuration{NimbusFo
     groups = [source_keys[i:min(i+n_channels-1,end)] for i in 1:n_channels:length(source_keys)]
     return vcat([batch_group_four_channel(df,row_groups,g,n_channels,config,capacity,effective_capacity;
         volume_precision,insert_blowouts,waste_target,dead_volume_buffer,aspirate_buffer,
-        priming,priming_volume,priming_target) for g in groups]...)
+        priming,priming_volume,priming_target,synchronize_reloads) for g in groups]...)
 end
 
 # (channel capacity, effective capacity) in µL: the effective capacity reserves headroom for the
