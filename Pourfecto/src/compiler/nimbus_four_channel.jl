@@ -327,14 +327,13 @@ function compute_synchronized_cycles(ordered_windows::Vector{DispenseWindow}, ch
             consumed[c] += 1
             consumed[c] > assigned[c] && (needs_sync = true)
         end
-        # a sync here may itself assign a channel's last remaining items (fully exhausting it), so
-        # exhaustion must be checked AFTER do_sync! updates `assigned`, using the freshest state --
-        # if a sync just happened at this window, resolve the disposal immediately (same window,
-        # piggybacking for free); otherwise defer it to whichever sync (or the final wave) comes next
+        # exhaustion is checked AFTER do_sync! (a sync may itself assign a channel's last items). A
+        # channel that finishes here always waits for a later sync: this window's reload trip happens
+        # before its last dispense, so riding along on it would mean a second trip back to dispose
         needs_sync && do_sync!(w_idx)
         for (c,it) in w.active
             if consumed[c] == assigned[c] == length(channel_items[c]) && !haskey(disposal_window,c) && !(c in pending_disposal)
-                needs_sync ? (disposal_window[c] = w_idx) : push!(pending_disposal,c)
+                push!(pending_disposal,c)
             end
         end
     end
@@ -484,8 +483,12 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
     for (w_idx,w) in enumerate(ordered_windows)
         starts = get(channels_starting_at,w_idx,Tuple{Int,Int}[])
         disposals = get(channels_disposing_at,w_idx,Int[])
+        # a disposal deferred onto another channel's reload rides along on that reload trip, before
+        # the dispense; only the end-of-run wave comes after the last window's dispense
+        last_window = w_idx == length(ordered_windows)
+        riding_disposals = last_window ? Int[] : disposals
 
-        if !isempty(starts)
+        if !isempty(starts) || !isempty(riding_disposals)
             blowout_entries = Tuple{Int,String,String,Float64}[]
             dispose_entries = Tuple{Int,String,String,Float64}[]
             pickup_entries = Tuple{Int,String,String,Float64}[]
@@ -508,6 +511,9 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
                     push!(priming_entries,(c,ptarget[1],string(ptarget[2]),priming_volume))
                 end
             end
+            for c in riding_disposals
+                push!(dispose_entries,(c,"None","Dispose",0.0))
+            end
             emit_grouped!("Blowout",blowout_entries)
             emit_grouped!("TipDisposal",dispose_entries)
             emit_grouped!("TipPickup",pickup_entries)
@@ -523,9 +529,9 @@ function assemble_windows(ordered_windows::Vector{DispenseWindow}, n_channels::I
         end
         emit_row!("Dispense",w.labware_id,per_channel)
 
-        # final disposals fire AFTER this window's own dispense -- a channel's own last item may be
-        # dispensed in this very window, and physically it dispenses first, then the tip is disposed
-        if !isempty(disposals)
+        # the end-of-run wave fires AFTER the last dispense: a channel's own last item may be dispensed
+        # in this very window, and physically it dispenses first, then the tip is disposed
+        if last_window && !isempty(disposals)
             final_dispose_entries = Tuple{Int,String,String,Float64}[(c,"None","Dispose",0.0) for c in disposals]
             emit_grouped!("TipDisposal",final_dispose_entries)
         end
@@ -546,10 +552,19 @@ end
                                dead_volume_buffer, aspirate_buffer, priming, priming_volume,
                                priming_target) -> DataFrame
 
-Group `convert_design_four_channel`'s flat transfer list by reagent (source), assign each reagent
-to one physical channel (first-appearance order; **requires reagent count <= n_channels** --
-reassignment when there are more distinct reagents than channels is explicit follow-up work, not
-supported here), then run the three-phase sweep-based dispense-ordering pipeline:
+Group `convert_design_four_channel`'s flat transfer list by reagent (source), split the reagents into
+groups of up to `n_channels`, and run each group through the three-phase sweep-based
+dispense-ordering pipeline below, one group after another. Within a group, each reagent owns one
+channel for its whole tip session. Between groups, all tips swap on one trip: a group's last
+`TipDisposal` row is immediately followed by the next group's `TipPickup` row.
+
+Reagents are ordered by physical tube position by default ([`source_position_order`](@ref): labware
+id, then column, then row) and chunked into consecutive runs of `n_channels`: chunk *k* is group *k*,
+and position within the chunk is the channel. So the tube placement chosen by
+[`place_labware`](@ref) decides both grouping and channel order, and a 2-row tube rack's A1, B1, A2,
+B2 land on channels 1-4 down the head. `channel_order` overrides this with an explicit list of every
+source `(labware id, position)` key, chunked the same way; `place_labware` uses it to score candidate
+orders before tubes are moved.
 
 1. [`compute_dispense_windows`](@ref) -- per `(destination labware, destination kind)` target,
    pooling demand across every channel with items there, greedily group into the fewest possible
@@ -568,24 +583,14 @@ function batch_design_four_channel(df::DataFrame, config::Configuration{NimbusFo
     volume_precision::Int=1, insert_blowouts::Bool=true,
     waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_4ch_waste_target,
     dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01,
-    priming::Bool=false, priming_volume::Real=50.0, priming_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing)
+    priming::Bool=false, priming_volume::Real=50.0, priming_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nothing,
+    channel_order::Union{Nothing,AbstractVector}=nothing)
 
-    capacity = ustrip(uconvert(u"µL", dispense_channels(head(config))[1].capacity))
-    rounding_margin = 0.5 * 10.0^(-volume_precision)
-
-    if insert_blowouts
-        isnothing(waste_target) && throw(ArgumentError("batch_design_four_channel: insert_blowouts=true requires a waste_target (labware id, position)"))
-        dead_volume_buffer > 0 || throw(ArgumentError("batch_design_four_channel: insert_blowouts=true requires dead_volume_buffer > 0"))
-    end
-    aspirate_buffer >= 0 || throw(ArgumentError("batch_design_four_channel: aspirate_buffer must be >= 0"))
+    capacity, effective_capacity = four_channel_capacities(config;volume_precision,insert_blowouts,waste_target,dead_volume_buffer,aspirate_buffer)
     if priming
         priming_volume > 0 || throw(ArgumentError("batch_design_four_channel: priming_volume must be > 0 when priming=true"))
     end
-    reserved = aspirate_buffer + (insert_blowouts ? dead_volume_buffer : 0.0) + rounding_margin
-    reserved < capacity || throw(ArgumentError("batch_design_four_channel: aspirate_buffer + dead_volume_buffer + rounding margin ($reserved) must be less than channel capacity ($capacity)"))
-    effective_capacity = capacity - reserved
 
-    # group rows by reagent (source), preserving first-appearance order -> channel assignment
     source_keys = Tuple{String,Union{String,Integer}}[]
     row_groups = Dict{Tuple{String,Union{String,Integer}},Vector{Int}}()
     for row in 1:nrow(df)
@@ -596,38 +601,243 @@ function batch_design_four_channel(df::DataFrame, config::Configuration{NimbusFo
         end
         push!(row_groups[key],row)
     end
-    length(source_keys) <= n_channels || throw(ArgumentError("batch_design_four_channel: $(length(source_keys)) distinct reagents exceeds the $n_channels available channels -- reassigning channels across more reagents than channels is not yet supported (explicit follow-up work)"))
-
-    source_keys_by_channel = Dict{Int,Tuple{String,Union{String,Integer}}}(c=>source_keys[c] for c in eachindex(source_keys))
-
-    # per-channel, already-split_oversized items, grouped by (destination labware, destination kind)
-    demand_by_group = Dict{Tuple{String,Symbol},Dict{Int,Vector{DispenseItem}}}()
-    group_order = Tuple{String,Symbol}[]
-    for c in eachindex(source_keys)
-        rows = row_groups[source_keys[c]]
-        items = [DispenseItem(r,well_to_cartesian(df[r,"Destination Position ID"]),df[r,"Volume (uL)"]) for r in rows]
-        items = split_oversized(items,effective_capacity)
-        for it in items
-            key = (df[it.col,"Destination Labware ID"],df[it.col,"Destination Kind"])
-            if !haskey(demand_by_group,key)
-                demand_by_group[key] = Dict{Int,Vector{DispenseItem}}()
-                push!(group_order,key)
-            end
-            push!(get!(demand_by_group[key],c,DispenseItem[]),it)
-        end
+    if isnothing(channel_order)
+        sort!(source_keys,by=source_position_order)
+    else
+        Set(channel_order) == Set(source_keys) && length(channel_order) == length(source_keys) ||
+            throw(ArgumentError("batch_design_four_channel: channel_order must list each source (labware id, position) in the transfer list exactly once"))
+        source_keys = collect(Tuple{String,Union{String,Integer}},channel_order)
     end
 
-    max_tip_use = settings(config)["max_tip_use"]
+    # consecutive runs of n_channels reagents are groups, run one after another; each group's last
+    # TipDisposal row lands right before the next group's TipPickup row, i.e. one swap trip
+    groups = [source_keys[i:min(i+n_channels-1,end)] for i in 1:n_channels:length(source_keys)]
+    return vcat([batch_group_four_channel(df,row_groups,g,n_channels,config,capacity,effective_capacity;
+        volume_precision,insert_blowouts,waste_target,dead_volume_buffer,aspirate_buffer,
+        priming,priming_volume,priming_target) for g in groups]...)
+end
+
+# (channel capacity, effective capacity) in µL: the effective capacity reserves headroom for the
+# aspirate buffer, the dead volume drained by blowouts, and rounding
+function four_channel_capacities(config::Configuration{NimbusFourChannel}; volume_precision::Int=1, insert_blowouts::Bool=true,
+    waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_4ch_waste_target,
+    dead_volume_buffer::Real=20.0, aspirate_buffer::Real=0.01)
+    capacity = ustrip(uconvert(u"µL", dispense_channels(head(config))[1].capacity))
+    if insert_blowouts
+        isnothing(waste_target) && throw(ArgumentError("batch_design_four_channel: insert_blowouts=true requires a waste_target (labware id, position)"))
+        dead_volume_buffer > 0 || throw(ArgumentError("batch_design_four_channel: insert_blowouts=true requires dead_volume_buffer > 0"))
+    end
+    aspirate_buffer >= 0 || throw(ArgumentError("batch_design_four_channel: aspirate_buffer must be >= 0"))
+    reserved = aspirate_buffer + (insert_blowouts ? dead_volume_buffer : 0.0) + 0.5 * 10.0^(-volume_precision)
+    reserved < capacity || throw(ArgumentError("batch_design_four_channel: aspirate_buffer + dead_volume_buffer + rounding margin ($reserved) must be less than channel capacity ($capacity)"))
+    return capacity, capacity - reserved
+end
+
+# One reagent's split_oversized demand, per destination (labware id, kind) in first-appearance order.
+function reagent_demand(df::DataFrame, rows::AbstractVector{Int}, effective_capacity::Real)
+    items = split_oversized([DispenseItem(r,well_to_cartesian(df[r,"Destination Position ID"]),df[r,"Volume (uL)"]) for r in rows],effective_capacity)
+    out = Pair{Tuple{String,Symbol},Vector{DispenseItem}}[]
+    for it in items
+        dest = (df[it.col,"Destination Labware ID"],df[it.col,"Destination Kind"])
+        idx = findfirst(p -> p.first == dest,out)
+        isnothing(idx) ? push!(out,dest=>[it]) : push!(out[idx].second,it)
+    end
+    return out
+end
+
+# The window pipeline for one group of <= n_channels reagents, channel c running group_keys[c].
+function batch_group_four_channel(df::DataFrame, row_groups::Dict, group_keys::AbstractVector, n_channels::Integer,
+    config::Configuration{NimbusFourChannel}, capacity::Real, effective_capacity::Real; kwargs...)
+    demand_by_dest = Dict{Tuple{String,Symbol},Dict{Int,Vector{DispenseItem}}}()
+    dest_order = Tuple{String,Symbol}[]
+    for (c,key) in enumerate(group_keys), (dest,items) in reagent_demand(df,row_groups[key],effective_capacity)
+        haskey(demand_by_dest,dest) || (demand_by_dest[dest] = Dict{Int,Vector{DispenseItem}}(); push!(dest_order,dest))
+        demand_by_dest[dest][c] = items
+    end
     ordered_windows = DispenseWindow[]
-    for (labware_id,dest_kind) in group_order
-        spacing = four_channel_row_spacing(dest_kind)
-        windows = compute_dispense_windows(demand_by_group[(labware_id,dest_kind)],n_channels,labware_id,dest_kind,spacing)
+    for dest in dest_order
+        windows = compute_dispense_windows(demand_by_dest[dest],n_channels,dest[1],dest[2],four_channel_row_spacing(dest[2]))
         append!(ordered_windows,order_windows(windows))
     end
+    keys_by_channel = Dict{Int,Tuple{String,Union{String,Integer}}}(c=>k for (c,k) in enumerate(group_keys))
+    return assemble_windows(ordered_windows,n_channels,keys_by_channel,capacity,effective_capacity;
+        max_tip_use=settings(config)["max_tip_use"],kwargs...)
+end
 
-    return assemble_windows(ordered_windows,n_channels,source_keys_by_channel,capacity,effective_capacity;
-        volume_precision,insert_blowouts,waste_target,dead_volume_buffer,aspirate_buffer,max_tip_use,
-        priming,priming_volume,priming_target)
+"""
+    source_position_order(key::Tuple) -> Tuple
+
+Sort key for a source `(labware id, well)`: labware id, then column, then row. Channels are handed
+out in this order, so in a 2-row tube rack A1, B1, A2, B2 map to channels 1-4 down the head, and the
+two tubes sharing a column always put the lower channel on row A.
+"""
+function source_position_order(key::Tuple)
+    rc = well_to_cartesian(string(key[2]))
+    return (string(key[1]), rc[2], rc[1])
+end
+
+slot_position_order(s::Tuple{DeckPosition,Int}) = source_position_order((s[1].name, nimbus_4ch_well(s[1],s[2])))
+
+function four_channel_permutations(v::AbstractVector)
+    length(v) <= 1 && return [collect(v)]
+    return [vcat(v[i],p) for i in eachindex(v) for p in four_channel_permutations(v[setdiff(eachindex(v),i)])]
+end
+
+"""
+    group_window_count(demands, order, n_channels) -> Int
+
+Dispense windows needed by one group when reagent `order[c]` runs on channel `c`, summed over
+destination labware. `demands[i]` is reagent `i`'s [`reagent_demand`](@ref).
+"""
+function group_window_count(demands::AbstractVector, order::AbstractVector{Int}, n_channels::Integer)
+    by_dest = Dict{Tuple{String,Symbol},Dict{Int,Vector{DispenseItem}}}()
+    for (c,i) in enumerate(order), (dest,items) in demands[i]
+        get!(by_dest,dest,Dict{Int,Vector{DispenseItem}}())[c] = items
+    end
+    return sum((length(compute_dispense_windows(d,n_channels,dest[1],dest[2],four_channel_row_spacing(dest[2]))) for (dest,d) in by_dest); init=0)
+end
+
+"""
+    group_reagents(demands, volumes, n_channels, effective_capacity; reload_weight=8.0, max_passes=50) -> Vector{Vector{Int}}
+
+Split reagents `1:length(demands)` into `ceil(n/n_channels)` groups that run one after another,
+minimizing the sum over groups of
+
+    (fewest dispense windows over the group's channel orders) + reload_weight × (reload waves)
+
+A group's reload waves are `ceil(largest reagent volume / effective_capacity)`, since reloads within a
+group are synchronized. `reload_weight` is how many dispense motions one reload trip is worth (8
+matches instrument timings). Tips used, swap trips and total volume don't depend on the partition, so
+they're left out.
+
+Seeded greedily: each group starts from the highest-volume unassigned reagent and repeatedly adds
+whichever remaining reagent raises the group's score least, until full. Then pairs of reagents are
+swapped between groups until a full pass finds no improvement or `max_passes` is reached. A
+swap-only search from an arbitrary seed can stall on plateaus where every single swap scores the same
+(two aligned sets that start mixed need two swaps to separate), which the greedy seed avoids. Group
+sizes stay as seeded (full groups first, any short group last), which keeps the groups readable from
+tube position.
+"""
+function group_reagents(demands::AbstractVector, volumes::AbstractVector{<:Real}, n_channels::Integer, effective_capacity::Real;
+    reload_weight::Real=8.0, max_passes::Int=50)
+    cache = Dict{Vector{Int},Float64}()
+    score(g) = get!(cache,sort(g)) do
+        key = sort(g)
+        minimum(group_window_count(demands,p,n_channels) for p in four_channel_permutations(key)) +
+            reload_weight * maximum(ceil(volumes[i]/effective_capacity) for i in key)
+    end
+
+    unassigned = sortperm(volumes,rev=true)
+    groups = Vector{Int}[]
+    while !isempty(unassigned)
+        group = [popfirst!(unassigned)]
+        while length(group) < n_channels && !isempty(unassigned)
+            k = argmin(i -> score(vcat(group,unassigned[i])), eachindex(unassigned))
+            push!(group,unassigned[k])
+            deleteat!(unassigned,k)
+        end
+        push!(groups,group)
+    end
+    for _ in 1:max_passes
+        improved = false
+        for a in 1:length(groups)-1, b in a+1:length(groups), i in eachindex(groups[a]), j in eachindex(groups[b])
+            ga,gb = copy(groups[a]),copy(groups[b])
+            ga[i],gb[j] = gb[j],ga[i]
+            if score(ga) + score(gb) < score(groups[a]) + score(groups[b]) - 1e-9
+                groups[a],groups[b] = ga,gb
+                improved = true
+            end
+        end
+        improved || break
+    end
+    return groups
+end
+
+"""
+    place_labware(slotting, design, sources, targets, config::Configuration{NimbusFourChannel}; reload_weight=8.0) -> SlottingDict
+
+Placement for the 4-channel Nimbus. Grouping and channels follow tube position
+([`source_position_order`](@ref), chunked by `n_channels`), so choosing where the reagent tubes sit
+also chooses each reagent's group and channel:
+
+1. **Grouping.** With more than `n_channels` reagents, [`group_reagents`](@ref) splits them into
+   groups that run one after another, scored by dispense windows plus `reload_weight` × reload waves.
+2. **Channel order.** Within each group, every assignment of its reagents to channels (24 at most) is
+   compiled with [`batch_design_four_channel`](@ref) and scored by action-row count, which captures
+   dispense-window parallelism plus the reload interruptions and window tour that shift with it. The
+   lowest wins; ties keep the incoming order.
+3. **Tube placement.** The reagents' tubes are re-placed into free 50 mL rack slots, filling whole
+   rack columns (both rows free) first, in as few racks as possible, then single slots, and handed out
+   in position order: group 1's channels first, then group 2's, and so on. Channels aspirate together
+   from one rack column when the lower channel sits on row A, so a crossed column never occurs.
+
+Aspirate cost here depends only on which slots are free, not on grouping or channel order (any two
+reagents fit any free column with the lower channel on row A), so optimizing those first and then
+placing loses nothing. Returns `slotting` unchanged unless every source is a 50 mL conical, or if not
+enough free rack slots exist.
+"""
+function place_labware(slotting::SlottingDict,design::DataFrame,sources::Vector{<:Labware},targets::Vector{<:Labware},config::Configuration{NimbusFourChannel};
+    reload_weight::Real=8.0)
+    all(s -> kind(s).name == :Conical50, sources) || return slotting
+    df = convert_design_four_channel(design,sources,targets,slotting,config)
+    key_of(lw) = (slotting[lw][1].name, nimbus_4ch_well(slotting[lw][1],slotting[lw][2]))
+    rows_of = Dict{Tuple{String,String},Vector{Int}}()
+    for r in 1:nrow(df)
+        push!(get!(rows_of,(df[r,"Source Labware ID"],string(df[r,"Source Position ID"])),Int[]),r)
+    end
+    reagents = [s for s in sources if haskey(rows_of,key_of(s))]
+    isempty(reagents) && return slotting
+
+    n_channels = settings(config)["n_channels"]
+    _, effective_capacity = four_channel_capacities(config)
+    demands = [reagent_demand(df,rows_of[key_of(r)],effective_capacity) for r in reagents]
+    volumes = [sum(df[rows_of[key_of(r)],"Volume (uL)"]) for r in reagents]
+    groups = group_reagents(demands,volumes,n_channels,effective_capacity;reload_weight)
+
+    best_order = Labware[]
+    for g in groups
+        members = reagents[g]
+        sub = df[sort(vcat([rows_of[key_of(r)] for r in members]...)),:]
+        best = members
+        best_score = typemax(Int)
+        for order in four_channel_permutations(members)
+            score = nrow(batch_design_four_channel(sub,config;channel_order=[key_of(r) for r in order]))
+            if score < best_score
+                best_score = score
+                best = order
+            end
+        end
+        append!(best_order,best)
+    end
+
+    occupied = Set(slotting[lw] for lw in keys(slotting) if !(lw in reagents))
+    racks = [p for p in deck(config) if can_place(first(reagents),p,config)]
+    free_by_column = Dict{Tuple{DeckPosition,Int},Vector{Int}}()
+    for p in racks, (slot,ci) in enumerate(CartesianIndices(slots(p)))
+        (p,slot) in occupied && continue
+        push!(get!(free_by_column,(p,ci[2]),Int[]),slot)
+    end
+    full_columns(p) = sort([col for ((q,col),free) in free_by_column if q == p && length(free) == 2])
+
+    need = length(reagents)
+    chosen = Tuple{DeckPosition,Int}[]
+    for p in sort(racks,by=p -> -length(full_columns(p))), col in full_columns(p)
+        need >= 2 || break
+        append!(chosen,[(p,s) for s in free_by_column[(p,col)]])
+        need -= 2
+    end
+    used_racks = Set(first.(chosen))
+    singles = sort([(p,s) for ((p,col),free) in free_by_column for s in free if !((p,s) in chosen)],
+        by=x -> (!(x[1] in used_racks), findfirst(==(x[1]),racks), slot_position_order(x)))
+    append!(chosen,singles[1:min(need,length(singles))])
+    length(chosen) == length(reagents) || return slotting
+
+    sort!(chosen,by=slot_position_order)
+    placed = copy(slotting)
+    for (c,lw) in enumerate(best_order)
+        placed[lw] = chosen[c]
+    end
+    return placed
 end
 
 """
@@ -649,7 +859,7 @@ compile stage (`compile(directory,pourcast;kwargs...)`, `Pourfecto/src/compiler/
 without a catch-all here, a solve-only keyword like `optimizer` would otherwise reach
 `batch_design_four_channel` (which has no catch-all of its own) and error.
 """
-function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{NimbusFourChannel},slotting::SlottingDict=slotting_greedy(vcat(source,target),config);
+function write_instrument_files(directory::AbstractString,design::DataFrame,source::Vector{<:Labware},target::Vector{<:Labware},config::Configuration{NimbusFourChannel},slotting::SlottingDict=place_labware(slotting_greedy(vcat(source,target),config),design,source,target,config);
     n_channels::Int=settings(config)["n_channels"],
     volume_precision::Int=1, insert_blowouts::Bool=true,
     waste_target::Union{Nothing,Tuple{AbstractString,Union{AbstractString,Integer}}}=nimbus_4ch_waste_target,

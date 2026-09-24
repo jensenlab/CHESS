@@ -132,6 +132,7 @@ function compile(directory::AbstractString,pourcast::Pourcast; packing_method::F
             protocol_design = trfs_by_config[c][s_idxs,t_idxs] # get all transfers for this configuration with the labware that are currently slotted 
         
             protocol_design = DataFrame(protocol_design,:auto)
+            slotting_dicts[p] = place_labware(slotting_dicts[p],protocol_design,protocol_sources,protocol_targets,configs(pourcast)[c])
             protocol_directory = joinpath(config_directory,protocol_names[p])
             if !isdir(protocol_directory)
                 mkdir(protocol_directory)

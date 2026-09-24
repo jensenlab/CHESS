@@ -164,9 +164,21 @@ function packing_greedy(pairings::Vector{Tuple{Labware,Labware}},config::Configu
             break 
         end 
         all_labware = union(remaining...)
-    end 
-    return slotting_dicts 
-end 
+    end
+    return slotting_dicts
+end
+
+"""
+    place_labware(slotting::SlottingDict, design::DataFrame, sources, targets, config::Configuration) -> SlottingDict
+
+Placement step of compiling, run once per protocol after packing. Packing
+([`packing_greedy`](@ref)) decides which labware share a deck load, i.e. the bounds of each protocol;
+placement decides where that labware sits within the protocol, now that its transfer `design` is
+known. The default returns `slotting` unchanged. Instruments whose execution cost depends on where
+labware sits override it (see `NimbusFourChannel`, which places source tubes to match its channel
+order). An override must keep the same set of labware and return a valid slotting for `config`.
+"""
+place_labware(slotting::SlottingDict,design::DataFrame,sources::Vector{<:Labware},targets::Vector{<:Labware},config::Configuration) = slotting
 
 
 

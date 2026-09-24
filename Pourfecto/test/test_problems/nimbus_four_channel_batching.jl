@@ -2,7 +2,12 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
     four_channel_row_spacing, compute_dispense_windows, order_windows, DispenseWindow,
     channel_event_sequence, compute_synchronized_cycles, assemble_windows,
     nimbus_4ch_waste_conical, nimbus_4ch_waste_slot, nimbus_4ch_waste_target, nimbus_4ch_well,
-    tuberack50mL_0006_4ch
+    tuberack50mL_0006_4ch, place_labware, four_channel_permutations, source_position_order,
+    slot_position_order, group_reagents, group_window_count, four_channel_capacities
+
+# reagents in transfer-list order (design row order), for tests that pin reagent i -> channel i
+# instead of letting tube position decide
+reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Position ID"])))
 
 @testset "NimbusFourChannel Batching" begin
 
@@ -167,16 +172,17 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
         target = build_location(location_kinds[:DeepWP96],"nimbus4ch_align_target")
         targets = Labware[target]
         config = configurations["nimbus_four_channel"]
-        slotting = slotting_greedy(vcat(sources,targets),config)
         R,C = size(target)
         well_col(letter_row,col) = (col-1)*R + letter_row
 
         # reagent i always targets row (2i-1) -- rows 1,3,5,7 -- every column: perfectly
-        # spacing-compatible for every column simultaneously
+        # spacing-compatible for every column simultaneously, but only if reagent i sits on channel
+        # i. Placement has to discover that order on its own (channels follow tube position).
         design = DataFrame(zeros(4,R*C),:auto)
         for col in 1:C, i in 1:4
             design[i,well_col(2i-1,col)] = 30.0
         end
+        slotting = place_labware(slotting_greedy(vcat(sources,targets),config),design,sources,targets,config)
         df = convert_design_four_channel(design,sources,targets,slotting,config)
         action_df = batch_design_four_channel(df,config;insert_blowouts=false)
 
@@ -189,11 +195,9 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
         @test all(c -> pickup_row["Labware Position $c"] == "Pickup", 1:4)
         @test all(c -> dispose_row["Labware Position $c"] == "Dispose", 1:4)
 
-        # Aspirate merges only across channels sharing the same physical Source Labware ID; with 4
-        # separate conicals, slotting may pack more than one into the same physical rack position
-        # (a real merge opportunity, not a bug), so the expected row count tracks how many distinct
-        # Labware IDs the 4 reagents actually landed on, not a hardcoded 4
-        @test count(==("Aspirate"),action_df.Action) == length(unique(df[!,"Source Labware ID"]))
+        # placement puts all 4 tubes in one rack, so their Aspirates share a Labware ID and merge
+        @test length(unique(df[!,"Source Labware ID"])) == 1
+        @test count(==("Aspirate"),action_df.Action) == 1
 
         dispense_rows = action_df[action_df.Action .== "Dispense",:]
         @test nrow(dispense_rows) == C # one merged row per column, all 4 channels together
@@ -226,22 +230,20 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
             # assume it, since slotting_greedy could in principle pack both into one shared rack
             @test length(unique(base_df[!,"Source Labware ID"])) == 2
 
-            action_df = batch_design_four_channel(base_df,config;insert_blowouts=false)
+            action_df = batch_design_four_channel(base_df,config;insert_blowouts=false,channel_order=reagent_order(base_df))
 
             @test count(==("TipPickup"),action_df.Action) == 1
             @test count(==("TipDisposal"),action_df.Action) == 1
             @test count(==("Aspirate"),action_df.Action) == 2
         end
 
+        # placement puts both tubes in one rack, so they share a Source Labware ID
+        shared_slotting = place_labware(slotting,design2,sources,targets,config)
+
         @testset "same source labware -> Aspirate also merges" begin
-            # two reagents physically slotted in the same tube rack (real example: distinct
-            # reagents sharing one "TubeRack50ML..." Labware ID at different sub-positions) --
-            # simulated here by overwriting Source Labware ID post-conversion, keeping each
-            # reagent's own distinct Source Position ID, which is exactly what a shared physical
-            # rack looks like in this table's schema.
-            df = copy(base_df)
-            df[!,"Source Labware ID"] .= "SharedTubeRack"
-            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+            df = convert_design_four_channel(design2,sources,targets,shared_slotting,config)
+            @test length(unique(df[!,"Source Labware ID"])) == 1
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false,channel_order=reagent_order(df))
 
             @test count(==("TipPickup"),action_df.Action) == 1
             @test count(==("TipDisposal"),action_df.Action) == 1
@@ -260,9 +262,9 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
             for col in 1:C, i in 1:2
                 design_big[i,well_col(2i-1,col)] = 165.0
             end
-            df = convert_design_four_channel(design_big,sources,targets,slotting,config)
-            df[!,"Source Labware ID"] .= "SharedTubeRack"
-            action_df = batch_design_four_channel(df,config;insert_blowouts=true,dead_volume_buffer=20.0)
+            df = convert_design_four_channel(design_big,sources,targets,shared_slotting,config)
+            @test length(unique(df[!,"Source Labware ID"])) == 1
+            action_df = batch_design_four_channel(df,config;insert_blowouts=true,dead_volume_buffer=20.0,channel_order=reagent_order(df))
 
             @test count(==("TipPickup"),action_df.Action) == 1
             @test count(==("TipDisposal"),action_df.Action) == 1
@@ -295,7 +297,7 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
                 design[2,well_col(1,col)] = 30.0
             end
             df = convert_design_four_channel(design,sources,targets,slotting,config)
-            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false,channel_order=reagent_order(df))
 
             @test count(==("TipPickup"),action_df.Action) == 1
             pickup_row = only(eachrow(action_df[action_df.Action .== "TipPickup",:]))
@@ -326,7 +328,7 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
                 design[2,well_col(row,col)] = 30.0
             end
             df = convert_design_four_channel(design,sources,targets,slotting,config)
-            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false,channel_order=reagent_order(df))
 
             # channel 2 needs more than one aspirate cycle for this to be a meaningful test
             @test count(==("Aspirate"),action_df.Action) >= 2
@@ -338,24 +340,176 @@ import Pourfecto: convert_design_four_channel, batch_design_four_channel, channe
             # pushed to the very end either (there's an intermediate channel-2 reload to piggyback on)
             @test ch1_disposal_idx > last_ch1_dispense_idx + 1
             @test ch1_disposal_idx < nrow(action_df)
-            # channel 2 must still be actively reloading (not yet done) when channel 1 finally disposes
-            @test count(==("Aspirate"),action_df.Action[1:ch1_disposal_idx]) >= 2
+            # it rides along on channel 2's next reload trip: disposed right before channel 2 re-aspirates
+            @test action_df[ch1_disposal_idx+1,"Action"] == "Aspirate"
+            @test action_df[ch1_disposal_idx+1,"Labware Position 2"] != "None"
+            @test count(r -> r.Action == "Aspirate" && r["Labware Position 2"] != "None", eachrow(action_df[1:ch1_disposal_idx,:])) == 1 # rides on channel 2's second load, not its first
         end
     end
 
-    @testset "reagent count exceeding channel count throws" begin
-        sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_toomany_src$i") for i in 1:5]
-        target = build_location(location_kinds[:DeepWP96],"nimbus4ch_toomany_target")
+    @testset "placement: channels follow tube position, tubes placed to match the head" begin
+        @testset "default place_labware leaves other instruments' slotting unchanged" begin
+            config = configurations["nimbus"]
+            sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_place_default_src")]
+            targets = Labware[build_location(location_kinds[:DeepWP96],"nimbus4ch_place_default_target")]
+            slotting = slotting_greedy(vcat(sources,targets),config)
+            design = DataFrame(zeros(1,length(targets[1])),:auto)
+            design[1,1] = 30.0
+            @test place_labware(slotting,design,sources,targets,config) === slotting
+        end
+
+        @testset "channels are handed out in tube-position order, not transfer-list order" begin
+            config = configurations["nimbus_four_channel"]
+            # B1's reagent appears first in the transfer list, but A1 sorts first -> channel 1
+            df = DataFrame("Source Labware ID"=>["RackX","RackX"],"Source Position ID"=>["B1","A1"],
+                "Volume (uL)"=>[30.0,30.0],"Destination Labware ID"=>["Plate","Plate"],
+                "Destination Position ID"=>["C1","A1"],"Destination Kind"=>[:DeepWP96,:DeepWP96])
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+            aspirate_row = only(eachrow(action_df[action_df.Action .== "Aspirate",:]))
+            @test aspirate_row["Labware Position 1"] == "A1"
+            @test aspirate_row["Labware Position 2"] == "B1"
+            # A1's reagent (ch1) goes to row A, B1's (ch2) to row C: 2 rows apart, one shared dispense
+            dispense_row = only(eachrow(action_df[action_df.Action .== "Dispense",:]))
+            @test dispense_row["Labware Position 1"] == "A1"
+            @test dispense_row["Labware Position 2"] == "C1"
+
+            @test source_position_order(("RackX","B1")) > source_position_order(("RackX","A1"))
+            @test source_position_order(("RackX","A2")) > source_position_order(("RackX","B1"))
+            @test_throws ArgumentError batch_design_four_channel(df,config;channel_order=[("RackX","A1")])
+        end
+
+        sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_place_src$i") for i in 1:4]
+        target = build_location(location_kinds[:DeepWP96],"nimbus4ch_place_target")
         targets = Labware[target]
         config = configurations["nimbus_four_channel"]
-        slotting = slotting_greedy(vcat(sources,targets),config)
         R,C = size(target)
-        design = DataFrame(zeros(5,R*C),:auto)
-        for i in 1:5
-            design[i,i] = 10.0
+        well_col(letter_row,col) = (col-1)*R + letter_row
+        Random.seed!(42)
+        design = DataFrame(zeros(4,R*C),:auto)
+        for row in 1:R, col in 1:C, i in 1:4
+            rand() < 0.5 && (design[i,well_col(row,col)] = 30.0)
         end
-        df = convert_design_four_channel(design,sources,targets,slotting,config)
-        @test_throws ArgumentError batch_design_four_channel(df,config)
+
+        @testset "4 reagents: one rack, head-aligned slots, waste pinned, best channel order" begin
+            base = slotting_greedy(vcat(sources,targets),config)
+            placed = place_labware(base,design,sources,targets,config)
+
+            @test length(unique(placed[s][1] for s in sources)) == 1
+            @test sort([placed[s][2] for s in sources]) == [1,2,3,4] # A1,B1,A2,B2
+            @test placed[nimbus_4ch_waste_conical] == base[nimbus_4ch_waste_conical]
+            @test placed[target] == base[target]
+
+            df = convert_design_four_channel(design,sources,targets,placed,config)
+            chosen = nrow(batch_design_four_channel(df,config))
+            best = minimum(nrow(batch_design_four_channel(df,config;channel_order=order)) for order in four_channel_permutations(reagent_order(df)))
+            @test chosen == best
+        end
+
+        @testset "fragmented racks: every free full column used, lower channel always on row A" begin
+            base = slotting_greedy(vcat(sources,targets),config)
+            racks = [p for p in Pourfecto.deck(config) if Pourfecto.can_place(sources[1],p,config)]
+            # occupy A1 and A2 of every 50 mL rack: only column 3 stays whole, except in the waste
+            # rack, whose A3 holds the waste conical -- so no rack can host all 4 tubes aligned
+            fillers = Labware[]
+            for p in racks, slot in (1,3)
+                f = build_location(location_kinds[:Conical50],"nimbus4ch_place_fill_$(p.name)_$slot")
+                base[f] = (p,slot)
+                push!(fillers,f)
+            end
+            placed = place_labware(base,design,sources,targets,config)
+
+            @test all(placed[f] == base[f] for f in fillers)
+            @test allunique(placed[s] for s in sources)
+            column_of(s) = (placed[s][1], Tuple(CartesianIndices(Pourfecto.slots(placed[s][1]))[placed[s][2]])[2])
+            @test length(unique(column_of(s) for s in sources)) == 2 # two whole columns, 2 tubes each
+
+            df = convert_design_four_channel(design,sources,targets,placed,config)
+            action_df = batch_design_four_channel(df,config)
+            for row in eachrow(action_df[action_df.Action .== "Aspirate",:])
+                positions = [row["Labware Position $c"] for c in 1:4 if row["Labware Position $c"] != "None"]
+                length(positions) == 2 || continue
+                # channels are listed low to high; the lower one must sit on row A of the shared column
+                @test positions[1][1] == 'A' && positions[2][1] == 'B'
+                @test positions[1][2:end] == positions[2][2:end]
+            end
+        end
+    end
+
+    @testset "more reagents than channels: fixed groups" begin
+        config = configurations["nimbus_four_channel"]
+        _, effective_capacity = four_channel_capacities(config)
+
+        @testset "groups are read from tube position, one swap trip between them" begin
+            # 8 reagents listed out of position order; sorted by position, the first 4 are group 1
+            positions = [("RackY","B1"),("RackX","A3"),("RackX","B1"),("RackX","A1"),
+                         ("RackY","A1"),("RackX","B2"),("RackX","B3"),("RackX","A2")]
+            df = DataFrame("Source Labware ID"=>first.(positions),"Source Position ID"=>last.(positions),
+                "Volume (uL)"=>fill(30.0,8),"Destination Labware ID"=>fill("Plate",8),
+                "Destination Position ID"=>["A$k" for k in 1:8],"Destination Kind"=>fill(:DeepWP96,8))
+            action_df = batch_design_four_channel(df,config;insert_blowouts=false)
+
+            pickups = findall(==("TipPickup"),action_df.Action)
+            @test length(pickups) == 2
+            @test action_df[pickups[2]-1,"Action"] == "TipDisposal"
+            sources_used(rows) = Set((r["Labware ID"],r["Labware Position $c"]) for r in eachrow(rows)
+                for c in 1:4 if r["Labware Position $c"] != "None")
+            aspirates = action_df.Action .== "Aspirate"
+            first_half = aspirates .& (1:nrow(action_df) .< pickups[2])
+            @test sources_used(action_df[first_half,:]) == Set([("RackX","A1"),("RackX","B1"),("RackX","A2"),("RackX","B2")])
+            @test sources_used(action_df[aspirates .& .!first_half,:]) == Set([("RackX","A3"),("RackX","B3"),("RackY","A1"),("RackY","B1")])
+        end
+
+        score(demands,volumes,g) = minimum(group_window_count(demands,p,4) for p in four_channel_permutations(g)) +
+            8 * maximum(ceil(volumes[i]/effective_capacity) for i in g)
+        seed_groups(volumes) = (o = sortperm(volumes,rev=true); [o[i:min(i+3,end)] for i in 1:4:length(o)])
+
+        @testset "grouping search recovers a planted structure a volume-sorted split would miss" begin
+            # odd reagents fill rows 1,3,5,7 and even reagents rows 2,4,6,8, in every column: each
+            # parity set shares a window per column only when grouped together. A plain volume-sorted
+            # split (all volumes equal) would mix them as {1,2,3,4},{5,6,7,8}, where no single swap
+            # helps; the greedy seed has to find the parity sets
+            rows = [1,2,3,4,5,6,7,8]
+            demands = [[("Plate",:DeepWP96) => [DispenseItem(100i+col,CartesianIndex(rows[i],col),30.0) for col in 1:12]] for i in 1:8]
+            volumes = fill(360.0,8)
+            groups = group_reagents(demands,volumes,4,effective_capacity)
+            @test Set(Set.(groups)) == Set([Set([1,3,5,7]),Set([2,4,6,8])])
+            @test sum(score(demands,volumes,g) for g in groups) < sum(score(demands,volumes,g) for g in seed_groups(volumes))
+        end
+
+        @testset "$n reagents compile: volume conserved, one tip session per group, whole head-aligned columns" for n in (5,8,13,24)
+            sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_group_$(n)_src$i") for i in 1:n]
+            target = build_location(location_kinds[:DeepWP96],"nimbus4ch_group_$(n)_target")
+            targets = Labware[target]
+            R,C = size(target)
+            Random.seed!(n)
+            design = DataFrame(zeros(n,R*C),:auto)
+            for i in 1:n, w in 1:R*C
+                rand() < 0.3 && (design[i,w] = 30.0)
+            end
+            slotting = place_labware(slotting_greedy(vcat(sources,targets),config),design,sources,targets,config)
+            df = convert_design_four_channel(design,sources,targets,slotting,config)
+            action_df = batch_design_four_channel(df,config)
+
+            dispense_rows = action_df[action_df.Action .== "Dispense",:]
+            @test sum(sum(dispense_rows[!,"Volume $c"]) for c in 1:4) ≈ sum(Matrix(design))
+            n_groups = cld(n,4)
+            @test count(==("TipPickup"),action_df.Action) == n_groups # all channels pick up together per group
+            cells(action) = sum(count(c -> r["Labware Position $c"] != "None",1:4) for r in eachrow(action_df[action_df.Action .== action,:]))
+            @test cells("TipPickup") == n
+            @test cells("TipDisposal") == n # every tip disposed exactly once
+            # a disposal is never its own trip: it rides along on a reload/pickup, or ends a group
+            for i in findall(==("TipDisposal"),action_df.Action)
+                @test i == nrow(action_df) || action_df[i+1,"Action"] in ("TipPickup","Aspirate","TipDisposal")
+            end
+
+            slots_in_order = sort([slotting[s] for s in sources],by=slot_position_order)
+            column(s) = (s[1].name, Tuple(CartesianIndices(Pourfecto.slots(s[1]))[s[2]])[2])
+            for k in 1:n_groups
+                group_slots = slots_in_order[4k-3:min(4k,n)]
+                length(group_slots) == 4 || continue
+                @test all(count(==(col),column.(group_slots)) == 2 for col in column.(group_slots))
+            end
+        end
     end
 
     @testset "oversized transfer forces multiple aspirate cycles for one reagent" begin
