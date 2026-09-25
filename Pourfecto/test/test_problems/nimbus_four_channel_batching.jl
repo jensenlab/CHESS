@@ -489,7 +489,7 @@ reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Po
             @test sum(score(demands,volumes,g) for g in groups) < sum(score(demands,volumes,g) for g in seed_groups(volumes))
         end
 
-        @testset "$n reagents compile: volume conserved, one tip session per group, whole head-aligned columns" for n in (5,8,13,24)
+        @testset "$n reagents compile: volume conserved, one tip session per group, whole head-aligned columns" for n in (5,7,8,13,24)
             sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_group_$(n)_src$i") for i in 1:n]
             target = build_location(location_kinds[:DeepWP96],"nimbus4ch_group_$(n)_target")
             targets = Labware[target]
@@ -517,11 +517,14 @@ reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Po
 
             slots_in_order = sort([slotting[s] for s in sources],by=slot_position_order)
             column(s) = (s[1].name, Tuple(CartesianIndices(Pourfecto.slots(s[1]))[s[2]])[2])
-            for k in 1:n_groups
-                group_slots = slots_in_order[4k-3:min(4k,n)]
-                length(group_slots) == 4 || continue
-                @test all(count(==(col),column.(group_slots)) == 2 for col in column.(group_slots))
+            # every group, the short last one included, owns whole columns in one rack: no column is
+            # shared with another group, and a group of k tubes uses exactly cld(k,2) columns
+            group_columns = [unique(column.(slots_in_order[4k-3:min(4k,n)])) for k in 1:n_groups]
+            for (k,cols) in enumerate(group_columns)
+                @test length(cols) == cld(length(4k-3:min(4k,n)),2)
+                @test length(unique(first.(cols))) == 1
             end
+            @test allunique(vcat(group_columns...))
         end
     end
 

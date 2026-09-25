@@ -775,10 +775,12 @@ also chooses each reagent's group and channel:
    compiled with [`batch_design_four_channel`](@ref) and scored by action-row count, which captures
    dispense-window parallelism plus the reload interruptions and window tour that shift with it. The
    lowest wins; ties keep the incoming order.
-3. **Tube placement.** The reagents' tubes are re-placed into free 50 mL rack slots, filling whole
-   rack columns (both rows free) first, in as few racks as possible, then single slots, and handed out
-   in position order: group 1's channels first, then group 2's, and so on. Channels aspirate together
-   from one rack column when the lower channel sits on row A, so a crossed column never occurs.
+3. **Tube placement.** The reagents' tubes are re-placed into free 50 mL rack slots. Each group gets
+   its own whole rack columns (both rows free), in its own rack when possible, with racks and columns
+   taken in position order so group 1's tubes sort first, then group 2's, and so on; a group never
+   shares a column with another. Channels aspirate together from one rack column when the lower
+   channel sits on row A, so a crossed column never occurs. Only if too few whole columns are free
+   does placement fall back to single slots.
 
 Aspirate cost here depends only on which slots are free, not on grouping or channel order (any two
 reagents fit any free column with the lower channel on row A), so optimizing those first and then
@@ -828,17 +830,46 @@ function place_labware(slotting::SlottingDict,design::DataFrame,sources::Vector{
     end
     full_columns(p) = sort([col for ((q,col),free) in free_by_column if q == p && length(free) == 2])
 
-    need = length(reagents)
-    chosen = Tuple{DeckPosition,Int}[]
-    for p in sort(racks,by=p -> -length(full_columns(p))), col in full_columns(p)
-        need >= 2 || break
-        append!(chosen,[(p,s) for s in free_by_column[(p,col)]])
-        need -= 2
+    # Groups are read back from sorted tube position, so each group's tubes must form one contiguous
+    # block in position order. Prefer each group in its own rack, in whole columns, taking racks and
+    # columns in position order (a short last group leaves its final B slot empty); if racks are too
+    # fragmented, take whole columns in position order, a group possibly spanning two racks.
+    needs = [cld(length(g),2) for g in groups]
+    by_rack = [(p,full_columns(p)) for p in sort(racks,by=p -> p.name)]
+    blocks = Vector{Tuple{DeckPosition,Int}}[]
+    ri, taken = 1, 0
+    for m in needs
+        while ri <= length(by_rack) && length(by_rack[ri][2]) - taken < m
+            ri, taken = ri + 1, 0
+        end
+        ri > length(by_rack) && break
+        push!(blocks,[(by_rack[ri][1],col) for col in by_rack[ri][2][taken+1:taken+m]])
+        taken += m
     end
-    used_racks = Set(first.(chosen))
-    singles = sort([(p,s) for ((p,col),free) in free_by_column for s in free if !((p,s) in chosen)],
-        by=x -> (!(x[1] in used_racks), findfirst(==(x[1]),racks), slot_position_order(x)))
-    append!(chosen,singles[1:min(need,length(singles))])
+    all_full = [(p,col) for (p,cols) in by_rack for col in cols]
+    if length(blocks) < length(groups) && length(all_full) >= sum(needs)
+        bounds = cumsum(needs)
+        blocks = [all_full[b-m+1:b] for (b,m) in zip(bounds,needs)]
+    end
+
+    chosen = Tuple{DeckPosition,Int}[]
+    if length(blocks) == length(groups)
+        for (g,block) in zip(groups,blocks)
+            append!(chosen,[(p,s) for (p,col) in block for s in free_by_column[(p,col)]][1:length(g)])
+        end
+    else
+        # too few whole columns: fill what whole columns exist, then single slots
+        need = length(reagents)
+        for (p,col) in all_full
+            need >= 2 || break
+            append!(chosen,[(p,s) for s in free_by_column[(p,col)]])
+            need -= 2
+        end
+        used_racks = Set(first.(chosen))
+        singles = sort([(p,s) for ((p,col),free) in free_by_column for s in free if !((p,s) in chosen)],
+            by=x -> (!(x[1] in used_racks), slot_position_order(x)))
+        append!(chosen,singles[1:min(need,length(singles))])
+    end
     length(chosen) == length(reagents) || return slotting
 
     sort!(chosen,by=slot_position_order)
