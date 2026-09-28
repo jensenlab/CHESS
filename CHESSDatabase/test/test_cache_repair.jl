@@ -49,3 +49,23 @@ cr_x=reconstruct_location(9)
 cache(cr_x)
 update( set_attribute!,cr_a,Temperature(42u"°C"); ledger_id= insert_ledger(11))
 update( set_attribute!,cr_a,Temperature(200u"°C"); ledger_id= replace_ledger(11))
+@testset "activity repair only rewrites caches that changed" begin
+    room = generate_location(Room,"activity repair room")
+    id = location_id(room)
+    lock_activity_rows() = nrow(query_db("SELECT 1 FROM CachedLockActivity WHERE LocationID = ?",(id,)))
+    off_ledger = upload(deactivate!,room)
+    on_ledger = upload(activate!,room)
+    cache(reconstruct_location(id)) # active, as of on_ledger
+
+    # a change before the deactivate/activate pair leaves the cached state alone, so no rewrite
+    before = lock_activity_rows()
+    s1 = get_sequence_id(off_ledger)
+    update(deactivate!,reconstruct_location(id,s1-1);ledger_id=insert_ledger(s1))
+    @test lock_activity_rows() == before
+    @test is_active(reconstruct_activity(id))
+
+    # replacing the activate! with a deactivate! does change it
+    s2 = get_sequence_id(on_ledger)
+    update(deactivate!,reconstruct_location(id,s2-1);ledger_id=replace_ledger(s2))
+    @test !is_active(reconstruct_activity(id))
+end
