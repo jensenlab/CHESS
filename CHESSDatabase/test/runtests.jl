@@ -528,6 +528,23 @@ end
     @test CHESSCore.value.(reads(fresh,Absorbance)) == [90.0,95.0]
 end
 
+# Units from CHESSCore.JensenLabUnits (OD, RFU, xg) are stored as strings and must parse back on
+# reconstruction -- Unitful.uparse doesn't search them unless told to.
+@read JensenUnitsOD u"OD"
+@read JensenUnitsRFU u"RFU"
+@attribute JensenUnitsCentrifugation u"xg"
+
+@testset "Reads and attributes in JensenLabUnits reconstruct" begin
+    w = generate_location(Well200, "jensen units well")
+    upload(record_read!, w, JensenUnitsOD(0.42u"OD"))
+    upload(record_read!, w, JensenUnitsRFU(1500u"RFU"))
+    upload(set_attribute!, w, JensenUnitsCentrifugation(3000u"xg"))
+    fresh = reconstruct_location(location_id(w))
+    @test CHESSCore.quantity(only(reads(fresh, JensenUnitsOD))) == 0.42u"OD"
+    @test CHESSCore.quantity(only(reads(fresh, JensenUnitsRFU))) == 1500u"RFU"
+    @test CHESSCore.quantity(attributes(fresh)[:JensenUnitsCentrifugation]) == 3000u"xg"
+end
+
 @testset "Instrument: qualitative reads round-trip (constrained + free-text)" begin
     colorimetric = only(reads(w2,:ColorimetricResult))
     @test CHESSCore.value(colorimetric) == "Positive"

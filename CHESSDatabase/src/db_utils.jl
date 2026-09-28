@@ -11,6 +11,11 @@ function connect_SQLite(path)
     return nothing
 end
 
+# Parse a unit string read back from the database. Unitful.uparse (the function form, unlike the
+# u"..." macro) only searches the unit modules it is given, so CHESS's own units (OD, RFU, X, xg
+# from CHESSCore.JensenLabUnits) have to be listed explicitly.
+_parse_unit(str::AbstractString) = Unitful.uparse(str;unit_context=[Unitful,CHESSCore.JensenLabUnits])
+
 function execute_db(query::String)
     db=_require_db()
     DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.
