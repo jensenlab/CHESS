@@ -2,6 +2,11 @@ function repair_environment_attribute_caches(ledger_id::Integer)
     sequence_id=get_sequence_id(ledger_id)
 
     participants=unique(get_participants(get_environment_attribute_participant,sequence_id))
+    repair_environment_attribute_caches(participants,sequence_id)
+end
+
+# repair the attribute caches of `participants` at or after `sequence_id`
+function repair_environment_attribute_caches(participants::Vector{<:Integer},sequence_id::Integer)
     cache_update_counter=0
 
     for loc_id in participants 

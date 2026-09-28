@@ -407,6 +407,11 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         end
     end
 
+    # component and cost observations on every well whose own state this call reads back: the
+    # requested wells plus the core ancestor closure. Collateral destinations never need them.
+    target_wells=filter(id -> find_most_recent_location(all_locs,id) isa CHESSCore.Well,location_ids)
+    observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time)
+
     # grab the sequence id of each location we need to complete this set of transfers
     cache_dict=Dict{Integer,Integer}()
     for row in reverse(eachrow(transfers))
@@ -417,6 +422,12 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
 
         cache_dict[row.Source]=seq_id
         cache_dict[row.Destination]=seq_id
+    end
+    # a core well must also be bootstrapped from before its first observation
+    for row in eachrow(observations)
+        row.LocationID in core_locs || continue
+        seq_id=min(row.SequenceID-1,sequence_id)
+        cache_dict[row.LocationID]=min(get(cache_dict,row.LocationID,seq_id),seq_id)
     end
     reconstructions_needed=Set{Integer}()
     for loc_id in keys(cache_dict)
@@ -444,9 +455,18 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         end
     end
 
-    #start simulation
+    #start simulation: transfers and observations in sequence order. An observation never shares a
+    # SequenceID with a transfer (each is its own ledger entry), so the relative order of equal keys
+    # doesn't matter.
+    events=vcat([(row.SequenceID,row) for row in eachrow(transfers)],
+                [(key.SequenceID,rows) for (key,rows) in pairs(groupby(observations,[:LocationID,:SequenceID];sort=false))])
+    sort!(events;by=first)
 
-    for row in eachrow(transfers)
+    for (_,row) in events
+        if !(row isa DataFrameRow)
+            _apply_content_observations!(all_locs,row)
+            continue
+        end
         seq_id=row.SequenceID -1
         quant= row.Quantity * Unitful.uparse(row.Unit)
         src = find_most_recent_location(all_locs,row.Source,seq_id)
@@ -517,3 +537,54 @@ end
 
 
 
+"""
+    get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+
+Every component and cost observation on `locs` between `starting` and `ending` sequence points,
+ordered by `SequenceID`. Component rows have a missing `Cost`, and cost rows a missing
+`ComponentID`/`Quantity`/`Unit`.
+"""
+function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    isempty(locs) && return DataFrame(LedgerID=Int[],SequenceID=Int[],LocationID=Int[],ComponentID=Union{Int,Missing}[],
+        Quantity=Union{Float64,Missing}[],Unit=Union{String,Missing}[],Cost=Union{Float64,Missing}[])
+    ledger_time=db_time(time)
+    entry=query_join_vector(locs)
+    return query_db("""
+        WITH ledger_subset (ID,SequenceID,Time)
+        AS(
+            SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
+            )
+        SELECT o.LedgerID,l.SequenceID,o.LocationID,o.ComponentID,o.Quantity,o.Unit,NULL AS Cost
+            FROM ObservedComponents o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
+        UNION ALL
+        SELECT o.LedgerID,l.SequenceID,o.LocationID,NULL,NULL,NULL,o.Cost
+            FROM ObservedCosts o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
+        ORDER BY SequenceID
+        """)
+end
+
+"""
+    _apply_content_observations!(all_locs, rows)
+
+Replay one location's observations at one sequence point (`rows` share a `LocationID` and
+`SequenceID`) on top of its most recent reconstructed state, and record the result at that sequence
+point. Skipped when that location's state is only known from a point at or after the observation --
+a cache written there already reflects it.
+"""
+function _apply_content_observations!(all_locs,rows)
+    loc_id=rows[1,:LocationID]
+    seq_id=rows[1,:SequenceID]
+    entry=find_most_recent_entry(all_locs,loc_id,seq_id-1)
+    isnothing(entry) && return nothing
+    loc=deepcopy(entry[2])
+    for row in eachrow(rows)
+        if ismissing(row.ComponentID)
+            loc.cost=row.Cost
+        else
+            quant=row.Quantity*Unitful.uparse(row.Unit;unit_context=[Unitful,CHESSCore.JensenLabUnits])
+            loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
+        end
+    end
+    push_location!(all_locs,loc_id,seq_id,loc)
+    return nothing
+end

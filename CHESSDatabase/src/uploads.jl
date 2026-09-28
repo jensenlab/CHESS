@@ -17,7 +17,8 @@ function upload_operation(fun::Function)
         transfer! => upload_transfer,
         set_attribute! => upload_environment_attribute,
         record_read! => upload_read,
-        assign_barcode! => update_barcode
+        assign_barcode! => update_barcode,
+        observe! => upload_observation
     )
     return opfun_dict[fun]
 end

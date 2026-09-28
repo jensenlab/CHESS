@@ -51,9 +51,13 @@ include("./validation_and_repair/validation.jl")
 
 # ledger updates
 include("./update_operation.jl")
+# observations
+include("./observations.jl")
 
 #database
 export create_db
+#observations.jl
+export observe, upload_observation, observation_discrepancies, backfill_observations
 #ledger.jl
 export append_ledger,insert_ledger,update_ledger,replace_ledger
 #db_utils

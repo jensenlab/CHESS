@@ -75,6 +75,7 @@ include("./operations/movement.jl")
 include("./operations/transfer.jl")
 include("./operations/attributes.jl")
 include("./operations/reads.jl")
+include("./operations/observe.jl")
 include("./operations/mixing.jl")
 
 include("./interop/stock_utils.jl")
@@ -88,6 +89,7 @@ export JensenLabUnits # custom units
 export Attribute, AttributeDict,set_attribute! ,attribute_unit, attribute_kind
 export AttributeKind, attribute_kinds, Unknown, UnknownValue, isunknown
 export Read, ReadKind, read_kinds, @read, @read_str, read_kind, read_unit, read_time, reads, record_read!
+export observe!, set_component
 export is_quantitative, is_qualitative
 export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
 export StockComponent # common dispatch/gathering ancestor for Reagent and Organism

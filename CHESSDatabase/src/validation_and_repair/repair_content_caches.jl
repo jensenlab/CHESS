@@ -5,12 +5,17 @@ function repair_content_caches(ledger_id::Integer)
 
     participants=get_participants(get_transfer_participants,sequence_id)
     locs=unique(vcat(collect.(participants)...))
+    repair_content_caches(locs,sequence_id)
+end
+
+# repair the content caches of `locs`, and of every well downstream of them, at or after `sequence_id`
+function repair_content_caches(locs::Vector{<:Integer},sequence_id::Integer)
     trfs=get_transfer_descendents(locs,sequence_id)
-    
+
     srcs=trfs.Source
     dests=trfs.Destination
 
-    all_locs=unique(vcat(srcs,dests))
+    all_locs=unique(vcat(locs,srcs,dests))
     cache_update_counter=0
     for loc_id in all_locs
 

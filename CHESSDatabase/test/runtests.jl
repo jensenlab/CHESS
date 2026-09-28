@@ -573,4 +573,7 @@ end
     @test move_into! in performable_operations(reconstructed)
 end
 
+# last: backfill_observations inserts ledger entries, shifting the sequence ids earlier tests hard-code
+include("test_observations.jl")
+
 rm(file)

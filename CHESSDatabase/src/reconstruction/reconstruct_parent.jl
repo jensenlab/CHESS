@@ -145,7 +145,7 @@ function get_last_movement_as_child(locs::Vector{<:Integer},starting::Integer=0,
             FROM encumbrance_subset e INNER JOIN EncumberedMovements v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
             SELECT c.LedgerID,l.SequenceID,0, c.Parent,c.Child
-            FROM Movements c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
+            FROM $(movement_events) c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
         z( LedgerID, SequenceID,EncumbranceID,Parent,Child) 
         As(SELECT  LedgerID,Max(SequenceID),EncumbranceID, Parent,Child FROM y WHERE  Child in $entry GROUP BY Child  ORDER BY   SequenceID 
         )
@@ -160,7 +160,7 @@ function get_last_movement_as_child(locs::Vector{<:Integer},starting::Integer=0,
             ) ,
              y(LedgerID, SequenceID,EncumbranceID,Parent,Child) 
              AS( 
-             SELECT  LedgerID,Max(SequenceID),0,Parent,Child FROM Movements INNER JOIN ledger_subset ON Movements.LedgerID = ledger_subset.ID WHERE  Child in $entry GROUP BY Child   ORDER BY SequenceID 
+             SELECT  LedgerID,Max(SequenceID),0,Parent,Child FROM $(movement_events) AS Movements INNER JOIN ledger_subset ON Movements.LedgerID = ledger_subset.ID WHERE  Child in $entry GROUP BY Child   ORDER BY SequenceID 
              )
         Select * FROM y 
         """

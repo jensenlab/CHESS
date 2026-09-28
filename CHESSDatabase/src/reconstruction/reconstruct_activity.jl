@@ -135,7 +135,7 @@ function get_activity(location_ids::Vector{<:Integer},starting::Integer=0,ending
             FROM encumbrance_subset e INNER JOIN EncumberedActivity v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
             SELECT c.LedgerID,l.SequenceID,0, c.LocationID,c.IsActive
-            FROM Activity c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
+            FROM $(activity_events) c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
         z( LedgerID, SequenceID,EncumbranceID,LocationID,IsActive) 
         As(SELECT  LedgerID,Max(SequenceID),EncumbranceID, LocationID,IsActive FROM y WHERE  LocationID in $entry GROUP BY LocationID  ORDER BY   SequenceID 
         )
@@ -150,7 +150,7 @@ function get_activity(location_ids::Vector{<:Integer},starting::Integer=0,ending
             ) ,
              y(LedgerID, SequenceID,EncumbranceID,LocationID,IsActive) 
              AS( 
-             SELECT  LedgerID,Max(SequenceID),0,LocationID,IsActive FROM Activity INNER JOIN ledger_subset ON Activity.LedgerID = ledger_subset.ID WHERE  LocationID in $entry GROUP BY LocationID  ORDER BY SequenceID 
+             SELECT  LedgerID,Max(SequenceID),0,LocationID,IsActive FROM $(activity_events) AS Activity INNER JOIN ledger_subset ON Activity.LedgerID = ledger_subset.ID WHERE  LocationID in $entry GROUP BY LocationID  ORDER BY SequenceID 
              )
         Select * FROM y 
         """

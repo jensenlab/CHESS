@@ -12,39 +12,62 @@ so committing in place is not possible). Use the returned value going forward, t
 Already-committed locations embedded in an otherwise-uncommitted subtree are left as-is (reattached,
 not re-committed) -- `commit_location!` is safe to call on a mixed tree.
 
-See also: [`build_location`](@ref), [`release_location`](@ref), [`UncommittedLocationError`](@ref).
+Whatever the new locations hold beyond a fresh location's defaults (stock, cost, attributes, lock and
+activity state, and which location each child sits in) is recorded as observations on a single new
+ledger entry, so the ledger alone can reconstruct it. The new locations are then cached at that entry.
+
+See also: [`build_location`](@ref), [`release_location`](@ref), [`UncommittedLocationError`](@ref),
+[`observe`](@ref).
 """
-function commit_location!(loc::Well)
+function commit_location!(loc::Location)
     is_committed(loc) && return loc
-    real_id = upload_new_location(name(loc),kind(loc))
-    return Well(real_id,name(loc),kind(loc);stock=stock(loc),attributes=attributes(loc),
-        cost=cost(loc),is_active=is_active(loc))
+    new_locs = Location[]
+    real = _commit_tree!(loc,new_locs)
+    facets = reduce(vcat,_genesis_facets.(new_locs);init=Tuple[])
+    if !isempty(facets)
+        ledger_id = append_ledger()
+        for f in facets
+            upload_observation(f...;ledger_id=ledger_id)
+        end
+    end
+    cache.(new_locs)
+    return real
 end
 
-function commit_location!(loc::Labware)
+# upload a Locations row for every uncommitted location in `loc`'s subtree, collecting the newly
+# committed copies in `new_locs`
+function _commit_tree!(loc::Well,new_locs::Vector{Location})
     is_committed(loc) && return loc
     real_id = upload_new_location(name(loc),kind(loc))
-    cs = commit_location!.(children(loc))
+    real = Well(real_id,name(loc),kind(loc);stock=stock(loc),attributes=attributes(loc),
+        cost=cost(loc),is_active=is_active(loc))
+    push!(new_locs,real)
+    return real
+end
+
+function _commit_tree!(loc::Labware,new_locs::Vector{Location})
+    is_committed(loc) && return loc
+    real_id = upload_new_location(name(loc),kind(loc))
+    cs = _commit_tree!.(children(loc),Ref(new_locs))
     real = Labware(real_id,name(loc),kind(loc);children=cs,attributes=attributes(loc),
         is_locked=is_locked(loc),is_active=is_active(loc))
     for c in cs
         c.parent = real
     end
-    cache(real)
-    cache.(children(real))
+    push!(new_locs,real)
     return real
 end
 
-function commit_location!(loc::GenericLocation)
+function _commit_tree!(loc::GenericLocation,new_locs::Vector{Location})
     is_committed(loc) && return loc
     real_id = upload_new_location(name(loc),kind(loc))
-    cs = commit_location!.(children(loc))
+    cs = _commit_tree!.(children(loc),Ref(new_locs))
     real = GenericLocation(real_id,name(loc),kind(loc);children=cs,attributes=attributes(loc),
         is_locked=is_locked(loc),is_active=is_active(loc))
     for c in cs
         c.parent = real
     end
-    cache(real)
+    push!(new_locs,real)
     return real
 end
 

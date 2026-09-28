@@ -83,3 +83,26 @@ function find_most_recent_location(index::Dict{<:Integer,<:Vector},location_id::
     idx == 0 && return nothing
     return entries[idx][2]
 end
+
+# Event sources for the "last write wins" reconstructions (parent/children, attributes, lock,
+# activity): each unions an operation table with its observation table, so an observation replays
+# exactly like the operation it declares the outcome of. Observed attributes that only confirmed an
+# inherited value (IsInherited = 1) never become own attributes, so they're left out.
+const movement_events = "(SELECT LedgerID,Parent,Child FROM Movements UNION ALL SELECT LedgerID,Parent,Child FROM ObservedParents)"
+const attribute_events = "(SELECT LedgerID,LocationID,Attribute,Value,Unit FROM EnvironmentAttributes UNION ALL SELECT LedgerID,LocationID,Attribute,Value,Unit FROM ObservedAttributes WHERE IsInherited = 0)"
+const lock_events = "(SELECT LedgerID,LocationID,IsLocked FROM Locks UNION ALL SELECT LedgerID,LocationID,IsLocked FROM ObservedLocks)"
+const activity_events = "(SELECT LedgerID,LocationID,IsActive FROM Activity UNION ALL SELECT LedgerID,LocationID,IsActive FROM ObservedActivity)"
+
+"""
+    find_most_recent_entry(index, location_id, sequence_id)
+
+Like [`find_most_recent_location`](@ref), but return the `(SequenceID, Location)` entry itself, so a
+caller can tell what sequence point the found state reflects.
+"""
+function find_most_recent_entry(index::Dict{<:Integer,<:Vector},location_id::Integer,sequence_id::Integer)
+    haskey(index,location_id) || return nothing
+    entries = index[location_id]
+    idx = searchsortedlast(entries, (sequence_id, nothing); by=first)
+    idx == 0 && return nothing
+    return entries[idx]
+end

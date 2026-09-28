@@ -25,6 +25,9 @@ function reconstruct_children(location_ids::Vector{<:Integer},sequence_id::Integ
                 n,t=get_location_info(row.Child)
                 all_locs[row.Child]=t(row.Child,n)
             end
+            # the cache this started from may already hold the child: a movement or observation on
+            # the cache's own ledger entry is already reflected in it
+            any(c -> c === all_locs[row.Child],children(all_locs[row.Parent])) && continue
             move_into!(all_locs[row.Parent],all_locs[row.Child])
         elseif (row.Child in keys(current_children)) && row.Parent != current_children[row.Child]
             p_id=location_id(CHESSCore.parent(all_locs[row.Child]))
@@ -169,7 +172,7 @@ function get_last_movements_as_parent(locs::Vector{<:Integer},starting::Integer=
             FROM encumbrance_subset e INNER JOIN EncumberedMovements v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
             SELECT c.LedgerID,l.SequenceID,0, c.Parent,c.Child
-            FROM Movements c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
+            FROM $(movement_events) c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
         z( LedgerID, SequenceID,EncumbranceID,Parent,Child) 
         As(SELECT  LedgerID,Max(SequenceID),EncumbranceID, Parent,Child FROM y  GROUP BY Child  ORDER BY   SequenceID 
         )
@@ -184,7 +187,7 @@ function get_last_movements_as_parent(locs::Vector{<:Integer},starting::Integer=
             ) ,
              y(LedgerID, SequenceID,EncumbranceID,Parent,Child) 
              AS( 
-             SELECT  LedgerID,Max(SequenceID),0,Parent,Child FROM Movements INNER JOIN ledger_subset ON Movements.LedgerID = ledger_subset.ID GROUP BY Child   ORDER BY SequenceID 
+             SELECT  LedgerID,Max(SequenceID),0,Parent,Child FROM $(movement_events) AS Movements INNER JOIN ledger_subset ON Movements.LedgerID = ledger_subset.ID GROUP BY Child   ORDER BY SequenceID 
              )
         Select * FROM y WHERE Parent in $entry
         """

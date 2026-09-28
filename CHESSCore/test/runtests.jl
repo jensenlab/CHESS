@@ -1250,3 +1250,63 @@ end
     plt2 = plot_well_heatmap!(Plots.plot(plate),plate)
     @test plt2 isa Plots.Plot
 end
+
+@testset "observe!: declare state without history" begin
+    w=Well(nothing,"observed well",Well1000)
+    deposit!(w,100u"µL"*rgt"water"+2.35u"mg"*rgt"paba",1.5)
+
+    # a component observation replaces exactly that component and leaves the rest and the cost alone
+    observe!(w,rgt"paba",2.04u"mg")
+    @test solids(stock(w))[rgt"paba"] == 2.04u"mg"
+    @test liquids(stock(w))[rgt"water"] == 100u"µL"
+    @test cost(w) == 1.5
+
+    # observing a liquid changes the total volume
+    observe!(w,rgt"water",50u"µL")
+    @test quantity(stock(w)) == 50u"µL"
+
+    # zero asserts absence, and a new component can appear out of nowhere
+    observe!(w,rgt"paba",0u"mg")
+    @test !haskey(solids(stock(w)),rgt"paba")
+    observe!(w,org"SMU_UA159",0.1u"OD*mL")
+    @test stock(w) isa Culture
+
+    @test_throws ArgumentError observe!(w,rgt"paba",1u"µL") # wrong dimension for a solid
+    @test_throws DomainError observe!(w,rgt"paba",-1u"mg")
+    @test_throws WellCapacityError observe!(w,rgt"water",2u"mL") # Well1000 holds 1 mL
+
+    # set_component doesn't touch the original stock
+    s=100u"µL"*rgt"water"
+    @test set_component(s,rgt"water",0u"µL") == Empty()
+    @test s == 100u"µL"*rgt"water"
+
+    # scalar facets
+    observe!(w,:cost,4.0)
+    @test cost(w) == 4.0
+    observe!(w,:active,false)
+    @test !is_active(w)
+    @test_throws ArgumentError observe!(w,:colour,1)
+
+    # attributes are own attributes; missing defers to the parent
+    room=GenericLocation(nothing,"observed room",Room)
+    bench=GenericLocation(nothing,"observed bench",Bench)
+    move_into!(room,bench)
+    set_attribute!(room,Temperature(37u"°C"))
+    observe!(bench,Temperature(30u"°C"))
+    @test environment(bench)[:Temperature] == Temperature(30u"°C")
+    observe!(bench,Temperature(missing))
+    @test environment(bench)[:Temperature] == Temperature(37u"°C")
+
+    # position: moves like move_into!, ignores the child's lock, and is a no-op if already there
+    bench2=GenericLocation(nothing,"other bench",Bench)
+    lock!(bench)
+    observe!(bench,bench2)
+    @test parent(bench) === bench2
+    @test is_locked(bench)
+    @test !(bench in children(room))
+    observe!(bench,bench2)
+    @test count(==(bench),children(bench2)) == 1
+    observe!(bench,nothing)
+    @test isnothing(parent(bench))
+    @test_throws FixedMembershipError observe!(w,room) # wells stay fused to their labware
+end

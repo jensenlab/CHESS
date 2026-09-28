@@ -146,7 +146,7 @@ function get_environment_attributes(locs::Vector{<:Integer},starting::Integer=0,
             FROM encumbrance_subset  e INNER JOIN EncumberedEnvironments v ON e.EncumbranceID = v.EncumbranceID 
         UNION ALL 
             SELECT c.LedgerID,l.SequenceID,0,c.LocationID,c.Attribute,c.Value,c.Unit
-            FROM EnvironmentAttributes c INNER JOIN ledger_subset l on l.ID = c.LedgerID) ,
+            FROM $(attribute_events) c INNER JOIN ledger_subset l on l.ID = c.LedgerID) ,
         
         z (LedgerID,SequenceID,EncumbranceID,LocationID,Attribute,Value,Unit)
         AS(Select LedgerID, Max(SequenceID),EncumbranceID,LocationID,Attribute,Value,Unit FROM y WHERE  LocationID in $entry  GROUP BY LocationID, Attribute ORDER BY SequenceID)
@@ -163,7 +163,7 @@ function get_environment_attributes(locs::Vector{<:Integer},starting::Integer=0,
             SELECT Max(ID), SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID 
             ) ,
         y (LedgerID,SequenceID,EncumbranceID, LocationID, Attribute, Value,Unit)
-        AS( SELECT c.LedgerID,l.SequenceID,0, c.LocationID,c.Attribute,c.Value,c.Unit FROM EnvironmentAttributes c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
+        AS( SELECT c.LedgerID,l.SequenceID,0, c.LocationID,c.Attribute,c.Value,c.Unit FROM $(attribute_events) c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
 
                 z (LedgerID,SequenceID,EncumbranceID,LocationID,Attribute,Value,Unit)
         AS(Select LedgerID, Max(SequenceID),EncumbranceID,LocationID,Attribute,Value,Unit FROM y WHERE  LocationID in $entry  GROUP BY LocationID, Attribute ORDER BY SequenceID)

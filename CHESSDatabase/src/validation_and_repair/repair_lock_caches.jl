@@ -2,6 +2,11 @@ function repair_lock_caches(ledger_id::Integer)
     sequence_id=get_sequence_id(ledger_id)
 
     participants=unique(get_participants(get_lock_participant,sequence_id))
+    repair_lock_caches(participants,sequence_id)
+end
+
+# repair the lock caches of `participants` at or after `sequence_id`
+function repair_lock_caches(participants::Vector{<:Integer},sequence_id::Integer)
     cache_update_counter=0
 
     for loc_id in participants 

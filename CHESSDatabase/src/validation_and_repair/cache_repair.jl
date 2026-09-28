@@ -9,6 +9,8 @@ function repair_operation_type(ledger_id::Integer)
         return repair_lock_caches
     elseif isa_activity(ledger_id)
         return repair_activity_caches
+    elseif isa_observation(ledger_id)
+        return repair_observation_caches
     else
         error("cache repair operation not supported")
     end 

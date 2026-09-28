@@ -9,6 +9,8 @@ function validate_operation_type(ledger_id::Integer)
         return validate_lock
     elseif isa_activity(ledger_id)
         return validate_activity
+    elseif isa_observation(ledger_id)
+        return validate_observation
     else
         error("validate operation not supported")
     end 

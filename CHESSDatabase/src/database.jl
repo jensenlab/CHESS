@@ -407,6 +407,97 @@ function create_db(path)
     );
     """
 
+    # Observations: ground-truth statements about one facet of a location at a ledger position,
+    # made without any claim about how the state came about. Replay applies them in sequence with
+    # the operations above. ReadLedgerID optionally points at the Read that produced the observation.
+    observation_columns = """
+        Time INTEGER,
+        InstrumentID INTEGER,
+        InstrumentTime INTEGER,
+        ReadLedgerID INTEGER,
+        FOREIGN KEY(LedgerID) REFERENCES Ledger(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        FOREIGN KEY(InstrumentID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        FOREIGN KEY(ReadLedgerID) REFERENCES Ledger(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    """
+
+    create_ObservedComponents="""
+    CREATE TABLE ObservedComponents(
+        ID INTEGER PRIMARY KEY NOT NULL,
+        LedgerID INTEGER,
+        LocationID INTEGER,
+        ComponentID INTEGER,
+        Quantity REAL,
+        Unit TEXT,
+        $observation_columns,
+        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        FOREIGN KEY(ComponentID) REFERENCES Components(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
+    create_ObservedCosts="""
+    CREATE TABLE ObservedCosts(
+        ID INTEGER PRIMARY KEY NOT NULL,
+        LedgerID INTEGER,
+        LocationID INTEGER,
+        Cost REAL,
+        $observation_columns,
+        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
+    # IsInherited = 1 when the observed value matched what the location already inherited from its
+    # parent: the row is kept for audit and discrepancy reporting, but replay skips it so the
+    # location keeps following its parent.
+    create_ObservedAttributes="""
+    CREATE TABLE ObservedAttributes(
+        ID INTEGER PRIMARY KEY NOT NULL,
+        LedgerID INTEGER,
+        LocationID INTEGER,
+        Attribute TEXT,
+        Value REAL,
+        Unit TEXT,
+        IsInherited INTEGER,
+        $observation_columns,
+        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        FOREIGN KEY(Attribute) REFERENCES Attributes(Attribute) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
+    create_ObservedParents="""
+    CREATE TABLE ObservedParents(
+        ID INTEGER PRIMARY KEY NOT NULL,
+        LedgerID INTEGER,
+        Parent INTEGER,
+        Child INTEGER,
+        $observation_columns,
+        FOREIGN KEY(Parent) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        FOREIGN KEY(Child) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+        CHECK (Parent != Child)
+    );
+    """
+
+    create_ObservedLocks="""
+    CREATE TABLE ObservedLocks(
+        ID INTEGER PRIMARY KEY NOT NULL,
+        LedgerID INTEGER,
+        LocationID INTEGER,
+        IsLocked INTEGER,
+        $observation_columns,
+        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
+    create_ObservedActivity="""
+    CREATE TABLE ObservedActivity(
+        ID INTEGER PRIMARY KEY NOT NULL,
+        LedgerID INTEGER,
+        LocationID INTEGER,
+        IsActive INTEGER,
+        $observation_columns,
+        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
+    );
+    """
+
 
     create_Protocols="""
     CREATE TABLE Protocols( 
@@ -601,6 +692,16 @@ function create_db(path)
     DBInterface.execute(db, create_Activity)
     DBInterface.execute(db,create_Locks)
     DBInterface.execute(db,create_InstrumentSettings)
+    #observations
+    DBInterface.execute(db,create_ObservedComponents)
+    DBInterface.execute(db,create_ObservedCosts)
+    DBInterface.execute(db,create_ObservedAttributes)
+    DBInterface.execute(db,create_ObservedParents)
+    DBInterface.execute(db,create_ObservedLocks)
+    DBInterface.execute(db,create_ObservedActivity)
+    for tbl in ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
+        DBInterface.execute(db,"CREATE INDEX idx_$(lowercase(tbl))_ledger ON $tbl(LedgerID);")
+    end
 
     # indexes on InstrumentID columns -- added from day one, unlike the rest of the schema (see the
     # earlier caching/indexing critique this design followed from)

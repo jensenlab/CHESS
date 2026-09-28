@@ -142,7 +142,7 @@ function get_locks(location_ids::Vector{<:Integer},starting::Integer=0,ending::I
             FROM encumbrance_subset e INNER JOIN EncumberedLocks v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
             SELECT c.LedgerID,l.SequenceID,0, c.LocationID,c.IsLocked
-            FROM Locks c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
+            FROM $(lock_events) c INNER JOIN ledger_subset l ON c.LedgerID = l.ID) ,
         z( LedgerID, SequenceID,EncumbranceID,LocationID,IsLocked) 
         As(SELECT  LedgerID,Max(SequenceID),EncumbranceID, LocationID,IsLocked FROM y WHERE  LocationID in $entry GROUP BY LocationID  ORDER BY   SequenceID 
         )
@@ -157,7 +157,7 @@ function get_locks(location_ids::Vector{<:Integer},starting::Integer=0,ending::I
             ) ,
              y(LedgerID, SequenceID,EncumbranceID,LocationID,IsLocked) 
              AS( 
-             SELECT  LedgerID,Max(SequenceID),0,LocationID,IsLocked FROM Locks INNER JOIN ledger_subset ON Locks.LedgerID = ledger_subset.ID WHERE  LocationID in $entry GROUP BY LocationID  ORDER BY SequenceID 
+             SELECT  LedgerID,Max(SequenceID),0,LocationID,IsLocked FROM $(lock_events) AS Locks INNER JOIN ledger_subset ON Locks.LedgerID = ledger_subset.ID WHERE  LocationID in $entry GROUP BY LocationID  ORDER BY SequenceID 
              )
         Select * FROM y 
         """

@@ -4,10 +4,16 @@ function repair_movement_caches(ledger_id::Integer)
     sequence_id=get_sequence_id(ledger_id)
 
     participants=get_participants(get_movement_participants,sequence_id)
-    cache_update_counter=0
-
     unique_parents= unique(map(x-> x[1],participants) )
     unique_children=unique(map(x->x[2],participants))
+    repair_movement_caches(unique_parents,unique_children,sequence_id)
+end
+
+# repair the child caches of `unique_parents` and the parent caches of `unique_children` at or after
+# `sequence_id`
+function repair_movement_caches(unique_parents::Vector,unique_children::Vector{<:Integer},sequence_id::Integer)
+    cache_update_counter=0
+
     # repair the parent's child caches 
     for prt in unique_parents
         caches=get_child_caches(prt,sequence_id)
