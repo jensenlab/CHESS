@@ -120,7 +120,7 @@ end
 Remove the stock contained in a well by setting it to `Empty()`
 
 See also: [`Empty`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function empty!(x::Well)
     s=Empty()
@@ -133,7 +133,7 @@ end
     sterilize!(x::Well)
 
 Remove any organisms from the [`Stock`](@ref) object contained in well `x`. To preview this without
-mutating `x`, see [`reconstruct_location`](@ref)/[`build_location`](@ref).
+mutating `x`, see [`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function sterilize!(x::Well)
     st=stock(x);
@@ -151,7 +151,7 @@ Remove all [`Chemical`](@ref) components from the [`Stock`](@ref) object contain
 * `drain!` leaves behind any [`Organism`](@ref)s *
 
 See also: [`sterilize!`](@ref),[`empty!`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function drain!(x::Well)
     st=stock(x);
@@ -162,7 +162,18 @@ function drain!(x::Well)
 end
 
 
+"""
+    withdraw!(donor::Well, quant::Union{Unitful.Volume,Unitful.Mass}) -> (Stock, Real)
 
+Remove `quant` of `donor`'s stock and return it along with its share of the well's cost.
+
+The withdrawn [`Stock`](@ref) is a proportional slice of the well's contents: withdrawing a
+quarter of the total quantity takes a quarter of every reagent and organism. The well's cost is
+reduced by the same fraction, and that amount is returned as the second value. `quant` must have
+the same dimension (volume or mass) as the well's total quantity, otherwise an error is thrown.
+
+See also: [`deposit!`](@ref), [`transfer!`](@ref).
+"""
 function withdraw!(donor::Well,quant::Union{Unitful.Volume,Unitful.Mass})
     st=stock(donor)
     q_tot=quantity(st)

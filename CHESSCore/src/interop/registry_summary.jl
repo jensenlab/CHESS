@@ -7,7 +7,7 @@ Assemble every registered constant across `context` (a `Module` or list of `Modu
 category: `reagents`, `chemicals`, `organisms`, `locations`, `attributes`, `reads`, `stocks`.
 
 `organisms`/`locations`/`attributes`/`reads` are read directly from CHESSCore's central registries
-([`orgprops`](@ref)/[`location_kinds`](@ref)/[`attribute_kinds`](@ref)/[`read_kinds`](@ref)), which
+(`orgprops`/[`location_kinds`](@ref)/[`attribute_kinds`](@ref)/[`read_kinds`](@ref)), which
 already hold everything needed. `reagents`/`chemicals` have no such registry, and `stocks`'
 registry ([`stock_recipes`](@ref)) only reflects `Stock`s explicitly registered via
 [`@stock`](@ref) -- so like [`symbol`](@ref)'s own reverse lookup, all three are instead found here

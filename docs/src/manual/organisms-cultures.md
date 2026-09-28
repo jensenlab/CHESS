@@ -2,7 +2,7 @@
 
 A [`Culture`](@ref) also tracks living organisms, not just chemicals -- an [`Organism`](@ref) is a
 species-and-strain identity: `genus`, `species`, and `strain`. Each `Organism` present in a `Culture`
-carries a [`Biomass`](@ref) quantity, not just presence/absence.
+carries a [`Biomass`](@ref CHESSCore.Biomass) quantity, not just presence/absence.
 
 ## Registering an organism
 
@@ -42,7 +42,7 @@ SMU_UA159
 ## Biomass: a quantity, not just presence
 
 Organisms can't be counted directly -- the only real measurement is optical density (OD), which is
-a concentration, not a count. [`Biomass`](@ref) is the quantity CHESS tracks for an organism: an
+a concentration, not a count. [`Biomass`](@ref CHESSCore.Biomass) is the quantity CHESS tracks for an organism: an
 absolute, conserved amount dimensioned as `OD * Volume`, so `biomass / volume` recovers an OD
 reading by construction (no separate calibration factor). Like a solid's `Mass` or a liquid's
 `Volume`, `Biomass` isn't tied to *this stock's* current liquid volume -- a `Culture` can validly

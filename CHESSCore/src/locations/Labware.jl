@@ -6,7 +6,7 @@
 
 The concrete [`Location`](@ref) subtype for a manufactured physical item with a fixed, homogeneous
 grid of slots (`kind.shape`), populated once at creation by
-[`generate_location`](@ref) and never restructured afterward — `add_to!`/`remove!` on a `Labware`
+[`build_location`](@ref) and never restructured afterward — `add_to!`/`remove!` on a `Labware`
 throw [`FixedMembershipError`](@ref). Every distinct model (`:WP96`, `:AltemisBox`, ...) is a
 [`LocationKind`](@ref) value carried in `kind`, not a distinct Julia type.
 """
@@ -58,6 +58,12 @@ function childtype(x::Labware)
     return concretetype(location_kinds[kind(x).socket])
 end
 
+"""
+    wells(x::Labware)
+
+The grid of slots in `x`, the same `Matrix` as [`children`](@ref). The name reads better when
+the slots are [`Well`](@ref)s.
+"""
 wells(x::Labware) = children(x)
 
 # Ergonomic array-like indexing forwarding to the underlying children Matrix. Deliberately no

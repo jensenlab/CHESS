@@ -45,8 +45,8 @@ graph TD
     Bench[Bench] --> Plate[Plate]
 ```
 
-Reading the tree back afterward is a pair of accessors: [`parent(x)`](@ref) (`nothing` if `x` is at
-the root of its tree) and [`children(x)`](@ref).
+Reading the tree back afterward is a pair of accessors: [`parent(x)`](@ref parent) (`nothing` if `x` is at
+the root of its tree) and [`children(x)`](@ref children).
 
 ```julia-repl
 julia> children(lab)

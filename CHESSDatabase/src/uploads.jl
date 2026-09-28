@@ -3,8 +3,25 @@
 
 
 
+"""
+    upload_operation(fun::Function) -> Function
 
+The database-writing function that [`upload`](@ref) and [`update`](@ref) call to persist an operation
+`fun`. Supported operations:
 
+| Operation | Written by |
+|---|---|
+| `move_into!` | `upload_movement` |
+| `transfer!` | [`upload_transfer`](@ref) |
+| `set_attribute!` | `upload_environment_attribute` |
+| `record_read!` | [`upload_read`](@ref) |
+| `lock!`, `unlock!`, `toggle_lock!` | `upload_lock` |
+| `activate!`, `deactivate!`, `toggle_activity!` | [`upload_activity`](@ref) |
+| `assign_barcode!` | `update_barcode` |
+| `observe!` | [`upload_observation`](@ref) |
+
+Throws a `KeyError` for any other function.
+"""
 function upload_operation(fun::Function)
     opfun_dict=Dict(
         activate! => upload_activity,
@@ -119,7 +136,7 @@ end
     get_component_id(reagent::Reagent)
 
 Return the `Components.ID`/`Reagents.ComponentID` for `reagent`, uploading it first (via
-[`upload_component`](@ref)) if no row with a matching natural key (name/type/molecular weight/
+`upload_component`) if no row with a matching natural key (name/type/molecular weight/
 density/pubchem ID) already exists. `Reagent` has a small, fixed set of scalar fields, so identity is
 looked up directly by those fields rather than via a content hash.
 """
@@ -203,7 +220,7 @@ end
     get_component_id(str::Organism)
 
 Return the `Components.ID`/`Organisms.ComponentID` for `str`, uploading it first (via
-[`upload_component`](@ref)) if no row with a matching natural key (genus/species/strain) already
+`upload_component`) if no row with a matching natural key (genus/species/strain) already
 exists.
 """
 function get_component_id(str::Organism)
@@ -292,7 +309,7 @@ end
     upload_read(loc::Location,read::Read; ledger_id, time, instrument_id, instrument_time)
 
 Persist `read` (a [`Read`](@ref)) for `loc`. Pure persistence -- matches
-[`upload_movement`](@ref)/[`upload_transfer`](@ref)/[`upload_environment_attribute`](@ref): the
+`upload_movement`/[`upload_transfer`](@ref)/`upload_environment_attribute`: the
 in-memory mutation ([`record_read!`](@ref)) is the caller's responsibility (normally
 `upload(record_read!,loc,read;instrument=...)`, which calls both). `instrument_time` is accepted and
 ignored -- `read`'s own [`read_time`](@ref) is what's stored as `Reads.InstrumentTime`, since a `Read`
@@ -315,7 +332,7 @@ end
     upload_instrument_setting(instrument::Location,setting::String,value; ledger_id, time, instrument_time)
 
 Append a new revision of `instrument`'s `setting` to `InstrumentSettings` -- the ledger's "amend"
-operation for instrument settings, mirroring [`upload_environment_attribute`](@ref)'s shape.
+operation for instrument settings, mirroring `upload_environment_attribute`'s shape.
 `value` is stored as text (see the design note on `InstrumentSettings` -- settings may be non-numeric).
 Returns `ledger_id` -- since `SequenceID` can shift after the fact (`insert_ledger`/`replace_ledger`),
 resolve this revision's *current* sequence position later via `get_sequence_id(ledger_id)` rather than

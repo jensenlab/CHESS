@@ -253,7 +253,13 @@ function quantity(stock::CHESSCore.Stock,ingredient::CHESSCore.Organism)
 end
 
 
+"""
+    all_reagents(stock::Stock) -> Vector{<:Reagent}
+    all_reagents(stocks::Vector{<:Stock}) -> Vector{<:Reagent}
 
+Every solid and liquid [`Reagent`](@ref) present in `stock`, or in any of `stocks`, without
+duplicates. Organisms are not included; use [`all_components`](@ref) when they should be.
+"""
 function all_reagents(stock::CHESSCore.Stock)
          # Gather all ingredients contained in the sources, destinations, and priority list
          solids = reagents(CHESSCore.solids(stock))
@@ -290,6 +296,15 @@ end
 
 ## Stock array conversion
 
+"""
+    reagent_df(stocks::Vector{<:Stock}; measure::Function=concentration, kwargs...) -> DataFrame
+
+Tabulate `stocks` with one row per stock and one column per reagent found by
+[`all_reagents`](@ref). Each cell is `measure(stock, reagent)`: [`concentration`](@ref) by default,
+or pass `measure=quantity` for absolute amounts. Column names come from
+[`component_to_string`](@ref), which receives `kwargs`. Organisms are left out; use
+[`component_df`](@ref) to include them.
+"""
 function reagent_df(stocks::Vector{<:CHESSCore.Stock};measure::Function=concentration,kwargs...) # can return concentration or quantity
     ingredients = all_reagents(stocks)
     out=DataFrame()

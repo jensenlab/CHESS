@@ -38,7 +38,7 @@ Pourfecto's goal is to abstract all of the logistical details of converting desi
 
 ## Installation
 
-Pourfecto is not published to a package registry — it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS:
+Pourfecto is not published to a package registry — it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS, with Julia 1.12 or later (the first version to support Pkg workspaces):
 
 ```julia
 # git clone https://github.com/jensenlab/CHESS && cd CHESS
@@ -48,12 +48,12 @@ Pkg.instantiate()
 using Pourfecto
 ```
 
-!!! note 
-      Pourfecto's default optimizer, Gurobi, requires an active [Gurobi](https://www.gurobi.com) license (free for academic users as of the time of writing). See [Solver requirements](#solver-requirements) below for license-free alternatives.
+> [!NOTE]
+> Pourfecto's default optimizer, Gurobi, requires an active [Gurobi](https://www.gurobi.com) license (free for academic users as of the time of writing). See [Solver requirements](#solver-requirements) below for license-free alternatives.
 
 ---
 
-Most workflows also utilize the [CHESSCore](https://jensenlab.github.io/CHESS/dev/), [Unitful](https://github.com/JuliaPhysics/Unitful.jl), and [DataFrames](https://github.com/JuliaData/DataFrames.jl) Julia packages.
+Most workflows also utilize the [CHESSCore](https://jensenlab.github.io/CHESS/dev/api/core/), [Unitful](https://github.com/JuliaPhysics/Unitful.jl), and [DataFrames](https://github.com/JuliaData/DataFrames.jl) Julia packages.
 
 ```julia
 using CHESSCore

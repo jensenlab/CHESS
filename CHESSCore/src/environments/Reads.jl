@@ -56,6 +56,13 @@ function _readkinds(m::Module)
     end
 end
 
+"""
+    const read_kinds::Dict{Symbol,ReadKind}
+
+Registry of every [`ReadKind`](@ref) defined with [`@read`](@ref), keyed by name. Kinds registered
+in any module are also added here. Look up a single kind with [`@read_str`](@ref)
+(`read"Absorbance"`) rather than indexing this directly.
+"""
 const read_kinds = _readkinds(CHESSCore)
 
 function readkind_expr(m::Module,n,rk)

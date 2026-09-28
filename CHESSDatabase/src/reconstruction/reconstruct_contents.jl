@@ -25,7 +25,7 @@ end
     get_chemical(id::Integer)
 
 Reconstruct a bare [`Chemical`](@ref) from the `Chemicals` table by `ID` -- the direct, standalone
-counterpart of [`get_component`](@ref) for `Reagent`/`Organism`. `Chemical` reconstruction otherwise
+counterpart of `get_component` for `Reagent`/`Organism`. `Chemical` reconstruction otherwise
 only happens inline inside [`restore_composition!`](@ref) as part of rebuilding a `Reagent`'s
 `CompositionRule`; this gives it the same testable, direct path.
 """
@@ -360,8 +360,22 @@ function fetch_content_cache(location_id::Integer,starting::Integer,ending::Inte
     return stock , cost, foot
 end
 
+"""
+    reconstruct_contents(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Location
+    reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Vector{<:Location}
 
+Rebuild the stock and cost of wells from the ledger's transfer history, returning new locations for
+the given IDs. [`reconstruct_contents!`](@ref) writes the result into existing
+[`Location`](@ref)s instead. IDs that are not [`Well`](@ref)s come back as bare locations with no contents.
 
+A well's contents can depend on every well that ever transferred into it, so reconstruction starts
+from the most recent cached stock of each well and replays only the transfers since then. Passing
+several wells at once shares that work.
+
+The optional arguments work as in [`reconstruct_location!`](@ref): `sequence_id` and `time` choose the
+point in history, `max_cache` limits which caches may be used, and `encumbrances=true` includes
+planned future operations.
+"""
 function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false)
     all_locs=deepcopy(loc_index)
     cache_feet=[]
@@ -498,8 +512,13 @@ function reconstruct_contents(location_id::Integer,sequence_id::Integer=get_last
     return reconstruct_contents([location_id],sequence_id,time,max_cache,loc_index;encumbrances=encumbrances)[1]
 end
 
+"""
+    reconstruct_contents!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+    reconstruct_contents!(locations::Vector{<:Location}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
 
-
+Set the stock and cost of each [`Well`](@ref) in `locations` to its reconstructed state. Other
+locations are left alone. Arguments work as in [`reconstruct_contents`](@ref).
+"""
 function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)
 
 

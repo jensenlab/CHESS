@@ -1,5 +1,19 @@
 
+"""
+    parent_cost(x::Location) -> Rational
+
+The fallback occupancy cost of `x` when it is the parent: its [`LocationKind`](@ref)'s
+`default_parent_cost`. [`occupancy_cost`](@ref) uses the larger of this and the child's
+[`child_cost`](@ref) only when no exact or category-based rule matches the pair.
+"""
 parent_cost(x::Location)=kind(x).default_parent_cost
+
+"""
+    child_cost(x::Location) -> Rational
+
+The fallback occupancy cost of `x` when it is the child: its [`LocationKind`](@ref)'s
+`default_child_cost`. See [`parent_cost`](@ref).
+"""
 child_cost(x::Location)=kind(x).default_child_cost
 
 """

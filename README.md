@@ -1,6 +1,5 @@
 # CHESS.jl
 
-[![Documentation (stable)](https://img.shields.io/badge/docs-stable-blue.svg)](https://jensenlab.github.io/CHESS/stable)
 [![Documentation (dev)](https://img.shields.io/badge/docs-dev-blue.svg)](https://jensenlab.github.io/CHESS/dev)
 [![CI](https://github.com/jensenlab/CHESS/actions/workflows/CI.yml/badge.svg)](https://github.com/jensenlab/CHESS/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,10 +20,10 @@ The core engine: recording, reconstructing, and looking up lab state.
 
 | Package | Description | Docs |
 |---|---|---|
-| [`CHESSCore`](CHESSCore) | The "lab engine": `Location`/`Stock`/`Attribute`/`Read` types and the pure, in-memory operations that act on them (`move_into!`, `transfer!`, `set_attribute!`, `record_read!`). | [stable](https://jensenlab.github.io/CHESS/stable/api/core/) / [dev](https://jensenlab.github.io/CHESS/dev/api/core/) |
-| [`CHESSDatabase`](CHESSDatabase) | An append-only SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand. | [stable](https://jensenlab.github.io/CHESS/stable/api/database/) / [dev](https://jensenlab.github.io/CHESS/dev/api/database/) |
-| [`CHESSLabConstants`](CHESSLabConstants) | A starter set of registered lab constants (reagents, organisms, location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining your own lab's constants. | [stable](https://jensenlab.github.io/CHESS/stable/api/labconstants/) / [dev](https://jensenlab.github.io/CHESS/dev/api/labconstants/) |
-| `CHESS` | The umbrella package: `@reexport`s `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, plus `Unitful`, so `using CHESS` alone is enough to get everything except packages from the other categories below. | [stable](https://jensenlab.github.io/CHESS/stable) / [dev](https://jensenlab.github.io/CHESS/dev) |
+| [`CHESSCore`](CHESSCore) | The "lab engine": `Location`/`Stock`/`Attribute`/`Read` types and the pure, in-memory operations that act on them (`move_into!`, `transfer!`, `set_attribute!`, `record_read!`). | [dev](https://jensenlab.github.io/CHESS/dev/api/core/) |
+| [`CHESSDatabase`](CHESSDatabase) | An append-only SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand. | [dev](https://jensenlab.github.io/CHESS/dev/api/database/) |
+| [`CHESSLabConstants`](CHESSLabConstants) | A starter set of registered lab constants (reagents, organisms, location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining your own lab's constants. | [dev](https://jensenlab.github.io/CHESS/dev/api/labconstants/) |
+| `CHESS` | The umbrella package: `@reexport`s `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, plus `Unitful`, so `using CHESS` alone is enough to get everything except packages from the other categories below. | [dev](https://jensenlab.github.io/CHESS/dev) |
 | [`CHESSExperiments`](CHESSExperiments) | The experimental-design layer: `Experiment`/`Factor`/design-matrix types, parsing a design into populated well conditions, and blocking -- independent of `RunMaps`/`PlateMaps`, with `schedule_layout` onto them provided by a package extension. | -- |
 
 ### Schedulers
@@ -74,12 +73,12 @@ Pkg.instantiate()
 ```julia
 using CHESS
 
-room = GenericLocation(nothing, "Main Room", Room)
-plate = build_location(WP96, "Plate 1")
+room = build_location(loc"Room", "Main Room")
+plate = build_location(loc"WP96", "Plate 1")
 move_into!(room, plate)
 
-set_attribute!(room, Temperature(25u"°C"))
-deposit!(plate["A1"], 100u"µL" * water)
+set_attribute!(room, attr"Temperature"(25u"°C"))
+deposit!(plate["A1"], 100u"µL" * rgt"water")
 
 environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
 ```
@@ -87,9 +86,9 @@ environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
 ## Documentation
 
 The full manual and API reference are published at
-**[http://jensenlab.net/CHESS](https://jensenlab.net/CHESS)**. The manual works through
+**[jensenlab.github.io/CHESS](https://jensenlab.github.io/CHESS/dev/)**. The manual works through
 CHESS's core concepts in the order they build on one another, starting with
-[Locations](https://jensenlab.github.io/CHESS/stable/manual/core-concepts/).
+[Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/).
 
 ## License
 

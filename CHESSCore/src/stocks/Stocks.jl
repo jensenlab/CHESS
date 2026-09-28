@@ -11,7 +11,7 @@ LiquidDict=Dict{Liquid,Unitful.Volume}
     const Biomass
 
 Quantity type for tracking how much of an [`Organism`](@ref) is present in a [`Culture`](@ref).
-Dimensionally `OD * Volume` (reusing [`JensenLabUnits.AbsorbanceVolume`](@ref)), so `biomass/volume`
+Dimensionally `OD * Volume` (reusing `JensenLabUnits.AbsorbanceVolume`), so `biomass/volume`
 recovers an OD reading by construction. `Biomass` is an absolute, conserved quantity -- like
 `Unitful.Mass` for a [`Solid`](@ref) -- not a value derived from a Culture's current liquid volume.
 """
@@ -169,7 +169,7 @@ end
 
 """
     organisms(::Stock)
-return the `organisms` property of a Stock (an [`OrganismDict`](@ref) mapping each present
+return the `organisms` property of a Stock (an `OrganismDict`, a `Dict` mapping each present
 [`Organism`](@ref) to its [`Biomass`](@ref)). If no organisms are present, return `OrganismDict()`.
 """
 organisms(c::Stock)=OrganismDict()

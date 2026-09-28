@@ -1,4 +1,13 @@
 __precompile__(true)
+"""
+    JensenLabUnits
+
+Unitful units used by CHESS that are not in Unitful itself: optical density `OD` (dimension
+absorbance), relative fluorescence `RFU`, an unspecified concentration `X` (as in "2X media"), and
+relative centrifugal force `xg`. It also defines the derived dimension `AbsorbanceVolume`
+(absorbance times volume), which `CHESSCore.Biomass` uses. The units are registered with Unitful when
+the module loads, so `u"OD"` and friends work after `using CHESSCore`.
+"""
 module JensenLabUnits
 
 using Unitful 

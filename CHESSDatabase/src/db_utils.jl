@@ -6,17 +6,44 @@ function _require_db()
     return db
 end
 
+"""
+    connect_SQLite(path)
+
+Open the SQLite database at `path` and make it the database that every `CHESSDatabase` function
+reads and writes. SQLite creates the file if it does not exist; use [`create_db`](@ref) to set up
+the CHESS tables in a new file. Calling it again switches to a different database.
+"""
 function connect_SQLite(path)
     _current_db[] = SQLite.DB(path)
     return nothing
 end
 
+"""
+    execute_db(query::String)
+    execute_db(query::String, params)
+
+Run a SQL statement that changes the connected database (`INSERT`, `UPDATE`, `CREATE`, ...).
+`params` fills the statement's `?` placeholders; prefer it over building SQL with string
+interpolation. Foreign-key constraints are switched on for every call. Throws an error if no
+database is connected (see [`connect_SQLite`](@ref)).
+
+See also: [`query_db`](@ref) for statements that return rows.
+"""
 function execute_db(query::String)
     db=_require_db()
     DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.
     SQLite.execute(db, query)
 end
 
+"""
+    query_db(query::String) -> DataFrame
+    query_db(query::String, params) -> DataFrame
+
+Run a SQL query against the connected database and return the result as a `DataFrame`. `params`
+fills the query's `?` placeholders. Foreign-key constraints are switched on for every call.
+
+See also: [`execute_db`](@ref).
+"""
 function query_db(query::String)
     db=_require_db()
     DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.

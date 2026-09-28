@@ -19,7 +19,7 @@ Pourfecto builds directly on [CHESSCore](https://jensenlab.github.io/CHESS/dev/)
 
 ## Installation
 
-Pourfecto is not published to a package registry -- it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS:
+Pourfecto is not published to a package registry -- it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS, with Julia 1.12 or later (the first version to support Pkg workspaces):
 
 ```julia
 # git clone https://github.com/jensenlab/CHESS && cd CHESS

@@ -57,6 +57,13 @@ function _attributekinds(m::Module)
     end
 end
 
+"""
+    const attribute_kinds::Dict{Symbol,AttributeKind}
+
+Registry of every [`AttributeKind`](@ref) defined with [`@attribute`](@ref), keyed by name. Kinds
+registered in any module are also added here. Look up a single kind with [`@attr_str`](@ref)
+(`attr"Temperature"`) rather than indexing this directly.
+"""
 const attribute_kinds = _attributekinds(CHESSCore)
 
 function attributekind_expr(m::Module,n,ak)

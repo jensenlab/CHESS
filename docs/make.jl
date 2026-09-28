@@ -19,16 +19,8 @@ makedocs(
     # build over docstring coverage gaps (CHESSLabConstants in particular is mostly generated
     # data with few standalone docstrings by design, see manual/registering-lab-constants.md)
     repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
-    format=Documenter.HTML(size_threshold=300_000, size_threshold_warn=200_000), # api/core.md and
-    # api/labconstants.md are large by design (CHESSCore/CHESSLabConstants have hundreds of
-    # documented reagents/organisms/functions) -- raise the hard failure threshold rather than
-    # splitting those pages, now that real source links (added once `repo` was set above) push
-    # their generated size past Documenter's 200 KiB default.
-    warnonly=[:cross_references], # several existing docstrings across CHESSCore/CHESSDatabase have
-    # stale @ref cross-references (renamed/unexported functions, typos) -- pre-existing docstring
-    # hygiene debt uncovered by this being the first-ever Documenter build, not introduced here, and
-    # out of scope for the docs scaffolding/manual pass. Downgrade to a build warning rather than a
-    # hard failure; auditing/fixing these individually is a good follow-up task.
+    # api/core-stocks.md and api/labconstants.md list hundreds of registered reagents and organisms.
+    format=Documenter.HTML(size_threshold_warn=150_000),
     pages=[
         "Home" => "index.md",
         "Manual" => [
@@ -59,7 +51,13 @@ makedocs(
             "Troubleshooting" => "manual/troubleshooting.md",
         ],
         "API Reference" => [
-            "CHESSCore" => "api/core.md",
+            "CHESSCore" => [
+                "Overview & Errors" => "api/core.md",
+                "Locations & Operations" => "api/core-locations.md",
+                "Stocks & Chemistry" => "api/core-stocks.md",
+                "Attributes & Reads" => "api/core-environment.md",
+                "Interop" => "api/core-interop.md",
+            ],
             "CHESSDatabase" => "api/database.md",
             "CHESSLabConstants" => "api/labconstants.md",
             "CHESSParsers" => "api/parsers.md",
