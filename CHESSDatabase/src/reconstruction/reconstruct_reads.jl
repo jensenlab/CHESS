@@ -31,7 +31,7 @@ function reconstruct_reads!(loc::Location,sequence_id::Integer=get_last_sequence
         rk=read_kinds[Symbol(row.Type)]
         val = ismissing(row.Value) ? missing :
               ismissing(row.Unit)  ? row.Value :
-              parse(Float64,row.Value)*Unitful.uparse(row.Unit)
+              parse(Float64,row.Value)*_parse_unit(row.Unit)
         rd_time = ismissing(row.InstrumentTime) ? nothing : julia_time(row.InstrumentTime)
         record_read!(loc,rk(val,rd_time))
     end

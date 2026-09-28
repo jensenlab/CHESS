@@ -22,7 +22,7 @@ function reconstruct_attributes(location_ids::Vector{<:Integer},sequence_id::Int
             attr=get_attribute(row.Attribute)
             val=row.Value
             un=row.Unit
-            set_attribute!(all_locs[loc_id],attr(val*Unitful.uparse(un)))
+            set_attribute!(all_locs[loc_id],attr(val*_parse_unit(un)))
         end
     
         return map(x->all_locs[x],location_ids)
@@ -70,7 +70,7 @@ function fetch_attribute_cache(location_id::Integer,starting::Integer=0,ending::
                 attr=get_attribute(attr_set[i,"AttributeID"])
                 val=attr_set[i,"Value"]
                 un=attr_set[i,"Unit"]
-                set_attribute!(loc,attr(val*Unitful.uparse(un)))
+                set_attribute!(loc,attr(val*_parse_unit(un)))
             end 
         end 
 

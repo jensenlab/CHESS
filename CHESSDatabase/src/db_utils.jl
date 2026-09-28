@@ -18,6 +18,11 @@ function connect_SQLite(path)
     return nothing
 end
 
+# Parse a unit string read back from the database. Unitful.uparse (the function form, unlike the
+# u"..." macro) only searches the unit modules it is given, so CHESS's own units (OD, RFU, X, xg
+# from CHESSCore.JensenLabUnits) have to be listed explicitly.
+_parse_unit(str::AbstractString) = Unitful.uparse(str;unit_context=[Unitful,CHESSCore.JensenLabUnits])
+
 """
     execute_db(query::String)
     execute_db(query::String, params)

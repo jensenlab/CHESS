@@ -285,10 +285,9 @@ function observation_discrepancies(location_ids::Vector{<:Integer};sequence_id::
         AS(SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $sequence_id GROUP BY SequenceID)"""
     rows(tbl,loc_col="LocationID") = query_db("$subset SELECT o.*, l.SequenceID FROM $tbl o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.$loc_col IN $entry ORDER BY l.SequenceID")
     report!(row,loc_id,facet,key,predicted,observed) = push!(out,(row.LedgerID,row.SequenceID,loc_id,facet,key,predicted,observed))
-    unit_context=[Unitful,CHESSCore.JensenLabUnits]
 
     for row in eachrow(rows("ObservedComponents"))
-        observed=row.Quantity*Unitful.uparse(row.Unit;unit_context=unit_context)
+        observed=row.Quantity*_parse_unit(row.Unit)
         component=get_component(row.ComponentID)
         comps=_components(CHESSCore.stock(reconstruct_contents(row.LocationID,row.SequenceID-1)))
         predicted=haskey(comps,component) ? uconvert(unit(observed),comps[component]) : zero(observed)
@@ -300,7 +299,7 @@ function observation_discrepancies(location_ids::Vector{<:Integer};sequence_id::
     end
     for row in eachrow(rows("ObservedAttributes"))
         kind=get_attribute(row.Attribute)
-        observed=ismissing(row.Value) ? Attribute(kind,missing) : kind(row.Value*Unitful.uparse(row.Unit))
+        observed=ismissing(row.Value) ? Attribute(kind,missing) : kind(row.Value*_parse_unit(row.Unit))
         env=environment(reconstruct_environment(row.LocationID,row.SequenceID-1))
         predicted=get(env,kind.name,Attribute(kind,missing))
         isequal(CHESSCore.value(predicted),CHESSCore.value(observed)) || report!(row,row.LocationID,"attribute",kind.name,predicted,observed)
@@ -401,7 +400,7 @@ function _unexplained_cache_facets(lid::Integer,seq::Integer,max_ids)
             was=CHESSCore.attributes(loc)
             for r in eachrow(query_db("SELECT * FROM CachedAttributes WHERE AttributeSetID = ?",(row.AttributeSetID,)))
                 kind=get_attribute(r.AttributeID)
-                attr=ismissing(r.Value) ? Attribute(kind,missing) : kind(r.Value*Unitful.uparse(r.Unit))
+                attr=ismissing(r.Value) ? Attribute(kind,missing) : kind(r.Value*_parse_unit(r.Unit))
                 haskey(was,kind.name) && isequal(CHESSCore.value(was[kind.name]),CHESSCore.value(attr)) || push!(facets,(loc,attr,false))
             end
             cached=Set(query_db("SELECT AttributeID FROM CachedAttributes WHERE AttributeSetID = ?",(row.AttributeSetID,)).AttributeID)
