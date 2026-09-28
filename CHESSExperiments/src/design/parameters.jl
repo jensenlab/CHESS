@@ -25,6 +25,12 @@ struct ParameterKind
     validator::Union{Function,Nothing}
 end
 
+"""
+    const parameter_registry::Dict{Symbol,ParameterKind}
+
+Every registered [`ParameterKind`](@ref), keyed by name. Add to it with
+[`register_parameter!`](@ref) rather than directly.
+"""
 const parameter_registry = Dict{Symbol,ParameterKind}()
 
 """

@@ -115,6 +115,11 @@ function get_last_ledger_id(sequence_id::Integer,time::DateTime=Dates.now())
     return current_id[1,1]
 end
 
+"""
+    get_last_sequence_id(time::DateTime=Dates.now()) -> Integer
+
+The newest sequence ID in the ledger as of `time`: the current end of the history.
+"""
 function get_last_sequence_id(time::DateTime=Dates.now())
     ledger_time = db_time(time)
     x= "SELECT Max(SequenceID) FROM Ledger WHERE Time <= ?"
@@ -123,6 +128,12 @@ function get_last_sequence_id(time::DateTime=Dates.now())
 end
 
 
+"""
+    get_sequence_id(ledger_id::Integer) -> Integer
+
+The sequence ID (position in the history) of ledger row `ledger_id`. Several ledger rows share a
+sequence ID when an entry has been revised with [`replace_ledger`](@ref).
+"""
 function get_sequence_id(ledger_id::Integer)
     x="SELECT SequenceID FROM Ledger WHERE Id = ?"
     return query_db(x,(ledger_id,))[1,1]

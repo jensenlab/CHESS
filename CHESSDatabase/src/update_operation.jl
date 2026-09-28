@@ -63,6 +63,13 @@ function update(fun::Function,args...;replace::Union{Integer,Nothing}=nothing,in
     return sql_transaction(update_transaction)
 end
 
+"""
+    process_update(ledger_id::Integer)
+
+The checks [`update`](@ref) runs after recording an amendment at `ledger_id`: that a replacement is
+the same kind of operation as the entry it replaces, that the amended history can still be replayed
+(`validate`), and repair of any caches the amendment made stale (`cache_repair`).
+"""
 function process_update(ledger_id::Integer)
         ids=get_all_ledger_ids(get_sequence_id(ledger_id))
         if length(ids) > 1 

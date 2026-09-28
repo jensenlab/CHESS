@@ -1,6 +1,16 @@
 
 
 
+"""
+    reconstruct_attributes(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Location
+    reconstruct_attributes(location_ids::Vector{<:Integer}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Vector{<:Location}
+
+Rebuild each location's own attributes for the given location IDs, as of `sequence_id` and `time`, and return new
+locations holding that state. [`reconstruct_location`](@ref) rebuilds everything at once; the
+arguments work the same way (see [`reconstruct_location!`](@ref)).
+
+See also: [`reconstruct_attributes!`](@ref).
+"""
 function reconstruct_attributes(location_ids::Vector{<:Integer},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
         all_locs=Dict{Integer,Location}() # constant defined in reconstruction_utils.jl Columns are location id, sequence id, location
         cache_feet=[]
@@ -34,6 +44,13 @@ function reconstruct_attributes(location_id::Integer,sequence_id::Integer=get_la
 end 
 
 
+"""
+    reconstruct_attributes!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+    reconstruct_attributes!(locations::Vector{<:Location}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+
+Set the own attributes of existing locations to their reconstructed state. Arguments work as in
+[`reconstruct_attributes`](@ref).
+"""
 function reconstruct_attributes!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
 
     parallel_locs=reconstruct_attributes(location_id.(locations),sequence_id,time,max_cache;encumbrances=encumbrances)

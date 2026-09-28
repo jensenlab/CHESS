@@ -1,4 +1,11 @@
 
+"""
+    get_location_info(id::Integer) -> (name, constructor)
+
+Look up location `id` in the database. Returns its name and a function `constructor(id, name)` that
+builds a bare location of the right kind (no parent, children, or contents yet). Throws an error if `id` is not in
+the database.
+"""
 function get_location_info(id::Integer)
     loc_info=query_db("SELECT * FROM Locations WHERE ID =?",(id,))
     if nrow(loc_info) == 0

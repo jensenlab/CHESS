@@ -1,5 +1,10 @@
 
 
+"""
+    get_barcode(barcode::String) -> Barcode
+
+Look up a barcode in the connected database. Throws an error if it has not been recorded.
+"""
 function get_barcode(barcode::String)
 
     x="""SELECT Name, LocationID FROM Barcodes WHERE Barcode = ? LIMIT 1"""

@@ -18,9 +18,7 @@ makedocs(
     sitename="CHESS.jl",
     modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants, CHESSParsers,
         CHESSExperiments, RunMaps, CHESSProcessing],
-    checkdocs=:none, # the manual/API pages are being built up incrementally -- don't fail the
-    # build over docstring coverage gaps (CHESSLabConstants in particular is mostly generated
-    # data with few standalone docstrings by design, see manual/registering-lab-constants.md)
+    checkdocs=:exports, # every exported name must have a docstring included on some page
     repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
     # api/labconstants.md lists hundreds of registered reagents and organisms.
     format=Documenter.HTML(size_threshold_warn=150_000),

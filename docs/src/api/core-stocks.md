@@ -7,5 +7,9 @@ chemistry are on the [Solution Chemistry](core-chemistry.md) page.
 ```@autodocs
 Modules = [CHESS.CHESSCore]
 Pages = ["stocks/StockComponent.jl", "stocks/Chemicals.jl", "stocks/Organisms.jl",
-         "stocks/Stocks.jl", "stocks/StockDisplay.jl", "Units/JensenLabUnits.jl"]
+         "stocks/Stocks.jl", "stocks/StockDisplay.jl"]
+```
+
+```@docs
+CHESSCore.JensenLabUnits
 ```

@@ -16,6 +16,11 @@ end
 
 
 
+"""
+    get_run(run_id::Integer) -> Run
+
+Look up a run in the connected database. Throws an error if it is not there.
+"""
 function get_run(run_id::Integer)
     run_info=query_db("SELECT * FROM Runs WHERE ID =?",(run_id,))
     if nrow(run_info) == 0 
@@ -55,6 +60,11 @@ end
 
 
 
+"""
+    get_all_runs(exp_id::Integer) -> Vector{Run}
+
+Every run recorded for experiment `exp_id`.
+"""
 function get_all_runs(exp_id::Integer)
     run_info=query_db("SELECT * FROM Runs WHERE ExperimentID =?",(exp_id,))
 

@@ -289,12 +289,24 @@ function upload_environment_attribute(loc::Location,attr::Attribute;ledger_id::I
 end
 
 
+"""
+    upload_barcode(bc::Barcode)
+
+Record a barcode in the database, with its current location if it has one. A barcode already
+recorded is left unchanged.
+"""
 function upload_barcode(bc::Barcode)
     loc_id=location_id(bc)
     n=name(bc)
     execute_db("INSERT OR IGNORE INTO Barcodes(Barcode,LocationID,Name) Values(?,?,?)",(string(barcode(bc)),loc_id,n))
 end
 
+"""
+    update_barcode(bc::Barcode, loc::Location; kwargs...)
+
+Record in the database that `bc` is attached to `loc`. This is the database write for
+`assign_barcode!` (see [`upload_operation`](@ref CHESSDatabase.upload_operation)).
+"""
 function update_barcode(bc::Barcode,loc::Location;kwargs...)
     loc_id=location_id(bc)
     if !ismissing(loc_id) && loc_id != location_id(loc)
@@ -349,6 +361,11 @@ end
 
 
 
+"""
+    upload_experiment(name, user::String, is_public=false; time=Dates.now()) -> Integer
+
+Create an experiment record and return its ID. Protocols and runs belong to an experiment.
+"""
 function upload_experiment(name::AbstractString,user::String,is_public=false;time=Dates.now())
     upload_time=db_time(time)
     execute_db("""INSERT INTO Experiments(Name,User,IsPublic,Time) Values(?,?,?,?)""",
@@ -356,6 +373,11 @@ function upload_experiment(name::AbstractString,user::String,is_public=false;tim
     return get_last_experiment_id()
 end
 
+"""
+    upload_run(run::Run) -> Integer
+
+Record `run` in the database and return its ID.
+"""
 function upload_run(run::Run)
     control_str = join(controls(run),",")
     blank_str = join(blanks(run),",")

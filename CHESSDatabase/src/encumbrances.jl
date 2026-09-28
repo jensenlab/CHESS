@@ -17,6 +17,14 @@ end
 
 
 
+"""
+    encumber(protocol_id::Integer, fun::Function, args...) -> Integer
+
+Reserve a planned operation under protocol `protocol_id` without writing it to the ledger. `fun` is
+applied to `args` in memory immediately, and the reservation is recorded in the matching
+`Encumbered*` table. Returns the new encumbrance's ID. Nothing marks the encumbrance complete when
+the real operation later happens; see [`upload_encumbrance_completion`](@ref).
+"""
 function encumber(protocol_id::Integer,fun::Function,args...)
     encumber_op=encumber_operation(fun) 
     function encumber_transaction()
@@ -70,6 +78,11 @@ macro protocol(experiment_id,name, expr)
 end 
 =#
 
+"""
+    get_last_encumbrance_id(protocol_id::Integer) -> Integer
+
+The ID of the most recently created encumbrance in protocol `protocol_id`.
+"""
 function get_last_encumbrance_id(protocol_id::Integer)
 
     e_id=query_db("""
@@ -77,6 +90,11 @@ function get_last_encumbrance_id(protocol_id::Integer)
     return e_id 
 end 
 
+"""
+    get_last_protocol_id(experiment_id::Integer) -> Integer
+
+The ID of the most recently created protocol in experiment `experiment_id`.
+"""
 function get_last_protocol_id(experiment_id::Integer)
     p_id = query_db("""
     SELECT Max(ID) FROM Protocols WHERE ExperimentID = $experiment_id""")[1,1]
@@ -88,6 +106,14 @@ end
 
 
 
+"""
+    upload_protocol(exp_id::Integer, name, ledger_id_entered_at=get_last_ledger_id(), estimate=Dates.Time(0); enforce=true) -> Integer
+
+Create a protocol named `name` in experiment `exp_id`: a group of encumbrances. `estimate` is the
+protocol's expected duration. With `enforce=true`, the protocol's encumbrances are included in
+reconstructions that ask for encumbrances. Returns the new protocol's ID. `(exp_id, name)` must be
+unique.
+"""
 function upload_protocol(exp_id::Integer,name::AbstractString,ledger_id_entered_at::Integer=get_last_ledger_id(), estimate::Dates.Time=Dates.Time(0);enforce=true)
     est_time=Dates.millisecond(estimate)
     execute_db("""
@@ -108,6 +134,12 @@ function upload_protocol_enforcement(protocol_id::Integer,is_enforced::Bool;time
     return nothing
 end
 
+"""
+    upload_encumbrance(protocol_id::Integer) -> Integer
+
+Create an empty encumbrance in protocol `protocol_id` and return its ID. [`encumber`](@ref) calls
+this and then records the planned operation against it.
+"""
 function upload_encumbrance(protocol_id::Integer, is_enforced::Bool=true;time=Dates.now())
 
     execute_db("""
@@ -117,6 +149,12 @@ function upload_encumbrance(protocol_id::Integer, is_enforced::Bool=true;time=Da
 end
 
 
+"""
+    upload_encumbrance_completion(encumbrance_id::Integer, ledger_id::Integer)
+
+Mark encumbrance `encumbrance_id` as completed by the operation recorded at `ledger_id`. This is
+always an explicit call: performing the real operation does not complete an encumbrance by itself.
+"""
 function upload_encumbrance_completion(encumbrance_id::Integer,ledger_id::Integer) # pair an encumbrance to a ledger operation
     execute_db("""
     INSERT INTO EncumbranceCompletion(EncumbranceID,LedgerID) Values(?,?)""",(encumbrance_id,ledger_id))
@@ -166,6 +204,12 @@ function encumber_activity(encumberid::Integer,loc::Location)
 end
 
 
+"""
+    encumber_cache(encumberid::Integer, loc::Location)
+
+Store a snapshot of `loc`'s state under encumbrance `encumberid`, the encumbrance counterpart of
+[`cache`](@ref), for reconstructions that include planned operations.
+"""
 function encumber_cache(encumberid::Integer, loc::Location)
     encumber_cache_parent(encumberid,loc)
 

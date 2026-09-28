@@ -67,16 +67,35 @@ function query_db(query::String, params)
     DataFrame(DBInterface.execute(db, query, params))
 end
 
+"""
+    sql_transaction(f::Function)
+
+Run `f()` inside a SQL transaction on the connected database: if `f` throws, every write it made
+is rolled back. Returns `f()`'s value. [`upload`](@ref) and [`update`](@ref) use this so an operation
+and its database record succeed or fail together.
+"""
 function sql_transaction(f::Function)
     db=_require_db()
     SQLite.transaction(f,db)
 end
 
+"""
+    sql_commit(name::String)
+
+Commit the named SQL savepoint on the connected database. Most code uses [`sql_transaction`](@ref)
+instead.
+"""
 function sql_commit(name::String)
     db=_require_db()
     SQLite.commit(db,name)
 end
 
+"""
+    sql_rollback(name::String)
+
+Roll back to the named SQL savepoint on the connected database. Most code uses
+[`sql_transaction`](@ref) instead.
+"""
 function sql_rollback(name::String)
     db=_require_db()
     SQLite.rollback(db,name)
@@ -100,15 +119,31 @@ function query_join_vector(entry::Vector{String})
 end
 
 
+"""
+    db_time(time::DateTime) -> Float64
+
+Convert `time` to the Unix-time number the database stores. See [`julia_time`](@ref).
+"""
 function db_time(time::Dates.DateTime)
     return Dates.datetime2unix(time)
 end 
 
 
+"""
+    julia_time(time::Float64) -> DateTime
+
+Convert a Unix-time number stored in the database back to a `DateTime`. Inverse of
+[`db_time`](@ref).
+"""
 function julia_time(time::Float64)
     return Dates.unix2datetime(time)
 end 
 
+"""
+    get_all_attributes() -> DataFrame
+
+Every attribute kind recorded in the connected database's `Attributes` table, with its base unit.
+"""
 function get_all_attributes()
     x="SELECT * FROM Attributes"
     return query_db(x)
