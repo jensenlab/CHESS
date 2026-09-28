@@ -108,10 +108,10 @@ julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE Location
    3 │    98        4         4
 
 julia> stock(reconstruct_location(a2))
-0.02 mL Solution (1 reagent(s))
+20.0 μL Solution (1 reagent(s))
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  0.02 mL        100.0 %
+ water    water  20.0 μL          100 %
 ```
 
 The old row stays, so a reconstruction as of a time before the correction still uses it.

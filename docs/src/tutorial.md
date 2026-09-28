@@ -100,15 +100,22 @@ julia> for w in ("A1", "A2", "A3"); upload(transfer!, bottle["A1"], plate[w], 19
 
 julia> inoculations = [upload(transfer!, tube["A1"], plate[w], 2u"µL") for w in ("A1", "A2")];
 
-julia> volume_and_biomass(s) = (round(u"µL", quantity(s); digits=1), quantity(s, org"SMU_UA159"));
+julia> stock(plate["A1"])
+200 μL Culture (2 reagent(s))
+ Organisms  Name                        Biomass     OD
+──────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  4.00 μL OD  0.0200 OD
 
-julia> volume_and_biomass(stock(plate["A1"]))
-(200.0 μL, 0.004 mL OD)
+ Solids  Name      Amount   Concentration
+──────────────────────────────────────────
+ lb      LB Broth  5.00 mg   25.0 mg mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  200 μL          100 %
 ```
 
-The well now holds 200 µL with 0.004 mL·OD of biomass. The stock display rounds small amounts, so
-this tutorial uses the small helper `volume_and_biomass`, built on [`quantity`](@ref), to print
-exact values.
+The well now holds 200 µL, with 4.00 µL·OD of *S. mutans* biomass.
 
 See [Wells: Depositing & Transferring Material](manual/wells.md).
 
@@ -172,8 +179,19 @@ hold both the original and the corrected transfer. The database holds the correc
 ```jldoctest tutorial
 julia> a2 = CHESSCore.location_id(plate["A2"]);
 
-julia> volume_and_biomass(stock(reconstruct_location(a2)))
-(202.0 μL, 0.008 mL OD)
+julia> stock(reconstruct_location(a2))
+202 μL Culture (2 reagent(s))
+ Organisms  Name                        Biomass     OD
+──────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  8.00 μL OD  0.0396 OD
+
+ Solids  Name      Amount   Concentration
+──────────────────────────────────────────
+ lb      LB Broth  5.05 mg   25.0 mg mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  202 μL          100 %
 ```
 
 See [The Ledger](manual/ledger.md) and [Caching & Repair](manual/caching-repair.md).
@@ -185,16 +203,34 @@ Because CHESS stores operations rather than states, any earlier state can be reb
 inoculation, A2 held only LB:
 
 ```jldoctest tutorial
-julia> volume_and_biomass(stock(reconstruct_location(a2, get_sequence_id(inoculations[2]) - 1)))
-(198.0 μL, 0 mL OD)
+julia> stock(reconstruct_location(a2, get_sequence_id(inoculations[2]) - 1))
+198 μL Solution (2 reagent(s))
+ Solids  Name      Amount   Concentration
+──────────────────────────────────────────
+ lb      LB Broth  4.95 mg   25.0 mg mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  198 μL          100 %
 ```
 
 It also takes a recording time, which shows what the database said at that moment, before the
 correction was made:
 
 ```jldoctest tutorial
-julia> volume_and_biomass(stock(reconstruct_location(a2, get_last_sequence_id(), recorded_before_fix)))
-(200.0 μL, 0.004 mL OD)
+julia> stock(reconstruct_location(a2, get_last_sequence_id(), recorded_before_fix))
+200 μL Culture (2 reagent(s))
+ Organisms  Name                        Biomass     OD
+──────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  4.00 μL OD  0.0200 OD
+
+ Solids  Name      Amount   Concentration
+──────────────────────────────────────────
+ lb      LB Broth  5.00 mg   25.0 mg mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  200 μL          100 %
 ```
 
 See [Reconstruction](manual/reconstruction.md).

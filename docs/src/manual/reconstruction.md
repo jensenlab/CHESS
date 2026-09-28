@@ -56,10 +56,10 @@ nothing before the transfer:
 julia> a2 = CHESSCore.location_id(committed["A2"]);
 
 julia> stock(reconstruct_location(a2))
-0.05 mL Solution (1 reagent(s))
+50.0 μL Solution (1 reagent(s))
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  0.05 mL        100.0 %
+ water    water  50.0 μL          100 %
 
 julia> stock(reconstruct_location(a2, get_sequence_id(transfer_id) - 1))
 Empty Stock

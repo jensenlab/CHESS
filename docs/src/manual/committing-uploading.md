@@ -99,10 +99,10 @@ julia> update(transfer!, plate["A1"], plate["A2"], 20u"µL"; ledger_id=replace_l
 caches updated: 0
 
 julia> stock(reconstruct_location(CHESSCore.location_id(plate["A2"])))
-0.02 mL Solution (1 reagent(s))
+20.0 μL Solution (1 reagent(s))
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  0.02 mL        100.0 %
+ water    water  20.0 μL          100 %
 ```
 
 `update` runs `fun` on the objects passed to it, just like `upload`, so after amending history those

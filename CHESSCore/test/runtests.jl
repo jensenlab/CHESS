@@ -116,6 +116,30 @@ end
     @test isempty(arr) && isempty(amt) && isempty(conc)
 end
 
+@testset "_pretty_quantity: prefix in [1,1000), 3 significant figures" begin
+    P = CHESSCore._pretty_quantity
+    @test P(2u"mg") == "2.00 mg"
+    @test P(0.002u"g") == "2.00 mg"
+    @test P(0.198u"mL") == "198 μL"
+    @test P(1500u"mL") == "1.50 L"
+    @test P(0.01u"g/mL") == "10.0 mg mL⁻¹"       # concentrations keep the per-mL denominator
+    @test P(0.004u"mL*OD") == "4.00 μL OD"        # Biomass
+    @test P(100u"percent") == "100 %"             # no ladder: unit kept, sig figs applied
+    @test P(0.02u"OD") == "0.0200 OD"
+    @test P(999.6u"µL") == "1.00 mL"              # rounding carries into the next prefix up
+    @test P(2e-12u"g") == "0.00200 ng"            # clamped to the smallest prefix
+    @test P(0u"mL") == "0 mL"
+    @test P(Inf*u"OD") == "Inf OD"
+    @test P(missing) == "missing"
+    @test P(1.23456u"g"; sigdigits=5) == "1.2346 g"
+
+    # a small amount in a well-sized stock is readable in the stock's own display
+    str = sprint(show, MIME"text/plain"(), 2u"mg"*rgt"paba" + 200u"µL"*rgt"water")
+    @test occursin("200 μL Solution",str)
+    @test occursin("2.00 mg",str)
+    @test occursin("10.0 mg mL⁻¹",str)
+end
+
 
 @testset "MixingArithmetic" begin
     @test c+b isa Mixture

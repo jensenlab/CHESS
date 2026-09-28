@@ -57,13 +57,13 @@ quantity builds a `Mixture`/`Solution`:
 
 ```jldoctest organisms
 julia> inoculum = 1u"OD*mL" * org"SMU_UA159"
-0.0 mL Culture (0 reagent(s))
- Organisms  Name                        Biomass    OD
-──────────────────────────────────────────────────────────
- SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  Inf OD
+0 mL Culture (0 reagent(s))
+ Organisms  Name                        Biomass     OD
+───────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.00 mL OD  Inf OD
 ```
 
-The inoculum has no liquid, so its total quantity is `0.0 mL` and its OD, biomass divided by liquid
+The inoculum has no liquid, so its total quantity is `0 mL` and its OD, biomass divided by liquid
 volume, shows as `Inf` until it is mixed into a liquid.
 
 ## Promoting a Stock to a Culture
@@ -76,32 +76,32 @@ solids/liquids, so diluting or mixing a culture visibly dilutes or combines its 
 julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
 
 julia> culture = saline + inoculum
-1.0 mL Culture (2 reagent(s))
- Organisms  Name                        Biomass    OD
-──────────────────────────────────────────────────────────
- SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  1.0 OD
+1.00 mL Culture (2 reagent(s))
+ Organisms  Name                        Biomass     OD
+────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.00 mL OD  1.00 OD
 
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  5.00 g    5.00 g mL⁻¹
 
- Liquids  Name   Amount  Concentration
-───────────────────────────────────────
- water    water  1.0 mL        100.0 %
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
 
 julia> diluted = 10u"mL" * culture # dilute to 10 mL total -- biomass scales down with it
 10.0 mL Culture (2 reagent(s))
  Organisms  Name                        Biomass     OD
-───────────────────────────────────────────────────────────
- SMU_UA159  Streptococcus mutans UA159  10.0 mL OD  1.0 OD
+────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  10.0 mL OD  1.00 OD
 
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride  50.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  50.0 g    5.00 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  10.0 mL        100.0 %
+ water    water  10.0 mL          100 %
 ```
 
 Since `quantity(::Stock)` is total *liquid* volume, `"OD"` in the `Concentration`/`OD` column above
@@ -117,12 +117,12 @@ special-cased operations:
 
 ```jldoctest organisms
 julia> sterilized = culture - inoculum # remove exactly this much biomass -- no organisms left
-1.0 mL Solution (2 reagent(s))
+1.00 mL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  5.00 g    5.00 g mL⁻¹
 
- Liquids  Name   Amount  Concentration
-───────────────────────────────────────
- water    water  1.0 mL        100.0 %
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
 ```

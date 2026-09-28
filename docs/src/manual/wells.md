@@ -31,26 +31,26 @@ julia> deposit!(a1, saline)
 ERROR: Well Capacity Error: 1 mL is greater than the well's capacity (400 μL)
 
 julia> small_saline = 100u"µL" * saline
-0.1 mL Solution (2 reagent(s))
+100 μL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  500 mg    5.00 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
- water    water  0.1 mL        100.0 %
+ water    water  100 μL          100 %
 
 julia> deposit!(a1, small_saline)
 
 julia> stock(a1)
-0.1 mL Solution (2 reagent(s))
+100 μL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  500 mg    5.00 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
- water    water  0.1 mL        100.0 %
+ water    water  100 μL          100 %
 ```
 
 `deposit!`'s third argument is a `cost` -- a plain tracked number (e.g. a reagent cost), apportioned
@@ -66,24 +66,24 @@ julia> a2 = plate["A2"];
 julia> transfer!(a1, a2, 40u"µL")
 
 julia> stock(a1)
-0.06 mL Solution (2 reagent(s))
+60.0 μL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   0.3 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  300 mg    5.00 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  0.06 mL        100.0 %
+ water    water  60.0 μL          100 %
 
 julia> stock(a2)
-0.04 mL Solution (2 reagent(s))
+40.0 μL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   0.2 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  200 mg    5.00 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  0.04 mL        100.0 %
+ water    water  40.0 μL          100 %
 ```
 
 ## Clearing a well
@@ -95,18 +95,18 @@ more selective -- demonstrated on a fresh well holding a `Culture`:
 julia> a3 = plate["A3"];
 
 julia> culture = small_saline + 1u"OD*mL" * org"SMU_UA159"
-0.1 mL Culture (2 reagent(s))
- Organisms  Name                        Biomass    OD
-───────────────────────────────────────────────────────────
- SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  10.0 OD
+100 μL Culture (2 reagent(s))
+ Organisms  Name                        Biomass     OD
+────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.00 mL OD  10.0 OD
 
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  500 mg    5.00 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
- water    water  0.1 mL        100.0 %
+ water    water  100 μL          100 %
 
 julia> deposit!(a3, culture)
 ```
@@ -117,14 +117,14 @@ julia> deposit!(a3, culture)
 julia> sterilize!(a3)
 
 julia> stock(a3)
-0.1 mL Solution (2 reagent(s))
+100 μL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  500 mg    5.00 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
- water    water  0.1 mL        100.0 %
+ water    water  100 μL          100 %
 ```
 
 `drain!` is the inverse -- keeps the organism, drops the chemicals. Shown on a fresh well with its
@@ -138,8 +138,8 @@ julia> deposit!(a4, culture)
 julia> drain!(a4)
 
 julia> stock(a4)
-0.0 mL Culture (0 reagent(s))
- Organisms  Name                        Biomass    OD
-──────────────────────────────────────────────────────────
- SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  Inf OD
+0 mL Culture (0 reagent(s))
+ Organisms  Name                        Biomass     OD
+───────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.00 mL OD  Inf OD
 ```

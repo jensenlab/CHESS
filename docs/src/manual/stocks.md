@@ -33,16 +33,16 @@ The natural way to build one is multiplying a quantity by a [`Reagent`](@ref):
 
 ```jldoctest stocks
 julia> water_solution = 1u"mL" * rgt"water"
-1.0 mL Solution (1 reagent(s))
- Liquids  Name   Amount  Concentration
-───────────────────────────────────────
- water    water  1.0 mL        100.0 %
+1.00 mL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
 
 julia> salt = 5u"g" * rgt"sodium_chloride"
-5.0 g Mixture (1 reagent(s))
+5.00 g Mixture (1 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   5.0 g        100.0 %
+ sodium_chloride  Sodium Chloride  5.00 g          100 %
 ```
 
 ## Mixing with `+`
@@ -52,17 +52,17 @@ water plus salt is genuinely saline now, so that's what this one gets called:
 
 ```jldoctest stocks
 julia> saline = water_solution + salt
-1.0 mL Solution (2 reagent(s))
+1.00 mL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  5.00 g    5.00 g mL⁻¹
 
- Liquids  Name   Amount  Concentration
-───────────────────────────────────────
- water    water  1.0 mL        100.0 %
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
 ```
 
-[`quantity(::Stock)`](@ref) reports total *liquid* volume only (`1.0 mL` here, not counting the
+[`quantity(::Stock)`](@ref) reports total *liquid* volume only (`1.00 mL` here, not counting the
 dissolved solid's mass). Solids contribute to [`volume_estimate`](@ref) instead, which falls back to
 density-based estimation and warns when a solid's density is unknown -- as it is for CHESS's
 `sodium_chloride`, which is registered with a `missing` density:
@@ -82,24 +82,24 @@ this is how diluting a `Culture` to a target volume also dilutes its organism co
 
 ```jldoctest stocks
 julia> double = 2*saline
-2.0 mL Solution (2 reagent(s))
+2.00 mL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride  10.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  10.0 g    5.00 g mL⁻¹
 
- Liquids  Name   Amount  Concentration
-───────────────────────────────────────
- water    water  2.0 mL        100.0 %
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  2.00 mL          100 %
 
 julia> tenmL = 10u"mL" * saline
 10.0 mL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride  50.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  50.0 g    5.00 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
- water    water  10.0 mL        100.0 %
+ water    water  10.0 mL          100 %
 ```
 
 ## The non-negativity constraint
@@ -125,14 +125,14 @@ discoverable:
 
 ```jldoctest stocks
 julia> @stock saline_recipe 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride"
-1.0 mL Solution (2 reagent(s))
+1.00 mL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
- sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
+ sodium_chloride  Sodium Chloride  5.00 g    5.00 g mL⁻¹
 
- Liquids  Name   Amount  Concentration
-───────────────────────────────────────
- water    water  1.0 mL        100.0 %
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
 ```
 
 As with location kinds, `saline_recipe` is also bound as a constant where it was registered.
@@ -140,12 +140,12 @@ As with location kinds, `saline_recipe` is also bound as a constant where it was
 
 ```jldoctest stocks
 julia> stock"lb_1000mL"
-1000.0 mL Solution (2 reagent(s))
+1.00 L Solution (2 reagent(s))
  Solids  Name      Amount  Concentration
 ─────────────────────────────────────────
- lb      LB Broth  25.0 g    0.02 g mL⁻¹
+ lb      LB Broth  25.0 g   25.0 mg mL⁻¹
 
- Liquids  Name   Amount     Concentration
-──────────────────────────────────────────
- water    water  1000.0 mL        100.0 %
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  1.00 L          100 %
 ```
