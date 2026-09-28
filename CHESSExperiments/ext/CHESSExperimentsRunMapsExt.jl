@@ -77,7 +77,7 @@ end
                      labware=missing) -> CHESSExperiments.Experiment
 
 Single-plate convenience form: schedules `experiment` onto the one plate `pm` (already produced by
-[`PlateMaps.schedule_platemap`](@ref) from `rm`), tagged with `labware`.
+`PlateMaps.schedule_platemap` from `rm`), tagged with `labware`.
 """
 function CHESSExperiments.schedule_layout(experiment::CHESSExperiments.Experiment,
         pm::PlateMaps.PlateMap, rm::RunMaps.RunMap; labware = missing)
@@ -88,7 +88,7 @@ end
     schedule_layout(experiment::CHESSExperiments.Experiment, rm::RunMaps.RunMap, wells::BitMatrix,
                      placeable_roles; labware_names=nothing, kwargs...) -> CHESSExperiments.Experiment
 
-Convenience form that schedules `rm` itself via [`PlateMaps.schedule_platemap`](@ref) (auto-splitting
+Convenience form that schedules `rm` itself via `PlateMaps.schedule_platemap` (auto-splitting
 across as many `wells`-shaped plates as needed), then builds the layout. `labware_names`, if given, must
 have one name per plate `schedule_platemap` returns (in order); `nothing` leaves every plate's `labware`
 as `missing` (fine for a single, unnamed plate).

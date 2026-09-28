@@ -9,7 +9,7 @@ edges that relate them, it decides *where on a plate* (or plates) each node goes
 
 The relationship half -- deciding *what* is connected to *what* (which run needs which controls, which
 runs are duplicates of each other, and so on) -- is deliberately a separate concern, owned by the sibling
-package [`RunMaps`](https://github.com/jensenlab/CHESS/tree/main/RunMaps). `PlateMaps` has no built-in notion of
+package [`RunMaps`](https://jensenlab.github.io/CHESS/dev/manual/runmaps/). `PlateMaps` has no built-in notion of
 "run" or "control": its core type, [`PlateMap`](@ref), just tracks which node occupies which well.
 
 ## Core type
@@ -28,7 +28,7 @@ edges use). `PlateMap` is the *solution* to a scheduling problem, not the proble
 
 1. **Standalone, dependency-free.** Build your own edges with [`mkedge`](@ref) and call
    [`schedule_platemap`](@ref) directly -- no other CHESS package required.
-2. **With [`RunMaps`](https://github.com/jensenlab/CHESS/tree/main/RunMaps).** A weak-dependency extension
+2. **With [`RunMaps`](https://jensenlab.github.io/CHESS/dev/manual/runmaps/).** A weak-dependency extension
    (loaded automatically when both packages are `using`'d) adds `schedule_platemap(wells, rm::RunMap,
    placeable_roles; kwargs...)`, plus `RunMap`-aware `describe`, `plot`, and `DataFrame` methods.
 3. **With `CHESSCore`.** Another weak-dependency extension adds `wells_from_locationkind` and

@@ -24,7 +24,7 @@ The core engine: recording, reconstructing, and looking up lab state.
 | [`CHESSDatabase`](CHESSDatabase) | An append-only SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand. | [dev](https://jensenlab.github.io/CHESS/dev/api/database/) |
 | [`CHESSLabConstants`](CHESSLabConstants) | A starter set of registered lab constants (reagents, organisms, location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining your own lab's constants. | [dev](https://jensenlab.github.io/CHESS/dev/api/labconstants/) |
 | `CHESS` | The umbrella package: `@reexport`s `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, plus `Unitful`, so `using CHESS` alone is enough to get everything except packages from the other categories below. | [dev](https://jensenlab.github.io/CHESS/dev) |
-| [`CHESSExperiments`](CHESSExperiments) | The experimental-design layer: `Experiment`/`Factor`/design-matrix types, parsing a design into populated well conditions, and blocking -- independent of `RunMaps`/`PlateMaps`, with `schedule_layout` onto them provided by a package extension. | -- |
+| [`CHESSExperiments`](CHESSExperiments) | The experimental-design layer: `Experiment`/`Factor`/design-matrix types, parsing a design into populated well conditions, and blocking -- independent of `RunMaps`/`PlateMaps`, with `schedule_layout` onto them provided by a package extension. | [dev](https://jensenlab.github.io/CHESS/dev/manual/experiments/) |
 
 ### Schedulers
 
@@ -33,7 +33,7 @@ Packages that plan and schedule lab operations against the CHESS engine's data m
 | Package | Description | Docs |
 |---|---|---|
 | [`Pourfecto`](Pourfecto) | Plans and schedules automated liquid-handling workflows -- turns source stocks, target compositions, labware, and instrument configurations into an executable protocol. See [`Pourfecto/README.md`](Pourfecto/README.md) for its own install/quickstart notes (it has extra solver-license setup CHESS itself doesn't need). | [dev](https://jensenlab.github.io/CHESS/pourfecto/dev/) |
-| [`RunMaps`](RunMaps) | Represents and schedules run-graphs -- linked runs, control/duplicate scheduling (greedy and MILP), and JSON round-trip -- pairs naturally with `PlateMaps` for the plate-layout side. | -- |
+| [`RunMaps`](RunMaps) | Represents and schedules run-graphs -- linked runs, control/duplicate scheduling (greedy and MILP), and JSON round-trip -- pairs naturally with `PlateMaps` for the plate-layout side. | [dev](https://jensenlab.github.io/CHESS/dev/manual/runmaps/) |
 | [`PlateMaps`](PlateMaps) | Schedules physical plate layouts (which node occupies which well, across one or more plates) from an edge-linked relationship structure -- pairs naturally with `RunMaps` for the run/control side. | [dev](https://jensenlab.github.io/CHESS/platemaps/dev/) |
 
 ### Data Processing
@@ -42,8 +42,8 @@ Packages for processing and analyzing data recorded through CHESS (e.g. reads an
 
 | Package | Description | Docs |
 |---|---|---|
-| [`CHESSParsers`](CHESSParsers) | Parses instrument-exported data files (starting with BioTek plate readers/incubators: Epoch2, Synergy, Cytation, BioSpa) into a `DataFrame`, `CHESSCore.Read`s, or JSON, through a generic, pluggable per-instrument-format interface. | -- |
-| [`CHESSProcessing`](CHESSProcessing) | A standard library of composable `Experiment`-processing operations -- `resolve`/`aggregate`/`normalize`/`correct`/`flag`/`merge` -- each appending a `ProcessingRecord` to the experiment's append-only processing log for provenance, so any subset or order can be composed rather than following a fixed pipeline. | -- |
+| [`CHESSParsers`](CHESSParsers) | Parses instrument-exported data files (starting with BioTek plate readers/incubators: Epoch2, Synergy, Cytation, BioSpa) into a `DataFrame`, `CHESSCore.Read`s, or JSON, through a generic, pluggable per-instrument-format interface. | [dev](https://jensenlab.github.io/CHESS/dev/manual/parsing-instrument-files/) |
+| [`CHESSProcessing`](CHESSProcessing) | A standard library of composable `Experiment`-processing operations -- `resolve`/`aggregate`/`normalize`/`correct`/`flag`/`merge` -- each appending a `ProcessingRecord` to the experiment's append-only processing log for provenance, so any subset or order can be composed rather than following a fixed pipeline. | [dev](https://jensenlab.github.io/CHESS/dev/manual/processing/) |
 
 ### Visualization
 

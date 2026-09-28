@@ -5,6 +5,8 @@ using CHESS.CHESSCore
 using CHESS.CHESSDatabase
 using CHESS.CHESSLabConstants
 using CHESSParsers # not re-exported by CHESS (like Pourfecto/PlateMaps), so used directly
+using CHESSExperiments, RunMaps, PlateMaps, CHESSProcessing # also separate packages; PlateMaps
+# loads CHESSExperiments' scheduling extension, and has its own docs site
 
 # register_format!'s jldoctest example (src/registry.jl) refers to CHESSParsers/register_format!/
 # format_registry without importing them itself -- innocuous while CHESSParsers was outside
@@ -14,12 +16,13 @@ Documenter.DocMeta.setdocmeta!(CHESSParsers, :DocTestSetup, :(using CHESSParsers
 
 makedocs(
     sitename="CHESS.jl",
-    modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants, CHESSParsers],
+    modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants, CHESSParsers,
+        CHESSExperiments, RunMaps, CHESSProcessing],
     checkdocs=:none, # the manual/API pages are being built up incrementally -- don't fail the
     # build over docstring coverage gaps (CHESSLabConstants in particular is mostly generated
     # data with few standalone docstrings by design, see manual/registering-lab-constants.md)
     repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
-    # api/core-stocks.md and api/labconstants.md list hundreds of registered reagents and organisms.
+    # api/labconstants.md lists hundreds of registered reagents and organisms.
     format=Documenter.HTML(size_threshold_warn=150_000),
     pages=[
         "Home" => "index.md",
@@ -38,6 +41,11 @@ makedocs(
             ],
             "Reads & Instrument Measurements" => "manual/reads.md",
             "Parsing Instrument Files" => "manual/parsing-instrument-files.md",
+            "Experiments & Data" => [
+                "Experimental Designs" => "manual/experiments.md",
+                "Run Maps" => "manual/runmaps.md",
+                "Processing Experiment Data" => "manual/processing.md",
+            ],
             "Registering Lab Constants" => "manual/registering-lab-constants.md",
             "CHESS Databases" => [
                 "Database Architecture" => "manual/db-architecture.md",
@@ -55,13 +63,17 @@ makedocs(
             "CHESSCore" => [
                 "Overview & Errors" => "api/core.md",
                 "Locations & Operations" => "api/core-locations.md",
-                "Stocks & Chemistry" => "api/core-stocks.md",
+                "Stocks" => "api/core-stocks.md",
+                "Solution Chemistry" => "api/core-chemistry.md",
                 "Attributes & Reads" => "api/core-environment.md",
                 "Interop" => "api/core-interop.md",
             ],
             "CHESSDatabase" => "api/database.md",
             "CHESSLabConstants" => "api/labconstants.md",
             "CHESSParsers" => "api/parsers.md",
+            "CHESSExperiments" => "api/experiments.md",
+            "RunMaps" => "api/runmaps.md",
+            "CHESSProcessing" => "api/processing.md",
         ],
     ],
 )

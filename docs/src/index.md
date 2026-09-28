@@ -36,17 +36,17 @@ The repository holds a family of packages, grouped by role.
   automated liquid-handling workflows.
 - **[`PlateMaps`](https://jensenlab.github.io/CHESS/platemaps/dev/)** -- schedules physical plate
   layouts.
-- **`RunMaps`** -- represents and schedules linked runs, controls, and duplicates.
+- **[`RunMaps`](manual/runmaps.md)** -- represents and schedules linked runs, controls, and
+  duplicates.
 
 **Experiments, data processing, and plotting:**
 
-- **`CHESSExperiments`** -- experimental designs: factors, design matrices, and blocking.
-- **`CHESSProcessing`** -- composable processing operations on recorded experiment data.
+- **[`CHESSExperiments`](manual/experiments.md)** -- experimental designs: factors, design matrices,
+  and blocking.
+- **[`CHESSProcessing`](manual/processing.md)** -- composable processing operations on recorded
+  experiment data.
 - **[`LabwarePlotting`](https://jensenlab.github.io/CHESS/labwareplotting/dev/)** -- shared
   plate and grid plotting primitives.
-
-`RunMaps`, `CHESSExperiments`, and `CHESSProcessing` do not have documentation pages yet; see
-their source folders in the [repository](https://github.com/jensenlab/CHESS).
 
 ## Installation
 
