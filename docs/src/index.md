@@ -87,6 +87,8 @@ julia> environment(plate["A1"])[:Temperature] # inherited from room -> plate -> 
 
 ## Where to go next
 
+- The **[Tutorial](tutorial.md)** follows one experiment from setup to reconstruction, touching each
+  part of CHESS once.
 - The **Manual** works through CHESS's core concepts in the order they build on one another,
   starting with [Locations](manual/core-concepts.md).
 - The **[`API Reference`](api/core.md)** is a generated listing of every documented function, macro, and type

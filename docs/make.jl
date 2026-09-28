@@ -23,6 +23,7 @@ makedocs(
     format=Documenter.HTML(size_threshold_warn=150_000),
     pages=[
         "Home" => "index.md",
+        "Tutorial" => "tutorial.md",
         "Manual" => [
             "Locations" => "manual/core-concepts.md",
             "Movement & Occupancy" => "manual/movement.md",
