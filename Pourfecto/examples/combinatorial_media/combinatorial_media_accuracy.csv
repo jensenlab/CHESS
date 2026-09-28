@@ -1,0 +1,5 @@
+scenario,n_wells,reagent_checks,reagent_misses,max_reagent_rel_error,water_misses,max_water_rel_error,all_targets_hit
+all_sources,480,23040,0,0.0,0,2.842170943040401e-16,true
+min_active_flows,480,23040,0,0.0,0,2.842170943040401e-16,true
+min_configurations,480,23040,0,0.0,0,1.4210854715202004e-16,true
+no_reservoir,480,23040,0,0.0,0,1.4210854715202004e-16,true
