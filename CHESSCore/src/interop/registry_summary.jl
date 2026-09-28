@@ -26,6 +26,7 @@ function registry_summary(context=vcat([CHESSCore],CHESSCore.labmodules))
     stocks = NamedTuple[]
     for m in mods
         for n in names(m; all=true)
+            _is_generated_name(n) && continue
             isdefined(m,n) || continue
             v = getfield(m,n)
             if v isa Reagent

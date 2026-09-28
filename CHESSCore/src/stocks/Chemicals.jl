@@ -630,7 +630,7 @@ function lookup_named_value(labmods, sym::Symbol, check::Function)
 
                    (Consider `using $hintmod` in your module?)"""))
         else
-            all_vals = vcat(map(x->filter(y-> check(getfield(x,y)),names(x;all=true)),labmods)...)
+            all_vals = vcat(map(x->filter(y-> !_is_generated_name(y) && check(getfield(x,y)),names(x;all=true)),labmods)...)
             idxs=findall(String(sym),String.(all_vals),StringDistances.Levenshtein();min_score=0.5)
             max_return = 4
             outlen=min(length(idxs),max_return)
@@ -668,6 +668,11 @@ chemstr_check_bool(::Any) =false
 rgtstr_check_bool(::Reagent) =true
 rgtstr_check_bool(::Any) =false
 
+# `names(m; all=true)` also lists compiler-generated bindings (e.g. Julia 1.13 adds `#139#val`
+# globals holding documented constants such as `H⁺`). Their names start with `#`, so they can never
+# be written in code and must be skipped by every scan that maps values back to names.
+_is_generated_name(n::Symbol) = startswith(string(n),'#')
+
 """
     symbol(x; context=vcat([CHESSCore],CHESSCore.labmodules))
 
@@ -684,6 +689,7 @@ function symbol(x; context=vcat([CHESSCore],CHESSCore.labmodules))
     mods = context isa Module ? [context] : context
     for m in mods
         for n in names(m; all=true)
+            _is_generated_name(n) && continue
             isdefined(m,n) || continue
             v = getfield(m,n)
             v isa typeof(x) && v == x && return n

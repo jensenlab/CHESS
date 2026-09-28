@@ -11,16 +11,20 @@ concurrency:
 
 jobs:
   test:
+    name: ${{ matrix.project }} - Julia ${{ matrix.julia-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        # 'min' is the lowest version each project's [compat] julia allows; '1' is the latest release
+        julia-version: ['min', '1']
         project: [CHESSCore, CHESSDatabase, CHESSLabConstants, Pourfecto, CHESSParsers, RunMaps, PlateMaps, LabwarePlotting, CHESSExperiments, CHESSProcessing, .]
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1'
+          version: ${{ matrix.julia-version }}
+          project: ${{ matrix.project }}
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
         with:
