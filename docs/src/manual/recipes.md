@@ -1,5 +1,9 @@
 # Recipes & Solution Chemistry
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 !!! note
     This chapter's chemistry model is intentionally simple -- pitched at what a biology lab needs
     (dissociation into ions, molar concentration, pH), not a complete physical chemistry treatment.
@@ -12,11 +16,13 @@
 
 A `Stock` is measured in `Reagent`s -- physical things you weigh out. [`Recipe`](@ref) reduces that
 to real molar quantities of `Chemical`s instead, accounting for dissociation, derived
-one-directionally via [`recipe(s::Stock)`](@ref):
+one-directionally via [`recipe(s::Stock)`](@ref). Using the saline from [Stocks](stocks.md):
 
-```julia-repl
+```jldoctest recipes
+julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
+
 julia> r = recipe(saline)
-Recipe(Dict(Cl⁻ => 0.0856 mol, Na⁺ => 0.0856 mol, water => 0.0555 mol))
+Recipe(Dict{Chemical, Union{Quantity{T, 𝐍, U}, Level{L, S, Quantity{T, 𝐍, U}} where {L, S}} where {T, U}}(Na⁺ => 0.08555817485063207 mol, Cl⁻ => 0.08555817485063207 mol, water => 0.055509297807382736 mol))
 ```
 
 `water` itself is in there too -- `recipe` sums every reagent's contribution, dissociating or not.
@@ -27,21 +33,21 @@ default from the previous chapters.
 
 [`mass`](@ref) and [`molar_amount`](@ref) read a `Recipe`'s quantity of a given `Chemical`:
 
-```julia-repl
-julia> mass(r, Na⁺)
-1.97 g
+```jldoctest recipes
+julia> mass(r, chem"Na+")
+1.966962701545093 g
 
-julia> molar_amount(r, Na⁺)
-0.0856 mol
+julia> molar_amount(r, chem"Na+")
+0.08555817485063207 mol
 ```
 
 ## `total_concentration`
 
 The molar concentration of a `Chemical` across the whole stock:
 
-```julia-repl
-julia> total_concentration(saline, Na⁺)
-0.0856 mol mL⁻¹
+```jldoctest recipes
+julia> total_concentration(saline, chem"Na+")
+0.08555817485063207 mol mL⁻¹
 ```
 
 ## `pH` and `net_hydrogen_ion_concentration`
@@ -50,25 +56,22 @@ julia> total_concentration(saline, Na⁺)
 [`H⁺`](@ref)/[`OH⁻`](@ref) `Chemical`s -- introduced in [Reagents & Chemicals](reagents-chemicals.md)
 -- against each other. `saline` is a neutral salt, so it comes out flat:
 
-```julia-repl
+```jldoctest recipes
 julia> pH(saline)
 7.0
 ```
 
-A new reagent, registered here specifically to show this meaningfully:
+CHESS registers hydrochloric acid with its dissociation formula, `H⁺ + Cl⁻`, which makes a more
+interesting example:
 
-```julia
-@reagent_formula HCl "hydrochloric acid" Liquid (H⁺+Cl⁻) 1.18u"g/mL" missing
-```
-
-```julia-repl
-julia> acid = 1u"mL"*HCl + 100u"mL"*water
+```jldoctest recipes
+julia> acid = 0.1u"g" * rgt"HCl" + 100u"mL" * rgt"water";
 
 julia> net_hydrogen_ion_concentration(acid)
-0.00032 mol mL⁻¹
+2.7428822206374456e-5 mol mL⁻¹
 
 julia> pH(acid)
-0.49
+1.5617928406001496
 ```
 
 This explicit `H⁺`-minus-`OH⁻` subtraction is exactly why a base registers its real dissociation

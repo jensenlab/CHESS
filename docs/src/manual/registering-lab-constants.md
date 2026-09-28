@@ -1,5 +1,9 @@
 # Registering Lab Constants
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 Every registration macro used so far -- [`@location_kind`](@ref), [`@attribute`](@ref),
 [`@read`](@ref), [`@chemical`](@ref), [`@reagent`](@ref), [`@organism`](@ref), [`@stock`](@ref) --
 does two things at once: define a `const` binding in the calling module, and record that binding in
@@ -8,16 +12,16 @@ a registry so it can be found later by name. This pattern is closely modeled on
 dimensions (`@unit`/`@dimension`, recalled via `u"..."`). This chapter covers the shared machinery
 directly, using a small worked lab module:
 
-```julia
-module MyLab
-using CHESSCore, Unitful
-@location_kind Flask Symbol[] nothing nothing nothing nothing nothing
-@attribute Turbidity u"percent"
-@organism EC_K12 "Escherichia" "coli" "K-12"
-@reagent ethanol "ethanol" Liquid 46.07u"g/mol" 0.789u"g/mL" 702
-end
+```jldoctest registering
+julia> module MyLab
+       using CHESS
+       @location_kind Flask Symbol[] nothing nothing nothing nothing nothing
+       @attribute Turbidity u"percent"
+       @organism EC_K12 "Escherichia" "coli" "K-12"
+       @reagent ethanol "ethanol" Liquid 46.07u"g/mol" 0.789u"g/mL" 702
+       end;
 
-CHESSCore.register_lab(MyLab)
+julia> CHESSCore.register_lab(MyLab);
 ```
 
 ## Per-module registries and the central merge
@@ -40,12 +44,9 @@ global namespace exactly once, typically from the module's `__init__`.
 
 [`@location_kind`](@ref), [`@attribute`](@ref), [`@read`](@ref), and [`@stock`](@ref) throw
 `ArgumentError` when a name is registered twice (checked against the always-current central
-registry):
+registry). `MyLab` already registered `Flask`, so registering it again fails:
 
-```julia-repl
-julia> @location_kind Flask Symbol[] nothing nothing nothing nothing nothing
-Flask
-
+```jldoctest registering
 julia> @location_kind Flask Symbol[] nothing nothing nothing nothing nothing
 ERROR: ArgumentError: LocationKind Flask already exists
 ```
@@ -74,12 +75,15 @@ Every string macro shares the same lookup algorithm:
 3. If the name exists in some globally registered lab module, but isn't visible to the caller, a
    specific error names the missing `using`:
 
-   ```julia-repl
-   julia> loc"Flask"
-   ERROR: ArgumentError: Symbol `Flask` was found in the globally registered lab module Main.MyLab
-   but was not in the provided list of lab modules CHESSCore.
+   ```jldoctest registering
+   julia> module OtherModule
+          using CHESS
+          flask_kind() = loc"Flask"
+          end
+   ERROR: LoadError: ArgumentError: Symbol `Flask` was found in the globally registered lab module MyLab
+   but was not in the provided list of lab modules CHESSCore, CHESSLabConstants.
 
-   (Consider `using Main.MyLab` in your module?)
+   (Consider `using MyLab` in your module?)
    ```
 4. If the name doesn't exist anywhere at all, a fuzzy, typo-tolerant "did you mean" search runs
    against the caller-visible list instead.
@@ -93,10 +97,10 @@ If a name resolves in more than one caller-visible module, the last-registered o
 category -- the practical payoff of the whole registry system, and the fastest way to answer "what's
 already defined" for a lab module like `CHESSLabConstants`:
 
-```julia-repl
+```jldoctest registering
 julia> registry_summary([CHESSCore, MyLab]).reagents
 1-element Vector{NamedTuple}:
- (module_ = Main.MyLab, name = :ethanol, type = Liquid, molecular_weight = 46.07 g mol⁻¹, density = 0.789 g mL⁻¹, pubchemid = 702)
+ (module_ = MyLab, name = :ethanol, type = Liquid, molecular_weight = 46.07 g mol⁻¹, density = 0.789 g mL⁻¹, pubchemid = 702)
 ```
 
 Called with no arguments, `registry_summary()` covers every lab module ever registered globally --

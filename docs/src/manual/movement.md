@@ -1,15 +1,21 @@
 # Movement & Occupancy
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 [Locations](core-concepts.md) covered what a location is; this
 chapter covers how Locations move within a hierarchy.
 
-A few more `LocationKind`s, alongside the `WP96`/`Well200` plate from [Locations](core-concepts.md), are enough to give it somewhere to go.
+`using CHESS` already registers `Lab`, `Bench`, and `WP96`. CHESS's own `Incubator` kind models an
+incubator with shelves, so this chapter registers a simpler one that holds plates directly, and
+allows up to four of them:
 
-```julia
-@location_kind Lab       Symbol[] nothing nothing nothing nothing nothing 0//1 2//1
-@location_kind Bench     Symbol[] nothing nothing nothing nothing nothing 0//1 0//1
-@location_kind Incubator Symbol[] nothing nothing nothing nothing nothing 2//1 0//1
-set_occupancy_cost!(:Incubator, :WP96, 1//4)
+```jldoctest movement
+julia> @location_kind SmallIncubator Symbol[] nothing nothing nothing nothing nothing 2//1 0//1
+LocationKind(SmallIncubator)
+
+julia> set_occupancy_cost!(:SmallIncubator, :WP96, 1//4)
 ```
 
 ## `move_into!`
@@ -18,18 +24,14 @@ set_occupancy_cost!(:Incubator, :WP96, 1//4)
 reassigns `child`'s parent to `parent`, removing it from wherever it was before.
 
 
-```julia-repl
-julia> lab = build_location(loc"Lab", "Lab")
-Lab
+```jldoctest movement
+julia> lab = build_location(loc"Lab", "Lab");
 
-julia> bench = build_location(loc"Bench", "Bench")
-Bench
+julia> bench = build_location(loc"Bench", "Bench");
 
-julia> incubator = build_location(loc"Incubator", "Incubator")
-Incubator
+julia> incubator = build_location(SmallIncubator, "Incubator");
 
-julia> plate = build_location(loc"WP96", "Plate 1")
-Plate 1
+julia> plate = build_location(loc"WP96", "Plate 1");
 
 julia> move_into!(lab, bench)
 
@@ -48,13 +50,13 @@ graph TD
 Reading the tree back afterward is a pair of accessors: [`parent(x)`](@ref parent) (`nothing` if `x` is at
 the root of its tree) and [`children(x)`](@ref children).
 
-```julia-repl
+```jldoctest movement
 julia> children(lab)
 2-element Vector{Location}:
  Bench
  Incubator
 
-julia> parent(plate)
+julia> print(parent(plate))
 Bench
 ```
 
@@ -64,7 +66,7 @@ kind of event: a location being moved into a new parent.
 
 Recording the plate moving into the incubator: 
 
-```julia-repl
+```jldoctest movement
 julia> move_into!(incubator, plate)
 ```
 The tree changes accordingly. 
@@ -84,7 +86,7 @@ everything nested inside that location comes along automatically.
 Confirming the change directly: `bench` no longer has `plate`, `incubator` now does, and `lab`'s
 own children are untouched:
 
-```julia-repl
+```jldoctest movement
 julia> children(bench)
 Location[]
 
@@ -115,10 +117,10 @@ full it is, and every `(parent kind, child kind)` pair has an [`occupancy_cost`]
 how much of the parent's capacity one instance of that child consumes. `move_into!` refuses any move
 that would push `occupancy(parent) + occupancy_cost(parent, child)` above `1`. Register a cost with
 [`set_occupancy_cost!`](@ref) -- this is exactly the rule registered at the top of this chapter,
-letting an Incubator hold up to four plates:
+letting the incubator hold up to four plates:
 
 ```julia
-set_occupancy_cost!(:Incubator, :WP96, 1//4) # an Incubator holds up to four plates
+set_occupancy_cost!(:SmallIncubator, :WP96, 1//4) # holds up to four plates
 ```
 
 Occupancy costs are stored as `Rational`s specifically to avoid floating-point rounding ever
@@ -132,19 +134,18 @@ physically-impossible pairings (a bench into a well) get rejected outright rathe
 `Labware` and `Well` are the exception: `occupancy` is always `1//1`, regardless
 of how many of a `Labware`'s wells actually hold anything. Their slots are structurally fixed --
 either fully built at construction or not present at all -- so there's no partial-membership state
-to compute, unlike `GenericLocation`/`Instrument`, whose occupancy is always derived from
-`occupancy_cost`.
+to compute, unlike `GenericLocation`, whose occupancy is always derived from `occupancy_cost`.
 
 **Locking and activity.** Two other pieces of per-location state: [`is_locked`](@ref) (can this
 location itself be moved out of its current parent right now? -- children of a locked location can
 still be moved) and [`is_active`](@ref) (a general on/off flag), toggled with
 `lock!`/`unlock!`/`toggle_lock!` and `activate!`/`deactivate!`/`toggle_activity!`.
 
-```julia-repl
-julia> lock!(plate)
+```jldoctest movement
+julia> lock!(plate);
 
 julia> move_into!(bench, plate)
-ERROR: LockedLocationError: Plate 1 is locked
+ERROR: Locked Location Error with: Plate 1
 ```
 
 ## Checking a move before making it
@@ -153,12 +154,13 @@ ERROR: LockedLocationError: Plate 1 is locked
 above. "Checking" whether a move would succeed without performing it means calling `can_move_into`
 directly and catching whatever it throws, rather than branching on a boolean:
 
-```julia-repl
+```jldoctest movement
 julia> try
            can_move_into(bench, plate)
        catch e
            println("can't move: ", e)
        end
+can't move: LockedLocationError(Plate 1)
 ```
 
 ## Detaching a location
@@ -166,8 +168,8 @@ julia> try
 Moving a location out of the hierarchy entirely -- with no new parent -- is `move_into!(nothing,
 child)`:
 
-```julia-repl
-julia> unlock!(plate)
+```jldoctest movement
+julia> unlock!(plate);
 
 julia> move_into!(nothing, plate)
 

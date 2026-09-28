@@ -1,10 +1,14 @@
 # Interop
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 `CHESSCore` has two complementary data-interchange formats. The tabular one
-(`CHESSCore/src/interop/dataframe_interface.jl`) is for bulk, flat batches of stock definitions --
-a wet-lab CSV template. The general one (`CHESSCore/src/interop/location_interchange.jl`) is for a
-whole `Location` (or tree of them) with full fidelity -- for tools outside CHESS, and outside Julia
-entirely, to consume.
+([`stock_to_df`](@ref)/[`df_to_stock`](@ref) and their `labware` counterparts) is for bulk, flat
+batches of stock definitions -- a wet-lab CSV template. The general one ([`location_to_dict`](@ref)/
+[`dict_to_location`](@ref)) is for a whole `Location` (or tree of them) with full fidelity -- for
+tools outside CHESS, and outside Julia entirely, to consume.
 
 ## The tabular format: "vc" vs "q"
 
@@ -12,14 +16,27 @@ Both encode only the *stock* columns of a table -- everything else (`labware`/`n
 full labware table) is metadata used to place the stock, not part of the format itself.
 
 **"q" (quantity)** -- each reagent column is an absolute quantity (mass, volume, or molar amount).
-Exact and unambiguous, with no dependence on a stock having any particular total:
+Exact and unambiguous, with no dependence on a stock having any particular total. The examples
+pass `reagent_context` so reagent names resolve against CHESS's registered reagents (see
+[below](#Reagent-columns-must-match-a-registered-name)):
 
-```julia-repl
-julia> deposit!(bottle.children[1,1], 10u"g"*paba, 5)
+```jldoctest interop
+julia> ctx = [CHESSCore, CHESSLabConstants];
 
-julia> df_q, units_q = labware_to_df(bottle, "q"; reagent_context=[CHESSCore,Main])
+julia> bottle = build_location(loc"Bottle500mL", "Bottle 1");
 
-julia> lws_q = df_to_labware(df_q, units_q; reagent_context=[CHESSCore,Main])
+julia> deposit!(bottle.children[1,1], 10u"g" * rgt"paba", 5)
+
+julia> df_q, units_q = labware_to_df(bottle, "q"; reagent_context=ctx);
+
+julia> df_q
+1×4 DataFrame
+ Row │ labware      name      well    paba
+     │ String       String    String  Int64
+─────┼──────────────────────────────────────
+   1 │ Bottle500mL  Bottle 1  A1         10
+
+julia> lws_q = df_to_labware(df_q, units_q; reagent_context=ctx);
 
 julia> stock(lws_q[1][df_q.well[1]]) == stock(bottle.children[1,1])
 true
@@ -33,12 +50,21 @@ reagent. This is the natural shape for a human-authored wet-lab template: "how m
 and what percent (or M, or g/mL) of each reagent." It only works when the stock has a defined total
 quantity to relate concentrations to:
 
-```julia-repl
-julia> deposit!(bottle2.children[1,1], 100u"mL"*water, 5)
+```jldoctest interop
+julia> bottle2 = build_location(loc"Bottle500mL", "Bottle 2");
 
-julia> df_vc, units_vc = labware_to_df(bottle2, "vc"; reagent_context=[CHESSCore,Main])
+julia> deposit!(bottle2.children[1,1], 100u"mL" * rgt"water", 5)
 
-julia> lws_vc = df_to_labware(df_vc, units_vc; reagent_context=[CHESSCore,Main])
+julia> df_vc, units_vc = labware_to_df(bottle2, "vc"; reagent_context=ctx);
+
+julia> df_vc
+1×5 DataFrame
+ Row │ labware      name      well    volume  water
+     │ String       String    String  Int64   Float64
+─────┼────────────────────────────────────────────────
+   1 │ Bottle500mL  Bottle 2  A1         100    100.0
+
+julia> lws_vc = df_to_labware(df_vc, units_vc; reagent_context=ctx);
 
 julia> stock(lws_vc[1][df_vc.well[1]]) == stock(bottle2.children[1,1])
 true
@@ -56,8 +82,8 @@ falling back to the display name only if the symbol can't be found in the given 
 This means `reagent_context` needs to be passed **consistently when converting a stock to a
 DataFrame and back**. Leave it out of either call and the fallback happens silently; if the
 display name then contains spaces or punctuation that isn't valid in a name, converting back fails
-internally and produces an empty, propertyless reagent instead of the real one -- with no error
-shown to say so.
+internally and produces an empty, propertyless reagent instead of the real one. CHESS logs a
+warning ("reagent ... not registered"), but does not throw an error.
 
 ## The general format: `Location`/`Stock` <-> `Dict`
 
@@ -66,9 +92,18 @@ programming language can read (`Dict`/`Vector`/`String`/`Real`/`Nothing`) -- no 
 needed to write or read it. It mirrors the "q" format's exact quantity shape, not "vc"'s relative
 one:
 
-```julia-repl
-julia> stock_to_dict(10u"g"*paba; reagent_context=[CHESSCore,Main])
-Dict{String, Any}("organisms" => String[], "solids" => Dict{String, Any}("paba" => Dict{String, Any}("amount" => 10, "unit" => "g")), "liquids" => Dict{String, Any}())
+```jldoctest interop
+julia> d = stock_to_dict(10u"g" * rgt"paba"; reagent_context=ctx);
+
+julia> keys(d)
+KeySet for a Dict{String, Any} with 3 entries. Keys:
+  "organisms"
+  "solids"
+  "liquids"
+
+julia> d["solids"]
+Dict{String, Any} with 1 entry:
+  "paba" => Dict{String, Any}("amount"=>10, "unit"=>"g")
 ```
 
 `attribute_to_dict`/`read_to_dict` share a `"state"` field (`"value"`/`"missing"`/`"unknown"`), with
@@ -92,18 +127,18 @@ Every subtype shares a common set of fields: `kind`, `name`, `is_locked`, `is_ac
   `performable_operations`/`readable_types` -- these are never consulted on reconstruction, which
   always re-derives real capability from the resolved `LocationKind` by name.
 
-```julia-repl
-julia> root = CHESSCore.GenericLocation(nothing, "interop root", Room)
+```jldoctest interop
+julia> root = build_location(loc"Room", "interop root");
 
-julia> child = CHESSCore.GenericLocation(nothing, "interop child", Bench)
+julia> child = build_location(loc"Bench", "interop child");
 
 julia> move_into!(root, child)
 
-julia> set_attribute!(root, Temperature(22u"°C"))
+julia> set_attribute!(root, attr"Temperature"(22u"°C"))
 
-julia> d = location_to_dict(root)
+julia> d = location_to_dict(root);
 
-julia> root2 = dict_to_location(d)
+julia> root2 = dict_to_location(d);
 
 julia> CHESSCore.softequal(root, root2)
 true

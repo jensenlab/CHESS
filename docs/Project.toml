@@ -1,6 +1,7 @@
 [deps]
 CHESS = "62dec9b8-6080-46d4-b979-4cedd2cd98ca"
 CHESSParsers = "c41996af-383d-4049-9b52-09a73c86e265"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterMermaid = "a078cd44-4d9c-4618-b545-3ab9d77f9177"
 

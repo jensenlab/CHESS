@@ -1,40 +1,44 @@
 # Organisms & Cultures
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 A [`Culture`](@ref) also tracks living organisms, not just chemicals -- an [`Organism`](@ref) is a
 species-and-strain identity: `genus`, `species`, and `strain`. Each `Organism` present in a `Culture`
 carries a [`Biomass`](@ref CHESSCore.Biomass) quantity, not just presence/absence.
 
 ## Registering an organism
 
-Register one with [`@organism`](@ref):
+`using CHESS` registers several lab strains. Register a new one with [`@organism`](@ref):
 
-```julia
-@organism SMU_UA159 "Streptococcus" "mutans" "UA159"
-```
+```jldoctest organisms
+julia> @organism BSU_168 "Bacillus" "subtilis" "168"
+Bacillus subtilis 168
 
-```julia-repl
-julia> genus(SMU_UA159)
-"Streptococcus"
+julia> genus(BSU_168)
+"Bacillus"
 
-julia> species(SMU_UA159)
-"mutans"
+julia> species(BSU_168)
+"subtilis"
 
-julia> strain(SMU_UA159)
-"UA159"
+julia> strain(BSU_168)
+"168"
 
-julia> name(SMU_UA159)
-"Streptococcus mutans UA159"
+julia> name(BSU_168)
+"Bacillus subtilis 168"
 ```
 
 `name(x)` joins all three fields for display. `show(x)` prints the recoverable binding name
-instead (`SMU_UA159`), the same convention [`Reagent`](@ref)/[`Chemical`](@ref) use.
+instead (`BSU_168`), the same convention [`Reagent`](@ref)/[`Chemical`](@ref) use.
 
 ## Recalling with `@org_str`
 
 [`@org_str`](@ref) is the collision-safe lookup, mirroring
-[`@loc_str`](@ref)/[`@attr_str`](@ref)/[`@rgt_str`](@ref)/[`@chem_str`](@ref):
+[`@loc_str`](@ref)/[`@attr_str`](@ref)/[`@rgt_str`](@ref)/[`@chem_str`](@ref). It finds
+organisms registered by CHESS or a lab module:
 
-```julia-repl
+```jldoctest organisms
 julia> org"SMU_UA159"
 SMU_UA159
 ```
@@ -51,30 +55,35 @@ have organisms and zero liquid (see [Stocks](stocks.md)).
 Write an inoculum by multiplying a `Biomass` quantity by an `Organism`, the same way a `Reagent`
 quantity builds a `Mixture`/`Solution`:
 
-```julia-repl
+```jldoctest organisms
 julia> inoculum = 1u"OD*mL" * org"SMU_UA159"
-1.0 mL OD Culture (0 reagent(s))
+0.0 mL Culture (0 reagent(s))
  Organisms  Name                        Biomass    OD
-───────────────────────────────────────────────────────
- SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  1.0 OD
+──────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  Inf OD
 ```
+
+The inoculum has no liquid, so its total quantity is `0.0 mL` and its OD, biomass divided by liquid
+volume, shows as `Inf` until it is mixed into a liquid.
 
 ## Promoting a Stock to a Culture
 
-Adding a quantified `Organism` to any `Stock` -- e.g. `saline`, built in [Stocks](stocks.md) --
-promotes it to a `Culture`. `Biomass` is conserved under `+`/`-`/scalar `*`/`/` exactly like
+Adding a quantified `Organism` to any `Stock` promotes it to a `Culture`, shown here with the saline
+from [Stocks](stocks.md). `Biomass` is conserved under `+`/`-`/scalar `*`/`/` exactly like
 solids/liquids, so diluting or mixing a culture visibly dilutes or combines its organism content:
 
-```julia-repl
+```jldoctest organisms
+julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
+
 julia> culture = saline + inoculum
 1.0 mL Culture (2 reagent(s))
  Organisms  Name                        Biomass    OD
-───────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────
  SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  1.0 OD
 
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   5.0 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
@@ -83,8 +92,16 @@ julia> culture = saline + inoculum
 julia> diluted = 10u"mL" * culture # dilute to 10 mL total -- biomass scales down with it
 10.0 mL Culture (2 reagent(s))
  Organisms  Name                        Biomass     OD
-────────────────────────────────────────────────────────
+───────────────────────────────────────────────────────────
  SMU_UA159  Streptococcus mutans UA159  10.0 mL OD  1.0 OD
+
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride  50.0 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  10.0 mL        100.0 %
 ```
 
 Since `quantity(::Stock)` is total *liquid* volume, `"OD"` in the `Concentration`/`OD` column above
@@ -98,12 +115,12 @@ so an organism's biomass can now be reduced or fully removed -- e.g. centrifugin
 or autoclaving a stock are just applications of `-` with an explicitly constructed `Stock`, not
 special-cased operations:
 
-```julia-repl
+```jldoctest organisms
 julia> sterilized = culture - inoculum # remove exactly this much biomass -- no organisms left
 1.0 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   5.0 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────

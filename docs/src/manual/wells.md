@@ -1,17 +1,19 @@
 # Wells: Depositing & Transferring Material
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 A `Well` holds exactly one [`Stock`](@ref), accessed with [`stock(w)`](@ref). Its capacity is fixed
 by its `LocationKind` ([`wellcapacity`](@ref)):
 
-```julia-repl
-julia> plate = build_location(loc"WP96", "Plate 1")
-Plate 1
+```jldoctest wells
+julia> plate = build_location(loc"WP96", "Plate 1");
 
-julia> a1 = plate["A1"]
-A1
+julia> a1 = plate["A1"];
 
 julia> wellcapacity(a1)
-200 μL
+400 μL
 
 julia> stock(a1)
 Empty Stock
@@ -20,21 +22,31 @@ Empty Stock
 ## Depositing and withdrawing
 
 [`deposit!`](@ref)/[`withdraw!`](@ref) add to and remove from a well's stock, guarded by its
-capacity:
+capacity. The examples use the saline from [Stocks](stocks.md):
 
-```julia-repl
+```jldoctest wells
+julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
+
 julia> deposit!(a1, saline)
-ERROR: Well Capacity Error: 1 mL is greater than the well's capacity (200 μL)
+ERROR: Well Capacity Error: 1 mL is greater than the well's capacity (400 μL)
 
 julia> small_saline = 100u"µL" * saline
+0.1 mL Solution (2 reagent(s))
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  0.1 mL        100.0 %
 
 julia> deposit!(a1, small_saline)
 
 julia> stock(a1)
 0.1 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   0.5 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
@@ -48,17 +60,16 @@ proportionally whenever `withdraw!` pulls material back out. It defaults to `0`.
 
 [`transfer!(donor, recipient, quantity)`](@ref) is `withdraw!` then `deposit!` in one call:
 
-```julia-repl
-julia> a2 = plate["A2"]
-A2
+```jldoctest wells
+julia> a2 = plate["A2"];
 
 julia> transfer!(a1, a2, 40u"µL")
 
 julia> stock(a1)
 0.06 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   0.3 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   0.3 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
@@ -66,9 +77,9 @@ julia> stock(a1)
 
 julia> stock(a2)
 0.04 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   0.2 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   0.2 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
@@ -80,25 +91,36 @@ julia> stock(a2)
 [`empty!`](@ref) resets a well to `Empty()` outright. [`sterilize!`](@ref) and [`drain!`](@ref) are
 more selective -- demonstrated on a fresh well holding a `Culture`:
 
-```julia-repl
-julia> a3 = plate["A3"]
-A3
+```jldoctest wells
+julia> a3 = plate["A3"];
 
-julia> culture = small_saline + org"SMU_UA159"
+julia> culture = small_saline + 1u"OD*mL" * org"SMU_UA159"
+0.1 mL Culture (2 reagent(s))
+ Organisms  Name                        Biomass    OD
+───────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  10.0 OD
+
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  0.1 mL        100.0 %
 
 julia> deposit!(a3, culture)
 ```
 
 `sterilize!` keeps the chemicals, drops the organism:
 
-```julia-repl
+```jldoctest wells
 julia> sterilize!(a3)
 
 julia> stock(a3)
 0.1 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   0.5 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   0.5 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
@@ -108,9 +130,8 @@ julia> stock(a3)
 `drain!` is the inverse -- keeps the organism, drops the chemicals. Shown on a fresh well with its
 own deposit of `culture`, so it doesn't stack on top of `a3`'s already-sterilized contents:
 
-```julia-repl
-julia> a4 = plate["A4"]
-A4
+```jldoctest wells
+julia> a4 = plate["A4"];
 
 julia> deposit!(a4, culture)
 
@@ -118,7 +139,7 @@ julia> drain!(a4)
 
 julia> stock(a4)
 0.0 mL Culture (0 reagent(s))
- Organisms
-───────────
- SMU_UA159
+ Organisms  Name                        Biomass    OD
+──────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  1.0 mL OD  Inf OD
 ```

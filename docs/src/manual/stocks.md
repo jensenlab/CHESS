@@ -1,5 +1,10 @@
 # Stocks
 
+```@meta
+DocTestSetup = :(using CHESS)
+DocTestFilters = [r"└ @ CHESSCore .*"]
+```
+
 A [`Stock`](@ref) is a combination of organisms and chemicals -- what actually lives inside a
 `Well`. `Stock` is an abstract type; which concrete subtype you get is determined by what it
 contains, not chosen directly: [`Empty`](@ref) (nothing), [`Mixture`](@ref) (solids only),
@@ -17,7 +22,7 @@ checking in order whether any organisms, then liquids, then solids are present:
 | 0 | 0 | ≥ 1 | [`Mixture`](@ref) |
 | 0 | 0 | 0 | [`Empty`](@ref) |
 
-```julia-repl
+```jldoctest stocks
 julia> Empty()
 Empty Stock
 ```
@@ -26,18 +31,18 @@ Empty Stock
 
 The natural way to build one is multiplying a quantity by a [`Reagent`](@ref):
 
-```julia-repl
-julia> water_solution = 1u"mL" * water
+```jldoctest stocks
+julia> water_solution = 1u"mL" * rgt"water"
 1.0 mL Solution (1 reagent(s))
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
  water    water  1.0 mL        100.0 %
 
-julia> salt = 5u"g" * NaCl
+julia> salt = 5u"g" * rgt"sodium_chloride"
 5.0 g Mixture (1 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   5.0 g        100.0 %
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   5.0 g        100.0 %
 ```
 
 ## Mixing with `+`
@@ -45,12 +50,12 @@ julia> salt = 5u"g" * NaCl
 Combining two stocks via `+` always produces whichever subtype the *combined* contents call for --
 water plus salt is genuinely saline now, so that's what this one gets called:
 
-```julia-repl
+```jldoctest stocks
 julia> saline = water_solution + salt
 1.0 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride   5.0 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
@@ -59,14 +64,14 @@ julia> saline = water_solution + salt
 
 [`quantity(::Stock)`](@ref) reports total *liquid* volume only (`1.0 mL` here, not counting the
 dissolved solid's mass). Solids contribute to [`volume_estimate`](@ref) instead, which falls back to
-density-based estimation and warns when a solid's density is unknown -- as it is for `NaCl` here,
-registered with a `missing` density in [Reagents & Chemicals](reagents-chemicals.md):
+density-based estimation and warns when a solid's density is unknown -- as it is for CHESS's
+`sodium_chloride`, which is registered with a `missing` density:
 
-```julia-repl
+```jldoctest stocks
 julia> volume_estimate(salt)
-┌ Warning: volume_estimate: density unknown for sodium chloride; excluded from the estimate (result is a lower bound)
+┌ Warning: volume_estimate: density unknown for Sodium Chloride; excluded from the estimate (result is a lower bound)
 └ @ CHESSCore ...
-0.0 mL
+0 mL
 ```
 
 ## Scaling
@@ -75,12 +80,12 @@ julia> volume_estimate(salt)
 multiplying by a *quantity* instead scales the whole stock to hit that quantity as its new total --
 this is how diluting a `Culture` to a target volume also dilutes its organism content:
 
-```julia-repl
+```jldoctest stocks
 julia> double = 2*saline
 2.0 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride  10.0 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride  10.0 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount  Concentration
 ───────────────────────────────────────
@@ -88,9 +93,9 @@ julia> double = 2*saline
 
 julia> tenmL = 10u"mL" * saline
 10.0 mL Solution (2 reagent(s))
- Solids  Name             Amount  Concentration
-────────────────────────────────────────────────
- NaCl    sodium chloride  50.0 g     5.0 g mL⁻¹
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride  50.0 g     5.0 g mL⁻¹
 
  Liquids  Name   Amount   Concentration
 ────────────────────────────────────────
@@ -104,9 +109,10 @@ applies identically to organism [`Biomass`](@ref CHESSCore.Biomass) -- an organi
 removed via `-`, the same way a chemical amount can (see
 [Removing organisms](organisms-cultures.md#Removing-organisms)):
 
-```julia-repl
+```jldoctest stocks
 julia> saline - double
-ERROR: MixingError: NaCl: attempted to add a negative quantity to a Stock
+ERROR: Mixing Error with sodium_chloride
+: attempted to add a negative quantity to a Stock
 ```
 
 ## `@stock_str` for named recipes
@@ -117,10 +123,29 @@ Register one with [`@stock`](@ref) (mirroring [`@location_kind`](@ref)/[`@reagen
 (e.g. a concentrated stock solution combined into a larger recipe) never accidentally becomes
 discoverable:
 
-```julia
-@stock saline_recipe 1u"mL" * water + 5u"g" * NaCl
+```jldoctest stocks
+julia> @stock saline_recipe 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride"
+1.0 mL Solution (2 reagent(s))
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride   5.0 g     5.0 g mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  1.0 mL        100.0 %
 ```
 
-```julia-repl
-julia> stock"saline_recipe"
+As with location kinds, `saline_recipe` is also bound as a constant where it was registered.
+`stock"..."` recalls stocks registered by CHESS or a lab module, such as CHESS's LB broth recipe:
+
+```jldoctest stocks
+julia> stock"lb_1000mL"
+1000.0 mL Solution (2 reagent(s))
+ Solids  Name      Amount  Concentration
+─────────────────────────────────────────
+ lb      LB Broth  25.0 g    0.02 g mL⁻¹
+
+ Liquids  Name   Amount     Concentration
+──────────────────────────────────────────
+ water    water  1000.0 mL        100.0 %
 ```

@@ -1,5 +1,9 @@
 # Locations
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 ## Recording moves, not positions
 
 CHESS's design is inspired by how the game of chess is recorded. A chess database doesn't store
@@ -101,26 +105,38 @@ implementation instead has exactly three concrete `Location` subtypes** --
 [`Well`](@ref) -- and *kind* (a 96-well plate vs. a 384-well plate vs. a
 tube rack) is [`LocationKind`](@ref): a named, interned, immutable *value*, not a type.
 
-CHESSCore provides a macro for creating new LocationKinds:
+CHESSCore provides a macro for creating new LocationKinds. `using CHESS` already registers the
+common ones (`Room`, `Incubator`, `WP96`, and so on) through `CHESSLabConstants`, so this example
+defines two new kinds:
 
-```julia
-@location_kind Well200 Symbol[] nothing nothing 200u"µL" nothing nothing
-@location_kind WP96 [:Plate] (8,12) :Well200 nothing "Manufacturer" "Product No."
+```jldoctest core_concepts
+julia> @location_kind DemoWell Symbol[] nothing nothing 200u"µL" nothing nothing
+LocationKind(DemoWell)
 
+julia> @location_kind DemoPlate [:Plate] (8,12) :DemoWell nothing "Manufacturer" "Product No."
+LocationKind(DemoPlate)
 ```
 
-These two calls create the LocationKinds `Well200` and `WP96`. The definition of WP96 has an organizational tag `:Plate` to indicate that it is a plate. Because it is a Labware, it is given an 8x12 shape that is to be filled with the `:Well200` LocationKind upon creation. It has no capacity, since that is a well property, but product information can be provided to help identify the plate. 
+The positional arguments are, in order: the name, organizational categories, grid shape, the kind
+that fills each slot, well capacity, vendor, and catalog number. `DemoWell` has a capacity, so it
+is a well. `DemoPlate` has the category `:Plate`, an 8x12 shape filled with `DemoWell`s, and product
+information in place of a capacity, since capacity is a well property.
 
-Every `WP96` plate anywhere in the lab shares the *same* `LocationKind` object.  Adding a new plate model never requires touching Julia's type system
-at all, it just registers a new `LocationKind` value. A location's rules and capability data live as
-fields directly on `LocationKind` (`categories`, `shape`, `capacity`, `vendor`/`catalog`,
-`default_parent_cost`/`default_child_cost`, and, for instruments, `actuatable_attributes`/
-`performable_operations`/`readable_types` -- see [Reads & Instrument Measurements](reads.md)).
+Every plate of the same kind shares the *same* `LocationKind` object. Adding a new plate model never
+requires touching Julia's type system; it just registers a new `LocationKind` value. A location's
+rules and capability data live as fields directly on `LocationKind` (`categories`, `shape`,
+`capacity`, `vendor`/`catalog`, `default_parent_cost`/`default_child_cost`, and, for instruments,
+`actuatable_attributes`/`performable_operations`/`readable_types` -- see
+[Reads & Instrument Measurements](reads.md)).
 
-The `@location_kind` macro stores new definitions in a `location_kinds` registry, so it can be looked up by name later. The collision-safe way to recall a registered kind -- without needing a fully qualified name -- is the
-[`@loc_str`](@ref) string macro: `loc"WP96"`.
+The `@location_kind` macro stores new definitions in the [`location_kinds`](@ref) registry, so they
+can be looked up by name later. `@location_kind` also binds a constant of the same name in the
+module where it runs, so this session can refer to `DemoPlate` directly. The collision-safe way to
+recall a kind registered by CHESS or by a lab module (see
+[Registering Lab Constants](registering-lab-constants.md)), without needing a fully qualified name,
+is the [`@loc_str`](@ref) string macro:
 
-```julia-repl
+```jldoctest core_concepts
 julia> loc"WP96"
 LocationKind(WP96)
 ```
@@ -131,24 +147,17 @@ the one Julia type that represents it: `Well` if it has a `capacity`, `Labware` 
 capability-bearing (`is_instrument`) -- a capability-bearing kind still concretizes to whichever
 of these three its `capacity`/`shape` calls for.
 
-```julia-repl 
-julia> kind(loc"WP96")
-Labware 
+```jldoctest core_concepts
+julia> concretetype(DemoPlate)
+Labware
 ```
 
-
-!!! note 
+!!! note
     As a technical note on `LocationKinds`, [`@location_kind`](@ref) registers a `LocationKind` under a `const` binding in whatever module it's
     called from -- but deliberately does **not** `export` that binding (the same namespace-hygiene
     pattern used by `@attribute`/`@read`/`@chemical`/`@organism`, see
     [Registering Lab Constants](registering-lab-constants.md)): a lab module can register hundreds of
     kinds without flooding the namespace of anyone who is invoking it.
-
-
-
-
-
-
 
 ## Creating and inspecting a location
 
@@ -162,19 +171,16 @@ Every `Location` also has a compact one-line `Base.show` (just its name) for use
 string interpolation, and a much more detailed `MIME"text/plain"` report (kind, lock/active state,
 parent, children summary, attributes, and reads) for REPL inspection and `display`:
 
-```julia-repl
+```jldoctest core_concepts
 julia> plate = build_location(loc"WP96", "Plate 1")
-Plate 1
-
-julia> display(plate)
-Plate 1 [WP96 (Plate)]
+Plate 1 [WP96 (MicroPlate, WellPlate)]
   id: N/A   locked: false   active: true
   parent: (root)
 
 Labware: shape (8, 12), vendor Thermo, catalog 123456
 
 Children: 96 total, 100.0% occupied
-  Well200: 96
+  Well400: 96
 ```
 
 !!! note 

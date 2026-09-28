@@ -1,34 +1,49 @@
 # Reads & Instrument Measurements
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 ## Registering what an instrument can measure
 
 A [`ReadKind`](@ref) is either quantitative (unit-bearing) or qualitative (string-valued, optionally
 constrained to a fixed set of values), registered with [`@read`](@ref) (mirrors
 [`@attribute`](@ref)/[`@location_kind`](@ref)):
 
-```julia
-@read Absorbance u"OD"
+```jldoctest reads
+julia> @read Conductivity u"mS/cm"
+ReadKind(Conductivity)
+
+julia> Conductivity(1.2u"mS/cm")
+1.2 mS cm⁻¹
 ```
 
-```julia-repl
-julia> Absorbance(90u"OD")
-90.0 OD
-```
+`using CHESS` registers the read kinds its supported instruments produce, such as `Absorbance`.
+Recall a registered kind collision-safely with [`@read_str`](@ref):
 
-Recalled collision-safely with [`@read_str`](@ref): `read"Absorbance"`.
+```jldoctest reads
+julia> read"Absorbance"(0.9u"OD")
+0.9 OD
+```
 
 ## Recording a read
 
 [`record_read!(loc, read; instrument=nothing)`](@ref) appends a [`Read`](@ref) to a location's
-collection, continuing `a1` (the well from [Wells](wells.md)):
+collection. Here the location is well A1 of a new plate:
 
-```julia-repl
-julia> record_read!(a1, Absorbance(0.47u"OD", DateTime(2026,1,1,9,30)))
+```jldoctest reads
+julia> using Dates
 
-julia> record_read!(a1, Absorbance(0.42u"OD", DateTime(2026,1,1,9,0)))
+julia> a1 = build_location(loc"WP96", "Plate 1")["A1"];
 
-julia> reads(a1, Absorbance)
-Read[0.42 OD, 0.47 OD]
+julia> record_read!(a1, read"Absorbance"(0.47u"OD", DateTime(2026,1,1,9,30)))
+
+julia> record_read!(a1, read"Absorbance"(0.42u"OD", DateTime(2026,1,1,9,0)))
+
+julia> reads(a1, read"Absorbance")
+2-element Vector{Read}:
+ 0.42 OD
+ 0.47 OD
 ```
 
 Unlike [`Attribute`](@ref)'s single overwritable slot per kind, [`reads(x)`](@ref) is insertion
@@ -40,12 +55,13 @@ regardless of recording order.
 
 Constrained (categorical) and free-text qualitative kinds, contrasted directly:
 
-```julia
-@read Observation
-@read ColorimetricResult nothing Set(["Positive","Negative"])
-```
+```jldoctest reads
+julia> @read Observation
+ReadKind(Observation)
 
-```julia-repl
+julia> @read ColorimetricResult nothing Set(["Positive","Negative"])
+ReadKind(ColorimetricResult)
+
 julia> Observation("looked a bit cloudy")
 looked a bit cloudy
 
@@ -63,11 +79,11 @@ Inheritance](attributes.md) applies to reads: `missing` means no reading was att
 location was out of scope; `Unknown` means one was attempted but came back indeterminate (a sensor
 fault, a saturation error):
 
-```julia-repl
-julia> Absorbance(CHESSCore.Unknown)
+```jldoctest reads
+julia> read"Absorbance"(Unknown)
 Unknown
 
-julia> Absorbance(missing)
+julia> read"Absorbance"(missing)
 missing
 ```
 
@@ -79,24 +95,20 @@ per-model capability data ([`performable_operations`](@ref), [`actuatable_attrib
 [`readable_types`](@ref)). `record_read!`'s optional `instrument` keyword
 routes the call through `_check_capability`: it does nothing when `instrument` is omitted (the
 default), otherwise the instrument must have the calling operation in its `performable_operations`
-or the call throws `ArgumentError`:
+or the call throws `ArgumentError`. CHESS's `Epoch2` plate reader lists `record_read!`; its
+`Autoclave` does not:
 
-```julia
-@location_kind PlateReader Symbol[] nothing nothing nothing nothing nothing 0//1 0//1 Set{Symbol}() Set{Function}([record_read!]) Set([:Absorbance]) true
-@location_kind Autoclave   Symbol[] nothing nothing nothing nothing nothing 0//1 0//1 Set{Symbol}() Set{Function}() Set{Symbol}() true
-```
+```jldoctest reads
+julia> reader = build_location(loc"Epoch2", "Reader 1");
 
-```julia-repl
-julia> reader = build_location(loc"PlateReader", "Reader 1")
+julia> autoclave = build_location(loc"Autoclave", "Autoclave 1");
 
-julia> autoclave = build_location(loc"Autoclave", "Autoclave 1")
+julia> record_read!(a1, read"Absorbance"(0.5u"OD"); instrument=reader)
 
-julia> record_read!(a1, Absorbance(0.5u"OD"); instrument=reader)
-
-julia> record_read!(a1, Absorbance(0.5u"OD"); instrument=autoclave)
+julia> record_read!(a1, read"Absorbance"(0.5u"OD"); instrument=autoclave)
 ERROR: ArgumentError: Autoclave 1 cannot perform record_read!
 ```
 
-This check only asks whether `record_read!` is allowed at all -- `readable_types` (`{:Absorbance}`
-above) is descriptive `LocationKind` data only, not enforced here. A `PlateReader` could record any
-registered `ReadKind` through this gate, not just the ones listed in its own `readable_types`.
+This check only asks whether `record_read!` is allowed at all -- `readable_types` is descriptive
+`LocationKind` data only, not enforced here. A plate reader could record any registered `ReadKind`
+through this gate, not just the ones listed in its own `readable_types`.
