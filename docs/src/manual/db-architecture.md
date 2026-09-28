@@ -1,13 +1,19 @@
 # Database Architecture
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 `CHESSDatabase` persists everything built with `CHESSCore` to a SQLite database. `create_db(path)`
 builds a fresh schema at `path`; `connect_SQLite(path)` opens the connection every other function in
 the package uses:
 
-```julia-repl
-julia> create_db("lab.db")
+```jldoctest db_architecture
+julia> path = joinpath(mktempdir(), "lab.db");
 
-julia> connect_SQLite("lab.db")
+julia> create_db(path);
+
+julia> connect_SQLite(path)
 ```
 
 `create_db` also turns on a setting that makes the database reject any write that would leave a
@@ -42,7 +48,7 @@ LedgerID, LocationID, Attribute, Value, Unit, Time, InstrumentID, InstrumentTime
 Every mutating `CHESSCore` operation has a matching append-only table: `Transfers`, `Movements`,
 `Reads`, `Locks`, `Activity`, `InstrumentSettings`. Each carries its own `LedgerID` (tying it to a
 point in history) and its own `InstrumentID`/`InstrumentTime` pair (tying it to whichever
-`Instrument` performed it, if any) -- these `InstrumentID` columns are indexed from day one, not
+instrument performed it, if any) -- these `InstrumentID` columns are indexed from day one, not
 added later as an afterthought. [Instrument Interfaces](instrument-interfaces.md) covers exactly how
 that attribution gets written.
 
@@ -59,8 +65,8 @@ so reconstructing a location doesn't always mean replaying its entire history. C
 
 `Experiments`, `Runs`, `Protocols`, `ProtocolEnforcement`, `Encumbrances`, `EncumbranceCompletion`,
 and a mirrored `Encumbered*` family of operation tables exist for grouping and reserving future work
-against an experiment. [Encumbrances](encumbrances.md) covers this in depth; `Runs`/`Experiments`
-themselves are outside this pass's scope.
+against an experiment. [Encumbrances](encumbrances.md) covers this in depth. This manual does not yet cover
+`Runs`/`Experiments` themselves.
 
 [The Ledger](ledger.md) covers how `Ledger`/`SequenceID` actually get written, and why they're kept
 deliberately separate from both physical insertion order and wall-clock time.

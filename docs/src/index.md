@@ -1,5 +1,9 @@
 # CHESS
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 CHESS is a data framework for recording, reconstructing, and planning the operations of a
 laboratory -- automated or otherwise. Rather than storing the *state* of a lab (what's where,
 what's in it, how full it is) at each point in time, CHESS records the *operations* that produced
@@ -64,17 +68,21 @@ Pkg.instantiate()
 
 ## Quickstart
 
-```julia
-using CHESS
+```jldoctest quickstart
+julia> using CHESS
 
-room = build_location(loc"Room", "Main Room")
-plate = build_location(loc"WP96", "Plate 1")
-move_into!(room, plate)
+julia> room = build_location(loc"Room", "Main Room");
 
-set_attribute!(room, attr"Temperature"(25u"°C"))
-deposit!(plate["A1"], 100u"µL" * rgt"water")
+julia> plate = build_location(loc"WP96", "Plate 1");
 
-environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
+julia> move_into!(room, plate)
+
+julia> set_attribute!(room, attr"Temperature"(25u"°C"))
+
+julia> deposit!(plate["A1"], 100u"µL" * rgt"water")
+
+julia> environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
+25.0 °C
 ```
 
 ## Where to go next

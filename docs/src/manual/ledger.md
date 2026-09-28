@@ -1,5 +1,9 @@
 # The Ledger
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 The `Ledger` table (`ID`, `SequenceID`, `Time`) numbers every recorded event in order, deliberately
 kept separate from both the order rows happen to be stored in and the real-world clock time
 (`Time`). Every other persisted table references a `LedgerID` to place itself in this history.
@@ -28,10 +32,18 @@ returns its `ID`:
   `replace_ledger` asserts the slot is already occupied first -- `error("sequence_id $sequence_id
   does not exist yet -- use append_ledger or insert_ledger")` if not.
 
-```julia-repl
+```jldoctest ledger
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
 julia> before = get_last_sequence_id()
+1
 
 julia> new_id = append_ledger()
+2
 
 julia> get_sequence_id(new_id) == before + 1
 true

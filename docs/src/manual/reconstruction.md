@@ -1,12 +1,31 @@
 # Reconstruction
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 `CHESSDatabase` never stores "what's currently where" directly -- it stores the history of
 operations, and rebuilds any state by replaying it. [`reconstruct_location(location_id,
 sequence_id=get_last_sequence_id(), time=now(), max_cache=sequence_id; encumbrances=false)`](@ref)
-is the entry point:
+is the entry point. The examples use a new database holding one plate, with a transfer between two
+of its wells:
 
-```julia-repl
-julia> preview = reconstruct_location(CHESSCore.location_id(committed))
+```jldoctest reconstruction
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
+julia> plate = build_location(loc"WP96", "Plate 1");
+
+julia> deposit!(plate["A1"], 200u"µL" * rgt"water")
+
+julia> committed = commit_location!(plate);
+
+julia> transfer_id = upload(transfer!, committed["A1"], committed["A2"], 50u"µL");
+
+julia> preview = reconstruct_location(CHESSCore.location_id(committed));
 
 julia> CHESSCore.location_id(preview) == CHESSCore.location_id(committed)
 true
@@ -17,17 +36,33 @@ object. This makes it the sanctioned way to preview a hypothetical mutation on a
 location without side effects, mirroring the role `build_location` plays for locations that don't
 exist yet:
 
-```julia-repl
-julia> real_well = children(plate1)[1,1]
+```jldoctest reconstruction
+julia> real_well = committed["A1"];
 
-julia> preview = reconstruct_location(location_id(real_well))
+julia> preview = reconstruct_location(CHESSCore.location_id(real_well));
 
-julia> original_stock = stock(real_well)
+julia> original_stock = stock(real_well);
 
 julia> drain!(preview)
 
 julia> stock(real_well) == original_stock
 true
+```
+
+Passing an earlier `sequence_id` reconstructs the state at that point in history. Well A2 held
+nothing before the transfer:
+
+```jldoctest reconstruction
+julia> a2 = CHESSCore.location_id(committed["A2"]);
+
+julia> stock(reconstruct_location(a2))
+0.05 mL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  0.05 mL        100.0 %
+
+julia> stock(reconstruct_location(a2, get_sequence_id(transfer_id) - 1))
+Empty Stock
 ```
 
 ## The cache-then-replay algorithm

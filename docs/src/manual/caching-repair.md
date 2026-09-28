@@ -1,5 +1,9 @@
 # Caching & Repair
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 [Reconstruction](reconstruction.md) can always replay a location's entire history from nothing --
 caching exists to bound how much of that history it actually has to replay.
 
@@ -7,12 +11,29 @@ caching exists to bound how much of that history it actually has to replay.
 
 `cache` (`loc, sequence_id=nothing, time=now()`) is an explicit, manually-invoked snapshot --
 not automatic on every write, and not on any scheduler. It asserts `loc` (and everything nested
-within it) is already committed before writing anything:
+within it) is already committed before writing anything. The examples use a new database with one
+plate and two transfers, then cache well A2:
 
-```julia-repl
-julia> cache(committed)
+```jldoctest caching
+julia> path = joinpath(mktempdir(), "lab.db");
 
-julia> preview = reconstruct_location(CHESSCore.location_id(committed))
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
+julia> plate = build_location(loc"WP96", "Plate 1");
+
+julia> deposit!(plate["A1"], 200u"µL" * rgt"water")
+
+julia> committed = commit_location!(plate);
+
+julia> first_transfer = upload(transfer!, committed["A1"], committed["A2"], 50u"µL");
+
+julia> upload(transfer!, committed["A1"], committed["A3"], 10u"µL");
+
+julia> a2 = CHESSCore.location_id(committed["A2"]);
+
+julia> cache(committed["A2"])
 ```
 
 A call to `cache` writes one row per applicable sub-state table -- parent, children, environment,
@@ -26,15 +47,16 @@ The sub-objects most expensive to store repeatedly -- a location's child set, it
 well's stock -- are shared automatically when identical: `CachedChildSets`, `CachedAttributeSets`,
 and `CachedStocks` each store one copy of a given child-set, attribute-set, or stock, so many
 locations that happen to have an identical one at cache time reuse that same stored copy instead of
-duplicating it:
+duplicating it. Committing the plate cached all 96 wells, but most are empty and share one stored
+stock:
 
-```julia-repl
-julia> sid1 = cache(big_stock)
-
-julia> sid2 = cache(big_stock)
-
-julia> sid1 == sid2
-true
+```jldoctest caching
+julia> query_db("SELECT COUNT(*) AS cache_rows, COUNT(DISTINCT StockID) AS stored_stocks FROM CachedContents")
+1×2 DataFrame
+ Row │ cache_rows  stored_stocks
+     │ Int64       Int64
+─────┼───────────────────────────
+   1 │         97              3
 ```
 
 ## Repair: keeping caches correct as history changes
@@ -57,26 +79,42 @@ itself since been amended -- a new cache row is written to supersede the old one
 only**. The old row is never deleted, so a reconstruction query asking "as of an earlier moment"
 still sees exactly what it saw before the repair.
 
-## A real repair sequence
+## A repair in practice
 
-`test_cache_repair.jl`'s own exercise (no assertions -- its only job is to not throw):
+Well A2 was cached after both transfers. Correcting the first transfer from 50 µL to 20 µL amends
+history before that cache, so repair writes a new cache row for A2 (`StockID` 4) that supersedes
+the stale one:
 
-```julia
-cr_a = reconstruct_location(27, 53)
-cr_b = reconstruct_location(25, 53)
-update(transfer!, cr_a, cr_b, 1u"g"; ledger_id=replace_ledger(54))
+```jldoctest caching
+julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE LocationID = $a2")
+2×3 DataFrame
+ Row │ ID     StockID  LedgerID
+     │ Int64  Int64    Int64
+─────┼──────────────────────────
+   1 │     9        2         2
+   2 │    97        3         4
 
-cache(cr_a)
-cache(cr_b)
+julia> update(transfer!, reconstruct_location(CHESSCore.location_id(committed["A1"])),
+              reconstruct_location(a2), 20u"µL"; ledger_id=replace_ledger(get_sequence_id(first_transfer)));
+caches updated: 1
 
-cr_a = reconstruct_location(27, 53)
-cr_b = reconstruct_location(25, 53)
-update(transfer!, cr_a, cr_b, 7u"g"; ledger_id=insert_ledger(54))
+julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE LocationID = $a2")
+3×3 DataFrame
+ Row │ ID     StockID  LedgerID
+     │ Int64  Int64    Int64
+─────┼──────────────────────────
+   1 │     9        2         2
+   2 │    97        3         4
+   3 │    98        4         4
+
+julia> stock(reconstruct_location(a2))
+0.02 mL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  0.02 mL        100.0 %
 ```
 
-The first `update` amends an existing transfer; the two `cache` calls snapshot the result; the
-second `update` inserts a brand-new transfer earlier in the same history, exercising repair against
-caches that were themselves just taken.
+The old row stays, so a reconstruction as of a time before the correction still uses it.
 
 [Encumbrances](encumbrances.md) covers the next topic: non-binding, future-dated reservations that
 sit alongside this same ledger without touching the canonical history tables at all.

@@ -1,5 +1,9 @@
 # Instrument Interfaces
 
+```@meta
+DocTestSetup = :(using CHESS)
+```
+
 [Reads & Instrument Measurements](reads.md) covered instrument capability gating entirely within
 `CHESSCore` -- `performable_operations` and `_check_capability`, checked in memory, with no notion of
 persistence at all. This chapter covers the other half: how `CHESSDatabase` records *which*
@@ -38,22 +42,41 @@ ever recorded. Separately, `location_id(instrument)` is computed by `upload` its
 into the matching `upload_*`
 call for the actual `INSERT`.
 
-```julia-repl
-julia> incapable = generate_location(IncapableReaderKind, "Incapable Reader")
+The examples use a new database with a plate, CHESS's `Epoch2` plate reader, and an `Autoclave`,
+which cannot record reads:
 
-julia> upload(record_read!, w2, Fluorescence(50u"percent"); instrument=incapable)
-ERROR: ArgumentError: Incapable Reader cannot perform record_read!
+```jldoctest instruments
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
+julia> well = generate_location(loc"WP96", "Plate 1")["A1"];
+
+julia> reader = generate_location(loc"Epoch2", "Reader 1");
+
+julia> autoclave = generate_location(loc"Autoclave", "Autoclave 1");
+
+julia> upload(record_read!, well, read"Fluorescence"(50u"RFU"); instrument=autoclave)
+ERROR: ArgumentError: Autoclave 1 cannot perform record_read!
 ```
 
 The gate only checks `performable_operations` -- `readable_types` is descriptive-only, not enforced
 (already covered in [Reads & Instrument Measurements](reads.md)), so a capable instrument can record
-any registered `ReadKind` through this same gate:
+any registered `ReadKind` through this same gate. `Epoch2` lists only `:Absorbance` and
+`:Fluorescence`, but it can still record a free-text note:
 
-```julia-repl
-julia> upload(record_read!, w2, Fluorescence(50u"percent"); instrument=reader1)
+```jldoctest instruments
+julia> upload(record_read!, well, read"Fluorescence"(50u"RFU"); instrument=reader)
+3
+
+julia> @read ReaderNote
+ReadKind(ReaderNote)
+
+julia> upload(record_read!, well, ReaderNote("condensation on lid"); instrument=reader)
+4
 ```
-
-succeeds even if `reader1`'s `readable_types` only lists `:Absorbance`.
 
 ## Instrument settings: a different axis entirely
 
@@ -62,12 +85,17 @@ capability at all -- it's the actual time-varying configuration of one specific 
 (free-text `Setting`/`Value` pairs, e.g. `"Gain"` = `"2.0"`), latest-wins per setting name, much like
 an `Attribute`'s single current value rather than a `Read`'s accumulating history:
 
-```julia-repl
-julia> upload_instrument_setting(reader1, "Gain", 1.5)
+```jldoctest instruments
+julia> upload_instrument_setting(reader, "Gain", 1.5);
 
-julia> upload_instrument_setting(reader1, "Gain", 2.0)
+julia> upload_instrument_setting(reader, "Gain", 2.0);
 
-julia> get_instrument_settings(location_id(reader1))
+julia> get_instrument_settings(CHESSCore.location_id(reader))
+1×3 DataFrame
+ Row │ Setting  Value   SequenceID
+     │ String   String  Int64
+─────┼─────────────────────────────
+   1 │ Gain     2.0              6
 ```
 
 `performable_operations`/`actuatable_attributes`/`readable_types` are static capability data on a
