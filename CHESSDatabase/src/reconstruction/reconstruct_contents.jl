@@ -217,15 +217,23 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ) ,
 
+         -- restrict to transfers inside the requested window before walking ancestors, as the
+         -- encumbrance branch does: a transfer after `ending` must not pull its source into the
+         -- closure, or that source's earlier outgoing transfers come back as collateral rows
+         -- for a well that was never bootstrapped.
+         y (LedgerID,Source,Destination,Quantity,Unit)
+        AS(SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit
+            FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
+
          x (LedgerID,Source,Destination,Quantity,Unit)
         AS(
-        SELECT Transfers.LedgerID, Source,Destination,Transfers.Quantity,Transfers.Unit
-            FROM Transfers
+        SELECT y.LedgerID, Source,Destination,y.Quantity,y.Unit
+            FROM y
             WHERE Destination in $entry OR Source in $entry
         UNION
-        SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit
-            FROM Transfers t  ,x
-            WHERE x.Source = t.Destination
+        SELECT y.LedgerID,y.Source,y.Destination,y.Quantity,y.Unit
+            FROM y ,x
+            WHERE x.Source = y.Destination
         ),
         ancestor_wells (LocationID) AS (
             SELECT Source FROM x UNION SELECT Destination FROM x
@@ -233,9 +241,9 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
         full_set (LedgerID,Source,Destination,Quantity,Unit,Core) AS (
             SELECT *, 1 FROM x
             UNION
-            SELECT Transfers.LedgerID, Source, Destination, Transfers.Quantity, Transfers.Unit, 0
-                FROM Transfers INNER JOIN ancestor_wells ON Transfers.Source = ancestor_wells.LocationID
-                WHERE NOT EXISTS (SELECT 1 FROM x WHERE x.LedgerID = Transfers.LedgerID)
+            SELECT y.LedgerID, Source, Destination, y.Quantity, y.Unit, 0
+                FROM y INNER JOIN ancestor_wells ON y.Source = ancestor_wells.LocationID
+                WHERE NOT EXISTS (SELECT 1 FROM x WHERE x.LedgerID = y.LedgerID)
         )
         SELECT full_set.LedgerID,Source,Destination,Quantity,Unit,Max(Core) AS Core,ledger_subset.SequenceID
             FROM full_set INNER JOIN ledger_subset ON full_set.LedgerID = ledger_subset.ID
