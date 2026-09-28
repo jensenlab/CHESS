@@ -61,7 +61,7 @@ julia> query_db("SELECT COUNT(*) AS cache_rows, COUNT(DISTINCT StockID) AS store
 
 ## Repair: keeping caches correct as history changes
 
-Amending history (via `update` with [`replace_ledger`](@ref)/[`insert_ledger`](@ref), see
+Amending history (via `update` with `replace` or `insert`, see
 [Committing & Uploading](committing-uploading.md)) can invalidate a cache taken after the amended
 point. `process_update` runs two steps automatically, in order:
 
@@ -95,7 +95,7 @@ julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE Location
    2 │    97        3         4
 
 julia> update(transfer!, reconstruct_location(CHESSCore.location_id(committed["A1"])),
-              reconstruct_location(a2), 20u"µL"; ledger_id=replace_ledger(get_sequence_id(first_transfer)));
+              reconstruct_location(a2), 20u"µL"; replace=get_sequence_id(first_transfer));
 caches updated: 1
 
 julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE LocationID = $a2")

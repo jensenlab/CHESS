@@ -545,6 +545,36 @@ end
     @test CHESSCore.quantity(attributes(fresh)[:JensenUnitsCentrifugation]) == 3000u"xg"
 end
 
+@testset "update(...; replace/insert) rolls back its ledger row on failure" begin
+    ur_bottle = generate_location(Bottle1L,"update rollback bottle")
+    deposit!(ur_bottle[1,1],500u"mL"*rgt"water",1)
+    cache(ur_bottle[1,1])
+    ur_plate = generate_location(WP96,"update rollback plate")
+    ur_src, ur_dst, ur_empty = ur_bottle[1,1], ur_plate[1,1], ur_plate[1,2]
+    t = upload(transfer!,ur_src,ur_dst,10u"µL")
+    s = get_sequence_id(t)
+    dst_volume() = uconvert(u"µL",quantity(stock(reconstruct_location(location_id(ur_dst)))))
+    n_ledger_rows() = nrow(CHESSDatabase.query_db("SELECT ID FROM Ledger"))
+
+    n_rows, last_seq = n_ledger_rows(), get_last_sequence_id()
+    # a replacement of a different operation type fails, and leaves the slot's transfer in place
+    @test_throws ErrorException update(set_attribute!,ur_plate,Temperature(20u"°C");replace=s)
+    @test n_ledger_rows() == n_rows
+    @test isapprox(dst_volume(),10u"µL")
+    # replacing a slot past the end fails before writing anything
+    @test_throws ErrorException update(transfer!,ur_src,ur_dst,1u"µL";replace=last_seq+100)
+    @test n_ledger_rows() == n_rows
+    # an insert whose operation fails doesn't renumber the ledger
+    @test_throws Exception update(transfer!,ur_empty,ur_dst,5u"µL";insert=s)
+    @test get_last_sequence_id() == last_seq
+    @test get_sequence_id(t) == s
+    # a valid replacement is recorded at the same slot
+    l = update(transfer!,reconstruct_location(location_id(ur_src)),reconstruct_location(location_id(ur_dst)),20u"µL";replace=s)
+    @test get_sequence_id(l) == s
+    @test isapprox(dst_volume(),20u"µL")
+    @test_throws ArgumentError update(transfer!,ur_src,ur_dst,1u"µL";replace=s,insert=s)
+end
+
 @testset "Instrument: qualitative reads round-trip (constrained + free-text)" begin
     colorimetric = only(reads(w2,:ColorimetricResult))
     @test CHESSCore.value(colorimetric) == "Positive"

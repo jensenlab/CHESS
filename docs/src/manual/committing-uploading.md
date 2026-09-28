@@ -77,12 +77,12 @@ upload_environment_attribute`, `record_read! -> upload_read`, plus `lock!`/`unlo
 
 ## `update`: amending history
 
-`update` (`fun, args...; ledger_id=...`) is the counterpart used with
-[`replace_ledger`](@ref)/[`insert_ledger`](@ref) (from [The Ledger](ledger.md)) instead of the
-default `append_ledger()` -- it amends an existing point in history rather than appending a new one.
-After running `fun` and its persistence call, `update` also triggers `process_update`, which
-validates the edit and repairs any caches it invalidates -- covered in full in
-[Caching & Repair](caching-repair.md).
+[`update`](@ref) (`fun, args...; replace=s` or `insert=s`) amends an existing point in history
+rather than appending a new one: `replace=s` records a new revision of the entry at sequence ID `s`,
+and `insert=s` adds an entry there, moving later entries back (see [The Ledger](ledger.md)). After
+running `fun` and its persistence call, `update` also validates the edit and repairs any caches it
+invalidates -- covered in full in [Caching & Repair](caching-repair.md). All of this happens in one
+SQL transaction, so a failed `update` leaves the database unchanged.
 
 For example, recording a 50 µL transfer and then correcting it to 20 µL:
 
@@ -95,7 +95,7 @@ julia> plate = commit_location!(plate);
 
 julia> ledger_id = upload(transfer!, plate["A1"], plate["A2"], 50u"µL");
 
-julia> update(transfer!, plate["A1"], plate["A2"], 20u"µL"; ledger_id=replace_ledger(get_sequence_id(ledger_id)));
+julia> update(transfer!, plate["A1"], plate["A2"], 20u"µL"; replace=get_sequence_id(ledger_id));
 caches updated: 0
 
 julia> stock(reconstruct_location(CHESSCore.location_id(plate["A2"])))

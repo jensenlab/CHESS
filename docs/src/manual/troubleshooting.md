@@ -115,31 +115,30 @@ when this error is thrown. See [Committing & Uploading](committing-uploading.md)
 
 ### "does not exist yet -- use append_ledger or insert_ledger"
 
-[`replace_ledger`](@ref) was given a sequence ID past the end of the ledger. Only an existing entry
-can be replaced; use [`append_ledger`](@ref) to add a new one at the end, or
-[`insert_ledger`](@ref) to add one in the middle. See [The Ledger](ledger.md).
+`update(...; replace=s)` or [`replace_ledger`](@ref) was given a sequence ID past the end of the
+ledger. Only an existing entry can be replaced; append a new one instead, or use `insert=s` to add
+one in the middle. See [The Ledger](ledger.md).
 
 ### "the new operation is not the same type of operation as the previous one"
 
-[`update`](@ref) with [`replace_ledger`](@ref) must replace an operation with the same kind of
-operation, such as a transfer with a transfer. To change what kind of operation happened at that
-point, see [The Ledger](ledger.md) for inserting a new entry instead.
+[`update`](@ref) with `replace` must replace an operation with the same kind of operation, such as a
+transfer with a transfer. To record a different kind of operation at that point, use `insert`
+instead. The database is left unchanged.
 
 ### Errors from `update` that name a well or stock
 
 After amending history, `update` replays everything that happened afterward to check that the
 history is still possible. If the correction makes a later step impossible, such as a transfer out
 of a well that would now be empty, the replay throws the same error that step would throw on its
-own (for example `WellCapacityError` or `MixingError`). See [Caching & Repair](caching-repair.md).
+own (for example `WellCapacityError` or `MixingError`), and the database is left unchanged. See
+[Caching & Repair](caching-repair.md).
 
-!!! warning "A failed `update` still changes the ledger"
-    `replace_ledger` and `insert_ledger` add their ledger row as soon as they are called, before
-    `update` runs, and that row is not removed if `update` then fails. After a failed
-    `update(...; ledger_id=replace_ledger(s))`, the slot `s` has a newer, empty revision, so
-    reconstructions no longer see the operation that was there. The in-memory objects passed to
-    `update` have also already been changed. There is currently no supported way to restore the
-    slot afterward, so check that a correction is the same kind of operation, and still possible,
-    before calling `update`.
+!!! warning "Allocating the ledger row yourself"
+    `update` also accepts `ledger_id=replace_ledger(s)` or `ledger_id=insert_ledger(s)`. Those
+    functions write their ledger row as soon as they are called, before `update` starts, so that
+    row is not rolled back if `update` fails. The slot is left with a newer, empty revision, and
+    reconstructions no longer see the operation that was there. Use `replace=s` or `insert=s`
+    instead.
 
 ## Installation and environment
 

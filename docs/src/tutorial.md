@@ -159,8 +159,8 @@ See [Reads & Instrument Measurements](manual/reads.md) and
 
 ## Correct a mistake
 
-Suppose the A2 inoculation was actually 4 µL, not 2 µL. [`update`](@ref) replaces that record in
-place, at the same point in the history, with [`replace_ledger`](@ref). The time just before the
+Suppose the A2 inoculation was actually 4 µL, not 2 µL. [`update`](@ref) with `replace` records a
+new revision of that entry, at the same point in the history. The time just before the
 correction is kept so the next section can look back at what was recorded then:
 
 ```jldoctest tutorial
@@ -168,7 +168,7 @@ julia> recorded_before_fix = now();
 
 julia> sleep(1)  # only so that the correction gets a later timestamp in this quick demo
 
-julia> update(transfer!, tube["A1"], plate["A2"], 4u"µL"; ledger_id=replace_ledger(get_sequence_id(inoculations[2])));
+julia> update(transfer!, tube["A1"], plate["A2"], 4u"µL"; replace=get_sequence_id(inoculations[2]));
 caches updated: 0
 ```
 
