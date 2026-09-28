@@ -95,7 +95,7 @@ function get_activity_caches(location_id::Integer,starting::Integer=0,ending::In
             FROM encumbrance_subset e INNER JOIN EncumberedCachedLockActivity v ON e.EncumbranceID = v.EncumbranceID 
         UNION ALL 
             SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.IsActive
-            FROM CachedLockActivity c INNER JOIN ledger_subset l ON c.LedgerID = l.ID Group By l.SequenceID) 
+            FROM CachedLockActivity c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID = $location_id Group By l.SequenceID) 
             SELECT * FROM y WHERE LocationID=$location_id ORDER BY SequenceID ")
     else
         return query_db("

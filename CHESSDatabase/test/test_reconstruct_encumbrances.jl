@@ -31,3 +31,22 @@
     # Bug C again, environment/attribute cache path, via jensen_lab's environment encumbrance.
     @test reconstruct_location(location_id(jensen_lab); encumbrances=true) isa Location
 end
+
+# The encumbered cache fetchers used to GROUP BY sequence point across *all* locations before
+# filtering to the one asked for, so when several locations were cached on one ledger entry (as
+# generate_location does for a plate and its wells) only the last-cached one kept its cache.
+@testset "encumbered cache fetchers keep every location cached on a shared ledger entry" begin
+    plate = generate_location(WP96,"enc cache grouping plate")
+    well = plate[1,1]
+    seqs(f,id;kw...) = f(id;kw...).SequenceID
+    for id in (location_id(plate),location_id(well))
+        for f in (CHESSDatabase.get_activity_caches,CHESSDatabase.get_lock_caches,
+                  CHESSDatabase.get_parent_caches,CHESSDatabase.get_attribute_caches)
+            @test !isempty(seqs(f,id))
+            @test seqs(f,id;encumbrances=true) == seqs(f,id)
+        end
+    end
+    @test seqs(CHESSDatabase.get_child_caches,location_id(plate);encumbrances=true) == seqs(CHESSDatabase.get_child_caches,location_id(plate))
+    @test seqs(CHESSDatabase.get_content_caches,location_id(well);encumbrances=true) == seqs(CHESSDatabase.get_content_caches,location_id(well))
+    @test length(children(reconstruct_children(location_id(plate);encumbrances=true))) == 96
+end

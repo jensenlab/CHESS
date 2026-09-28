@@ -130,7 +130,7 @@ function get_child_caches(location_id::Integer,starting::Integer=0,ending::Integ
             FROM encumbrance_subset e INNER JOIN EncumberedCachedDescendants v ON e.EncumbranceID = v.EncumbranceID 
         UNION ALL 
             SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.ChildSetID
-            FROM CachedDescendants c INNER JOIN ledger_subset l ON c.LedgerID = l.ID Group By l.SequenceID) 
+            FROM CachedDescendants c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID = $location_id Group By l.SequenceID) 
             SELECT * FROM y WHERE LocationID=$location_id ORDER BY EncumbranceID,SequenceID ")
     else
         return query_db("
