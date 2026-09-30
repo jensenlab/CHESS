@@ -94,10 +94,7 @@ function get_stock(stock_id::Integer)
         if ismissing(r.Quantity) 
             out_stock += component
         else
-            # unit_context has to include JensenLabUnits explicitly for Biomass units like "OD mL"
-            # -- Unitful.uparse (the function form) doesn't search globally registered unit
-            # modules automatically the way the u"..." macro does.
-            out_stock +=  (r.Quantity * Unitful.uparse(r.Unit;unit_context=[Unitful,CHESSCore.JensenLabUnits])) * component
+            out_stock +=  (r.Quantity * _parse_unit(r.Unit)) * component
         end
     end 
     return out_stock
@@ -468,7 +465,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
             continue
         end
         seq_id=row.SequenceID -1
-        quant= row.Quantity * Unitful.uparse(row.Unit)
+        quant= row.Quantity * _parse_unit(row.Unit)
         src = find_most_recent_location(all_locs,row.Source,seq_id)
 
         if row.Core == 0
@@ -581,7 +578,7 @@ function _apply_content_observations!(all_locs,rows)
         if ismissing(row.ComponentID)
             loc.cost=row.Cost
         else
-            quant=row.Quantity*Unitful.uparse(row.Unit;unit_context=[Unitful,CHESSCore.JensenLabUnits])
+            quant=row.Quantity*_parse_unit(row.Unit)
             loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
         end
     end

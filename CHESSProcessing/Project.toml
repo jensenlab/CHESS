@@ -39,7 +39,7 @@ Plots = "1.41.6"
 RunMaps = "0.1.0"
 Statistics = "1.11.0"
 Unitful = "1.27.0"
-julia = "1.12"
+julia = "1.12.4"
 
 [extras]
 CHESSCore = "69a75495-4bbf-4cc1-abd0-11bfacf319d1"
