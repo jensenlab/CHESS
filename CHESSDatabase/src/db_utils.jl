@@ -78,7 +78,7 @@ function db_time(time::Dates.DateTime)
 end 
 
 
-function julia_time(time::Float64)
+function julia_time(time::Real)
     return Dates.unix2datetime(time)
 end 
 

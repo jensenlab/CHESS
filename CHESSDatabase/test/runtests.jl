@@ -534,6 +534,17 @@ end
 @read JensenUnitsRFU u"RFU"
 @attribute JensenUnitsCentrifugation u"xg"
 
+@testset "julia_time accepts whole-second Unix times" begin
+    @test julia_time(1700000000) == DateTime(2023,11,14,22,13,20)
+    @test julia_time(1700000000) == julia_time(1700000000.0)
+
+    w = generate_location(Well200, "whole-second read well")
+    upload(record_read!, w, JensenUnitsOD(0.1u"OD", DateTime(2024,1,1,12,0,0)))
+    CHESSDatabase.execute_db("UPDATE Reads SET InstrumentTime = CAST(InstrumentTime AS INTEGER) WHERE LocationID = ?", (location_id(w),))
+    fresh = reconstruct_location(location_id(w))
+    @test read_time(only(reads(fresh, JensenUnitsOD))) == DateTime(2024,1,1,12,0,0)
+end
+
 @testset "Reads and attributes in JensenLabUnits reconstruct" begin
     w = generate_location(Well200, "jensen units well")
     upload(record_read!, w, JensenUnitsOD(0.42u"OD"))
