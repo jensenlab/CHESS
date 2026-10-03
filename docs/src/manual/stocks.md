@@ -5,15 +5,18 @@ DocTestSetup = :(using CHESS)
 DocTestFilters = [r"└ @ CHESSCore .*"]
 ```
 
-A [`Stock`](@ref) is a combination of organisms and chemicals -- what actually lives inside a
-`Well`. `Stock` is an abstract type; which concrete subtype you get is determined by what it
-contains, not chosen directly: [`Empty`](@ref) (nothing), [`Mixture`](@ref) (solids only),
-[`Solution`](@ref) (at least one liquid, any solids), [`Culture`](@ref) (at least one organism, any
-solids/liquids -- including zero liquid, since an organism's [`Biomass`](@ref CHESSCore.Biomass) is an absolute
-quantity, not one derived from the stock's own volume -- covered in
-[Organisms & Cultures](organisms-cultures.md)). The generic
-[`Stock(organisms,solids,liquids)`](@ref) constructor automatically picks the right one,
-checking in order whether any organisms, then liquids, then solids are present:
+A [`Stock`](@ref) is a combination of organisms and chemicals. It is what a `Well` holds. `Stock`
+is an abstract type, and the concrete subtype depends on the contents:
+
+- [`Empty`](@ref): nothing.
+- [`Mixture`](@ref): solids only.
+- [`Solution`](@ref): at least one liquid, and any solids.
+- [`Culture`](@ref): at least one organism, and any solids and liquids. A culture can have no
+  liquid, because an organism's [`Biomass`](@ref CHESSCore.Biomass) is an absolute quantity, not
+  one derived from the stock's volume. See [Organisms & Cultures](organisms-cultures.md).
+
+The generic [`Stock(organisms,solids,liquids)`](@ref) constructor picks the subtype by checking for
+organisms, then liquids, then solids:
 
 | Organisms | Liquids | Solids | Result |
 |:---:|:---:|:---:|:---|
@@ -29,7 +32,7 @@ Empty Stock
 
 ## Building a stock from a quantity
 
-The natural way to build one is multiplying a quantity by a [`Reagent`](@ref):
+Multiplying a quantity by a [`Reagent`](@ref) builds a stock:
 
 ```jldoctest stocks
 julia> water_solution = 1u"mL" * rgt"water"
@@ -47,8 +50,8 @@ julia> salt = 5u"g" * rgt"sodium_chloride"
 
 ## Mixing with `+`
 
-Combining two stocks via `+` always produces whichever subtype the *combined* contents call for --
-water plus salt is genuinely saline now, so that's what this one gets called:
+Adding two stocks with `+` produces the subtype that the combined contents call for. Water plus
+salt is a `Solution`:
 
 ```jldoctest stocks
 julia> saline = water_solution + salt
@@ -62,10 +65,10 @@ julia> saline = water_solution + salt
  water    water  1.00 mL          100 %
 ```
 
-[`quantity(::Stock)`](@ref) reports total *liquid* volume only (`1.00 mL` here, not counting the
-dissolved solid's mass). Solids contribute to [`volume_estimate`](@ref) instead, which falls back to
-density-based estimation and warns when a solid's density is unknown -- as it is for CHESS's
-`sodium_chloride`, which is registered with a `missing` density:
+[`quantity(::Stock)`](@ref) reports the total liquid volume only (`1.00 mL` here, excluding the
+dissolved solid). Solids contribute to [`volume_estimate`](@ref), which estimates from density and
+warns when a solid's density is unknown. CHESS's `sodium_chloride` is registered with a `missing`
+density:
 
 ```jldoctest stocks
 julia> volume_estimate(salt)
@@ -76,9 +79,10 @@ julia> volume_estimate(salt)
 
 ## Scaling
 
-`*`/`/` by a plain number scales every reagent (and any organism's [`Biomass`](@ref CHESSCore.Biomass)) proportionally;
-multiplying by a *quantity* instead scales the whole stock to hit that quantity as its new total --
-this is how diluting a `Culture` to a target volume also dilutes its organism content:
+`*` and `/` by a plain number scale every reagent and every organism's
+[`Biomass`](@ref CHESSCore.Biomass) proportionally. Multiplying by a quantity scales the whole stock
+so that the quantity is its new total. This is how diluting a `Culture` to a target volume also
+dilutes its organisms:
 
 ```jldoctest stocks
 julia> double = 2*saline
@@ -104,10 +108,9 @@ julia> tenmL = 10u"mL" * saline
 
 ## The non-negativity constraint
 
-`-` mixes by subtraction, and throws [`MixingError`](@ref) if any reagent would go negative. This
-applies identically to organism [`Biomass`](@ref CHESSCore.Biomass) -- an organism's biomass can be reduced or fully
-removed via `-`, the same way a chemical amount can (see
-[Removing organisms](organisms-cultures.md#Removing-organisms)):
+`-` mixes by subtraction and throws [`MixingError`](@ref) if any reagent would go negative. The
+same applies to organism [`Biomass`](@ref CHESSCore.Biomass), which `-` can reduce or remove like a
+chemical amount (see [Removing organisms](organisms-cultures.md#Removing-organisms)):
 
 ```jldoctest stocks
 julia> saline - double
@@ -117,11 +120,10 @@ ERROR: Mixing Error with sodium_chloride
 
 ## `@stock_str` for named recipes
 
-Register one with [`@stock`](@ref) (mirroring [`@location_kind`](@ref)/[`@reagent`](@ref)/
-[`@chemical`](@ref)/[`@organism`](@ref)), then recall it with [`@stock_str`](@ref). Unlike a bare
-`const` binding, only recipes registered this way are reachable -- an ordinary intermediate `Stock`
-(e.g. a concentrated stock solution combined into a larger recipe) never accidentally becomes
-discoverable:
+[`@stock`](@ref) registers a named stock, like [`@location_kind`](@ref), [`@reagent`](@ref),
+[`@chemical`](@ref), and [`@organism`](@ref). [`@stock_str`](@ref) recalls it. Only stocks
+registered this way can be recalled, so an intermediate stock, such as a concentrated solution
+combined into a larger recipe, is never recalled by accident:
 
 ```jldoctest stocks
 julia> @stock saline_recipe 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride"
@@ -135,8 +137,8 @@ julia> @stock saline_recipe 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride"
  water    water  1.00 mL          100 %
 ```
 
-As with location kinds, `saline_recipe` is also bound as a constant where it was registered.
-`stock"..."` recalls stocks registered by CHESS or a lab module, such as CHESS's LB broth recipe:
+`saline_recipe` is also bound as a constant where it was registered. `stock"..."` recalls stocks
+registered by CHESS or a lab module, such as CHESS's LB broth recipe:
 
 ```jldoctest stocks
 julia> stock"lb_1000mL"

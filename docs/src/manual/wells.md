@@ -21,7 +21,7 @@ Empty Stock
 
 ## Depositing and withdrawing
 
-[`deposit!`](@ref)/[`withdraw!`](@ref) add to and remove from a well's stock, guarded by its
+[`deposit!`](@ref) and [`withdraw!`](@ref) add to and remove from a well's stock, within the well's
 capacity. The examples use the saline from [Stocks](stocks.md):
 
 ```jldoctest wells
@@ -53,8 +53,8 @@ julia> stock(a1)
  water    water  100 μL          100 %
 ```
 
-`deposit!`'s third argument is a `cost` -- a plain tracked number (e.g. a reagent cost), apportioned
-proportionally whenever `withdraw!` pulls material back out. It defaults to `0`.
+The third argument of `deposit!` is a `cost`, a tracked number such as a reagent cost. `withdraw!`
+apportions it proportionally when material is removed. It defaults to `0`.
 
 ## Transferring between wells
 
@@ -88,8 +88,8 @@ julia> stock(a2)
 
 ## Clearing a well
 
-[`empty!`](@ref) resets a well to `Empty()` outright. [`sterilize!`](@ref) and [`drain!`](@ref) are
-more selective -- demonstrated on a fresh well holding a `Culture`:
+[`empty!`](@ref) resets a well to `Empty()`. [`sterilize!`](@ref) and [`drain!`](@ref) remove only
+part of the contents. The examples use a fresh well holding a `Culture`:
 
 ```jldoctest wells
 julia> a3 = plate["A3"];
@@ -127,8 +127,8 @@ julia> stock(a3)
  water    water  100 μL          100 %
 ```
 
-`drain!` is the inverse -- keeps the organism, drops the chemicals. Shown on a fresh well with its
-own deposit of `culture`, so it doesn't stack on top of `a3`'s already-sterilized contents:
+`drain!` is the inverse: it keeps the organism and drops the chemicals. This example uses a fresh
+well so that it does not stack on the sterilized contents of `a3`:
 
 ```jldoctest wells
 julia> a4 = plate["A4"];

@@ -4,13 +4,13 @@
 DocTestSetup = :(using CHESS)
 ```
 
-A [`Culture`](@ref) also tracks living organisms, not just chemicals -- an [`Organism`](@ref) is a
-species-and-strain identity: `genus`, `species`, and `strain`. Each `Organism` present in a `Culture`
-carries a [`Biomass`](@ref CHESSCore.Biomass) quantity, not just presence/absence.
+A [`Culture`](@ref) tracks living organisms as well as chemicals. An [`Organism`](@ref) is a
+species and strain identity with the fields `genus`, `species`, and `strain`. Each `Organism` in a
+`Culture` carries a [`Biomass`](@ref CHESSCore.Biomass) quantity.
 
 ## Registering an organism
 
-`using CHESS` registers several lab strains. Register a new one with [`@organism`](@ref):
+`using CHESS` registers several lab strains. [`@organism`](@ref) registers a new one:
 
 ```jldoctest organisms
 julia> @organism BSU_168 "Bacillus" "subtilis" "168"
@@ -29,14 +29,13 @@ julia> name(BSU_168)
 "Bacillus subtilis 168"
 ```
 
-`name(x)` joins all three fields for display. `show(x)` prints the recoverable binding name
-instead (`BSU_168`), the same convention [`Reagent`](@ref)/[`Chemical`](@ref) use.
+`name(x)` joins all three fields. `show(x)` prints the binding name (`BSU_168`), as it does for
+[`Reagent`](@ref) and [`Chemical`](@ref).
 
 ## Recalling with `@org_str`
 
-[`@org_str`](@ref) is the collision-safe lookup, mirroring
-[`@loc_str`](@ref)/[`@attr_str`](@ref)/[`@rgt_str`](@ref)/[`@chem_str`](@ref). It finds
-organisms registered by CHESS or a lab module:
+[`@org_str`](@ref) looks up organisms registered by CHESS or a lab module, like
+[`@loc_str`](@ref), [`@attr_str`](@ref), [`@rgt_str`](@ref), and [`@chem_str`](@ref):
 
 ```jldoctest organisms
 julia> org"SMU_UA159"
@@ -45,15 +44,15 @@ SMU_UA159
 
 ## Biomass: a quantity, not just presence
 
-Organisms can't be counted directly -- the only real measurement is optical density (OD), which is
-a concentration, not a count. [`Biomass`](@ref CHESSCore.Biomass) is the quantity CHESS tracks for an organism: an
-absolute, conserved amount dimensioned as `OD * Volume`, so `biomass / volume` recovers an OD
-reading by construction (no separate calibration factor). Like a solid's `Mass` or a liquid's
-`Volume`, `Biomass` isn't tied to *this stock's* current liquid volume -- a `Culture` can validly
-have organisms and zero liquid (see [Stocks](stocks.md)).
+Organisms cannot be counted directly. The available measurement is optical density (OD), which is
+a concentration. [`Biomass`](@ref CHESSCore.Biomass) is the quantity CHESS tracks for an organism:
+an absolute, conserved amount with dimensions `OD * Volume`, so `biomass / volume` gives an OD
+reading with no calibration factor. Like a solid's `Mass` or a liquid's `Volume`, `Biomass` is not
+tied to the stock's liquid volume, so a `Culture` can have organisms and no liquid (see
+[Stocks](stocks.md)).
 
-Write an inoculum by multiplying a `Biomass` quantity by an `Organism`, the same way a `Reagent`
-quantity builds a `Mixture`/`Solution`:
+Multiplying a `Biomass` quantity by an `Organism` writes an inoculum, as multiplying a quantity by
+a `Reagent` builds a `Mixture` or `Solution`:
 
 ```jldoctest organisms
 julia> inoculum = 1u"OD*mL" * org"SMU_UA159"
@@ -68,9 +67,9 @@ volume, shows as `Inf` until it is mixed into a liquid.
 
 ## Promoting a Stock to a Culture
 
-Adding a quantified `Organism` to any `Stock` promotes it to a `Culture`, shown here with the saline
-from [Stocks](stocks.md). `Biomass` is conserved under `+`/`-`/scalar `*`/`/` exactly like
-solids/liquids, so diluting or mixing a culture visibly dilutes or combines its organism content:
+Adding a quantified `Organism` to any `Stock` promotes it to a `Culture`. The example uses the
+saline from [Stocks](stocks.md). `Biomass` is conserved under `+`, `-`, and scalar `*` and `/`, like
+solids and liquids, so diluting or mixing a culture dilutes or combines its organisms:
 
 ```jldoctest organisms
 julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
@@ -89,7 +88,7 @@ julia> culture = saline + inoculum
 ────────────────────────────────────────
  water    water  1.00 mL          100 %
 
-julia> diluted = 10u"mL" * culture # dilute to 10 mL total -- biomass scales down with it
+julia> diluted = 10u"mL" * culture # dilute to 10 mL total; biomass scales with it
 10.0 mL Culture (2 reagent(s))
  Organisms  Name                        Biomass     OD
 ────────────────────────────────────────────────────────────
@@ -104,19 +103,18 @@ julia> diluted = 10u"mL" * culture # dilute to 10 mL total -- biomass scales dow
  water    water  10.0 mL          100 %
 ```
 
-Since `quantity(::Stock)` is total *liquid* volume, `"OD"` in the `Concentration`/`OD` column above
-is the culture's current, on-demand-derived optical density -- `Biomass / quantity(culture)` --
-never a value stored directly on the `Organism`.
+The `OD` column above is the culture's current optical density, `Biomass / quantity(culture)`,
+where `quantity(::Stock)` is the total liquid volume. It is derived on demand and never stored on
+the `Organism`.
 
 ### Removing organisms
 
-`-` mixes by subtraction just like solids/liquids (see [The non-negativity constraint](stocks.md)),
-so an organism's biomass can now be reduced or fully removed -- e.g. centrifuging off a supernatant
-or autoclaving a stock are just applications of `-` with an explicitly constructed `Stock`, not
-special-cased operations:
+`-` subtracts organism biomass as it does solids and liquids (see
+[The non-negativity constraint](stocks.md)). Centrifuging off a supernatant or autoclaving a stock
+is `-` with an explicitly constructed `Stock`:
 
 ```jldoctest organisms
-julia> sterilized = culture - inoculum # remove exactly this much biomass -- no organisms left
+julia> sterilized = culture - inoculum # remove exactly this much biomass; no organisms left
 1.00 mL Solution (2 reagent(s))
  Solids           Name             Amount  Concentration
 ─────────────────────────────────────────────────────────
