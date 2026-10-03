@@ -9,6 +9,9 @@ docstrings that feed the generated API pages. The audit has been carried out in 
 | 1 | 2026-08-11 | CHESS and Pourfecto manuals, 5 READMEs, ~450 docstrings (see its own scope note) | [Round 1: original report](#round-1-original-report-2026-08-11), preserved verbatim |
 | 2 | 2026-09-28 | Re-check of every Round 1 finding; scripted coverage, link, and build checks on all four sites; packages with no documentation | [Round 2 findings](#round-2-findings-2026-09-28) and [Round 1 resolution status](#round-1-resolution-status-checked-2026-09-28) |
 
+On 2026-10-03, every finding in both rounds was checked again against the repository. Its result is in
+[Current status](#Current-status-(2026-10-03)).
+
 Most of the Round 1 fixes landed in commit `4cdd8f9` ("Audit and fix documentation staleness and
 accuracy"), the same commit that added this file.
 
@@ -19,29 +22,37 @@ Round 2 adds [F] coverage gaps and [G] build and tooling.
 
 ---
 
-## Current status (2026-09-28)
+## Current status (2026-10-03)
 
-**Round 1:** of 80 tracked findings, 50 are resolved, 5 are partially resolved, and 25 are still
-open. Every Critical manual finding has been fixed except the Pourfecto quickstart's placeholder
-files, which leave the page unrunnable. The open items are mostly Minor tone and typo findings, the
-two README link/formatting fixes, and the Part 6 coverage gaps that Round 1 deferred.
+**Round 1:** of 80 tracked findings, 75 are resolved, 2 are partly resolved, and 3 are open. The
+open findings are the one-line stub docstring for the Mantis `write_instrument_files` method, the
+`InstrumentModel` `jldoctest` with no expected output, and the missing summary of the CHESS package
+family in the Pourfecto README and home page. The partly resolved findings are the missing Julia
+version statement on the Pourfecto pages (the CHESS installation instructions that they link to
+state it) and `location_kinds` appearing in the Pourfecto troubleshooting page without context.
 
-**Round 2:** 27 new findings.
+**Round 2:** of 27 findings, 21 are resolved, 5 are partly resolved, and 1 is open.
 
-- 5 Critical: dead `stable` links, dead RunMaps links, four packages with no documentation, and
-  no manual example being tested.
-- 12 Moderate.
-- 10 Minor.
+- Open: F7, the four CHESSLabConstants exports that the manual does not name.
+- Partly resolved: F1 (three packages still lack READMEs), F4 and F6 (exports not named in the
+  manual), F9 (only the CHESSCore API is split by topic), and A7 (`format_registry`).
 
-The main site builds with 66 unresolved `@ref` warnings, which `warnonly=[:cross_references]`
-hides. Locally, the Pourfecto and PlateMaps sites fail to build from stale local manifests (G5).
+The main site builds with no warnings other than the expected "Skipping deployment" message. It
+runs 125 doctests, requires a docstring for every export, and treats an unresolved reference as an
+error. The Pourfecto, PlateMaps, and LabwarePlotting sites build with source and edit links.
 
-**Suggested next order of work:**
-1. Round 2 Critical items.
-2. The open Round 1 Critical items.
-3. The `@ref` warnings, so `warnonly` can be removed.
-4. Coverage gaps: a tutorial, the undocumented packages, and CHESSDatabase docstrings.
-5. The tone and typo backlog.
+The prose of every manual, Home, Quick Start, and Tutorial page on the four sites follows
+[`STYLE.md`](STYLE.md), and the four sites share one installation text and the same Quick Start
+naming.
+
+**Remaining work:**
+1. READMEs for CHESSExperiments, CHESSProcessing, and RunMaps (F1).
+2. Manual coverage of the exports in F4, F6, F7, and A7.
+3. Topic-based API pages for the packages other than CHESSCore (F9).
+4. The three open Round 1 findings.
+
+The Round 2 section below keeps its 2026-09-28 findings and adds a Status column dated
+2026-10-03. The Round 1 resolution tables carry the statuses as of 2026-10-03.
 
 ---
 
@@ -65,35 +76,35 @@ hides. Locally, the Pourfecto and PlateMaps sites fail to build from stale local
 
 ### Summary
 
-| ID | Severity | Category | Location | Finding |
-|---|---|---|---|---|
-| L1 | Critical | [B] | `README.md:3,92`; README package table; `docs/src/index.md` | Links to `jensenlab.github.io/CHESS/stable/...` return 404. The repository has no release tags, so `deploydocs` has never published a `stable` version. |
-| L2 | Critical | [B] | `PlateMaps/docs/src/index.md:12,31` | Links to `jensenlab.github.io/CHESS/runmaps/dev/` return 404. No RunMaps docs site exists. |
-| F1 | Critical | [F] | `CHESSExperiments`, `CHESSProcessing`, `RunMaps`; `CHESSParsers` | Three packages have no manual pages, no API page, and no README. CHESSParsers has only an `@autodocs` page (`docs/src/api/parsers.md`); its usage documentation is in `CHESSParsers/README.md` only. The root README lists all four as part of the framework and marks their Docs column "--". |
-| F2 | Critical | [G] | `docs/src/manual/*.md` (19 pages) | None of the manual's 81 ` ```julia-repl ` blocks run during the build: there are no `jldoctest` or `@example` blocks anywhere in the four sites. The shown output can drift from the real API without any failure. Round 1's checks were one-time reads. This is what would keep those fixes from regressing. |
-| F3 | Critical | [F] | Main site | No end-to-end tutorial. The manual teaches CHESSCore objects and CHESSDatabase persistence in separate sections, but no page walks one scenario from building locations through committing, uploading, and reconstructing a past state. Round 1 item 4a covered the quickstart; this is the database half. |
-| A1 | Moderate | [A] | `docs/src/index.md:20,26,62` | Package count is stale: "`@reexport`s all three", "ties its four packages together", "across the three packages". The root README lists 11 packages in the workspace. The Home page mentions neither the Scheduler, Data Processing, and Visualization packages nor the separate Pourfecto, PlateMaps, and LabwarePlotting sites. |
-| F4 | Moderate | [F] | CHESSDatabase docstrings | 48 of 72 exports have no docstring, including the whole `reconstruct_*`/`reconstruct_*!` family, most `upload_*` functions, `update`, `create_db`, `connect_SQLite`, `cache`, `encumber`, the `sql_*` transaction helpers, `get_last_sequence_id`, and `get_sequence_id`. 34 of the 72 are never mentioned in the manual either (for example `upload_run`, `upload_experiment`, `upload_design`, `observe`, `backfill_observations`, `observation_discrepancies`). |
-| F5 | Moderate | [F] | CHESSCore docstrings | 17 exports have no docstring: `@org_str`, `Gas`, `JensenLabUnits`, `all_reagents`, `attribute_kinds`, `location_kinds`, `read_kinds`, `child_cost`, `parent_cost`, `orgparse`, `q_to_stock`, `vc_to_stock`, `stock_to_q`, `stock_to_vc`, `reagent_df`, `wells`, `withdraw!`. Several are the targets of the unresolved `@ref`s in G1. |
-| F6 | Moderate | [F] | CHESSCore manual | About 55 exports appear nowhere in the manual, after discounting string macros. Notable groups: the error types `ChildNotFoundError`, `AmbiguousChildNameError`, `AmbiguousOccupancyRuleError`, `UncommittedLocationError`, `WellCapacityError`; the tree queries `ancestors`, `get_all_within`, `children_named`; the composition and occupancy rules `composition_rules`, `set_composition!`, `occupancy_rules`, `observe!`; the analytical-species API `AnalyticalSpecies`, `OpenSystemSpecies`, `acid_base_systems`, `ion_parameters`, `set_ion_parameters!`, `Kw`, `default_water_correction`; and the unknown-value API `UnknownValue`, `isunknown`. |
-| F7 | Moderate | [F] | `docs/src/manual/registering-lab-constants.md` | None of CHESSLabConstants' four exports (`register_reagent!`, `register_chemical!`, `register_organism!`, `get_mw_density`) is named in the manual, including on the page about registering lab constants. |
-| F8 | Moderate | [F] | `docs/src/manual/troubleshooting.md` | Covers five CHESSCore errors only. It has nothing on CHESSDatabase failures (uncommitted locations, ledger slot errors, encumbrance conflicts, cache repair), nothing on installation problems (Julia < 1.12, `Pkg.add(url=...)` instead of a local clone), and none of the error types listed in F6. |
-| F9 | Moderate | [F] | `docs/src/api/*.md` | Each API page is one sentence plus a single `@autodocs` block. `api/core.md` exceeds Documenter's 200 KiB size warning, and `make.jl` raises the threshold rather than splitting the page. Nothing points the reader to entry points or groups symbols by topic. |
-| G1 | Moderate | [B] | Main site build | 66 unresolved `@ref`s: 57 in docstrings (42 in CHESSCore, 15 in CHESSDatabase) and 9 in manual pages. `warnonly=[:cross_references]` in `docs/make.jl` turns these into warnings. Detail below. |
-| G2 | Moderate | [G] | `docs/make.jl` | `checkdocs=:none` and `warnonly=[:cross_references]` are both marked in the file's comments as temporary. With both set, a new export with no docstring or a broken reference does not fail the build. |
-| G3 | Moderate | [G] | `Pourfecto/`, `PlateMaps/`, `LabwarePlotting/docs/make.jl` | `remotes=nothing`, so the three subsites have no "edit on GitHub" or source links. The LabwarePlotting build warns "Unable to determine the repository root URL for the navbar link". The main site sets `repo=Remotes.GitHub("jensenlab", "CHESS")`. |
-| A2 | Moderate | [D2] | `docs/src/manual/ledger.md:75` | Implementation history in reader-facing prose: "its only current caller is `upload_protocol`'s `ledger_id_entered_at` default…". A list of callers goes stale and is not something a reader acts on. |
-| A3 | Moderate | [E] | `docs/src/manual/interop.md:4-5` | Source file paths (`CHESSCore/src/interop/dataframe_interface.jl`, `.../location_interchange.jl`) stand in for the functions they contain. Cross-references to the functions would survive a file move. |
-| A4 | Minor | [E] | `Pourfecto/docs/src/**` | 85 horizontal rules (`---`) across 9 pages (21 in `pourcasts.md`, 19 in `pourfecto_method.md`, 15 in `configurations.md`). Documenter's section headings already separate sections. The main site uses none. |
-| A5 | Minor | [D1] | Main-site manual | Frequent `--` asides and long parentheticals, for example `index.md` and `core-concepts.md` ("--- just like in the real world"). Round 1 judged the manual clean on D1 by counting filler words. This is a sentence-structure issue that word counting misses. |
-| A6 | Minor | [E] | `docs/src/manual/core-concepts.md` | The chess-recording analogy is told twice: on the Home page and again at length in "Recording moves, not positions". |
-| A7 | Minor | [F] | `CHESSParsers` | `detect_format` and `format_registry` are exported but never mentioned in the manual (`parsing-instrument-files.md`). |
-| A8 | Minor | [A] | `Pourfecto/src/compiler/compile.jl:49,141` | The `compile` docstring now says `kwargs...` go only to `write_instrument_files`. The code also passes them to `plot_slotting` (line 141). This is the reverse of the drift Round 1 reported. |
-| A9 | Minor | [E] | `docs/src/index.md:21-23` | Two blank lines before `## Installation`. Carried over from the Round 1 index finding. |
-| A10 | Minor | [G] | Repository | Coverage-run `*.jl.<pid>.cov` files and `lcov.info` sit in package `src/` trees (for example `CHESSCore/src/*.cov`). They are not documentation, but they turn up in every `grep` over docstrings and double every hit. They should be ignored or cleaned. |
-| G4 | Minor | [G] | `.gitignore` | `docs/build/` is ignored only at the root. Building a subsite leaves an untracked `LabwarePlotting/docs/build/`. |
-| G5 | Minor | [G] | Local environment | The Pourfecto and PlateMaps sites fail to build locally: "Package Pourfecto/PlateMaps does not have LabwarePlotting in its dependencies". The cause is the git-ignored `*/docs/Manifest.toml` files, which predate LabwarePlotting becoming a dependency. CI instantiates fresh, so this affects contributors only. Running `Pkg.resolve()` in each docs environment fixes it. The docs README or CONTRIBUTING notes should say so. |
-| G6 | Minor | [G] | `docs/make.jl` | `api/core.md` exceeds `size_threshold_warn`, and the build warns on every run. This is resolved by F9's split. |
+| ID | Severity | Category | Location | Finding | Status (2026-10-03) |
+|---|---|---|---|---|---|
+| L1 | Critical | [B] | `README.md:3,92`; README package table; `docs/src/index.md` | Links to `jensenlab.github.io/CHESS/stable/...` return 404. The repository has no release tags, so `deploydocs` has never published a `stable` version. | Resolved. No link to `jensenlab.github.io/CHESS/stable/` remains. |
+| L2 | Critical | [B] | `PlateMaps/docs/src/index.md:12,31` | Links to `jensenlab.github.io/CHESS/runmaps/dev/` return 404. No RunMaps docs site exists. | Resolved. No RunMaps site link remains; RunMaps is documented in the main manual (`manual/runmaps.md`). |
+| F1 | Critical | [F] | `CHESSExperiments`, `CHESSProcessing`, `RunMaps`; `CHESSParsers` | Three packages have no manual pages, no API page, and no README. CHESSParsers has only an `@autodocs` page (`docs/src/api/parsers.md`); its usage documentation is in `CHESSParsers/README.md` only. The root README lists all four as part of the framework and marks their Docs column "--". | Partly resolved. Manual and API pages now exist for CHESSExperiments, RunMaps, and CHESSProcessing, and CHESSParsers has a manual page. READMEs for CHESSExperiments, CHESSProcessing, and RunMaps are still missing. |
+| F2 | Critical | [G] | `docs/src/manual/*.md` (19 pages) | None of the manual's 81 ` ```julia-repl ` blocks run during the build: there are no `jldoctest` or `@example` blocks anywhere in the four sites. The shown output can drift from the real API without any failure. Round 1's checks were one-time reads. This is what would keep those fixes from regressing. | Resolved. 125 `jldoctest` blocks across Home, Quick Start, Tutorial, and the manual run in every build; no `julia-repl` blocks remain. |
+| F3 | Critical | [F] | Main site | No end-to-end tutorial. The manual teaches CHESSCore objects and CHESSDatabase persistence in separate sections, but no page walks one scenario from building locations through committing, uploading, and reconstructing a past state. Round 1 item 4a covered the quickstart; this is the database half. | Resolved. `docs/src/tutorial.md` walks one experiment from setup through reconstruction. |
+| A1 | Moderate | [A] | `docs/src/index.md:20,26,62` | Package count is stale: "`@reexport`s all three", "ties its four packages together", "across the three packages". The root README lists 11 packages in the workspace. The Home page mentions neither the Scheduler, Data Processing, and Visualization packages nor the separate Pourfecto, PlateMaps, and LabwarePlotting sites. | Resolved. The Home package list and counts were rewritten. |
+| F4 | Moderate | [F] | CHESSDatabase docstrings | 48 of 72 exports have no docstring, including the whole `reconstruct_*`/`reconstruct_*!` family, most `upload_*` functions, `update`, `create_db`, `connect_SQLite`, `cache`, `encumber`, the `sql_*` transaction helpers, `get_last_sequence_id`, and `get_sequence_id`. 34 of the 72 are never mentioned in the manual either (for example `upload_run`, `upload_experiment`, `upload_design`, `observe`, `backfill_observations`, `observation_discrepancies`). | Partly resolved. Every CHESSDatabase export has a docstring, enforced by `checkdocs=:exports`. 28 of 72 exports are still not named in the manual. |
+| F5 | Moderate | [F] | CHESSCore docstrings | 17 exports have no docstring: `@org_str`, `Gas`, `JensenLabUnits`, `all_reagents`, `attribute_kinds`, `location_kinds`, `read_kinds`, `child_cost`, `parent_cost`, `orgparse`, `q_to_stock`, `vc_to_stock`, `stock_to_q`, `stock_to_vc`, `reagent_df`, `wells`, `withdraw!`. Several are the targets of the unresolved `@ref`s in G1. | Resolved. Every CHESSCore export has a docstring. |
+| F6 | Moderate | [F] | CHESSCore manual | About 55 exports appear nowhere in the manual, after discounting string macros. Notable groups: the error types `ChildNotFoundError`, `AmbiguousChildNameError`, `AmbiguousOccupancyRuleError`, `UncommittedLocationError`, `WellCapacityError`; the tree queries `ancestors`, `get_all_within`, `children_named`; the composition and occupancy rules `composition_rules`, `set_composition!`, `occupancy_rules`, `observe!`; the analytical-species API `AnalyticalSpecies`, `OpenSystemSpecies`, `acid_base_systems`, `ion_parameters`, `set_ion_parameters!`, `Kw`, `default_water_correction`; and the unknown-value API `UnknownValue`, `isunknown`. | Partly resolved. The five error types are now in Troubleshooting. 46 of 189 CHESSCore exports are still not named in the manual, mainly the analytical-species API, `UnknownValue`/`isunknown`, the composition and occupancy rule functions, and the tree queries `ancestors`, `get_all_within`, and `children_named`. |
+| F7 | Moderate | [F] | `docs/src/manual/registering-lab-constants.md` | None of CHESSLabConstants' four exports (`register_reagent!`, `register_chemical!`, `register_organism!`, `get_mw_density`) is named in the manual, including on the page about registering lab constants. | Open. None of the four CHESSLabConstants exports is named in the manual. |
+| F8 | Moderate | [F] | `docs/src/manual/troubleshooting.md` | Covers five CHESSCore errors only. It has nothing on CHESSDatabase failures (uncommitted locations, ledger slot errors, encumbrance conflicts, cache repair), nothing on installation problems (Julia < 1.12, `Pkg.add(url=...)` instead of a local clone), and none of the error types listed in F6. | Resolved. Troubleshooting covers database errors, installation problems, and the error types listed in F6. |
+| F9 | Moderate | [F] | `docs/src/api/*.md` | Each API page is one sentence plus a single `@autodocs` block. `api/core.md` exceeds Documenter's 200 KiB size warning, and `make.jl` raises the threshold rather than splitting the page. Nothing points the reader to entry points or groups symbols by topic. | Partly resolved. The CHESSCore API is split into six topic pages with short introductions. The other API pages are still a short introduction and one `@autodocs` block. |
+| G1 | Moderate | [B] | Main site build | 66 unresolved `@ref`s: 57 in docstrings (42 in CHESSCore, 15 in CHESSDatabase) and 9 in manual pages. `warnonly=[:cross_references]` in `docs/make.jl` turns these into warnings. Detail below. | Resolved. The main-site build has no unresolved `@ref`s. |
+| G2 | Moderate | [G] | `docs/make.jl` | `checkdocs=:none` and `warnonly=[:cross_references]` are both marked in the file's comments as temporary. With both set, a new export with no docstring or a broken reference does not fail the build. | Resolved. `docs/make.jl` sets `checkdocs=:exports` and no `warnonly`. |
+| G3 | Moderate | [G] | `Pourfecto/`, `PlateMaps/`, `LabwarePlotting/docs/make.jl` | `remotes=nothing`, so the three subsites have no "edit on GitHub" or source links. The LabwarePlotting build warns "Unable to determine the repository root URL for the navbar link". The main site sets `repo=Remotes.GitHub("jensenlab", "CHESS")`. | Resolved. The three subsites set the CHESS GitHub remote, so source and edit links resolve. |
+| A2 | Moderate | [D2] | `docs/src/manual/ledger.md:75` | Implementation history in reader-facing prose: "its only current caller is `upload_protocol`'s `ledger_id_entered_at` default…". A list of callers goes stale and is not something a reader acts on. | Resolved. |
+| A3 | Moderate | [E] | `docs/src/manual/interop.md:4-5` | Source file paths (`CHESSCore/src/interop/dataframe_interface.jl`, `.../location_interchange.jl`) stand in for the functions they contain. Cross-references to the functions would survive a file move. | Resolved. `interop.md` links to functions and quotes no source paths. |
+| A4 | Minor | [E] | `Pourfecto/docs/src/**` | 85 horizontal rules (`---`) across 9 pages (21 in `pourcasts.md`, 19 in `pourfecto_method.md`, 15 in `configurations.md`). Documenter's section headings already separate sections. The main site uses none. | Resolved. The 84 rules in the Pourfecto manual and Home page, and one in `api_reference.md`, were removed. Each Literate-generated example page ends with one generator rule. |
+| A5 | Minor | [D1] | Main-site manual | Frequent `--` asides and long parentheticals, for example `index.md` and `core-concepts.md` ("--- just like in the real world"). Round 1 judged the manual clean on D1 by counting filler words. This is a sentence-structure issue that word counting misses. | Resolved. The Home, Quick Start, Tutorial, and manual pages were revised to `docs/STYLE.md`. |
+| A6 | Minor | [E] | `docs/src/manual/core-concepts.md` | The chess-recording analogy is told twice: on the Home page and again at length in "Recording moves, not positions". | Resolved. The analogy is told on Home only. |
+| A7 | Minor | [F] | `CHESSParsers` | `detect_format` and `format_registry` are exported but never mentioned in the manual (`parsing-instrument-files.md`). | Partly resolved. `detect_format` is described. `format_registry` is still not mentioned. |
+| A8 | Minor | [A] | `Pourfecto/src/compiler/compile.jl:49,141` | The `compile` docstring now says `kwargs...` go only to `write_instrument_files`. The code also passes them to `plot_slotting` (line 141). This is the reverse of the drift Round 1 reported. | Resolved. The `compile` docstring now says the keyword arguments also go to `plot_slotting`. |
+| A9 | Minor | [E] | `docs/src/index.md:21-23` | Two blank lines before `## Installation`. Carried over from the Round 1 index finding. | Resolved. |
+| A10 | Minor | [G] | Repository | Coverage-run `*.jl.<pid>.cov` files and `lcov.info` sit in package `src/` trees (for example `CHESSCore/src/*.cov`). They are not documentation, but they turn up in every `grep` over docstrings and double every hit. They should be ignored or cleaned. | Resolved. `*.cov` and `lcov.info` are in `.gitignore`, and none is tracked. The files may remain in local working trees. |
+| G4 | Minor | [G] | `.gitignore` | `docs/build/` is ignored only at the root. Building a subsite leaves an untracked `LabwarePlotting/docs/build/`. | Resolved. LabwarePlotting now ignores `docs/build/` like the other subsites. |
+| G5 | Minor | [G] | Local environment | The Pourfecto and PlateMaps sites fail to build locally: "Package Pourfecto/PlateMaps does not have LabwarePlotting in its dependencies". The cause is the git-ignored `*/docs/Manifest.toml` files, which predate LabwarePlotting becoming a dependency. CI instantiates fresh, so this affects contributors only. Running `Pkg.resolve()` in each docs environment fixes it. The docs README or CONTRIBUTING notes should say so. | Resolved. Troubleshooting describes running `Pkg.resolve()` in a docs environment. |
+| G6 | Minor | [G] | `docs/make.jl` | `api/core.md` exceeds `size_threshold_warn`, and the build warns on every run. This is resolved by F9's split. | Resolved. `api/core.md` was split, and the build has no size warning. |
 
 ### G1 detail: unresolved `@ref` targets
 
@@ -152,7 +163,7 @@ The targets fall into four causes:
 
 ---
 
-## Round 1 resolution status (checked 2026-09-28)
+## Round 1 resolution status (updated 2026-10-03)
 
 Each Round 1 finding and its status. Line numbers in the original report refer to the files as
 they stood on 2026-08-11. Where a file has since changed, the current location is given.
@@ -164,34 +175,34 @@ Open.
 
 | Round 1 ref | Finding | Status | Current state |
 |---|---|---|---|
-| Part 4, `README.md` | `jensenlab.net/CHESS` link inconsistent with `jensenlab.github.io` | Open | Now `README.md:90` |
-| Part 4, `Pourfecto/README.md` | `!!! note` admonition does not render on GitHub | Open | Still at `Pourfecto/README.md:51` |
-| Part 4, `Pourfecto/README.md` | CHESSCore link goes to docs root, not `api/core/` | Open | Still at `Pourfecto/README.md:56` |
+| Part 4, `README.md` | `jensenlab.net/CHESS` link inconsistent with `jensenlab.github.io` | Resolved | The link no longer appears |
+| Part 4, `Pourfecto/README.md` | `!!! note` admonition does not render on GitHub | Resolved | Now a GitHub `> [!NOTE]` block |
+| Part 4, `Pourfecto/README.md` | CHESSCore link goes to docs root, not `api/core/` | Resolved | Links to `api/core/` |
 | Part 4, `index.md` | Sentence fragment "packages everything into a single repository" | Resolved | Replaced by the umbrella-package bullet |
-| Part 4, `index.md` | Inconsistent blank lines before `## Installation` | Open | Now Round 2 A9 |
-| Part 4, `index.md` | "ledger" not linked on first use | Open | `docs/src/index.md:7` |
+| Part 4, `index.md` | Inconsistent blank lines before `## Installation` | Resolved | See Round 2 A9 |
+| Part 4, `index.md` | "ledger" not linked on first use | Resolved | Linked at `docs/src/index.md:7` |
 | Part 4, `core-concepts.md` | "Four concrete `Location` subtypes" including `Instrument` | Resolved | Now "three location types" plus the capability flag |
 | Part 2 / Part 4, `core-concepts.md:86,102` | Broken `` [`Instrument`](@ref) `` (×2) | Resolved | |
 | Part 4, `core-concepts.md` | `concretetype` described as mapping to `Instrument` | Resolved | `core-concepts.md:128-132` |
 | Part 4, `core-concepts.md` | "Occupancy cost" used before definition | Resolved | Phrase no longer on the page |
-| Part 4, `core-concepts.md` | Six consecutive blank lines | Open | Now `core-concepts.md:146-152` (7 lines) |
+| Part 4, `core-concepts.md` | Six consecutive blank lines | Resolved | Removed |
 | Part 4, `reads.md` | "Single concrete `Instrument` type" | Resolved | |
 | Part 4, `instrument-interfaces.md` | "`CHESSCore` owns `Instrument`" | Resolved | Now "owns instrument capability" |
 | Part 4, `interop.md` | `Instrument` described as a distinct subtype | Resolved | |
-| Part 4, `db-architecture.md` | "outside this pass's scope" | Open | Still at `db-architecture.md:63` |
-| Part 4, Pourfecto `quickstart.md` | No H1 title | Resolved | `# [Quickstart](@id pourfecto_quickstart)` |
+| Part 4, `db-architecture.md` | "outside this pass's scope" | Resolved | The sentence was removed |
+| Part 4, Pourfecto `quickstart.md` | No H1 title | Resolved | `# [Quick Start](@id pourfecto_quickstart)` |
 | Part 4, Pourfecto `quickstart.md` | Typo "defualt" | Resolved | |
 | Part 4, Pourfecto `quickstart.md` | "we will select" | Resolved | |
-| Part 4 / Part 6 1a, Pourfecto `quickstart.md` | Placeholder CSV files make the page unrunnable | Open | `quickstart.md:23` still reads `"<source_value_file>.csv"` |
+| Part 4 / Part 6 1a, Pourfecto `quickstart.md` | Placeholder CSV files make the page unrunnable | Resolved | The Quick Start builds its sources and targets from inline tables and runs with SCIP |
 | Part 4, `pourfecto_method.md` | `JLIMS.Stock`/`JLIMS.Labware` signatures | Resolved | No `JLIMS` left in `Pourfecto/docs/src`. One historical mention remains in a code comment, `Pourfecto/src/default_labware.jl:16`. |
 | Part 4, `pourfecto_method.md` | Typo "platn" | Resolved | |
 | Part 4, `configurations.md` | `labware` field described as a set of types, not `Set{Symbol}` | Resolved | |
 | Part 4, `configurations.md` | `Set([MyPlateType])` / `Set([SLASLabware])` examples | Resolved | |
 | Part 4, `configurations.md` | Same pattern in "Creating Decks" example | Resolved | |
 | Part 4, `configurations.md` | "aspirated aspirated" | Resolved | |
-| Part 4 / Part 3, `compiling.md:84` | "simply set aside" | Open | Still at `compiling.md:84`; a second "simply" at `:158` |
-| Part 4, Pourfecto `troubleshooting.md` | No `(@id ...)` anchor on H1 | Open | `# Troubleshooting Solver Failures` |
-| Part 4 / Part 3, Pourfecto `troubleshooting.md:46,75` | "Note that…" openers (×2) | Partial | One remains at `troubleshooting.md:76` |
+| Part 4 / Part 3, `compiling.md:84` | "simply set aside" | Resolved | Both instances removed in the rewrite of `compiling.md` |
+| Part 4, Pourfecto `troubleshooting.md` | No `(@id ...)` anchor on H1 | Resolved | `# [Troubleshooting Solver Failures](@id pourfecto_troubleshooting)` |
+| Part 4 / Part 3, Pourfecto `troubleshooting.md:46,75` | "Note that…" openers (×2) | Resolved | Both removed |
 | Part 3 / Part 4, Pourfecto examples | "we/we'll/we're" (19 instances) | Resolved | 0 in the four example pages and `quickstart.md` |
 | Part 3, `priority.md:22` | "as we'll see" | Resolved | |
 | Part 2, Pourfecto instrument docstrings | `` [`convert_design`](@ref) `` with no docstring target | Resolved | Ref removed; docstring added in `compiler/nimbus_four_channel.jl` |
@@ -206,10 +217,10 @@ Open.
 | Part 5 CHESSCore | `*(::Volume,::Liquid)` | Header copied from `*(::Mass,::Solid)` | Resolved | `stocks/Stocks.jl:244` |
 | Part 5 CHESSCore | `/(stock,num)` | Says scaled by `num` | Resolved | Now "scaled by a factor of `1/num`" |
 | Part 5 CHESSCore | `lock!` family (×6) | `instrument` kwarg undocumented | Resolved | `locations/Location.jl:171-241` |
-| Part 5 / Part 3 CHESSCore | `set_attribute!` (×2) | "We use this method to ensure…" | Partial | Removed from `operations/attributes.jl`; remains at `environments/Attributes.jl:212` |
+| Part 5 / Part 3 CHESSCore | `set_attribute!` (×2) | "We use this method to ensure…" | Resolved | Reworded in `environments/Attributes.jl` |
 | Part 5 CHESSCore | `toggle_lock!` | `x:Location` typo | Resolved | |
-| Part 5 CHESSCore | `strain` | "Acces" typo | Open | `stocks/Organisms.jl:137` |
-| Part 5 CHESSCore | `df_to_labware` | Stray trailing `]` | Open | `interop/dataframe_interface.jl` (the `df_to_stock` sentence) |
+| Part 5 CHESSCore | `strain` | "Acces" typo | Resolved | |
+| Part 5 CHESSCore | `df_to_labware` | Stray trailing `]` | Resolved | |
 | Part 5 CHESSDatabase | `upload_transfer` | Signature bears no resemblance to the real one | Resolved | `uploads.jl:232` |
 | Part 5 CHESSDatabase | `upload_activity` | `Locaiton` ref | Resolved | |
 | Part 5 CHESSDatabase | `upload` | "Funciton" typo and `time=DateTime=` syntax | Resolved | |
@@ -222,49 +233,50 @@ Open.
 | Part 5 Pourfecto | `Head` | Omits `channel_routing` | Resolved | |
 | Part 5 Pourfecto | `cobra_settings` | "AspDistnace" typo; `maxShot` missing | Resolved | |
 | Part 5 Pourfecto | `pourfecto` | `optimizer` kwarg undocumented | Resolved | |
-| Part 5 Pourfecto | `compile` | Says kwargs forward to `slotting_requirements` | Resolved | Now drifts the other way; see Round 2 A8 |
+| Part 5 Pourfecto | `compile` | Says kwargs forward to `slotting_requirements` | Resolved | Now says `write_instrument_files` and `plot_slotting`; see Round 2 A8 |
 | Part 5 Pourfecto | `write_instrument_files` (Mantis) | One-line stub docstring | Open | `instruments/Mantis.jl:94-97` |
-| Part 5 Pourfecto | `objectives` | Typos "defualt", "scheudling" | Open | `pourfecto_algorithms/objectives.jl:175` |
+| Part 5 Pourfecto | `objectives` | Typos "defualt", "scheudling" | Resolved | |
 | Part 5 Pourfecto | `InstrumentModel` | `jldoctest` with no expected output | Open | `types.jl:135`. Pourfecto's `makedocs` passes no `modules`, so this block is never run. |
-| Part 5 CHESSLabConstants | `get_mw_density` | "checmical" typo | Open | `pubchem.jl:74` |
+| Part 5 CHESSLabConstants | `get_mw_density` | "checmical" typo | Resolved | |
 
 ### Coverage gaps (Part 6)
 
 | Round 1 ref | Finding | Status | Current state |
 |---|---|---|---|
-| 1a | `build_location(WP96, …)` quickstart throws `UndefVarError` | Partial | Fixed in `docs/src/index.md:48`; still bare `WP96` at `README.md:78` |
+| 1a | `build_location(WP96, …)` quickstart throws `UndefVarError` | Resolved | Both `README.md` and `index.md` use `loc"WP96"` |
 | 1b | Root README and `index.md` contradict on install | Resolved | Both now say "local clone only" |
 | 1c | Pourfecto README and docs index contradict on install | Resolved | Both now say "local clone only" |
-| 1d | Quickstart does not signpost solver setup | Open | `quickstart.md` never mentions `optimizer` or links to "Choosing a solver" |
-| 1e | No Julia version statement on the Pourfecto side | Open | |
+| 1d | Quickstart does not signpost solver setup | Resolved | The Quick Start names the SCIP optimizer, notes the Gurobi license, and links to "Choosing a solver" |
+| 1e | No Julia version statement on the Pourfecto side | Partial | The Pourfecto pages link to the CHESS installation instructions, which state Julia 1.12 |
 | 2a | `JLIMS.*` types undefined | Resolved | |
 | 2b | Examples mutate `.stock` directly with no explanation | Resolved | Explained in an admonition at `Pourfecto/docs/src/manual/labware.md:217` |
 | 2c | `add_stock!` undefined | Resolved | Introduced at `labware.md:203-214` with a link to `deposit!` |
 | 2d | `location_kinds` used before explained | Partial | Explained in `labware.md`; Pourfecto `troubleshooting.md:93-101` still uses it without context, and it has no docstring (Round 2 F5) |
-| 3a | `@location_kind` positional args unexplained | Partial | The `WP96` call is explained in prose after the example (`core-concepts.md:112`); the `Well200` call and the argument order are not |
+| 3a | `@location_kind` positional args unexplained | Resolved | `core-concepts.md` lists the positional arguments in order |
 | 3b | `configurations.md` machinery before "most users don't need this" | Resolved | Callout at `configurations.md:27` |
-| 3c | No "which knobs matter" guidance on the kwarg table | Open | `pourfecto_method.md:160-176` |
+| 3c | No "which knobs matter" guidance on the kwarg table | Resolved | A list of the keywords most runs need precedes the table |
 | 4a | No CHESSCore "hello world" with stocks | Resolved | README and `index.md` quickstarts now include `deposit!` |
-| 4b | Pourfecto quickstart narrated, not runnable; no link to `checkerboard` | Open | |
-| 4c | Manual never assembles a complete `pourfecto()` call | Open | `pourfecto_method.md` and `pourcasts.md` still use undefined `sources`/`targets`/`configs` |
+| 4b | Pourfecto quickstart narrated, not runnable; no link to `checkerboard` | Resolved | The Quick Start is runnable and links to the Checkerboard Assay |
+| 4c | Manual never assembles a complete `pourfecto()` call | Resolved | The method and Pourcasts pages define `sources`, `targets`, and `configs`, and the Quick Start assembles a complete call |
 | 5a | Two "Stocks" chapters with no "read the other first" | Resolved | Prerequisite note at the top of `Pourfecto/docs/src/manual/stocks.md` |
 | 5b | No prerequisite reading list for Pourfecto | Resolved | Note in `Pourfecto/docs/src/index.md` |
-| 5c | Pourfecto `Configuration` vs CHESSCore instrument capability never distinguished | Open | |
-| 6 | `reads.md` 13-argument `@location_kind` calls unannotated | Open | `reads.md:85-86` |
+| 5c | Pourfecto `Configuration` vs CHESSCore instrument capability never distinguished | Resolved | `configurations.md` explains the difference |
+| 6 | `reads.md` 13-argument `@location_kind` calls unannotated | Resolved | The calls are no longer on the page |
 | 6 | Pourfecto README/index do not restate the CHESS package family | Open | |
 | 6 | No CHESSCore troubleshooting page | Resolved | `docs/src/manual/troubleshooting.md` added; its scope is now Round 2 F8 |
-| 6 | `reagent_context` silent failure unexplained for Pourfecto | Open | Pourfecto `reagents.md` documents `string_to_reagent` but not whether the `interop.md` gotcha applies |
+| 6 | `reagent_context` silent failure unexplained for Pourfecto | Resolved | Pourfecto `reagents.md` says the table interface is not affected |
 
 ### Round 1 "Suggested prioritization": status
 
 1. `Instrument` staleness: **Resolved.**
-2. Broken quickstart examples: **Partial.** `WP96` is fixed in `index.md` but not in `README.md`;
-   the Pourfecto placeholder CSVs are still open.
+2. Broken quickstart examples: **Resolved.**
 3. Contradictory install instructions: **Resolved.**
 4. `JLIMS` rename: **Resolved.**
 5. Docstring signature drift: **Resolved.**
 6. Tone pass on the examples and quickstart: **Resolved.**
-7. Part 6 coverage gaps: **Partial** (see the table above).
+7. Part 6 coverage gaps: **Mostly resolved.** The Julia version statement on the Pourfecto side and
+   the `location_kinds` context are partial, and the CHESS package family summary in the Pourfecto
+   README and home page is open.
 
 ---
 
