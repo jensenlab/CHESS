@@ -107,5 +107,36 @@ and `stocks` entries are found by scanning each module's names and filtering by 
 reagents and chemicals have no central registry and `stock_recipes` holds only stocks registered
 with `@stock`.
 
+## Generating registration lines
+
+`CHESSLabConstants` has four functions that help write the registrations of a lab module. They are
+used while the module is being written and are not needed to use registered constants.
+[`register_reagent!`](@ref), [`register_chemical!`](@ref), and [`register_organism!`](@ref) each
+return a line of code that registers the constant, ready to paste into the source of the module.
+They do not register anything and do not write to any source file.
+
+For a reagent or a chemical, the function looks up the molecular weight and density in a local
+cache. If the cache has no entry, it fetches them from PubChem with [`get_mw_density`](@ref) and
+stores them in the cache. The lookup needs a PubChem ID and a network connection. A chemical has no
+density, so the fetched density is discarded. For an organism, the function does not look anything
+up. It records the genus, species, strain, and optional ATCC ID and notes in the cache.
+
+```julia
+using CHESSLabConstants
+
+register_reagent!(CHESSCore.Solid, "boric_acid", "Boric Acid", 7628)
+# "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
+
+register_chemical!("Na⁺", "Na+", 1, 923)
+# "@chemical Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+
+register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "700610", notes = "wild type")
+# "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""
+```
+
+A compound with no PubChem entry, such as a rich-media broth, is registered without a PubChem ID,
+and its molecular weight and density are recorded as `missing`. [`get_mw_density`](@ref) takes a
+PubChem ID and returns the molecular weight in g/mol and the density in g/mL.
+
 [Database Architecture](db-architecture.md) describes how CHESSDatabase stores the locations and
 stocks built from registered constants.

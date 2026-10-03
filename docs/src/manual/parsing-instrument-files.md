@@ -27,7 +27,8 @@ end
 
 `detect` tests whether a file looks like the format's export, and `parse_raw` parses it.
 [`register_format!`](@ref) registers the format so that it can be found by auto-detection and by
-name:
+name. [`format_registry`](@ref) holds the registered formats, keyed by name, and
+`keys(format_registry)` lists them:
 
 ```julia
 register_format!(ExFormat; name="ex_format")
@@ -95,6 +96,18 @@ CHESSParsers includes these formats:
 | `CytationFormat` | `LabwareRead` | BioTek Cytation plate-reader `.xlsx` exports |
 | `BioSpaFormat` | `EnvironmentLog` | BioTek/Agilent BioSpa incubator `.SES` session logs |
 | `Take3TrioFormat` | `LabwareRead` | BioTek Take3 Trio nucleic-acid quant `.xlsx` exports |
+
+The names of the registered formats:
+
+```jldoctest parsing
+julia> sort(collect(keys(format_registry)))
+5-element Vector{String}:
+ "biospa"
+ "cytation"
+ "epoch2"
+ "synergy"
+ "take3trio"
+```
 
 The three plate-reader formats share one Gen5 `.xlsx` parsing engine and are distinguished only by
 the file's `Reader Type:` field. The engine handles endpoint, kinetic, and spectrum-scan reads, in
