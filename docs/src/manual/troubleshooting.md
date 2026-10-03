@@ -77,8 +77,8 @@ ArgumentError: Symbol Nonexistent could not be found in lab modules Module[CHESS
 
 The error suggests close matches when there are any. Lookups only search CHESS and registered lab
 modules, so a constant registered in your own session is used through its binding (`DemoPlate`),
-not `loc"DemoPlate"`. A lab module must be registered with `CHESSCore.register_lab` and loaded
-with `using` where the lookup runs. See [Registering Lab Constants](registering-lab-constants.md).
+not `loc"DemoPlate"`. A lab module must be registered with `CHESSCore.register_lab` and loaded in
+the module where the lookup runs. See [Registering Lab Constants](registering-lab-constants.md).
 
 ### "already exists"
 
@@ -89,7 +89,7 @@ register a name twice:
 ArgumentError: LocationKind Room already exists
 ```
 
-`using CHESS` already registers many common names, such as `Room` and `WP96`. Use the registered
+CHESS already includes many common names, such as `Room` and `WP96`. Use the registered
 constant, or pick a new name. `@reagent`, `@chemical`, and `@organism` do not check, and silently
 replace an existing registration. See [Registering Lab Constants](registering-lab-constants.md).
 
@@ -151,7 +151,7 @@ versions do not support. Check with `versioninfo()`.
 
 CHESS must be used from a local clone. Its packages find each other through the workspace's local
 paths, which Pkg does not carry over to a project that adds CHESS by URL. Clone the repository and
-run `Pkg.instantiate()` in it; see [Installation](../index.md#Installation).
+instantiate its environment as described under [Installation](../index.md#Installation).
 
 ### "does not have X in its dependencies" after pulling changes
 
