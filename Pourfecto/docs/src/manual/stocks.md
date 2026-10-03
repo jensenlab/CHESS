@@ -1,10 +1,9 @@
 # [Stocks](@id pourfecto_stocks) 
 
 !!! note
-    This page covers Pourfecto's table-conversion layer on top of CHESSCore's `Stock` type. It
-    assumes familiarity with `Stock` itself -- see CHESSCore's
-    [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) manual page first if you
-    haven't read it.
+    This page describes how Pourfecto converts tables to and from CHESSCore's `Stock` type. It
+    assumes familiarity with `Stock`, which CHESSCore's
+    [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) page describes.
 
 ## Creating Stocks from Tables 
 
@@ -12,9 +11,7 @@
 CurrentModule = Pourfecto
 ```
 
-Pourfecto represents source and target materials as CHESSCore `Stock` objects. In most workflows, users do not need to construct `Stock`s manually. Instead, stocks can be created from tabular data using [`df_to_stock`](@ref).
-
-This is useful when reading stocks from CSV files, spreadsheets, notebooks, or user-facing forms.
+Pourfecto represents source and target materials as CHESSCore `Stock` objects. Most workflows create them from tabular data with [`df_to_stock`](@ref) instead of constructing them by hand. This suits stocks read from CSV files, spreadsheets, notebooks, or forms.
 
 The main stock conversion functions are:
 
@@ -38,8 +35,6 @@ The reverse operation is:
 df, units = stock_to_df(stocks)
 ```
 
----
-
 ### Supported stock table formats
 
 Pourfecto supports two stock table encodings:
@@ -49,19 +44,11 @@ Pourfecto supports two stock table encodings:
 | `"vc"` | Volume/Concentration format |
 | `"q"` | Quantity format |
 
-The parser [`df_to_stock`](@ref) automatically detects which format is being used.
-
-If both `df` and `units` contain a `"volume"` column, Pourfecto treats the table as a **volume/concentration** table.
-
-Otherwise, Pourfecto treats the table as a **quantity** table.
-
----
+[`df_to_stock`](@ref) detects the format. If both `df` and `units` contain a `"volume"` column, the table is a **volume/concentration** table. Otherwise it is a **quantity** table.
 
 ### Volume/concentration format
 
-The volume/concentration format is useful when each row represents a stock with a total volume and one or more reagent concentrations.
-
-Conceptually:
+In the volume/concentration format, each row is a stock with a total volume and one or more reagent concentrations. For example:
 
 | volume | reagent_a | reagent_b |
 |---:|---:|---:|
@@ -96,18 +83,14 @@ units = DataFrame(
 stocks = df_to_stock(df, units)
 ```
 
-Because both tables contain a `"volume"` column, Pourfecto parses this as a `"vc"` table.
+Both tables contain a `"volume"` column, so this is parsed as a `"vc"` table.
 
-!!! warning 
-    Stocks cannot have reagents with the name "volume", as it will confuse the parser 
-
----
+!!! warning
+    A reagent cannot be named "volume", because the parser reads that name as the total volume.
 
 ### Quantity format
 
-The quantity format is useful when each row represents a stock directly by the amount of each reagent it contains.
-
-Conceptually:
+In the quantity format, each row is a stock given directly by the amount of each reagent it contains. For example:
 
 | water | sodium_chloride |
 |---:|---:|
@@ -139,41 +122,17 @@ units = DataFrame(
 stocks = df_to_stock(df, units)
 ```
 
-Because these tables do not contain a `"volume"` column, Pourfecto parses this as a `"q"` table.
+These tables have no `"volume"` column, so this is parsed as a `"q"` table.
 
----
+### Reagent names
 
-### Automatic reagent creation
-
-When parsing stock tables, reagent names are usually taken from the column names.
-
-Pourfecto can turn those reagent names into `Reagent` objects automatically, via `string_to_reagent`. Registered reagents are used when available. Unknown reagents are created on the fly with missing chemical properties.
-
-For example, a column named:
-
-```julia
-:sodium_chloride
-```
-
-or
-
-```julia
-:dye
-```
-
-can be interpreted as a reagent name.
-
-If the reagent is not registered, Pourfecto will warn and create a generic chemical object.
+Reagent names come from the column names. Pourfecto converts each name to a `Reagent` with `string_to_component`. A registered reagent is used when one exists. Otherwise a generic chemical is created with unknown properties, and a warning is shown. In the examples above, the columns `sodium_chloride` and `dye` are read as reagent names.
 
 !!! note
-    Unknown reagents can still be used for planning and scheduling. However, calculations
-    that require molecular weight or density may require fully registered reagents.
+    A reagent that is not registered can be used for planning and scheduling. Calculations that
+    need molecular weight or density require a registered reagent.
 
 See also: [Reagents](@ref pourfecto_reagents)
-
-
-
----
 
 ### Converting stocks back to dataframes
 
@@ -195,26 +154,19 @@ To request quantity format:
 df, units = stock_to_df(stocks, "q")
 ```
 
----
-
-
-
 ## Creating Stocks Manually
 
-Stocks can also be created manually with CHESSCore's arithmetic syntax (`*` to combine a quantity with a reagent, `+` to combine stocks, scalar `*`/`/` to scale, and quantity `*` to rescale to a target total) — useful in notebooks, tests, examples, and small workflows where writing a dataframe would be unnecessary:
+Stocks can also be created with CHESSCore's arithmetic. Multiplying a quantity by a reagent builds a stock, adding stocks combines them, multiplying or dividing by a number scales a stock, and multiplying by a quantity rescales it to that total. This suits notebooks, tests, examples, and small workflows where a dataframe is unnecessary:
 
 ```julia
 using Pourfecto, CHESSCore, Unitful
 
-water = string_to_reagent("water", Liquid)
-sodium_chloride = string_to_reagent("sodium_chloride", Solid)
+water = string_to_component("water", Liquid)
+sodium_chloride = string_to_component("sodium_chloride", Solid)
 
 buffer = 1u"mL" * water + 10u"mg" * sodium_chloride
 scaled = 2 * buffer
 ```
 
-For the full operator reference (`Mixture`/`Solution` construction rules, rescaling semantics, and more), see CHESSCore's [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) manual page.
-
----
-
+CHESSCore's [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) page describes the operations in full.
 

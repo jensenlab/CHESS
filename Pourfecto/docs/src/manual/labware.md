@@ -1,21 +1,18 @@
 # [Labware](@id pourfecto_labware)
 
-
 ## Creating Labware from Tables
 
 ```@meta
 CurrentModule = Pourfecto
 ```
-To plan executable liquid handling workflows, Pourfecto needs information about how `Stock`s are contained in physical labware. Just like for `Stock` objects, Pourfecto uses CHESSCore to create `Labware` objects.
+To plan liquid handling workflows, Pourfecto needs to know how `Stock`s are held in physical labware. As for stocks, Pourfecto uses CHESSCore to create `Labware` objects.
 
-Pourfecto can create populated labware objects from stock tables augmented with labware metadata. This is useful when source plates, destination plates, tubes, reservoirs, or other labware are described in CSV files, spreadsheets, or `DataFrame`s.
+Pourfecto creates populated labware from stock tables with added labware columns. This suits source plates, destination plates, tubes, reservoirs, and other labware described in CSV files, spreadsheets, or `DataFrame`s.
 
 ```@docs
 df_to_labware
 labware_to_df
 ```
-
----
 
 ### Overview
 
@@ -37,15 +34,13 @@ The reverse operation is:
 df, units = labware_to_df(labware)
 ```
 
----
-
 ### Required columns
 
 The input dataframe must include:
 
 | Column | Description |
 |---|---|
-| `labware` | `LocationKind` name registered in `location_kinds` (populated by whichever lab modules are registered via `CHESSCore.register_lab` -- see [Registering Lab Constants](https://jensenlab.github.io/CHESS/dev/manual/registering-lab-constants/); `CHESSLabConstants`, loaded automatically by `using CHESS`, provides the plate kinds used on this page), used to build the labware via `build_location(location_kinds[Symbol(labware)], name)` |
+| `labware` | Name of a `LocationKind` registered in `location_kinds`, such as `WP96`. The plate kinds used on this page come from `CHESSLabConstants`, which is loaded with CHESS. See [Registering Lab Constants](https://jensenlab.github.io/CHESS/dev/manual/registering-lab-constants/). |
 | `name` | Name of the labware instance |
 | `well` | Well identifier, such as `"A1"`, `"B12"`, or `"H2"` |
 
@@ -63,37 +58,17 @@ DataFrame(
 )
 ```
 
-Here, the columns `labware`, `name`, and `well` describe where each stock is located. The remaining columns describe the stock in that well.
-
----
+The columns `labware`, `name`, and `well` give the location of each stock. The remaining columns describe the stock in that well.
 
 ### Labware codes
 
-The `labware` column should contain a `LocationKind` name recognized by CHESSCore.
+The `labware` column holds the name of a `LocationKind` that CHESSCore knows. The available names are the keys of `location_kinds`:
 
 ```julia
 keys(location_kinds)
 ```
-returns the available labware codes.
 
-When parsing a table, Pourfecto calls:
-
-```julia
-build_location(location_kinds[Symbol(labware_code)], name)
-```
-
-for each unique `(labware, name)` pair.
-
-For example, rows with:
-
-```julia
-labware = "WP96"
-name = "source_plate"
-```
-
-will be placed on the same generated labware object.
-
----
+For each unique `(labware, name)` pair, Pourfecto builds one labware object with `build_location(location_kinds[Symbol(labware_code)], name)`. Rows with the same labware code and name, such as `"WP96"` and `"source_plate"`, are placed on the same object.
 
 ### Example: create labware from a volume/concentration table
 
@@ -121,11 +96,9 @@ units = DataFrame(
 source_labware = df_to_labware(df, units)
 ```
 
-Because the stock data includes a `volume` column, Pourfecto interprets the stock portion as the `"vc"` volume/concentration format.
+The stock data includes a `volume` column, so the stock portion is read as the `"vc"` volume/concentration format.
 
-The result is a vector of labware objects. In this example, the vector contains a single 96-well plate named "source_plate" with stocks deposited into wells `A1`, `A2`, and `A3`.
-
----
+The result is a vector of labware objects. Here it holds one 96-well plate named "source_plate" with stocks in wells `A1`, `A2`, and `A3`.
 
 ### Example: multiple labware objects in one table
 
@@ -157,12 +130,9 @@ This creates two labware objects:
 
 Rows with the same `(labware, name)` pair are placed on the same labware object.
 
----
-
-
 ### How `df_to_labware` works
 
-Internally, [`df_to_labware`](@ref) performs the following steps:
+[`df_to_labware`](@ref) performs these steps:
 
 1. Splits the table into labware metadata columns and stock columns.
 2. Creates one labware object for each unique `(labware, name)` pair.
@@ -171,8 +141,6 @@ Internally, [`df_to_labware`](@ref) performs the following steps:
 5. Deposits each parsed stock into the corresponding well.
 
 Only the stock columns should appear in the `units` dataframe. The `units` dataframe should not include `labware`, `name`, or `well`.
-
----
 
 ### Exporting labware to dataframes
 
@@ -196,22 +164,20 @@ df, units = labware_to_df(source_labware, "q")
 
 The output dataframe contains one row per non-empty well.
 
----
-
 ## Creating Labware Manually
 
-In addition to building labware from tables with [`df_to_labware`](@ref), you can create and fill labware directly in Julia with CHESSCore's `build_location`/`location_kinds` and `add_stock!` — useful for examples, tests, notebooks, and workflows where writing a dataframe would be unnecessary:
+Labware can also be built and filled directly with CHESSCore's `build_location`, `location_kinds`, and `add_stock!`. This suits examples, tests, and notebooks where a dataframe is unnecessary:
 
 ```julia
 using Pourfecto, CHESSCore, Unitful
 
 plate = build_location(location_kinds[:DeepWP96], "source_plate")
-water_stock = 1u"mL" * string_to_reagent("water", Liquid)
+water_stock = 1u"mL" * string_to_component("water", Liquid)
 
 add_stock!(plate, water_stock, 1, 1)  # adds stock to row 1, column 1; well A1
 ```
 
-For the full `LocationKind`/`Location` reference (available kinds, deck/well structure, and `add_stock!`'s underlying `deposit!` behavior), see CHESSCore's [Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/) manual page.
+CHESSCore's [Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/) page describes location kinds, wells, and `deposit!`, which `add_stock!` uses.
 
 !!! note
-    Pourfecto's own examples sometimes set `.stock` directly (`children(plate)[row, col].stock = ...`) or accumulate into it (`well.stock += ...`) instead of calling `add_stock!`/`deposit!`. This is a Pourfecto-idiomatic shortcut for quickly building example/test labware -- it skips `deposit!`'s well-capacity check, so it's fine for building up a target composition from scratch (where the values are already known to fit) but isn't a substitute for `deposit!` when depositing into labware whose existing contents you don't control.
+    Some Pourfecto examples set `.stock` directly, as in `children(plate)[row, col].stock = ...`, or add to it, as in `well.stock += ...`, instead of calling `add_stock!` or `deposit!`. This shortcut skips the well-capacity check of `deposit!`. It is appropriate when building a target composition that is known to fit. Use `deposit!` for labware whose existing contents are not known.

@@ -4,11 +4,9 @@
 CurrentModule = Pourfecto
 ```
 
-Once a [`Pourcast`](@ref pourfecto_pourcasts) has been solved, [`compile`](@ref) turns it into one or
-more protocol folders on disk -- files an actual liquid handler can run. This page covers what
-`compile` does, why slotting is part of that process, and what ends up in the output directory.
-
----
+[`compile`](@ref) turns a solved [`Pourcast`](@ref pourfecto_pourcasts) into one or more protocol
+folders on disk, containing files that a liquid handler can run. This page describes what `compile`
+does, why labware must be assigned to deck slots, and what the output directory contains.
 
 ## Running `compile`
 
@@ -16,33 +14,28 @@ more protocol folders on disk -- files an actual liquid handler can run. This pa
 compile(directory, pc)
 ```
 
-`compile` is also called automatically when you run `pourfecto` with a target directory:
+`pourfecto` calls `compile` when it is given a target directory:
 
 ```julia
 pc = pourfecto(directory, source_labware, target_labware, configs)
 ```
 
-so most users never call `compile` directly -- it's documented here for when you want to compile an
-already-solved `Pourcast` again (e.g. with a different `packing_method`), or want to understand the
-output layout.
+Calling `compile` directly is useful to compile a solved `Pourcast` again, for example with a
+different `packing_method`, or to inspect the output layout.
 
 ```@docs
 compile
 ```
 
----
+## Why labware is slotted
 
-## Why slotting is needed
+The [`Deck`](@ref) of a [`Configuration`](@ref) has a fixed number of slots, and not every piece of
+labware fits in every slot. [Configurations](@ref pourfecto_configurations) describes how deck
+positions and their admissible labware are defined. Before a solved design is written as a protocol,
+every piece of labware needs a `(DeckPosition, slot)` assignment that respects those constraints.
+The slotting functions on this page find that assignment.
 
-A [`Configuration`](@ref)'s [`Deck`](@ref) has a fixed number of slots, and not every piece of labware
-can sit in every slot -- see [Configurations](@ref pourfecto_configurations) for how deck positions and
-their admissible labware are defined. Before a solved design can be written out as a protocol, every
-piece of labware involved needs an actual `(DeckPosition, slot)` assignment that respects those
-constraints. Finding that assignment is what the slotting functions in this page do.
-
----
-
-## The pipeline, stage by stage
+## The compile pipeline
 
 ```
 pourfecto(...) solves a Pourcast
@@ -54,46 +47,48 @@ pourfecto(...) solves a Pourcast
           config, slotting; kwargs...)
 ```
 
-For each `Configuration` used in the `Pourcast`, `compile` first figures out which source/target
-labware pairs actually need to be accessible on the deck at the same time -- a pair only matters if the
-solved plan transfers a nonzero volume between them on that configuration. Not every pairing can
-necessarily share a single deck layout (a deck only has so many slots), so `compile` calls a
-`packing_method` -- [`packing_greedy`](@ref) by default -- to split the required pairings across one or
-more layouts. Each layout becomes its own protocol folder.
+For each `Configuration` in the `Pourcast`, `compile` first determines which source and target
+labware pairs must be on the deck at the same time. A pair matters only if the solved plan transfers
+a nonzero volume between them on that configuration. A deck has a limited number of slots, so not
+every pair can share one layout. `compile` calls a `packing_method`, which is
+[`packing_greedy`](@ref) by default, to split the pairs across one or more layouts. Each layout
+becomes its own protocol folder.
 
-This is the same pipeline documented from an instrument author's point of view in
 ["The compiler pipeline"](@ref pourfecto_new_instrument) on the
-[Defining a New Instrument](@ref pourfecto_new_instrument) page -- read that page if you need to
-override `write_instrument_files` or `packing_greedy` for a new instrument. This page instead covers
-what happens with the built-in instruments and how to read the results.
+[Defining a New Instrument](@ref pourfecto_new_instrument) page describes the same pipeline for
+instrument authors who override `write_instrument_files` or `packing_greedy`. This page describes
+the built-in instruments and how to read the results.
 
----
+## Slotting layouts
 
-## `SlottingDict` and inspecting a layout
+Each layout is a [`SlottingDict`](@ref), a mapping from each piece of labware to the
+`(DeckPosition, slot)` assigned to it. [`slotting_greedy`](@ref) assigns one set of labware to open
+slots, and [`packing_greedy`](@ref) calls `slotting_greedy` repeatedly until every required pair is
+covered.
 
-Each layout is a [`SlottingDict`](@ref) -- a mapping from each piece of labware to the
-`(DeckPosition, slot)` it was assigned. Layouts are produced by [`slotting_greedy`](@ref) (assigns one
-set of labware to open slots) and [`packing_greedy`](@ref) (calls `slotting_greedy` repeatedly until
-every required pairing is covered).
+`slotting_greedy` assigns labware to slots in the order the labware is given, taking the first open
+slot that admits each piece:
 
-`slotting_greedy` assigns labware to slots first-come-first-served, in the order the labware was
-given. It first collects every open `(position, slot)` pair on the deck, then deduplicates the labware
-by name -- a plate used as both a source and a target only needs one slot. For each unique piece of
-labware, it scans the open slots in order and claims the first one that admits it, removing that slot
-from further consideration; if a piece of labware can't be placed on the deck at all, it raises an
-error immediately, while labware that's placeable in principle but finds no open slot left is simply
-set aside rather than erroring. Finally, any duplicate labware is mapped back onto whichever slot its
-counterpart ended up in, so the same physical plate isn't assigned two different slots.
+1. It collects every open `(position, slot)` pair on the deck.
+2. It removes duplicate labware by name, so a plate used as both a source and a target needs one
+   slot.
+3. For each unique piece of labware, it scans the open slots in order and claims the first one that
+   admits it, which removes that slot from consideration.
+4. Labware that cannot be placed on the deck at all raises an error. Labware that could be placed
+   but finds no open slot is set aside without an error.
+5. Duplicate labware is mapped to the slot of its counterpart, so one physical plate never has two
+   slots.
 
-`packing_greedy` calls `slotting_greedy` as a subroutine, peeling off whichever pairings each layout
-happens to satisfy until none are left. Starting from every `(source, target)` pairing that must be
-co-slotted, it repeatedly runs `slotting_greedy` over the labware that's still unresolved, checks which
-pairings that layout actually covers (both members ended up with a slot), and keeps that layout as one
-protocol before continuing with only the leftover pairings. If a pass covers nothing new, it raises an
-error rather than looping forever; otherwise it stops once every pairing has been covered by some
-layout.
+`packing_greedy` calls `slotting_greedy` to cover the required pairs one layout at a time:
 
-To inspect a layout as a table rather than a raw `Dict`, use `slottingdict_to_df`:
+1. It starts from every `(source, target)` pair that must be co-slotted.
+2. It runs `slotting_greedy` over the labware that is still unresolved.
+3. It checks which pairs the layout covers, meaning both members received a slot, and keeps the
+   layout as one protocol.
+4. It repeats with the remaining pairs until none are left. If a pass covers no new pair, it raises
+   an error.
+
+`slottingdict_to_df` shows a layout as a table:
 
 ```julia
 using DataFrames
@@ -105,143 +100,130 @@ df = slottingdict_to_df(slotting)
 slottingdict_to_df
 ```
 
----
-
 ## Output files
 
-`compile` writes, once per call:
+Each call to `compile` writes these files once:
 
 | File | Contents |
 |---|---|
 | `pourcast.json` | The compiled `Pourcast`, serialized (see [Serializing Pourcasts](@ref pourfecto_pourcasts)) |
 | `target_plate_images/<name>.png` | A well heatmap for each target plate |
 
-and, inside each `<config_type>/<protocol_name>/` folder (one per generated layout):
+Each `<config_type>/<protocol_name>/` folder, one per layout, contains:
 
 | File | Contents |
 |---|---|
-| instrument-specific protocol file(s) | Written by that instrument's `write_instrument_files` method (e.g. Cobra's SoftLinx XML, Mantis's `.dl.txt`); a generic `transfer_table.csv` if the instrument hasn't customized this |
-| `loading_table.csv` | The layout's `SlottingDict`, as written by `slottingdict_to_df` |
-| `loading_instructions.png` | A diagram of the deck with labware placed per the layout, from `plot_slotting` |
+| instrument-specific protocol files | Written by the `write_instrument_files` method of the instrument, such as the SoftLinx XML of the Cobra or the `.dl.txt` file of the Mantis. An instrument without its own method gets a generic `transfer_table.csv`. |
+| `loading_table.csv` | The `SlottingDict` of the layout, written by `slottingdict_to_df` |
+| `loading_instructions.png` | A diagram of the deck with the labware placed as in the layout, drawn by `plot_slotting` |
 
 ```@docs
 plot_slotting
 ```
 
----
+## Nimbus batching
 
-## Nimbus: one-to-many aspirate/dispense batching
-
-Unlike the generic one-transfer-per-row fallback, the Nimbus's `write_instrument_files` batches
-multiple dispenses under a single aspirate whenever they fit within the channel's capacity,
-rather than aspirating once per destination well. Its protocol CSV uses a unified action-row
-schema:
+The generic fallback writes one transfer per row. The `write_instrument_files` method of the Nimbus
+instead batches several dispenses under one aspirate when they fit within the channel capacity. Its
+protocol CSV has one row per action:
 
 | Column | Meaning |
 |---|---|
-| `Labware ID`, `Labware Position ID` | The labware/position acted on by this row |
-| `Volume (uL)` | The volume aspirated, dispensed, or blown out by this row, rounded to `volume_precision` decimal places (default 1) |
+| `Labware ID`, `Labware Position ID` | The labware and position of the row |
+| `Volume (uL)` | The volume aspirated, dispensed, or blown out, rounded to `volume_precision` decimal places (default 1) |
 | `Action` | `"Aspirate"`, `"Dispense"`, or `"Blowout"` |
-| `Change Tip Before` | `1` on an aspirate row that should be preceded by a tip change; always `0` for `Dispense`/`Blowout` rows |
+| `Change Tip Before` | `1` on an aspirate row that follows a tip change, and `0` on every `Dispense` and `Blowout` row |
 
-An aspirate row is always immediately followed by the rows it feeds -- its dispenses, and (see
-below) a trailing blowout when one applies -- whose volumes sum to the aspirate's volume, minus a
-small fixed **`aspirate_buffer`** (default `0.01` µL), *exactly* at the rounded precision: the last
-value in each cycle absorbs whatever rounding remainder is needed, rather than every value being
-rounded independently, which can otherwise leave a hairline float residual (e.g. `-1.42e-14`) that
-a strict downstream `available >= requested` check on the instrument side rejects.
-`aspirate_buffer` itself is a **deliberate** margin, not a rounding artifact -- an unconditional
-physical safety allowance (applies whether or not `insert_blowouts` is used) against real-world
-pipetting inaccuracy leaving a tip short for the last action in a cycle. It's added on top of the
-rounded dispense/blowout sum without being re-rounded to `volume_precision` -- otherwise a buffer
-finer than that resolution (like the `0.01` default under the default `volume_precision=1`) would
-simply round away. Which destinations get grouped into the same aspirate is decided by a
-distance-aware greedy bin-packing pass -- spatially nearby destinations on the target plate are
-preferred, subject to the channel's capacity minus `aspirate_buffer` and a rounding margin (`0.5 *
-10^(-volume_precision)`, the most a raw value can round *up* by) -- and a transfer larger than
-capacity is split across multiple aspirates, with any remainder free to share a batch with other
-destinations.
+An aspirate row is followed by the rows it feeds: its dispenses and, when one applies, a trailing
+blowout. The volumes of those rows sum to the aspirate volume minus a small fixed
+**`aspirate_buffer`**, `0.01` µL by default. The sum is exact at the rounded precision. The last
+value in each cycle absorbs the rounding remainder, so no value is rounded independently. This
+avoids a residual such as `-1.42e-14`, which a strict `available >= requested` check on the
+instrument would reject.
+
+`aspirate_buffer` is a deliberate margin and not a rounding artifact. It is a physical safety
+allowance against pipetting inaccuracy that could leave a tip short for the last action in a cycle,
+and it applies whether or not `insert_blowouts` is used. It is added to the rounded sum without
+being rounded again, because a buffer finer than `volume_precision`, like the default `0.01` with
+`volume_precision=1`, would round away.
+
+A distance-aware greedy bin-packing pass decides which destinations share an aspirate. It prefers
+destinations that are close together on the target plate, within the channel capacity minus
+`aspirate_buffer` and a rounding margin of `0.5 * 10^(-volume_precision)`, the most that a raw value
+can round up. A transfer larger than the capacity is split across several aspirates, and the
+remainder can share a batch with other destinations.
 
 ### Reserved waste conical
 
-One slot on the Nimbus deck -- `TubeRack50ML_0006`, slot 5, the slot nearest the tip rack and
-waste area on the real deck -- is permanently reserved for a Conical50 tube used as liquid waste.
-This is a fixture of the physical deck layout, not a per-protocol choice: `slotting_greedy`'s
-`Configuration{Nimbus}` override pins a dedicated waste-conical `Labware` to that slot on *every*
-Nimbus compile (whether or not that particular protocol uses `insert_blowouts`), and excludes the
-slot from ordinary source/target slotting. This leaves 35 of the 36 total `Conical50` rack slots
-available for real reagents. The waste conical shows up like any other placed labware in
-`loading_table.csv` and the deck diagram (`plot_slotting`), so it's visible to whoever loads the
-physical deck.
+One slot on the Nimbus deck, `TubeRack50ML_0006` slot 5, is reserved for a Conical50 tube that
+holds liquid waste. It is the slot nearest the tip rack and waste area. The reservation is a fixture
+of the physical deck, not a per-protocol choice. The `Configuration{Nimbus}` method of
+`slotting_greedy` places a waste-conical `Labware` in that slot on every Nimbus compile, whether or
+not the protocol uses `insert_blowouts`, and excludes the slot from ordinary source and target
+slotting. The other 35 of the 36 `Conical50` rack slots remain available for reagents. The waste
+conical appears in `loading_table.csv` and in the deck diagram drawn by `plot_slotting`, so whoever
+loads the deck can see it.
 
-### Dead-volume Blowout (default-on)
+### Dead-volume blowout
 
-Draining a tip to exactly its computed zero is fragile against real pipetting tolerances, since
-tips in a protocol are frequently reused across several re-aspirate cycles without a tip change.
-**`insert_blowouts` defaults to `true`, with `dead_volume_buffer` defaulting to `20.0` µL** -- a
-`Blowout` row is inserted, draining `dead_volume_buffer` to `waste_target`, immediately after any
-batch that's followed by a re-aspirate under the same tip (no batch immediately followed by an
-actual tip change, and never the very last batch, gets one). That batch's own aspirate volume is
-then sized to cover its dispenses *plus* the buffer (the blowout is the last value in its cycle,
-so it absorbs the rounding remainder) -- batch formation reserves that headroom for every batch in
-this mode to keep the sum within the channel's true capacity.
+Tips are often reused across several re-aspirate cycles without a tip change, and draining a tip to
+exactly zero is fragile against real pipetting tolerances. **`insert_blowouts` defaults to `true`
+and `dead_volume_buffer` defaults to `20.0` µL.** A `Blowout` row drains `dead_volume_buffer` to
+`waste_target` after any batch that is followed by a re-aspirate under the same tip. A batch
+followed by a tip change gets no blowout, and neither does the last batch. The aspirate volume of
+such a batch covers its dispenses plus the buffer, and the blowout, as the last value in its cycle,
+absorbs the rounding remainder. Batch formation reserves this headroom in every batch so that the
+sum stays within the true channel capacity.
 
 ```julia
 write_instrument_files(directory, design, source, target, configurations["nimbus"])
 # equivalent to explicitly passing insert_blowouts=true, dead_volume_buffer=20.0
 ```
 
-`waste_target` defaults to the reserved waste conical above, so it doesn't need to be supplied --
-pass a different `(labware id, position)` tuple to target something else instead. Pass
-`insert_blowouts=false` to disable the path entirely, or override `dead_volume_buffer` with a
-different positive value (in µL, less than the channel's capacity) for a different tube/protocol.
+`waste_target` defaults to the reserved waste conical, so it does not need to be given. A
+`(labware id, position)` tuple targets a different location. `insert_blowouts=false` disables
+blowouts. A different positive `dead_volume_buffer`, in µL and less than the channel capacity,
+suits a different tube or protocol.
 
 !!! warning
-    The reserved deck slot is real and always active, and `insert_blowouts`/`dead_volume_buffer`
-    now default to on/`20.0` -- but the Blowout path itself hasn't yet been validated end-to-end
-    against real instrument hardware -- see `csv_generation_refactor_notes.md`'s Bug 3 section for
-    the remaining open items (the
-    instrument-side `.hsl` support for the `Blowout` action, and a RunControl smoke test).
+    The reserved deck slot is always active, and `insert_blowouts` and `dead_volume_buffer` default
+    to on and `20.0`. The blowout path has not yet been validated on instrument hardware. Two items
+    remain open: `.hsl` support for the `Blowout` action on the instrument side, and a RunControl
+    smoke test.
 
-`write_instrument_files(..., config::Configuration{Nimbus}, ...)` accepts a `batch_ordering`
-keyword controlling how dispenses *within* a batch are sequenced:
+`write_instrument_files` for a `Configuration{Nimbus}` accepts a `batch_ordering` keyword that sets
+how dispenses within a batch are sequenced:
 
-- `:greedy` (default) -- a fast nearest-neighbor tour.
-- `:exact` -- the minimum-total-travel-distance ordering, found by brute-force search. Only
-  tractable for small batches (capped at 8 items; larger batches fall back to `:greedy` with a
-  warning), since batch *membership* is fixed by the greedy packing step -- only the ordering
-  within an already-formed batch is solved exactly.
+- `:greedy` (default) uses a fast nearest-neighbor tour.
+- `:exact` finds the ordering with the minimum total travel distance by brute-force search. It is
+  tractable only for small batches. Batches larger than 8 items fall back to `:greedy` with a
+  warning. The greedy packing step fixes which dispenses belong to a batch, and only the order
+  within a batch is solved exactly.
 
 ```julia
 pourfecto(directory, source_labware, target_labware, ["nimbus"]; batch_ordering=:exact)
 ```
 
-is enough to try the exact ordering; `compile(directory, pourcast; batch_ordering=:exact)` works
-the same way against an already-solved `Pourcast`, letting you compare `:greedy` against `:exact`
-on the same design before deciding which to use by default.
+tries the exact ordering. `compile(directory, pourcast; batch_ordering=:exact)` does the same for a
+solved `Pourcast`, which allows `:greedy` and `:exact` to be compared on one design.
 
 !!! note
-    `"max_tip_use"` in the Nimbus `Configuration`'s settings now counts aspirate **batches**, not
-    individual dispense shots -- since one aspirate now typically feeds several dispenses, the
-    same numeric setting forces a tip refresh less often in wall-clock/shot terms than it used to.
-    Tip changes are still always forced on a source change, regardless of this setting.
-
----
+    The `"max_tip_use"` setting in the settings of the Nimbus `Configuration` counts aspirate
+    **batches**, not individual dispense shots. Because one aspirate typically feeds several
+    dispenses, a given value forces a tip refresh less often, measured in shots or wall-clock time.
+    A change of source always forces a tip change, whatever this setting is.
 
 ## Troubleshooting
 
 ### `labware type ... cannot be placed on a ... deck`
 
-This means a piece of labware in the `Pourcast` can't be placed on the given configuration's deck at
-all -- no position accepts it, regardless of open slots. Check that piece's labware kind against the
-deck positions' admissible labware in [Configurations](@ref pourfecto_configurations).
+A piece of labware in the `Pourcast` cannot be placed on the deck of the configuration, because no
+position accepts it, however many slots are open. Compare the labware kind with the admissible
+labware of the deck positions in [Configurations](@ref pourfecto_configurations).
 
 ### `unsolvable packing arrangement`
 
-`packing_greedy` raises this when it can't make progress covering the remaining required pairings --
-some set of labware that must be co-slotted doesn't fit together on the deck no matter how it's
-arranged. Check the configuration's total slot count against how many pieces of labware are ever
-required together at once; a deck with too few slots for a mandatory group of labware can't be
-resolved by any `packing_method`.
-
----
+`packing_greedy` raises this error when it cannot cover the remaining required pairs. Some set of
+labware that must be co-slotted does not fit on the deck in any arrangement. Compare the total slot
+count of the configuration with the number of pieces of labware that are required together at once.
+A deck with too few slots for a mandatory group cannot be resolved by any `packing_method`.
