@@ -14,6 +14,8 @@ Pourfecto separates liquid-handling protocol design into two related stages:
 - **planning mode** computes source-to-target transfer volumes.
 - **planning and scheduling mode** also maps those transfers onto liquid-handler configurations.
 
+The examples on this page use these names. `sources` and `targets` are vectors of CHESSCore `Stock`s, `source_labware` and `target_labware` are vectors of CHESSCore `Labware`, and `configs` is a vector of [`Configuration`](@ref)s. The [Quick Start](@ref pourfecto_quickstart) shows how to build them from tables.
+
 ## Planning
 
 ### Planning from stocks
@@ -110,6 +112,17 @@ This is the most automated interface. It goes from populated labware and instrum
 ## Keyword arguments
 
 Most high-level [`pourfecto`](@ref) methods accept the same keyword arguments and pass them to the planning, scheduling, and compilation steps as needed. The options control the solver, planning tolerances, reagent priorities, and scheduling objectives.
+
+Most runs need only a few of them:
+
+- `optimizer` selects the solver. The default needs a Gurobi license.
+- `solver_timelimit` raises the time limit for larger problems.
+- `priority` states which reagents must be matched most closely when some matter more than others.
+- `objective` selects what the scheduler optimizes, and `config_costs` weights the configurations.
+- `enforce_minimum_shot` makes the schedule respect the minimum dispense volume of each instrument.
+- `allow_in_place` is for adding to labware that already holds material.
+
+The other keywords set tolerances and solver details, and their defaults suit most problems.
 
 ```julia
 pc = pourfecto(

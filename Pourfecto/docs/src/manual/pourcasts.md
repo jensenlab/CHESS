@@ -4,7 +4,7 @@
 CurrentModule = Pourfecto
 ```
 
-A [`Pourcast`](@ref) is the result of a `pourfecto` run. It stores the inputs, results, and metadata of the run. [`pourfecto`](@ref) creates it:
+A [`Pourcast`](@ref) is the result of a `pourfecto` run. It stores the inputs, results, and metadata of the run. [`pourfecto`](@ref) creates it. In the examples on this page, `sources` and `targets` are vectors of CHESSCore `Stock`s, `source_labware` and `target_labware` are vectors of CHESSCore `Labware`, and `configs` is a vector of [`Configuration`](@ref)s, as in the [Quick Start](@ref pourfecto_quickstart):
 
 ```julia
 pc = pourfecto(source_labware, target_labware, configs)
