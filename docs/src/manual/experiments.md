@@ -28,6 +28,7 @@ julia> get_parameter(expt, :name)
 
 Metadata keys can be registered as a [`ParameterKind`](@ref) with [`register_parameter!`](@ref),
 giving them a type, a default, and an optional validator that [`get_parameter`](@ref) enforces.
+[`parameter_registry`](@ref) holds the registered kinds, keyed by name.
 Unregistered keys remain ordinary `Dict` entries. [`with_parameter`](@ref) returns a copy of the
 experiment with one key set, leaving the original unchanged.
 
@@ -51,6 +52,22 @@ differ in a blocking factor must never share a plate, as with an incubation atmo
 julia> register_factor!(CategoricalFactor(:atmosphere;
            levels = () -> (:aerobic, :anaerobic), blocking = true, destination = :condition));
 ```
+
+[`factor_registry`](@ref) holds the registered factors, keyed by name, and [`get_factor`](@ref) looks one
+up and raises a `KeyError` for an unregistered name. [`factor_levels`](@ref) returns the currently
+valid levels of a categorical factor, and [`is_blocking`](@ref) tests whether a factor is blocking:
+
+```jldoctest experiments
+julia> factor = get_factor(:atmosphere);
+
+julia> factor_levels(factor)
+(:aerobic, :anaerobic)
+
+julia> is_blocking(factor)
+true
+```
+
+Registering a name that is already taken raises a [`DuplicateRegistrationError`](@ref).
 
 ## Parsing a spreadsheet
 
@@ -100,7 +117,14 @@ julia> classify_columns(propertynames(expt.design); reagent_context = ctx, org_c
 ```
 
 `reagent_context` and `org_context` list the modules whose registered names count, here CHESS's
-own constants. The column map is stored in the experiment's metadata, so the translation stays on
+own constants. [`is_registered_reagent`](@ref) is the test that identifies a reagent column:
+
+```jldoctest experiments
+julia> is_registered_reagent(:glucose; reagent_context = ctx), is_registered_reagent(:atmosphere; reagent_context = ctx)
+(true, false)
+```
+
+ The column map is stored in the experiment's metadata, so the translation stays on
 record.
 
 ## Resolving a row
@@ -167,6 +191,24 @@ julia> expand_control_templates(expt).design
    8 │       0  missing     anaerobic   negative      (:anaerobic,)
 ```
 
+[`partition_by_blocking`](@ref) groups the rows of an expanded design by the values of its blocking
+factors. It returns the names of the blocking columns and a list of groups, each with the shared
+values of the blocking factors and the indices of its rows. Rows in different groups never share a
+plate:
+
+```jldoctest experiments
+julia> blocking_cols, groups = partition_by_blocking(expand_control_templates(expt));
+
+julia> blocking_cols
+1-element Vector{Symbol}:
+ :atmosphere
+
+julia> [(g.key, length(g.rows)) for g in groups]
+2-element Vector{Tuple{Tuple{Symbol}, Int64}}:
+ ((:aerobic,), 4)
+ ((:anaerobic,), 4)
+```
+
 A `:duplicates` column (not used here) gives a row more than one physical well; the extra wells are
 linked to the original so `CHESSProcessing` can average them later.
 
@@ -202,6 +244,30 @@ The aerobic rows went to plate `g1_p1` and the anaerobic rows to `g2_p1`. The re
 - `:well_conditions`, each placed well's organism and non-blocking condition values, keyed by
   `(labware, well)`;
 - `:run_map` and `:plate_maps`, the scheduling structures `CHESSProcessing` uses later.
+
+The layout has the columns in [`LAYOUT_COLUMNS`](@ref). [`populate_well_conditions`](@ref) fills
+`:well_conditions` for any scheduled experiment, however it was scheduled, because it reads only the
+layout and the design:
+
+```jldoctest experiments
+julia> LAYOUT_COLUMNS
+10-element Vector{Symbol}:
+ :well
+ :row
+ :col
+ :run
+ :positive
+ :negative
+ :run_index
+ :labware
+ :location_id
+ :metadata
+
+julia> repopulated = populate_well_conditions(scheduled; reagent_context = ctx, org_context = ctx);
+
+julia> length(get_parameter(repopulated, :well_conditions)) == length(get_parameter(scheduled, :well_conditions))
+true
+```
 
 Placement within a plate is randomized, so the exact wells vary from run to run. Looking a well up
 by its design row works regardless. Design row 7 is the aerobic negative control, which has no
@@ -284,8 +350,10 @@ true
 
 ## QC methods
 
-[`register_qc_method!`](@ref) lets another package register a quality-control method type under a
-name, found again with [`qc_method`](@ref). `CHESSExperiments` owns only the registry; the methods
-themselves live in the packages that implement them.
+A [`QCMethod`](@ref) is a quality-control or correction method. [`register_qc_method!`](@ref) lets
+another package register a method type under a name, [`qc_method`](@ref) finds it again, and
+[`qc_methods`](@ref) lists the registered names. Registering a name that is taken raises a
+`DuplicateRegistrationError`. `CHESSExperiments` owns only the registry. The methods themselves live in
+the packages that implement them.
 
 The [CHESSExperiments API reference](../api/experiments.md) lists every function.

@@ -25,8 +25,9 @@ Processing is a chain of six small operations:
 Every operation takes the same arguments, `(experiment, run_map, plate_maps, values; ...)`, and
 returns `(experiment, values)`. `values` is a `Dict` from run-map node to number. Because the shape
 is shared, operations can be chained, reordered, or skipped freely. Each call also appends a
-[`ProcessingRecord`](@ref) to the experiment, so [`processing_log`](@ref) shows exactly what was
-done.
+[`ProcessingRecord`](@ref) to the experiment, with [`append_record`](@ref), so [`processing_log`](@ref)
+shows exactly what was done. The operations call `append_record` themselves, and callers do not need
+to.
 
 ## Example
 
