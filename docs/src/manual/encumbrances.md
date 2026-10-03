@@ -4,9 +4,9 @@
 DocTestSetup = :(using CHESS)
 ```
 
-An encumbrance is a non-binding, future-dated reservation of an operation -- a way to say "this
-transfer/movement/attribute-change is planned" without writing it into the canonical history tables
-covered in [Database Architecture](db-architecture.md).
+An encumbrance is a non-binding reservation of a future operation. It records that a transfer,
+movement, or attribute change is planned without writing it to the history tables described in
+[Database Architecture](db-architecture.md).
 
 ## Protocols
 
@@ -37,19 +37,19 @@ julia> p_id = upload_protocol(exp_id, "move plates to bench")
 1
 ```
 
-`(ExperimentID, Name)` is unique -- a protocol has a stable identity within an experiment. Each
-protocol also carries its own ledger-timestamped enforcement flag, so enforcement can be toggled
-over time rather than being a fixed property.
+The pair `(ExperimentID, Name)` is unique, so a protocol has a stable identity within its
+experiment. Each protocol also has an enforcement flag that is stamped with a ledger entry, so
+enforcement can be switched on and off over time.
 
 ## Encumbering an operation
 
-There is no `Encumbrance` struct -- an encumbrance is a row identity: an `Int` `Encumbrances.ID`
-tying a `ProtocolID` to one row in an operation-specific `Encumbered*` table (`EncumberedTransfers`,
-`EncumberedMovements`, `EncumberedEnvironments`, `EncumberedLocks`, `EncumberedActivity`).
+An encumbrance has no type of its own. It is an integer `Encumbrances.ID` that ties a `ProtocolID`
+to one row in an operation-specific table: `EncumberedTransfers`, `EncumberedMovements`,
+`EncumberedEnvironments`, `EncumberedLocks`, or `EncumberedActivity`.
 
-`encumber` (`protocol_id, fun, args...`) has a mechanism worth stating plainly: it runs the raw
-`CHESSCore` mutation **immediately, in-memory**, then records the reservation into the matching
-`Encumbered*` table. Nothing about this is deferred or simulated:
+`encumber` takes `protocol_id, fun, args...`. It runs the `CHESSCore` operation immediately in
+memory and then records the reservation in the matching table. The operation is not deferred or
+simulated:
 
 ```jldoctest encumbrances
 julia> enc_move1 = encumber(p_id, move_into!, bench, plate1)
@@ -62,10 +62,10 @@ julia> print(parent(reconstruct_location(CHESSCore.location_id(plate1))))  # not
 Lab
 ```
 
-"Non-binding" describes the *database* side only -- nothing is written to `Movements`/`Transfers`/
-`EnvironmentAttributes`/etc. The in-memory object graph really is mutated right away, and nothing in
-the encumbrance machinery undoes that automatically. A movement encumbrance that also passes a
-trailing `lock=true` really does lock the location in memory:
+Non-binding refers to the database only: nothing is written to `Movements`, `Transfers`,
+`EnvironmentAttributes`, or the other history tables. The in-memory objects change immediately, and
+nothing reverses that change automatically. A movement encumbrance that passes a trailing `true`
+to lock the location does lock it in memory:
 
 ```jldoctest encumbrances
 julia> enc_move2 = encumber(p_id, move_into!, bench, plate2, true)
@@ -74,14 +74,14 @@ julia> enc_move2 = encumber(p_id, move_into!, bench, plate2, true)
 julia> is_locked(plate2)
 true
 
-julia> unlock!(plate2);  # reversing the in-memory lock manually, nothing does this for you
+julia> unlock!(plate2);  # reversing the in-memory lock is manual
 ```
 
-## Completing an encumbrance is a separate, manual step
+## Completing an encumbrance
 
-Performing the real operation later does **not**, by itself, mark an encumbrance complete. Linking
-the two is an explicit call. Here the real move is uploaded from a fresh reconstruction, since
-`plate1` in memory has already been moved:
+Performing the real operation later does not mark the encumbrance complete. A separate call links
+the two. Here the real move is uploaded from a reconstruction, because `plate1` in memory has
+already been moved:
 
 ```jldoctest encumbrances
 julia> move_id = upload(move_into!, bench, reconstruct_location(CHESSCore.location_id(plate1)));
@@ -89,10 +89,9 @@ julia> move_id = upload(move_into!, bench, reconstruct_location(CHESSCore.locati
 julia> CHESSDatabase.upload_encumbrance_completion(enc_move1, move_id)
 ```
 
-Nothing automatically ties "the real operation happened" to "this encumbrance is complete" -- an
-encumbrance can be marked complete without the corresponding real operation ever having been
-performed, or vice versa. Encumbrances model *intent*; closing the loop back to the ledger is the
-caller's responsibility.
+Nothing ties the real operation to the encumbrance automatically. An encumbrance can be marked
+complete without the operation having been performed, and the operation can be performed without
+completing the encumbrance. Encumbrances record intent, and the caller links them to the ledger.
 
 ## Status queries
 
@@ -111,11 +110,10 @@ julia> CHESSDatabase.get_encumbrance_status(p_id)
    2 │             2  Movement    missing       false
 ```
 
-`get_all_encumbrances(protocol_id)` lists every encumbrance ID in a protocol.
-`get_encumbrance_completion(encumbrance_ids)` reports whether each is linked to a ledger entry.
-`get_all_protocols`/`get_protocol_status` summarize at the protocol level -- how many of a
-protocol's encumbrances have been completed versus its total.
+- `get_all_encumbrances(protocol_id)` lists every encumbrance ID in a protocol.
+- `get_encumbrance_completion(encumbrance_ids)` reports whether each is linked to a ledger entry.
+- `get_all_protocols` and `get_protocol_status` summarize at the protocol level, giving the number
+  of completed encumbrances against the total.
 
-[Instrument Interfaces](instrument-interfaces.md) covers the last topic in this group: how an
-instrument's in-memory capability check and its database attribution are split across the two
-packages.
+[Instrument Interfaces](instrument-interfaces.md) describes how the capability check and the
+recording of the instrument are divided between the two packages.
