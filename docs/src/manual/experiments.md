@@ -7,13 +7,10 @@ DocTestSetup = :(using CHESS, CHESSExperiments, DataFrames)
 `CHESSExperiments` describes what an experiment is meant to test, before anything is prepared: a
 design matrix of treatments, the factors its columns stand for, and the controls and replicates it
 needs. It turns that design into `CHESSCore` stocks and per-plate conditions, and, with `RunMaps`
-and `PlateMaps` loaded, into a plate layout. It is a separate package from `CHESS`:
+and `PlateMaps` loaded, into a plate layout. It is a separate package that is loaded separately
+from `CHESS`.
 
-```julia
-using CHESSExperiments
-```
-
-## `Experiment`: the design and everything else
+## Experiments
 
 An [`Experiment`](@ref) has two fields. `design` is a `DataFrame` with one row per planned trial and
 one column per factor; a treatment run three times is the same row three times. `metadata` holds
@@ -31,7 +28,7 @@ julia> get_parameter(expt, :name)
 
 Metadata keys can be registered as a [`ParameterKind`](@ref) with [`register_parameter!`](@ref),
 giving them a type, a default, and an optional validator that [`get_parameter`](@ref) enforces.
-Unregistered keys are still plain `Dict` entries. [`with_parameter`](@ref) returns a copy of the
+Unregistered keys remain ordinary `Dict` entries. [`with_parameter`](@ref) returns a copy of the
 experiment with one key set, leaving the original unchanged.
 
 ## How design columns are read
@@ -137,8 +134,8 @@ Dict{Symbol, Any} with 1 entry:
 ```
 
 [`resolve_conditions`](@ref) returns a row's `:condition` values as a plain `Dict`, checking
-categorical values against their levels. Conditions are recorded, not applied: a plate cannot be
-set to "anaerobic" the way a well can be filled.
+categorical values against their levels. Conditions are only recorded. A plate cannot be set to
+"anaerobic" the way a well can be filled.
 
 ```jldoctest experiments
 julia> resolve_conditions(expt.design[1, :], [:atmosphere])

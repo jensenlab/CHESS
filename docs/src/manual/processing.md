@@ -6,15 +6,12 @@ DocTestSetup = :(using CHESSProcessing, CHESSExperiments, RunMaps, PlateMaps, CH
 
 `CHESSProcessing` turns plate readings into one value per design row. It works on the pieces an
 [experimental design](experiments.md) produces when it is scheduled: the `Experiment`, its
-[run map](runmaps.md), and its plate maps. It is a separate package:
+[run map](runmaps.md), and its plate maps. It is a separate package that is loaded separately from
+`CHESS`.
 
-```julia
-using CHESSProcessing
-```
+## Operations
 
-## Six operations, one shape
-
-Processing is a chain of small operations rather than a fixed pipeline:
+Processing is a chain of six small operations:
 
 | Operation | What it does |
 |:--|:--|
@@ -31,7 +28,7 @@ is shared, operations can be chained, reordered, or skipped freely. Each call al
 [`ProcessingRecord`](@ref) to the experiment, so [`processing_log`](@ref) shows exactly what was
 done.
 
-## A worked example
+## Example
 
 Three design rows are laid out on a 2×4 plate. Run 1 has two duplicate wells (nodes 5 and 6), and
 every run is linked to one negative control (node 100) and one positive control (node 200). The

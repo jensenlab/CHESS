@@ -8,11 +8,7 @@ DocTestSetup = :(using RunMaps, DataFrames)
 sample, and which wells are duplicates of the same treatment. It says nothing about where anything
 goes on a plate; [`PlateMaps`](https://jensenlab.github.io/CHESS/platemaps/dev/) places a run map
 onto plates, and [Experimental Designs](experiments.md) builds run maps from a design automatically.
-It is a separate package:
-
-```julia
-using RunMaps
-```
+It is a separate package that is loaded separately from `CHESS`.
 
 ## Runs and links
 
