@@ -85,6 +85,26 @@ julia> molecular_weight(LiCl)
 42.39 g mol⁻¹
 ```
 
+[`set_composition!`](@ref) registers the composition rule of a reagent that is already defined. The
+rules are held in [`composition_rules`](@ref), keyed by the reagent itself and not by its type,
+because every reagent is a value of one of three types and the type cannot tell two solids apart:
+
+```jldoctest reagents
+julia> @reagent DemoSalt "demo salt" Solid missing missing missing;
+
+julia> @chemical DemoCation "DemoCation" 1 20.0u"g/mol";
+
+julia> @chemical DemoAnion "DemoAnion" -1 30.0u"g/mol";
+
+julia> set_composition!(DemoSalt, CompositionRule(Dict(DemoCation => 1, DemoAnion => 1)));
+
+julia> composition(DemoSalt)
+CompositionRule(Dict{Chemical, Int64}(DemoAnion => 1, DemoCation => 1))
+
+julia> DemoSalt in keys(composition_rules)
+true
+```
+
 `CompositionRule` coefficients must be non-negative. A base's hydroxide is represented by the
 canonical [`OH⁻`](@ref) `Chemical`, not a negative [`H⁺`](@ref) count. This lets `pH` (see
 [Recipes & Solution Chemistry](recipes.md)) net acid and base contributions by explicit

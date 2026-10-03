@@ -37,7 +37,8 @@ AcidBaseSystem(Chemical[AspartateCation, L-aspartic acid, AspartateAnion, Aspart
 ## Registering one
 
 [`set_acid_base_system!`](@ref) registers a system for a [`Reagent`](@ref), and
-[`acid_base_system`](@ref) looks it up. The lookup returns `nothing` for a reagent with no
+[`acid_base_system`](@ref) looks it up. The systems are held in [`acid_base_systems`](@ref), keyed
+by the reagent, like the composition rules. The lookup returns `nothing` for a reagent with no
 registered weak acid or base, which is the default. This registry is independent of a reagent's
 [`CompositionRule`](@ref) (see [Reagents & Chemicals](reagents-chemicals.md)). A `Reagent` can have
 either, both, or neither, because they answer different questions: complete-dissociation mass
@@ -118,6 +119,49 @@ julia> pH(buffer; ionic_strength_correction=false)
 
 julia> pH(buffer)
 4.570325410721125
+```
+
+## Open systems and the water correction
+
+The equilibrium solver takes its inputs as families. An [`AnalyticalSpecies`](@ref) is an
+[`AcidBaseSystem`](@ref) together with its total concentration in a stock. Every family that comes
+from the recipe of a stock is of this kind. An [`OpenSystemSpecies`](@ref) is a family held at a
+fixed concentration of its first species. It models a species in equilibrium with an external
+reservoir, such as dissolved atmospheric carbon dioxide, whose concentration is set by the partial
+pressure and not by how much of the conjugate base forms. Its total concentration grows with pH.
+Both types are subtypes of [`AbstractAnalyticalSpecies`](@ref). The constant [`Kw`](@ref) is the
+autoionization constant of water that the solver uses.
+
+`pH` takes `water_correction=true` to add an open-system species to the equilibrium. Most stocks do
+not need this. It matters for poorly buffered basic solutions, such as a solution of a pure
+conjugate-base salt, which atmospheric carbon dioxide shifts much more than a fixed dose would. The
+species is `water_correction_source` if given, and otherwise [`default_water_correction`](@ref),
+which a lab module registers with [`set_default_water_correction!`](@ref). `CHESSLabConstants`
+registers an atmospheric carbon dioxide correction:
+
+```jldoctest acid_base
+julia> acetate = 0.01u"mol" * rgt"sodium_acetate_anhydrous" + 100u"mL" * rgt"water";
+
+julia> pH(acetate)
+8.68439649164793
+
+julia> pH(acetate; water_correction=true)
+7.746718884707661
+```
+
+## Ion parameters
+
+The Davies equation corrects for ionic strength with the charge of an ion alone. For an ion with
+published parameters, [`set_ion_parameters!`](@ref) registers the ion-size parameter `å` in Ångströms
+and the empirical parameter `b` of the Truesdell-Jones equation. The parameters are held in
+[`ion_parameters`](@ref), keyed by the chemical. An ion without parameters uses the Davies equation.
+`CHESSLabConstants` registers parameters for common inorganic ions:
+
+```jldoctest acid_base
+julia> set_ion_parameters!(MyConjugateBase, 4.5, 0.1)
+
+julia> ion_parameters[MyConjugateBase]
+(4.5, 0.1)
 ```
 
 ## Adjusting pH
