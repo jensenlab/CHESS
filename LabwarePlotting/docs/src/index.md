@@ -28,3 +28,17 @@ a grid-shaped type follows the same convention.
 [`role_palette`](@ref) maps roles to consistent colors. Both layers use them.
 
 The [Quick Start Guide](@ref) shows each of these.
+
+## Installation
+
+LabwarePlotting is a package of the [CHESS](https://github.com/jensenlab/CHESS) repository and is installed with it. Follow the [CHESS installation instructions](https://jensenlab.github.io/CHESS/dev/#Installation), then, in the clone, start Julia with the LabwarePlotting environment:
+
+```bash
+julia --project=LabwarePlotting
+```
+
+and load the package:
+
+```julia
+using LabwarePlotting
+```

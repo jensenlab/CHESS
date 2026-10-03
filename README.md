@@ -55,18 +55,23 @@ Shared plotting utilities consumed by packages across the other categories.
 
 ## Installation
 
-CHESS requires **Julia 1.12 or later** -- the repository ties its packages together as a Julia
-`[workspace]`, a Pkg feature introduced in 1.12. The workspace members (`CHESSCore`,
-`CHESSDatabase`, `CHESSLabConstants`, `Pourfecto`) resolve each other via local paths, not a
-package registry, so **CHESS must be used from a local clone** -- `Pkg.add(url="...")` from another
-project will not work (Pkg does not carry a workspace's local path resolution to consumers that
-merely add it as a dependency), and none of these packages are published to a registry.
+CHESS requires **Julia 1.12 or later**. The repository is a Julia workspace, a feature of the
+package manager that was introduced in 1.12, and its packages find each other through local paths.
+None of the packages is published to a registry. CHESS must therefore be used from a local clone.
+Adding it to another project from its URL does not work, because the package manager does not carry
+the local paths of a workspace over to a project that depends on it.
 
-```julia
-# git clone https://github.com/jensenlab/CHESS && cd CHESS
-using Pkg
-Pkg.instantiate()
+Clone the repository and instantiate its environment:
+
+```bash
+git clone https://github.com/jensenlab/CHESS
+cd CHESS
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
+
+Instantiating installs every package in the workspace from its local path, together with their
+dependencies. To start a session, run `julia --project=.` in the clone. To work with a package
+other than CHESS, such as Pourfecto, set `--project` to the directory of that package instead.
 
 ## Quickstart
 

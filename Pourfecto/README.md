@@ -38,13 +38,15 @@ Pourfecto's goal is to abstract all of the logistical details of converting desi
 
 ## Installation
 
-Pourfecto is not published to a package registry — it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS, with Julia 1.12 or later (the first version to support Pkg workspaces):
+Pourfecto is a package of the [CHESS](https://github.com/jensenlab/CHESS) repository and is installed with it. Follow the [CHESS installation instructions](https://jensenlab.github.io/CHESS/dev/#Installation), then, in the clone, start Julia with the Pourfecto environment:
+
+```bash
+julia --project=Pourfecto
+```
+
+and load the package:
 
 ```julia
-# git clone https://github.com/jensenlab/CHESS && cd CHESS
-using Pkg
-Pkg.activate("Pourfecto")
-Pkg.instantiate()
 using Pourfecto
 ```
 

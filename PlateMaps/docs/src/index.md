@@ -41,3 +41,17 @@ The docstrings of the extensions (`PlateMapsRunMapsExt` and `PlateMapsCHESSCoreE
 the [API Reference](@ref), because Documenter does not load package extensions as it loads
 `PlateMaps`. The [Quick Start Guide](@ref) shows how to use them. It also covers scheduling across
 several plates and the DataFrame and JSON interfaces.
+
+## Installation
+
+PlateMaps is a package of the [CHESS](https://github.com/jensenlab/CHESS) repository and is installed with it. Follow the [CHESS installation instructions](https://jensenlab.github.io/CHESS/dev/#Installation), then, in the clone, start Julia with the PlateMaps environment:
+
+```bash
+julia --project=PlateMaps
+```
+
+and load the package:
+
+```julia
+using PlateMaps
+```
