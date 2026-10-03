@@ -8,6 +8,11 @@ Rules for writing and revising pages on the CHESS documentation sites.
 - Do not use rhetorical interjections or filler: "full stop", "simply", "just", "note that".
 - Keep `--` asides short, or turn them into sentences. Avoid long parentheticals.
 - Keep a page's analogies to one place. The chess analogy is told on the Home page only.
+- Write headings as plain noun phrases that name the topic ("Locations", "Mixing stocks"). Do not
+  write slogans, contrasts, or "term: explanation" headings ("Recording moves, not positions",
+  "A quantity, not just presence", "Chemicals: identity").
+- Use "state" for what the ledger records and reconstructs: the state of the lab, of a location, of
+  a well. Use "position" only for a literal physical location or an index in a sequence.
 
 ## Pages stand alone
 
@@ -16,6 +21,16 @@ Rules for writing and revising pages on the CHESS documentation sites.
 - Link to another page when a concept depends on it, and restate the one fact the reader needs.
 - Do not describe implementation history or list callers of a function (for example "its only
   current caller is ..."). Describe what the function does and how to use it.
+
+## Code in prose
+
+- Inline code names things: functions, types, macros, fields, and values. It is not a verb. Do not
+  write that `using CHESS` registers constants or that a command "does" something. Describe the
+  behavior in plain language, for example "CHESS includes common location kinds such as ...".
+- Introduce an example in words before the doctest. Put commands such as `using CHESS` in the
+  doctest or setup block, not in the sentence that describes the setup.
+- Reserve code for doctests where possible. When a sentence can say the same thing without code,
+  leave the code out.
 
 ## Links and references
 

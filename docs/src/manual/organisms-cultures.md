@@ -10,7 +10,7 @@ species and strain identity with the fields `genus`, `species`, and `strain`. Ea
 
 ## Registering an organism
 
-`using CHESS` registers several lab strains. [`@organism`](@ref) registers a new one:
+CHESS already includes several lab strains. The [`@organism`](@ref) macro defines a new one:
 
 ```jldoctest organisms
 julia> @organism BSU_168 "Bacillus" "subtilis" "168"
@@ -42,7 +42,7 @@ julia> org"SMU_UA159"
 SMU_UA159
 ```
 
-## Biomass: a quantity, not just presence
+## Biomass
 
 Organisms cannot be counted directly. The available measurement is optical density (OD), which is
 a concentration. [`Biomass`](@ref CHESSCore.Biomass) is the quantity CHESS tracks for an organism:

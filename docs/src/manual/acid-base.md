@@ -13,7 +13,7 @@ DocTestSetup = :(using CHESS)
     when a stock contains no registered weak acid or base, so stocks that do not need the
     equilibrium model are unaffected.
 
-## `AcidBaseSystem`: conjugate families
+## Conjugate acid/base families
 
 An [`AcidBaseSystem`](@ref) represents a chain of [`Chemical`](@ref) protonation states, from
 fully-protonated to fully-deprotonated, linked by a `pKa` per step. Phosphoric acid is a
@@ -80,7 +80,7 @@ julia> pH(vinegar)
 partially dissociates, so `vinegar` is far less acidic than `acid` at a similar loading. The
 strong-electrolyte formula in [Recipes & Solution Chemistry](recipes.md) cannot capture this.
 
-## `speciation`: per-species breakdown
+## Speciation
 
 [`speciation`](@ref) reports the equilibrium fraction and concentration of every protonation state
 at a stock's solved `pH` and returns one [`SpeciationResult`](@ref) per distinct family present.
@@ -120,7 +120,7 @@ julia> pH(buffer)
 4.570325410721125
 ```
 
-## `adjust_pH`: titrating to a target
+## Adjusting pH
 
 [`adjust_pH`](@ref) returns a new `Stock`: `s` plus the amount of an `acid` or `base` reagent
 needed to reach a target pH. It does not modify `s`, since `Stock`s are immutable (see

@@ -9,7 +9,7 @@ laboratory -- automated or otherwise. Rather than storing the *state* of a lab (
 what's in it, how full it is) at each point in time, CHESS records the *operations* that produced
 that state -- movements, environmental changes, transfers, and reads -- as a permanent, append-only
 [ledger](manual/ledger.md), and reconstructs any state on demand by simulating that history. The design is directly
-inspired by how chess games are recorded: not as a sequence of board positions, but as a sequence
+inspired by how chess games are recorded: not as a sequence of board states, but as a sequence
 of moves, replayed by an engine that knows the rules.
 
 The repository holds a family of packages, grouped by role.

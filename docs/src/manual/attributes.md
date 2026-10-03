@@ -4,7 +4,7 @@
 DocTestSetup = :(using CHESS)
 ```
 
-A location has an environment (temperature, humidity, and so on) as well as a position in the
+A location has an environment (temperature, humidity, and so on) as well as a place in the
 hierarchy. The environment flows down the hierarchy the way physical containment does.
 
 The examples on this page use a room holding CHESS's `Incubator`, which has three shelves, with a
@@ -28,8 +28,8 @@ julia> move_into!(shelf, plate)
 
 A location's environment is made up of attribute kinds, registered with the [`@attribute`](@ref)
 macro. Like location kinds, each is a `const` binding plus a registry entry, recalled by name.
-`using CHESS` already registers common kinds such as `Temperature` and `Humidity`, so this example
-registers a new one:
+CHESS already includes common kinds such as `Temperature` and `Humidity`, so this example defines a
+new one:
 
 ```jldoctest attributes
 julia> @attribute BarometricPressure u"atm"
@@ -57,7 +57,7 @@ Dict{Symbol, Attribute} with 1 entry:
   :Temperature => 21.0 °C
 ```
 
-## Environment: attributes are inherited
+## Inherited environment
 
 [`environment(x)`](@ref) is the inherited view: `x`'s own attributes override its parent's
 environment, recursively. A location with no attributes of its own just inherits its parent's.

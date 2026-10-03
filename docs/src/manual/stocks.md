@@ -118,7 +118,7 @@ ERROR: Mixing Error with sodium_chloride
 : attempted to add a negative quantity to a Stock
 ```
 
-## `@stock_str` for named recipes
+## Named stocks
 
 [`@stock`](@ref) registers a named stock, like [`@location_kind`](@ref), [`@reagent`](@ref),
 [`@chemical`](@ref), and [`@organism`](@ref). [`@stock_str`](@ref) recalls it. Only stocks

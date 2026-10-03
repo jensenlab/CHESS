@@ -9,11 +9,11 @@ and *chemical identity*, what the material is once dissolved. Table salt is a so
 out, and once dissolved it is two chemical identities, Na⁺ and Cl⁻. `CHESSCore` represents these as
 two concepts: [`Reagent`](@ref) and [`Chemical`](@ref).
 
-## Reagents: physical form
+## Reagents
 
 `Reagent` is an abstract type with three concrete subtypes, `Solid`, `Liquid`, and `Gas`, which
-share four fields: `name`, `molecular_weight`, `density`, and `pubchemid`. `using CHESS` registers
-a starter set of reagents, recalled by name with [`@rgt_str`](@ref):
+share four fields: `name`, `molecular_weight`, `density`, and `pubchemid`. CHESS already includes
+a starter set of reagents, which [`@rgt_str`](@ref) recalls by name:
 
 ```jldoctest reagents
 julia> rgt"water"
@@ -40,7 +40,7 @@ julia> molecular_weight(myreagent)
 missing
 ```
 
-## Chemicals: identity
+## Chemicals
 
 `Chemical` is a single concrete type with the fields `name`, `charge` (`0` for neutral species),
 and `molecular_weight`. CHESS registers common ions such as Na⁺, Cl⁻, and Ca²⁺. [`@chemical`](@ref)
@@ -63,7 +63,7 @@ julia> chem"Ca2+" + 2*chem"Cl-"
 Formula(Dict{Chemical, Int64}(Cl⁻ => 2, Ca²⁺ => 1))
 ```
 
-## Dissociation: how a reagent breaks down
+## Dissociation
 
 Every `Reagent` has a [`composition`](@ref), a [`CompositionRule`](@ref) that describes which
 `Chemical`s it breaks down into when dissolved. The default rule is the reagent's own identity as a

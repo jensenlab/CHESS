@@ -6,8 +6,8 @@ DocTestSetup = :(using CHESS)
 
 This page describes how [locations](core-concepts.md) move within a hierarchy.
 
-`using CHESS` already registers `Lab`, `Bench`, and `WP96`. CHESS's own `Incubator` kind has
-shelves, so this page registers a simpler incubator that holds up to four plates directly:
+CHESS already includes the location kinds `Lab`, `Bench`, and `WP96`. Its `Incubator` kind has
+shelves, so this page defines a simpler incubator that holds up to four plates directly:
 
 ```jldoctest movement
 julia> @location_kind SmallIncubator Symbol[] nothing nothing nothing nothing nothing 2//1 0//1
@@ -169,5 +169,5 @@ true
 ```
 
 [Environmental Attributes & Inheritance](attributes.md) describes the environment a location
-carries in addition to its position.
+carries in addition to its place in the hierarchy.
 

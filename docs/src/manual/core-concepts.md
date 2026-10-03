@@ -4,25 +4,21 @@
 DocTestSetup = :(using CHESS)
 ```
 
-## Recording moves, not positions
-
-CHESS records a laboratory the way a chess game is recorded. A chess database stores the moves,
-not the position of every piece after every move, and an engine that knows the rules replays the
-moves to reconstruct any position.
+## How CHESS records a lab
 
 CHESS stores the primitive *operations* that change the lab (movements, environmental changes,
 transfers, and reads) as a permanent, ordered history called the *ledger*, described in
-[The Ledger](ledger.md). Any past or present state is reconstructed by replaying that history
-through a "lab engine," which is `CHESSCore`. This page describes the most fundamental object in
-that engine, the **location**.
+[The Ledger](ledger.md). The state of the lab at any past or present time is reconstructed by
+replaying that history through a lab engine, which is `CHESSCore`. This page describes the most
+fundamental object in that engine, the **location**.
 
-## Everything is a location
+## What a location is
 
 Every physical thing in a lab is modeled as a *location*: a room, a bench, an incubator, a
 microwell plate, a single well inside that plate, a liquid-handling robot. Anything that occupies
 space in the lab is a location.
 
-## Locations form a hierarchy
+## Location hierarchy
 
 Locations are nested. A well is inside a plate, a plate inside an incubator, and an incubator
 inside a room. This nesting forms a hierarchy: every location has at most one parent, and most can
@@ -79,9 +75,9 @@ operates on. A *kind* is a named, interned, immutable value that stores a locati
 parameters. Many kinds share one type, and registering a new kind, such as a new plate model or
 instrument, never adds a type.
 
-The [`@location_kind`](@ref) macro creates new kinds. `using CHESS` already registers the common
-ones (`Room`, `Incubator`, `WP96`, and so on) through `CHESSLabConstants`, so this example defines
-two new kinds:
+The [`@location_kind`](@ref) macro creates new kinds. CHESS already includes the common ones, such
+as `Room`, `Incubator`, and `WP96`, through `CHESSLabConstants`, so this example defines two new
+kinds:
 
 ```jldoctest core_concepts
 julia> @location_kind DemoWell Symbol[] nothing nothing 200u"µL" nothing nothing
