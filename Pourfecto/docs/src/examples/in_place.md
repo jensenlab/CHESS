@@ -30,9 +30,9 @@ as the same plate by matching labware name and well name, not object
 identity, so both are built with the same name.
 
 ```julia
-water = string_to_reagent("water", Liquid)
-buffer = string_to_reagent("buffer", Liquid)
-naoh = string_to_reagent("naoh", Liquid)
+water = string_to_component("water", Liquid)
+buffer = string_to_component("buffer", Liquid)
+naoh = string_to_component("naoh", Liquid)
 
 existing_plate = build_location(location_kinds[:WP96], "assay_plate")
 for w in vec(children(existing_plate))
@@ -98,7 +98,7 @@ in the target -- it's not something the plan is trying to
 change, just an oversight:
 
 ```julia
-preservative = string_to_reagent("preservative", Liquid)
+preservative = string_to_component("preservative", Liquid)
 
 existing_plate_2 = build_location(location_kinds[:WP96], "assay_plate_2")
 for w in vec(children(existing_plate_2))

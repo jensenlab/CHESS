@@ -30,13 +30,13 @@ using Pourfecto, CHESSCore, Unitful
 
 ## Defining reagents and source labware
 
-Reagents are created from names with [`string_to_reagent`](@ref). This example needs
+Reagents are created from names with [`string_to_component`](@ref). This example needs
 two solid reagents (A and B) and water to dissolve them.
 
 ```julia
-A = string_to_reagent("A", Solid)
-B = string_to_reagent("B", Solid)
-water = string_to_reagent("water", Liquid)
+A = string_to_component("A", Solid)
+B = string_to_component("B", Solid)
+water = string_to_component("water", Liquid)
 ```
 
 Each reagent's stock solution lives in its own deep reservoir.
