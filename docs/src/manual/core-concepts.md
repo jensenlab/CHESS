@@ -120,7 +120,7 @@ Labware
 ```
 
 !!! note
-    [`@location_kind`](@ref) binds the constant in the calling module but does not `export` it. The
+    [`@location_kind`](@ref) binds the constant in the calling module but does not export it. The
     same holds for `@attribute`, `@read`, `@chemical`, and `@organism` (see
     [Registering Lab Constants](registering-lab-constants.md)), so a lab module can register
     hundreds of kinds without adding names to the namespace of code that loads it.
@@ -131,8 +131,8 @@ Labware
 builds one node. For a `Labware` it builds the whole fixed well grid in the same call, so a
 half-built plate cannot exist.
 
-A `Location` prints as its name inside collections and string interpolation. The REPL and `display`
-show a detailed report: kind, lock and active state, parent, a summary of children, attributes, and
+A `Location` prints as its name inside collections and string interpolation. The REPL shows a
+detailed report: kind, lock and active state, parent, a summary of children, attributes, and
 reads.
 
 ```jldoctest core_concepts

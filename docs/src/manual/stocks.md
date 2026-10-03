@@ -48,9 +48,9 @@ julia> salt = 5u"g" * rgt"sodium_chloride"
  sodium_chloride  Sodium Chloride  5.00 g          100 %
 ```
 
-## Mixing with `+`
+## Mixing stocks
 
-Adding two stocks with `+` produces the subtype that the combined contents call for. Water plus
+Adding two stocks produces the subtype that the combined contents call for. Water plus
 salt is a `Solution`:
 
 ```jldoctest stocks
@@ -65,9 +65,9 @@ julia> saline = water_solution + salt
  water    water  1.00 mL          100 %
 ```
 
-[`quantity(::Stock)`](@ref) reports the total liquid volume only (`1.00 mL` here, excluding the
+[`quantity(::Stock)`](@ref) reports the total liquid volume only (1.00 mL here, excluding the
 dissolved solid). Solids contribute to [`volume_estimate`](@ref), which estimates from density and
-warns when a solid's density is unknown. CHESS's `sodium_chloride` is registered with a `missing`
+warns when a solid's density is unknown. CHESS's `sodium_chloride` is registered without a
 density:
 
 ```jldoctest stocks
@@ -79,7 +79,7 @@ julia> volume_estimate(salt)
 
 ## Scaling
 
-`*` and `/` by a plain number scale every reagent and every organism's
+Multiplying or dividing a stock by a plain number scales every reagent and every organism's
 [`Biomass`](@ref CHESSCore.Biomass) proportionally. Multiplying by a quantity scales the whole stock
 so that the quantity is its new total. This is how diluting a `Culture` to a target volume also
 dilutes its organisms:
@@ -108,8 +108,8 @@ julia> tenmL = 10u"mL" * saline
 
 ## The non-negativity constraint
 
-`-` mixes by subtraction and throws [`MixingError`](@ref) if any reagent would go negative. The
-same applies to organism [`Biomass`](@ref CHESSCore.Biomass), which `-` can reduce or remove like a
+Subtracting one stock from another throws [`MixingError`](@ref) if any reagent would go negative. The
+same applies to organism [`Biomass`](@ref CHESSCore.Biomass), which subtraction can reduce or remove like a
 chemical amount (see [Removing organisms](organisms-cultures.md#Removing-organisms)):
 
 ```jldoctest stocks

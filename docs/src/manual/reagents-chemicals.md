@@ -29,7 +29,7 @@ julia> pubchemid(rgt"water")
 962
 ```
 
-[`@reagent`](@ref) registers a new reagent. Any of the three properties can be `missing`, so a
+[`@reagent`](@ref) registers a new reagent. Any of the three properties can be left unknown, so a
 reagent can be registered and used with incomplete data:
 
 ```jldoctest reagents
@@ -42,7 +42,7 @@ missing
 
 ## Chemicals
 
-`Chemical` is a single concrete type with the fields `name`, `charge` (`0` for neutral species),
+`Chemical` is a single concrete type with the fields `name`, `charge` (zero for neutral species),
 and `molecular_weight`. CHESS registers common ions such as Na⁺, Cl⁻, and Ca²⁺. [`@chemical`](@ref)
 registers a new one:
 
@@ -52,8 +52,8 @@ Li⁺
 ```
 
 [`@chem_str`](@ref) recalls a registered chemical (`chem"Na+"`). It is mainly used to build a
-[`Formula`](@ref), a stoichiometric expression that combines `Chemical`s with `+` and supplies
-coefficients with `*`, as for the two chlorides that balance Ca²⁺:
+[`Formula`](@ref), a stoichiometric expression that adds `Chemical`s together and multiplies them by
+coefficients, as for the two chlorides that balance Ca²⁺:
 
 ```jldoctest reagents
 julia> chem"Na+" + chem"Cl-"

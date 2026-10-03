@@ -46,7 +46,7 @@ SMU_UA159
 
 Organisms cannot be counted directly. The available measurement is optical density (OD), which is
 a concentration. [`Biomass`](@ref CHESSCore.Biomass) is the quantity CHESS tracks for an organism:
-an absolute, conserved amount with dimensions `OD * Volume`, so `biomass / volume` gives an OD
+an absolute, conserved amount with dimensions of optical density times volume, so dividing biomass by volume gives an OD
 reading with no calibration factor. Like a solid's `Mass` or a liquid's `Volume`, `Biomass` is not
 tied to the stock's liquid volume, so a `Culture` can have organisms and no liquid (see
 [Stocks](stocks.md)).
@@ -62,13 +62,13 @@ julia> inoculum = 1u"OD*mL" * org"SMU_UA159"
  SMU_UA159  Streptococcus mutans UA159  1.00 mL OD  Inf OD
 ```
 
-The inoculum has no liquid, so its total quantity is `0 mL` and its OD, biomass divided by liquid
-volume, shows as `Inf` until it is mixed into a liquid.
+The inoculum has no liquid, so its total quantity is 0 mL and its OD, biomass divided by liquid
+volume, shows as infinite until it is mixed into a liquid.
 
 ## Promoting a Stock to a Culture
 
 Adding a quantified `Organism` to any `Stock` promotes it to a `Culture`. The example uses the
-saline from [Stocks](stocks.md). `Biomass` is conserved under `+`, `-`, and scalar `*` and `/`, like
+saline from [Stocks](stocks.md). `Biomass` is conserved under mixing, subtraction, and scaling, like
 solids and liquids, so diluting or mixing a culture dilutes or combines its organisms:
 
 ```jldoctest organisms
@@ -109,9 +109,9 @@ the `Organism`.
 
 ### Removing organisms
 
-`-` subtracts organism biomass as it does solids and liquids (see
+Subtraction removes organism biomass as it does solids and liquids (see
 [The non-negativity constraint](stocks.md)). Centrifuging off a supernatant or autoclaving a stock
-is `-` with an explicitly constructed `Stock`:
+is subtraction of an explicitly constructed `Stock`:
 
 ```jldoctest organisms
 julia> sterilized = culture - inoculum # remove exactly this much biomass; no organisms left

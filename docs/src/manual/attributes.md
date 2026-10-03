@@ -27,7 +27,7 @@ julia> move_into!(shelf, plate)
 ## Defining new attribute kinds
 
 A location's environment is made up of attribute kinds, registered with the [`@attribute`](@ref)
-macro. Like location kinds, each is a `const` binding plus a registry entry, recalled by name.
+macro. Like location kinds, each is a named constant plus a registry entry, recalled by name.
 CHESS already includes common kinds such as `Temperature` and `Humidity`, so this example defines a
 new one:
 
@@ -62,7 +62,7 @@ Dict{Symbol, Attribute} with 1 entry:
 [`environment(x)`](@ref) is the inherited view: `x`'s own attributes override its parent's
 environment, recursively. A location with no attributes of its own just inherits its parent's.
 
-Here `room` also sets `Humidity` and `BarometricPressure`. The incubator overrides `Temperature`
+Here the room also sets `Humidity` and `BarometricPressure`. The incubator overrides `Temperature`
 with a value and `Humidity` with [`Unknown`](@ref), an indeterminate reading such as a broken
 sensor produces. `Unknown` differs from `missing`, which means no local value. The shelf and the
 plate set nothing:

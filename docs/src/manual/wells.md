@@ -54,7 +54,7 @@ julia> stock(a1)
 ```
 
 The third argument of `deposit!` is a `cost`, a tracked number such as a reagent cost. `withdraw!`
-apportions it proportionally when material is removed. It defaults to `0`.
+apportions it proportionally when material is removed. It defaults to zero.
 
 ## Transferring between wells
 

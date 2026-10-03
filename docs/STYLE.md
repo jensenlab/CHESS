@@ -24,9 +24,14 @@ Rules for writing and revising pages on the CHESS documentation sites.
 
 ## Code in prose
 
-- Inline code names things: functions, types, macros, fields, and values. It is not a verb. Do not
-  write that `using CHESS` registers constants or that a command "does" something. Describe the
-  behavior in plain language, for example "CHESS includes common location kinds such as ...".
+- Use inline code for defined things: functions, types, macros, fields, and registered constants.
+  A sentence may name a function and say what it does ("`move_into!` refuses a move that would
+  over-fill the parent").
+- Do not use inline code as a stand-in for a concept that words can explain. Write "subtracting one
+  stock from another", not "`-` mixes by subtraction". Write "zero" and "full", not `0` and
+  `1//1`, and "export", not `export`, when the word is used in its ordinary sense.
+- Do not use code as a command in a sentence. Describe the behavior in plain language, for example
+  "CHESS includes common location kinds such as ..." instead of "`using CHESS` registers ...".
 - Introduce an example in words before the doctest. Put commands such as `using CHESS` in the
   doctest or setup block, not in the sentence that describes the setup.
 - Reserve code for doctests where possible. When a sentence can say the same thing without code,
