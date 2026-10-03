@@ -4,12 +4,11 @@
 DocTestSetup = :(using CHESS)
 ```
 
-A location doesn't just have a position in the hierarchy -- it has an environment (temperature,
-humidity, ...), and that environment flows down the hierarchy the same way physical containment
-does.
+A location has an environment (temperature, humidity, and so on) as well as a position in the
+hierarchy. The environment flows down the hierarchy the way physical containment does.
 
-This chapter uses a room holding CHESS's `Incubator`, which has three shelves, with a plate on the
-first shelf:
+The examples on this page use a room holding CHESS's `Incubator`, which has three shelves, with a
+plate on the first shelf:
 
 ```jldoctest attributes
 julia> room = build_location(loc"Room", "Room A");
@@ -27,10 +26,10 @@ julia> move_into!(shelf, plate)
 
 ## Defining new attribute kinds
 
-A location's environment is made up of attribute kinds, which are defined and registered with the
-[`@attribute`](@ref) macro. Attribute kinds are registered the same way location kinds are: a
-`const` binding plus a registry entry, recalled collision-safely by name. `using CHESS` already
-registers common kinds such as `Temperature` and `Humidity`, so this example registers a new one:
+A location's environment is made up of attribute kinds, registered with the [`@attribute`](@ref)
+macro. Like location kinds, each is a `const` binding plus a registry entry, recalled by name.
+`using CHESS` already registers common kinds such as `Temperature` and `Humidity`, so this example
+registers a new one:
 
 ```jldoctest attributes
 julia> @attribute BarometricPressure u"atm"
@@ -64,9 +63,9 @@ Dict{Symbol, Attribute} with 1 entry:
 environment, recursively. A location with no attributes of its own just inherits its parent's.
 
 Here `room` also sets `Humidity` and `BarometricPressure`. The incubator overrides `Temperature`
-with a real value and `Humidity` with [`Unknown`](@ref): an actively indeterminate reading (a broken
-sensor, say), as opposed to `missing`'s "no local opinion." The shelf and the plate set nothing of
-their own:
+with a value and `Humidity` with [`Unknown`](@ref), an indeterminate reading such as a broken
+sensor produces. `Unknown` differs from `missing`, which means no local value. The shelf and the
+plate set nothing:
 
 ```jldoctest attributes
 julia> set_attribute!(room, attr"Humidity"(45u"percent"))
@@ -93,15 +92,17 @@ graph TD
     Room --> Incubator --> Shelf --> Plate
 ```
 
-Each attribute takes a different path down the chain: `BarometricPressure` is set once at the room
-and never touched again -- pure inheritance, unchanged three levels down to the plate.
-`Temperature` is set at the room, overridden with a real value at the incubator, then inherited
-unchanged from there. `Humidity` is set at the room, then overridden with `Unknown` at the
-incubator -- which propagates to the plate just like a real value would, rather than being
-skipped. The plate itself has nothing of its own; every one of its values is inherited.
+Each attribute takes a different path down the chain:
 
-A `missing` value means "no local opinion" -- it clears the incubator's own `Temperature` and falls
-back to what the incubator itself inherits from the room:
+- `BarometricPressure` is set at the room and inherited unchanged by the plate.
+- `Temperature` is set at the room, overridden at the incubator, and inherited from there.
+- `Humidity` is set at the room and overridden with `Unknown` at the incubator. `Unknown`
+  propagates to the plate like any other value.
+
+The plate has no attributes of its own, so all of its values are inherited.
+
+Setting an attribute to `missing` clears the location's own value, so the location falls back to
+what it inherits. Here the incubator's `Temperature` falls back to the room's:
 
 ```jldoctest attributes
 julia> set_attribute!(incubator, attr"Temperature"(missing))
@@ -113,6 +114,5 @@ Dict{Symbol, Attribute} with 3 entries:
   :BarometricPressure => 1.0 atm
 ```
 
-Movement and attributes together cover rearranging the hierarchy and tracking each location's
-environment. [Stocks & Chemistry](stocks.md) covers putting material into wells -- chemicals,
-reagents, stocks, and transfers.
+[Stocks & Chemistry](stocks.md) describes putting material into wells: chemicals, reagents,
+stocks, and transfers.

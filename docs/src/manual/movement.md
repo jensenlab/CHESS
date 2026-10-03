@@ -4,12 +4,10 @@
 DocTestSetup = :(using CHESS)
 ```
 
-[Locations](core-concepts.md) covered what a location is; this
-chapter covers how Locations move within a hierarchy.
+This page describes how [locations](core-concepts.md) move within a hierarchy.
 
-`using CHESS` already registers `Lab`, `Bench`, and `WP96`. CHESS's own `Incubator` kind models an
-incubator with shelves, so this chapter registers a simpler one that holds plates directly, and
-allows up to four of them:
+`using CHESS` already registers `Lab`, `Bench`, and `WP96`. CHESS's own `Incubator` kind has
+shelves, so this page registers a simpler incubator that holds up to four plates directly:
 
 ```jldoctest movement
 julia> @location_kind SmallIncubator Symbol[] nothing nothing nothing nothing nothing 2//1 0//1
@@ -20,9 +18,8 @@ julia> set_occupancy_cost!(:SmallIncubator, :WP96, 1//4)
 
 ## `move_into!`
 
-[`move_into!(parent, child)`](@ref) is how the hierarchy actually gets built and changed: it
-reassigns `child`'s parent to `parent`, removing it from wherever it was before.
-
+[`move_into!(parent, child)`](@ref) builds and changes the hierarchy. It reassigns `child`'s parent
+to `parent`, removing it from its previous parent.
 
 ```jldoctest movement
 julia> lab = build_location(loc"Lab", "Lab");
@@ -47,8 +44,8 @@ graph TD
     Bench[Bench] --> Plate[Plate]
 ```
 
-Reading the tree back afterward is a pair of accessors: [`parent(x)`](@ref parent) (`nothing` if `x` is at
-the root of its tree) and [`children(x)`](@ref children).
+[`parent(x)`](@ref parent) returns the parent of `x`, or `nothing` if `x` is at the root of its
+tree. [`children(x)`](@ref children) returns its children.
 
 ```jldoctest movement
 julia> children(lab)
@@ -60,16 +57,17 @@ julia> print(parent(plate))
 Bench
 ```
 
-Over the course of an experiment, `plate` might start on `bench`, get moved into `incubator`
-overnight, and then get moved again into a plate reader to be measured. Each of these is the same
-kind of event: a location being moved into a new parent.
+Over an experiment, `plate` might start on `bench`, move into `incubator` overnight, and then move
+into a plate reader to be measured. Each is the same kind of event: a location moving into a new
+parent.
 
-Recording the plate moving into the incubator: 
+Moving the plate into the incubator:
 
 ```jldoctest movement
 julia> move_into!(incubator, plate)
 ```
-The tree changes accordingly. 
+
+The tree changes accordingly.
 
 ```mermaid
 graph TD
@@ -78,13 +76,12 @@ graph TD
     Incubator2 --> Plate2[Plate]
 ```
 
-`Bench` no longer has `Plate` as a child, `Incubator` now does, and nothing about `Lab` needed to
-change -- the grandparent relationship (`Lab`/`Plate`) was never directly recorded in the first
-place. A move always works this way: it changes exactly one relationship (a location's parent), and
-everything nested inside that location comes along automatically.
+`Bench` no longer has `Plate` as a child and `Incubator` does. `Lab` does not change, because the
+`Lab`/`Plate` relationship was never recorded. A move changes exactly one relationship, a
+location's parent, and everything nested inside that location moves with it.
 
-Confirming the change directly: `bench` no longer has `plate`, `incubator` now does, and `lab`'s
-own children are untouched:
+The children confirm the change: `bench` has no children, `incubator` has `plate`, and `lab`'s
+children are unchanged:
 
 ```jldoctest movement
 julia> children(bench)
@@ -102,44 +99,40 @@ julia> children(lab)
 
 ## Occupancy and locking
 
-Every `move_into!` call above succeeded, but not every move is allowed. `move_into!` is gated by
-[`can_move_into(parent, child)`](@ref), which can refuse a move for a few distinct reasons:
+Not every move is allowed. `move_into!` calls [`can_move_into(parent, child)`](@ref), which
+refuses a move for one of these reasons:
 
-- [`LockedLocationError`](@ref) -- `child` is [`is_locked`](@ref).
-- [`AlreadyLocatedInError`](@ref) -- `child` is already inside `parent`.
-- [`OccupancyError`](@ref) -- the move would over-fill `parent`.
-- [`FixedMembershipError`](@ref) -- `parent`'s slots are structurally fixed (`Labware`/`Well`), or
-  `child` is a `Well` (permanently fused to its `Labware`, per the generic-vs-fixed distinction from
-  [Locations](core-concepts.md)).
+- [`LockedLocationError`](@ref): `child` is [`is_locked`](@ref).
+- [`AlreadyLocatedInError`](@ref): `child` is already inside `parent`.
+- [`OccupancyError`](@ref): the move would over-fill `parent`.
+- [`FixedMembershipError`](@ref): `parent`'s slots are fixed (`Labware` or `Well`), or `child` is a
+  `Well`, which is permanently fused to its `Labware` (see [Locations](core-concepts.md)).
 
 **Occupancy.** A location's [`occupancy`](@ref) is a rational number from `0` to `1` describing how
-full it is, and every `(parent kind, child kind)` pair has an [`occupancy_cost`](@ref) describing
-how much of the parent's capacity one instance of that child consumes. `move_into!` refuses any move
-that would push `occupancy(parent) + occupancy_cost(parent, child)` above `1`. Register a cost with
-[`set_occupancy_cost!`](@ref) -- this is exactly the rule registered at the top of this chapter,
-letting the incubator hold up to four plates:
+full it is. Every `(parent kind, child kind)` pair has an [`occupancy_cost`](@ref), the fraction of
+the parent's capacity that one instance of the child consumes. `move_into!` refuses any move that
+would push `occupancy(parent) + occupancy_cost(parent, child)` above `1`. [`set_occupancy_cost!`](@ref)
+registers a cost. This is the rule registered at the top of this page, which lets the incubator hold
+up to four plates:
 
 ```julia
 set_occupancy_cost!(:SmallIncubator, :WP96, 1//4) # holds up to four plates
 ```
 
-Occupancy costs are stored as `Rational`s specifically to avoid floating-point rounding ever
-producing a spuriously-over-full or spuriously-under-full location. An occupancy cost greater than
-`1` unconditionally blocks a movement regardless of current occupancy, which is how
-physically-impossible pairings (a bench into a well) get rejected outright rather than merely
-"usually" rejected. Costs default to `0` unless a kind's `@location_kind` declaration sets
-`default_parent_cost`/`default_child_cost`, or an exact/category-based rule is registered via
-`set_occupancy_cost!`.
+Costs are `Rational`s so that floating-point rounding cannot make a location appear over-full or
+under-full. A cost greater than `1` blocks the move whatever the current occupancy, which rejects
+physically impossible pairings such as a bench into a well. A cost defaults to `0` unless the
+kind's `@location_kind` declaration sets `default_parent_cost`/`default_child_cost`, or an exact or
+category-based rule is registered with `set_occupancy_cost!`.
 
-`Labware` and `Well` are the exception: `occupancy` is always `1//1`, regardless
-of how many of a `Labware`'s wells actually hold anything. Their slots are structurally fixed --
-either fully built at construction or not present at all -- so there's no partial-membership state
-to compute, unlike `GenericLocation`, whose occupancy is always derived from `occupancy_cost`.
+The occupancy of a `Labware` or `Well` is always `1//1`, however many of its wells hold material.
+Their slots are fixed at construction, so no partial occupancy exists. The occupancy of a
+`GenericLocation` is derived from `occupancy_cost`.
 
-**Locking and activity.** Two other pieces of per-location state: [`is_locked`](@ref) (can this
-location itself be moved out of its current parent right now? -- children of a locked location can
-still be moved) and [`is_active`](@ref) (a general on/off flag), toggled with
-`lock!`/`unlock!`/`toggle_lock!` and `activate!`/`deactivate!`/`toggle_activity!`.
+**Locking and activity.** [`is_locked`](@ref) says whether a location can be moved out of its
+current parent. Children of a locked location can still be moved. [`is_active`](@ref) is a general
+on/off flag. `lock!`, `unlock!`, and `toggle_lock!` change the lock, and `activate!`,
+`deactivate!`, and `toggle_activity!` change the active flag.
 
 ```jldoctest movement
 julia> lock!(plate);
@@ -150,9 +143,8 @@ ERROR: Locked Location Error with: Plate 1
 
 ## Checking a move before making it
 
-`can_move_into` never returns `false` -- it either returns `true` or throws one of the four errors
-above. "Checking" whether a move would succeed without performing it means calling `can_move_into`
-directly and catching whatever it throws, rather than branching on a boolean:
+`can_move_into` never returns `false`. It returns `true` or throws one of the four errors above. To
+check a move without performing it, call `can_move_into` and catch the error:
 
 ```jldoctest movement
 julia> try
@@ -165,8 +157,7 @@ can't move: LockedLocationError(Plate 1)
 
 ## Detaching a location
 
-Moving a location out of the hierarchy entirely -- with no new parent -- is `move_into!(nothing,
-child)`:
+`move_into!(nothing, child)` removes a location from the hierarchy, leaving it with no parent:
 
 ```jldoctest movement
 julia> unlock!(plate);
@@ -177,6 +168,6 @@ julia> parent(plate) === nothing
 true
 ```
 
-The next chapter, [Environmental Attributes & Inheritance](attributes.md), covers what else a
-location carries besides its position: its environment.
+[Environmental Attributes & Inheritance](attributes.md) describes the environment a location
+carries in addition to its position.
 
