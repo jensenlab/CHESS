@@ -5,7 +5,7 @@ makedocs(sitename="PlateMaps.jl",
 remotes=nothing,
 pages = [
     "Home" => "index.md",
-    "Quick Start Guide" => "quickstart.md",
+    "Quick Start" => "quickstart.md",
     "API Reference" => "api-reference.md"
 ]
 )

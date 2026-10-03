@@ -67,30 +67,9 @@ Instantiating installs every package in the workspace from its local path, toget
 dependencies. To start a session, run `julia --project=.` in the clone. To work with a package
 other than CHESS, such as Pourfecto, set `--project` to the directory of that package instead.
 
-## Quickstart
-
-The example builds a room and a plate, moves the plate into the room, sets the temperature of the
-room, fills a well, and reads the temperature that the well inherits:
-
-```jldoctest quickstart
-julia> using CHESS
-
-julia> room = build_location(loc"Room", "Main Room");
-
-julia> plate = build_location(loc"WP96", "Plate 1");
-
-julia> move_into!(room, plate)
-
-julia> set_attribute!(room, attr"Temperature"(25u"°C"))
-
-julia> deposit!(plate["A1"], 100u"µL" * rgt"water")
-
-julia> environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
-25.0 °C
-```
-
 ## Where to go next
 
+- The **[Quick Start](quickstart.md)** builds a small lab and reads an inherited temperature.
 - The **[Tutorial](tutorial.md)** follows one experiment from setup to reconstruction and uses each
   part of CHESS once.
 - The **Manual** describes the core concepts of CHESS in the order that they build on each other,

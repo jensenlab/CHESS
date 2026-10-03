@@ -27,7 +27,7 @@ a grid-shaped type follows the same convention.
 [`letter_code`](@ref) and [`wellnames`](@ref) name rows in bijective base 26, and
 [`role_palette`](@ref) maps roles to consistent colors. Both layers use them.
 
-The [Quick Start Guide](@ref) shows each of these.
+The [Quick Start](@ref) shows each of these.
 
 ## Installation
 

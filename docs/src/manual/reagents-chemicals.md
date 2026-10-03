@@ -9,7 +9,7 @@ and *chemical identity*, what the material is once dissolved. Table salt is a so
 out, and once dissolved it is two chemical identities, Na⁺ and Cl⁻. `CHESSCore` represents these as
 two concepts: [`Reagent`](@ref) and [`Chemical`](@ref).
 
-## Reagents
+## Reagent types
 
 `Reagent` is an abstract type with three concrete subtypes, `Solid`, `Liquid`, and `Gas`, which
 share four fields: `name`, `molecular_weight`, `density`, and `pubchemid`. CHESS already includes
@@ -40,7 +40,7 @@ julia> molecular_weight(myreagent)
 missing
 ```
 
-## Chemicals
+## Chemical type
 
 `Chemical` is a single concrete type with the fields `name`, `charge` (zero for neutral species),
 and `molecular_weight`. CHESS registers common ions such as Na⁺, Cl⁻, and Ca²⁺. [`@chemical`](@ref)

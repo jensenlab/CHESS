@@ -2,7 +2,7 @@
 CurrentModule = PlateMaps
 ```
 
-# Quick Start Guide
+# Quick Start
 
 ## Standalone scheduling
 

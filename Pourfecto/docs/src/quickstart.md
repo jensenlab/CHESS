@@ -1,4 +1,4 @@
-# [Quickstart](@id pourfecto_quickstart)
+# [Quick Start](@id pourfecto_quickstart)
 
 The workflow for using Pourfecto is: 
 

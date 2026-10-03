@@ -20,7 +20,7 @@ remotes=nothing,
 warnonly=[:cross_references],
 pages = [
     "Home" => "index.md",
-    "Quick Start Guide" => "quickstart.md",
+    "Quick Start" => "quickstart.md",
     "Manual" => [
         "manual/reagents.md",
         "manual/stocks.md",

@@ -73,7 +73,7 @@ Instantiating installs every package in the workspace from its local path, toget
 dependencies. To start a session, run `julia --project=.` in the clone. To work with a package
 other than CHESS, such as Pourfecto, set `--project` to the directory of that package instead.
 
-## Quickstart
+## Quick Start
 
 ```julia
 using CHESS

@@ -2,7 +2,7 @@
 CurrentModule = LabwarePlotting
 ```
 
-# Quick Start Guide
+# Quick Start
 
 ## A flat-colored grid
 

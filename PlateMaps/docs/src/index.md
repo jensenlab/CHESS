@@ -39,7 +39,7 @@ does not describe the problem.
 
 The docstrings of the extensions (`PlateMapsRunMapsExt` and `PlateMapsCHESSCoreExt`) are not part of
 the [API Reference](@ref), because Documenter does not load package extensions as it loads
-`PlateMaps`. The [Quick Start Guide](@ref) shows how to use them. It also covers scheduling across
+`PlateMaps`. The [Quick Start](@ref) shows how to use them. It also covers scheduling across
 several plates and the DataFrame and JSON interfaces.
 
 ## Installation
