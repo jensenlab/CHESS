@@ -2,7 +2,7 @@
 using Documenter, PlateMaps
 
 makedocs(sitename="PlateMaps.jl",
-remotes=nothing,
+repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
 pages = [
     "Home" => "index.md",
     "Quick Start" => "quickstart.md",

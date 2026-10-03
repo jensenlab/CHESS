@@ -16,7 +16,9 @@ for name in ("checkerboard", "combinatorial_media", "priority", "in_place")
 end
 
 makedocs(sitename="Pourfecto.jl",
-remotes=nothing,
+repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
+# The single API page lists every documented name, with a source link on each.
+format=Documenter.HTML(size_threshold=300_000, size_threshold_warn=250_000),
 warnonly=[:cross_references],
 pages = [
     "Home" => "index.md",

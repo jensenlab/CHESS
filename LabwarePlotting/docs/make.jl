@@ -1,7 +1,7 @@
 using Documenter, LabwarePlotting
 
 makedocs(sitename="LabwarePlotting.jl",
-remotes=nothing,
+repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
 pages = [
     "Home" => "index.md",
     "Quick Start" => "quickstart.md",
