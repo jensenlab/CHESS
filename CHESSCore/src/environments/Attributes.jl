@@ -216,7 +216,7 @@ const AttributeDict=Dict{Symbol,Attribute}
 
 Set the value for key `attribute.kind.name` of `dict` to `attribute`.
 
-We use this method to ensure a proper pairing between the attribute kind and the attribute in the dict.
+This method keeps each attribute under the name of its own kind, so the key and the attribute always match.
 """
 function set_attribute!(dict::AttributeDict,attribute::Attribute)
     dict[attribute.kind.name]=attribute ;

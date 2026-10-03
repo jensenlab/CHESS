@@ -172,7 +172,7 @@ end
 
 Pourfecto provides an assortment of pre-defined objectives. Use `keys(objectives)` to see available options
 
-Note that many non-defualt options turn the problem into an MILP in the scheudling phase, which can lead to long and unpredictable run times. 
+Note that many non-default options turn the problem into an MILP in the scheduling phase, which can lead to long and unpredictable run times. 
 
 """
 const objectives = Dict{String,Function}(

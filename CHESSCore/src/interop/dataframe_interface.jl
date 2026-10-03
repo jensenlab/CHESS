@@ -250,7 +250,7 @@ end
 
 Reconstruct labware (and deposited well contents) from a dataframe representation.
 
-`df_to_labware` expects labware metadata (labware, name, and well) plus the stock columns needed to reconstruct well contents. Stock content may be encoded in any stock dataframe format supported by [`df_to_stock`](@ref) ].
+`df_to_labware` expects labware metadata (labware, name, and well) plus the stock columns needed to reconstruct well contents. Stock content may be encoded in any stock dataframe format supported by [`df_to_stock`](@ref).
 
 ## Required columns in `df`
 `df` must include the following columns:

@@ -148,7 +148,7 @@ Access the `species` property of a `Organism` object.
 species(x::Organism)= x.species
 """
     strain(x::Organism)
-Acces the  `strain` property of a `Organism` object.
+Access the `strain` property of an `Organism` object.
 """
 strain(x::Organism)= x.strain
 
