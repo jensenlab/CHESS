@@ -1,4 +1,4 @@
-# Troubleshooting Solver Failures
+# [Troubleshooting Solver Failures](@id pourfecto_troubleshooting)
 
 The planning and scheduling models of Pourfecto can fail in several ways. This page describes each
 failure, the error it raises, and how to read the message.
