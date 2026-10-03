@@ -72,6 +72,20 @@ julia> ColorimetricResult("Maybe")
 ERROR: ArgumentError: "Maybe" is not an allowed value for ColorimetricResult; allowed: Set(["Negative", "Positive"])
 ```
 
+[`is_quantitative`](@ref) and [`is_qualitative`](@ref) tell the two kinds apart, and
+[`read_unit`](@ref) returns the canonical unit of a quantitative read:
+
+```jldoctest reads
+julia> is_quantitative(Conductivity), is_qualitative(Conductivity)
+(true, false)
+
+julia> is_quantitative(ColorimetricResult), is_qualitative(ColorimetricResult)
+(false, true)
+
+julia> read_unit(Conductivity(1.2u"mS/cm"))
+mS cm⁻¹
+```
+
 ## `Unknown` and `missing`
 
 As with an [`Attribute`](@ref) (see [Environmental Attributes & Inheritance](attributes.md)),
@@ -108,6 +122,14 @@ julia> record_read!(a1, read"Absorbance"(0.5u"OD"); instrument=reader)
 
 julia> record_read!(a1, read"Absorbance"(0.5u"OD"); instrument=autoclave)
 ERROR: ArgumentError: Autoclave 1 cannot perform record_read!
+```
+
+[`is_capable`](@ref) reports whether a location, or a location kind, is capability-bearing. It does
+not depend on the type of the location. The plate reader is capable and a plate is not:
+
+```jldoctest reads
+julia> is_capable(reader), is_capable(a1)
+(true, false)
 ```
 
 The check asks only whether the instrument may perform `record_read!`. The `readable_types` field

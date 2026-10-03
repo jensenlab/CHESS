@@ -114,5 +114,22 @@ Dict{Symbol, Attribute} with 3 entries:
   :BarometricPressure => 1.0 atm
 ```
 
+## Unknown values and units
+
+`Unknown` is the only value of the type [`UnknownValue`](@ref). [`isunknown`](@ref) tests a value
+for it, as `ismissing` tests for `missing`. `CHESSCore.value` returns the value of an attribute.
+[`attribute_unit`](@ref) returns the canonical unit of an attribute:
+
+```jldoctest attributes
+julia> isunknown(CHESSCore.value(attr"Humidity"(Unknown)))
+true
+
+julia> isunknown(CHESSCore.value(attr"Humidity"(45u"percent")))
+false
+
+julia> attribute_unit(attr"Temperature"(21u"°C"))
+°C
+```
+
 [Stocks & Chemistry](stocks.md) describes putting material into wells: chemicals, reagents,
 stocks, and transfers.
