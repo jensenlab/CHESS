@@ -6,15 +6,15 @@ DocTestSetup = :(using CHESS)
 
 This tutorial follows one small experiment from start to finish: setting up a lab, preparing
 media, inoculating a plate, incubating and reading it, correcting a recording mistake, and then
-looking back at the plate's state at earlier points in its history. Each step links to the manual
-chapter that covers it in depth.
+looking back at the state of the plate at earlier points in its history. Each step links to the
+manual pages that describe it in depth.
 
 Every example on this page runs as written, in order, in one Julia session.
 
 ## Set up a database
 
-CHESS records operations in a SQLite database. [`create_db`](@ref) creates one and
-[`connect_SQLite`](@ref) makes it the database every later call uses. This tutorial uses a
+CHESS records operations in a SQLite database. [`create_db`](@ref) creates one, and
+[`connect_SQLite`](@ref) makes it the database that every later call uses. This tutorial uses a
 temporary file:
 
 ```jldoctest tutorial
@@ -32,8 +32,8 @@ See [Database Architecture](manual/db-architecture.md) for what the database con
 ## Build the lab
 
 [`generate_location`](@ref) builds a location and commits it to the database in one step, giving it
-a permanent ID. The lab is a room with a bench, an incubator, and a plate reader, all kinds that
-`using CHESS` already registers:
+a permanent ID. The lab is a room with a bench, an incubator, and a plate reader, all of which are
+kinds that CHESS already includes:
 
 ```jldoctest tutorial
 julia> room = generate_location(loc"Room", "Room 101");
@@ -198,9 +198,8 @@ See [The Ledger](manual/ledger.md) and [Caching & Repair](manual/caching-repair.
 
 ## Look back in time
 
-Because CHESS stores operations rather than states, any earlier state can be rebuilt.
-`reconstruct_location` takes a sequence ID, a position in the history. Just before the
-inoculation, A2 held only LB:
+CHESS stores operations, so any earlier state can be rebuilt. `reconstruct_location` takes a
+sequence ID, which is a position in the history. Just before the inoculation, A2 held only LB:
 
 ```jldoctest tutorial
 julia> stock(reconstruct_location(a2, get_sequence_id(inoculations[2]) - 1))
@@ -214,7 +213,7 @@ julia> stock(reconstruct_location(a2, get_sequence_id(inoculations[2]) - 1))
  water    water  198 μL          100 %
 ```
 
-It also takes a recording time, which shows what the database said at that moment, before the
+It also takes a recording time, which gives what the database held at that moment, before the
 correction was made:
 
 ```jldoctest tutorial
@@ -237,8 +236,8 @@ See [Reconstruction](manual/reconstruction.md).
 
 ## Where to go next
 
-The [Manual](manual/core-concepts.md) covers each of these topics in depth, starting with
-[Locations](manual/core-concepts.md). To plan liquid-handling steps like the plate filling above
-automatically, see [Pourfecto](https://jensenlab.github.io/CHESS/pourfecto/dev/). To load real
-plate-reader exports instead of typing values, see
-[Parsing Instrument Files](manual/parsing-instrument-files.md).
+The [Manual](manual/core-concepts.md) describes each of these topics in depth, starting with
+[Locations](manual/core-concepts.md). [Pourfecto](https://jensenlab.github.io/CHESS/pourfecto/dev/)
+plans liquid-handling steps like the plate filling above automatically.
+[Parsing Instrument Files](manual/parsing-instrument-files.md) describes loading real plate-reader
+exports instead of typing values.
