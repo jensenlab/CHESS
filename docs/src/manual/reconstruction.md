@@ -73,6 +73,31 @@ that snapshot, up to `sequence_id`. `max_cache` defaults to `sequence_id` and ca
 [Caching & Repair](caching-repair.md) uses this to reconstruct a value as if a given snapshot did
 not exist.
 
+Each sub-reconstruction has a mutating form whose name ends in `!`: `reconstruct_parent!`,
+`reconstruct_children!`, `reconstruct_attributes!`, `reconstruct_contents!`,
+`reconstruct_lock!`, and `reconstruct_environment!`. These set that part of the state of locations
+that already exist, with the same arguments as the form without `!`, and they accept a vector of
+locations. [`get_location_info`](@ref) returns the name of a committed location and a function that
+builds a bare location of the right kind, with no parent, children, or contents. The two together
+rebuild one part of a location:
+
+```jldoctest reconstruction
+julia> name, constructor = get_location_info(a2);
+
+julia> well = constructor(a2, name);
+
+julia> stock(well)
+Empty Stock
+
+julia> reconstruct_contents!(well);
+
+julia> stock(well)
+50.0 μL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  50.0 μL          100 %
+```
+
 `reconstruct_location!` runs these in one pass: the environment first (the parent chain and its
 attributes), then children, contents, lock, activity, and reads.
 

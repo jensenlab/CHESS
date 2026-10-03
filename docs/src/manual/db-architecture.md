@@ -39,7 +39,8 @@ ChemicalID, Coefficient)`, and `Organisms(ID, ComponentID, Genus, Species, Strai
 
 ## Environment
 
-`Attributes(Attribute, BaseUnit)` is the registry of attribute kinds. `EnvironmentAttributes(ID,
+`Attributes(Attribute, BaseUnit)` is the registry of attribute kinds, and [`get_all_attributes`](@ref)
+returns it as a `DataFrame`. `EnvironmentAttributes(ID,
 LedgerID, LocationID, Attribute, Value, Unit, Time, InstrumentID, InstrumentTime)` has one row for
 every `set_attribute!` call.
 
@@ -64,3 +65,37 @@ set, and stock once. See [Caching & Repair](caching-repair.md).
 The tables `Experiments`, `Runs`, `Protocols`, `ProtocolEnforcement`, `Encumbrances`, and
 `EncumbranceCompletion`, and a matching `Encumbered*` family of operation tables, group and reserve
 future work for an experiment. See [Encumbrances](encumbrances.md) for protocols and encumbrances.
+
+## Running SQL
+
+[`query_db`](@ref) runs a statement that returns rows and gives a `DataFrame`. [`execute_db`](@ref)
+runs a statement that changes the database, such as `INSERT`, `UPDATE`, or `CREATE`. Both take a
+vector of parameters for the `?` placeholders of the statement. Parameters are safer than building
+the SQL with string interpolation. Both raise an error if no database is connected.
+
+[`sql_transaction`](@ref) runs a function in a transaction. If the function throws, every write that
+it made is rolled back, and otherwise it returns the value of the function. `upload` and `update` use
+it, so an operation and its database record succeed or fail together. [`sql_commit`](@ref) and
+[`sql_rollback`](@ref) commit and roll back a named savepoint, and most code uses
+`sql_transaction` instead:
+
+```jldoctest db_architecture
+julia> execute_db("CREATE TABLE Scratch (Name TEXT)");
+
+julia> execute_db("INSERT INTO Scratch (Name) VALUES (?)", ["first"]);
+
+julia> try
+           sql_transaction() do
+               execute_db("INSERT INTO Scratch (Name) VALUES (?)", ["second"])
+               error("fail after the insert")
+           end
+       catch
+       end
+
+julia> query_db("SELECT Name FROM Scratch")
+1×1 DataFrame
+ Row │ Name
+     │ String
+─────┼────────
+   1 │ first
+```

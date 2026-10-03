@@ -67,6 +67,21 @@ cutoff. The same query is used throughout [Reconstruction](reconstruction.md) an
 [Caching & Repair](caching-repair.md). Cache repair uses it to test whether a slot has been amended
 since a cache was taken.
 
+## Times
+
+The database stores times as Unix time, a floating-point number of seconds. [`db_time`](@ref)
+converts a `DateTime` to that number, and [`julia_time`](@ref) converts it back:
+
+```jldoctest ledger
+julia> using Dates
+
+julia> stored = db_time(DateTime(2026, 1, 1, 9, 30))
+1.7672598e9
+
+julia> julia_time(stored)
+2026-01-01T09:30:00
+```
+
 ## Query helpers
 
 - `get_last_sequence_id(time=now())` returns the newest `SequenceID` as of `time`.
