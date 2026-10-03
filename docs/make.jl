@@ -50,6 +50,7 @@ makedocs(
                 "Database Architecture" => "manual/db-architecture.md",
                 "The Ledger" => "manual/ledger.md",
                 "Committing & Uploading" => "manual/committing-uploading.md",
+                "Observations" => "manual/observations.md",
                 "Reconstruction" => "manual/reconstruction.md",
                 "Caching & Repair" => "manual/caching-repair.md",
                 "Encumbrances" => "manual/encumbrances.md",

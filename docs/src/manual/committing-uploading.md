@@ -115,4 +115,32 @@ Like `upload`, `update` runs `fun` on the objects passed to it, so after the ame
 in-memory objects hold both transfers, 70 µL in A2. The database holds the corrected history.
 Reconstructing from it, as above, gives the amended state.
 
+## Barcodes
+
+A [`Barcode`](@ref) is a physical barcode string with an optional name and the ID of the location
+that it is attached to, which is `missing` until it is assigned. [`assign_barcode!`](@ref) attaches a
+barcode to a location in memory and raises an error if it is already attached to a different
+location. `upload` records the assignment in the database. [`get_barcode`](@ref) looks up a recorded
+barcode and raises an error if there is none. [`upload_barcode`](@ref) records a barcode, and a barcode that is
+already recorded is left unchanged. A barcode must be recorded before it is assigned, because the
+assignment of an unrecorded barcode writes nothing. [`barcode`](@ref) returns the string of a
+`Barcode`:
+
+```jldoctest committing
+julia> bc = Barcode("PLATE-0001", "Growth plate");
+
+julia> upload_barcode(bc);
+
+julia> upload(assign_barcode!, bc, plate);
+
+julia> found = get_barcode("PLATE-0001");
+
+julia> barcode(found)
+"PLATE-0001"
+
+julia> found.location_id == CHESSCore.location_id(plate)
+true
+```
+
+[Observations](observations.md) describes recording what the state of a location is.
 [Reconstruction](reconstruction.md) describes building a `Location` back from the committed history.
