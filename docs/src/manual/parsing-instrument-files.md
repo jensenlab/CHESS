@@ -4,16 +4,16 @@
 DocTestSetup = :(using CHESS)
 ```
 
-`CHESSParsers` turns lab-instrument export files -- plate-reader spreadsheets, incubator session
-logs, and similar -- into forms the rest of CHESS already knows how to use: a tidy `DataFrame`,
-[`Read`](@ref)s recorded directly onto a [`Labware`](@ref), or JSON. It's a separate package from
-`CHESS` (not re-exported by it, so `using CHESSParsers` on its own), designed so a new instrument
-export shape can be supported by adding a new format rather than changing anything already working.
+`CHESSParsers` converts lab-instrument export files, such as plate-reader spreadsheets and
+incubator session logs, into forms the rest of CHESS uses: a tidy `DataFrame`, [`Read`](@ref)s
+recorded onto a [`Labware`](@ref), or JSON. It is a separate package that `CHESS` does not
+re-export, so it is loaded on its own. A new export shape is supported by adding a format, without
+changing existing ones.
 
 ## The `InstrumentFormat` interface
 
-Every concrete instrument format is a singleton `struct` subtyping [`InstrumentFormat`](@ref) and
-implements two methods:
+Every instrument format is a singleton type that subtypes [`InstrumentFormat`](@ref) and implements
+two methods:
 
 ```julia
 struct ExFormat <: InstrumentFormat end
@@ -25,9 +25,9 @@ function CHESSParsers.parse_raw(::Type{ExFormat}, path::AbstractString; kwargs..
 end
 ```
 
-`detect` sniff-tests whether a file looks like that format's export; `parse_raw` does the actual
-parsing. Registering the format with [`register_format!`](@ref) makes it discoverable by
-auto-detection and by name:
+`detect` tests whether a file looks like the format's export, and `parse_raw` parses it.
+[`register_format!`](@ref) registers the format so that it can be found by auto-detection and by
+name:
 
 ```julia
 register_format!(ExFormat; name="ex_format")
@@ -35,23 +35,24 @@ register_format!(ExFormat; name="ex_format")
 
 ## `LabwareRead` and `EnvironmentLog`
 
-Parsing returns a `Vector` of one of two result types, depending on whether the data has a well to
+Parsing returns a vector of one of two result types, depending on whether the data has a well to
 attach to:
 
-- [`LabwareRead`](@ref) -- one per **(plate, channel)** found in the file, a channel being one
-  specific measurement configuration (e.g. absorbance at a given wavelength). `data` is exactly
-  `well`/`time`/`value`; everything constant for that one (plate, channel) -- instrument, plate id,
-  `read_kind`, wavelength -- lives once in `metadata` instead of being repeated on every row.
-- [`EnvironmentLog`](@ref) -- one per **reading kind**, for chamber-level data with no well at all
-  (an incubator's temperature/CO2/humidity history). `data` is exactly `time`/`value`.
+- [`LabwareRead`](@ref): one per **plate and channel** found in the file. A channel is one
+  measurement configuration, such as absorbance at a given wavelength. The `data` table has the
+  columns `well`, `time`, and `value`. Everything constant for the plate and channel (instrument,
+  plate id, `read_kind`, wavelength) is stored once in `metadata` and not repeated on every row.
+- [`EnvironmentLog`](@ref): one per **reading kind**, for chamber-level data with no well, such as
+  an incubator's temperature, CO2, and humidity history. The `data` table has the columns `time`
+  and `value`.
 
-Both share the same two-field shape (`metadata::Dict{String,Any}`, `data::DataFrame`), so the
-`DataFrame`/JSON conversions below work identically for either.
+Both have the same two fields, `metadata::Dict{String,Any}` and `data::DataFrame`, so the
+conversions to `DataFrame` and JSON below work for either.
 
 ## Parsing a file
 
-[`parse_instrument_file`](@ref) either auto-detects the format or uses one passed explicitly. The
-examples here parse the de-identified sample exports in CHESSParsers' test suite:
+[`parse_instrument_file`](@ref) detects the format or uses one passed explicitly. The examples
+parse the de-identified sample exports in the CHESSParsers test suite:
 
 ```jldoctest parsing
 julia> using CHESSParsers
@@ -85,7 +86,7 @@ julia> lrs = parse_instrument_file(joinpath(fixtures, "single_plate_single_read.
 julia> lrs = parse_instrument_file(joinpath(fixtures, "single_plate_single_read.xlsx"); format=Epoch2Format);
 ```
 
-CHESSParsers' built-in formats:
+CHESSParsers includes these formats:
 
 | Format | Produces | Covers |
 |---|---|---|
@@ -95,14 +96,14 @@ CHESSParsers' built-in formats:
 | `BioSpaFormat` | `EnvironmentLog` | BioTek/Agilent BioSpa incubator `.SES` session logs |
 | `Take3TrioFormat` | `LabwareRead` | BioTek Take3 Trio nucleic-acid quant `.xlsx` exports |
 
-The three plate-reader formats share one underlying Gen5 `.xlsx` parsing engine (they're
-distinguished only by the file's own `Reader Type:` field) that handles endpoint, kinetic, and
-spectrum-scan reads, single- or multi-plate, single- or multi-channel workbooks alike.
+The three plate-reader formats share one Gen5 `.xlsx` parsing engine and are distinguished only by
+the file's `Reader Type:` field. The engine handles endpoint, kinetic, and spectrum-scan reads, in
+workbooks with one or several plates and channels.
 
 ## Getting data out
 
-`DataFrame(lr)` (or `DataFrame(el)`) returns the tidy measurement table directly. `DataFrame` comes
-from DataFrames.jl, which CHESSParsers does not re-export:
+Calling `DataFrame` on a `LabwareRead` or `EnvironmentLog` returns the tidy measurement table.
+`DataFrame` comes from DataFrames.jl, which CHESSParsers does not re-export:
 
 ```jldoctest parsing
 julia> using DataFrames
@@ -118,11 +119,10 @@ julia> first(DataFrame(lrs[1]), 3)
 ```
 
 [`record_reads!(labware, lr; well_map=identity, instrument=nothing, layout=nothing)`](@ref) records
-every row of a `LabwareRead` onto a `Labware` as a [`Read`](@ref), via [`record_read!`](@ref) (see
-[Reads & Instrument Measurements](reads.md) for the underlying single-read mechanics) -- `well_map`
-converts a row's `well` value to the well name used on `labware`, for when the instrument's own
-well-naming convention differs. It also accepts a `Vector{LabwareRead}` directly, recording every
-element against the same `labware`:
+every row of a `LabwareRead` onto a `Labware` as a [`Read`](@ref), using [`record_read!`](@ref)
+(see [Reads & Instrument Measurements](reads.md)). `well_map` converts a row's `well` value to the
+well name used on `labware`, for instruments whose well names differ. It also accepts a
+`Vector{LabwareRead}` and records every element against the same `labware`:
 
 ```jldoctest parsing
 julia> plate = build_location(loc"WP96");
@@ -134,20 +134,20 @@ julia> reads(plate["A1"])
  1.04 OD
 ```
 
-`record_reads!` is provided by CHESSParsers' `CHESSCore` package extension, not CHESSParsers itself
--- `CHESSCore` is a weak dependency, so parsing a file never requires it, but recording the result
-onto a `Labware` does. `using CHESSCore` (alongside whatever registers the `ReadKind`s involved, e.g.
-`using CHESSLabConstants`) activates it.
+`record_reads!` comes from a CHESSParsers package extension that depends on `CHESSCore`. Parsing a
+file does not need `CHESSCore`, but recording the result onto a `Labware` does. Loading `CHESSCore`
+activates the extension, together with whatever registers the `ReadKind`s involved, such as
+`CHESSLabConstants`.
 
-`labwareread_to_json`/`json_to_labwareread` (and their `environmentlog_to_json`/
-`json_to_environmentlog` counterparts) round-trip a result through a plain JSON string, for handing
-data to tools outside Julia entirely.
+`labwareread_to_json` and `json_to_labwareread`, and the matching `environmentlog_to_json` and
+`json_to_environmentlog`, convert a result to a JSON string and back, for handing data to tools
+outside Julia.
 
 ## Adding a new instrument format
 
-A new format lives in its own file under `CHESSParsers/src/instruments/`, implementing `detect` and
-`parse_raw` as shown above and calling `register_format!` once at the bottom. See the package's own
-[`CHESSParsers/README.md`](https://github.com/jensenlab/CHESS/blob/main/CHESSParsers/README.md) for
-the full contributor workflow -- how to work from a real, private export file, de-identify it into a
-committed regression fixture, and add tests -- and the [API Reference](../api/parsers.md) for the
-complete function list.
+A new format goes in its own file under `CHESSParsers/src/instruments/`. The file implements
+`detect` and `parse_raw` as shown above and calls `register_format!` once at the end. The
+[CHESSParsers README](https://github.com/jensenlab/CHESS/blob/main/CHESSParsers/README.md)
+describes the contributor workflow: working from a private export file, de-identifying it into a
+committed regression fixture, and adding tests. The [API Reference](../api/parsers.md) lists every
+function.
