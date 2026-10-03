@@ -3,8 +3,6 @@
 ```@index
 ```
 
----
-
 ## Full docstrings
 
 ```@autodocs

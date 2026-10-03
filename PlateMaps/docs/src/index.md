@@ -4,13 +4,13 @@ CurrentModule = PlateMaps
 
 # PlateMaps.jl
 
-`PlateMaps` is the physical-placement half of plate scheduling in CHESS: given a set of nodes and the
-edges that relate them, it decides *where on a plate* (or plates) each node goes.
+`PlateMaps` places nodes on plates. Given a set of nodes and the edges that relate them, it decides
+which well on which plate each node occupies. It is the placement half of plate scheduling in CHESS.
 
-The relationship half -- deciding *what* is connected to *what* (which run needs which controls, which
-runs are duplicates of each other, and so on) -- is deliberately a separate concern, owned by the sibling
-package [`RunMaps`](https://jensenlab.github.io/CHESS/dev/manual/runmaps/). `PlateMaps` has no built-in notion of
-"run" or "control": its core type, [`PlateMap`](@ref), just tracks which node occupies which well.
+The relationships between nodes, such as which run needs which controls and which runs are
+duplicates, belong to the separate package
+[`RunMaps`](https://jensenlab.github.io/CHESS/dev/manual/runmaps/). `PlateMaps` has no notion of a
+run or a control. Its core type, [`PlateMap`](@ref), records which node occupies which well.
 
 ## Core type
 
@@ -21,24 +21,23 @@ struct PlateMap{T}
 end
 ```
 
-`T` is the caller-chosen node-identity type (an `Int`, a `Symbol`, a `RunMap` node id -- whatever the
-edges use). `PlateMap` is the *solution* to a scheduling problem, not the problem statement.
+`T` is the type that identifies a node. It is chosen by the caller and matches the edges, for example
+an `Int`, a `Symbol`, or a `RunMap` node id. A `PlateMap` is the solution of a scheduling problem and
+does not describe the problem.
 
-## Three ways to use it
+## Ways to use PlateMaps
 
-1. **Standalone, dependency-free.** Build your own edges with [`mkedge`](@ref) and call
-   [`schedule_platemap`](@ref) directly -- no other CHESS package required.
-2. **With [`RunMaps`](https://jensenlab.github.io/CHESS/dev/manual/runmaps/).** A weak-dependency extension
-   (loaded automatically when both packages are `using`'d) adds `schedule_platemap(wells, rm::RunMap,
-   placeable_roles; kwargs...)`, plus `RunMap`-aware `describe`, `plot`, and `DataFrame` methods.
-3. **With `CHESSCore`.** Another weak-dependency extension adds `wells_from_locationkind` and
-   `schedule_platemap(kind::CHESSCore.LocationKind, ...)`, so a registered plate `LocationKind` can stand
-   in for a hand-built `wells::BitMatrix` -- and composes with the `RunMaps` extension automatically
-   (`schedule_platemap(kind, rm, placeable_roles; kwargs...)` works with both loaded).
+1. **Standalone.** [`mkedge`](@ref) builds edges and [`schedule_platemap`](@ref) places them. No
+   other CHESS package is needed.
+2. **With [`RunMaps`](https://jensenlab.github.io/CHESS/dev/manual/runmaps/).** A package extension
+   that is active when both packages are loaded adds `schedule_platemap(wells, rm::RunMap,
+   placeable_roles; kwargs...)` and methods of `describe`, `plot`, and `DataFrame` for a `RunMap`.
+3. **With `CHESSCore`.** Another package extension adds `wells_from_locationkind` and
+   `schedule_platemap(kind::CHESSCore.LocationKind, ...)`. A registered plate `LocationKind` then
+   replaces a hand-built `wells::BitMatrix`. This combines with the `RunMaps` extension, so
+   `schedule_platemap(kind, rm, placeable_roles; kwargs...)` works when both are loaded.
 
-Extension docstrings (`PlateMapsRunMapsExt`, `PlateMapsCHESSCoreExt`) aren't pulled into the
-[API Reference](@ref) page's `@autodocs` block, since `Documenter` doesn't load weak-dependency extension
-modules the way it loads `PlateMaps` itself -- see the [Quick Start Guide](@ref) for their usage instead.
-
-See the [Quick Start Guide](@ref) for a full walkthrough, including multi-plate scheduling and the
-DataFrame/JSON interfaces.
+The docstrings of the extensions (`PlateMapsRunMapsExt` and `PlateMapsCHESSCoreExt`) are not part of
+the [API Reference](@ref), because Documenter does not load package extensions as it loads
+`PlateMaps`. The [Quick Start Guide](@ref) shows how to use them. It also covers scheduling across
+several plates and the DataFrame and JSON interfaces.

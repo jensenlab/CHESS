@@ -35,7 +35,7 @@ plot_heatmap!(plt, values)
 
 ```julia
 colors = role_palette([:positive, :negative, :duplicate])
-colors[:positive]  # same color every time this role set is passed in, anywhere in CHESS
+colors[:positive]  # the same color whenever this role set is passed in, anywhere in CHESS
 ```
 
 ## Row naming
