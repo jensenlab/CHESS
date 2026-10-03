@@ -75,7 +75,7 @@ not exist.
 
 Each sub-reconstruction has a mutating form whose name ends in `!`: `reconstruct_parent!`,
 `reconstruct_children!`, `reconstruct_attributes!`, `reconstruct_contents!`,
-`reconstruct_lock!`, and `reconstruct_environment!`. These set that part of the state of locations
+`reconstruct_lock!`, `reconstruct_activity!`, and `reconstruct_environment!`. These set that part of the state of locations
 that already exist, with the same arguments as the form without `!`, and they accept a vector of
 locations. [`get_location_info`](@ref) returns the name of a committed location and a function that
 builds a bare location of the right kind, with no parent, children, or contents. The two together
