@@ -115,5 +115,27 @@ julia> CHESSDatabase.get_encumbrance_status(p_id)
 - `get_all_protocols` and `get_protocol_status` summarize at the protocol level, giving the number
   of completed encumbrances against the total.
 
+[`get_last_protocol_id`](@ref) returns the ID of the most recently created protocol of an
+experiment, and [`get_last_encumbrance_id`](@ref) returns the ID of the most recently created
+encumbrance of a protocol:
+
+```jldoctest encumbrances
+julia> get_last_protocol_id(exp_id)
+1
+
+julia> get_last_encumbrance_id(p_id)
+2
+```
+
+## Caching encumbered state
+
+[`encumber_cache`](@ref) stores a snapshot of the state of a location under an encumbrance. It is the
+encumbrance counterpart of `cache` (see [Caching & Repair](caching-repair.md)) and is used by
+reconstructions that include planned operations. It takes the encumbrance ID and the location:
+
+```jldoctest encumbrances
+julia> encumber_cache(enc_move2, plate2)
+```
+
 [Instrument Interfaces](instrument-interfaces.md) describes how the capability check and the
 recording of the instrument are divided between the two packages.
