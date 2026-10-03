@@ -220,6 +220,68 @@ Dict{Symbol, Any} with 1 entry:
 [`schedule_layout`](@ref) is the lower-level form for a `RunMap` and plates you have already built
 yourself.
 
+## Saving designs and runs
+
+`CHESSDatabase` stores designs and runs in the database of a lab (see
+[Database Architecture](db-architecture.md)). [`upload_experiment`](@ref) creates an experiment
+record from a name and a user and returns its ID. Protocols and runs belong to an experiment.
+[`upload_design`](@ref) stores an `Experiment` under an experiment record and returns the ID of the
+design. It stores the design matrix, the metadata, and, if the design is scheduled, one row for each
+well of the layout. [`get_design`](@ref) rebuilds the `Experiment` from the ID, including its layout:
+
+```jldoctest experiments
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
+julia> exp_id = upload_experiment("glucose screen", "docs")
+1
+
+julia> design_id = upload_design(scheduled, exp_id)
+1
+
+julia> restored = get_design(design_id);
+
+julia> size(restored.design) == size(scheduled.design)
+true
+
+julia> nrow(layout(restored)) == nrow(layout(scheduled))
+true
+```
+
+A scheduled well is only a name until a real location is made for it. [`commit_run_location!`](@ref)
+attaches a committed location to a well of the layout. It takes the design ID, the name of the
+labware, the well, and the ID of the location. The name of the labware is needed because the same
+well name occurs on every plate:
+
+```jldoctest experiments
+julia> first_well = first(eachrow(layout(scheduled)));
+
+julia> plate = generate_location(loc"WP96", first_well.labware);
+
+julia> well_id = CHESSCore.location_id(plate[first_well.well]);
+
+julia> commit_run_location!(design_id, first_well.labware, first_well.well, well_id)
+```
+
+A [`Run`](@ref) is one run of an experiment. It holds the location that the run was performed in,
+the ID of the experiment, and the location IDs of its controls and blanks. [`upload_run`](@ref)
+records a run and returns its ID, [`get_run`](@ref) looks it up, and [`get_all_runs`](@ref) lists
+the runs of an experiment:
+
+```jldoctest experiments
+julia> run_id = upload_run(Run(plate, exp_id))
+1
+
+julia> length(get_all_runs(exp_id))
+1
+
+julia> get_run(run_id) isa Run
+true
+```
+
 ## QC methods
 
 [`register_qc_method!`](@ref) lets another package register a quality-control method type under a
