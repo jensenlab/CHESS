@@ -74,6 +74,37 @@ true
 `df_to_stock` and `df_to_labware` detect the variant from the presence of a `"volume"` column. Only
 the writing functions, `stock_to_df` and `labware_to_df`, take an explicit format argument.
 
+[`q_to_stock`](@ref) and [`vc_to_stock`](@ref) read the stock columns of a table in one variant
+directly, and [`stock_to_q`](@ref) and [`stock_to_vc`](@ref) write a vector of stocks as a table and
+a units table. `q_to_stock` raises an error for concentration units, and `vc_to_stock` raises an
+error for quantity units:
+
+```jldoctest interop
+julia> stocks = [10u"g" * rgt"paba", 20u"g" * rgt"paba"];
+
+julia> df, units = stock_to_q(stocks; reagent_context=ctx);
+
+julia> df
+2×1 DataFrame
+ Row │ paba
+     │ Int64
+─────┼───────
+   1 │    10
+   2 │    20
+
+julia> q_to_stock(df, units; reagent_context=ctx) == stocks
+true
+
+julia> df_vc, units_vc = stock_to_vc([100u"mL" * rgt"water"]; reagent_context=ctx);
+
+julia> df_vc
+1×2 DataFrame
+ Row │ volume  water
+     │ Int64   Float64
+─────┼─────────────────
+   1 │    100    100.0
+```
+
 ### Reagent columns must match a registered name
 
 The column header of a reagent is its registered binding name, such as `"paba"`, obtained with
@@ -84,6 +115,34 @@ converted to a DataFrame and back. If it is left out of one call, the fallback h
 warning. If the display name then contains spaces or punctuation that is not valid in a name, the
 conversion back fails internally and produces an empty reagent with no properties instead of the
 real one. CHESS logs a warning ("reagent ... not registered") and does not throw an error.
+
+## Names and objects
+
+Reagents, chemicals, and organisms appear in tables and in dictionaries by name.
+[`reagentparse`](@ref), [`chemparse`](@ref), and [`orgparse`](@ref) are the functions behind the
+string macros `rgt"..."`, `chem"..."`, and `org"..."`. They take the module or modules to search as a
+keyword, which allows the context to be chosen at run time. The string macro `chem"Na+"` accepts ASCII
+charge symbols, and `chemparse` needs the registered name, `Na⁺`. [`string_to_component`](@ref) converts a
+name to a reagent of a given type or to an organism. It shows a warning and returns a reagent with
+only a name when the name is not registered. [`component_to_string`](@ref) is the inverse. It returns
+the registered name when it finds the component in the context and the display name otherwise:
+
+```jldoctest interop
+julia> reagentparse("water"; reagent_context=ctx)
+water
+
+julia> chemparse("Na⁺"; chem_context=ctx)
+Na⁺
+
+julia> orgparse("SMU_UA159"; org_context=ctx)
+SMU_UA159
+
+julia> string_to_component("water", Liquid; reagent_context=ctx)
+water
+
+julia> component_to_string(rgt"water"; reagent_context=ctx)
+"water"
+```
 
 ## The general format
 
@@ -104,6 +163,17 @@ KeySet for a Dict{String, Any} with 3 entries. Keys:
 julia> d["solids"]
 Dict{String, Any} with 1 entry:
   "paba" => Dict{String, Any}("amount"=>10, "unit"=>"g")
+```
+
+[`dict_to_attribute`](@ref) and [`dict_to_read`](@ref) are the inverses of `attribute_to_dict` and
+`read_to_dict`:
+
+```jldoctest interop
+julia> dict_to_attribute(attribute_to_dict(attr"Temperature"(21u"°C")))
+21.0 °C
+
+julia> dict_to_read(read_to_dict(read"Absorbance"(0.5u"OD")))
+0.5 OD
 ```
 
 `attribute_to_dict` and `read_to_dict` share a `"state"` field with the value `"value"`,
