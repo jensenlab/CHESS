@@ -51,6 +51,10 @@ reading with no calibration factor. Like a solid's `Mass` or a liquid's `Volume`
 tied to the stock's liquid volume, so a `Culture` can have organisms and no liquid (see
 [Stocks](stocks.md)).
 
+The unit `OD` is one of the units that CHESS adds to Unitful. [`JensenLabUnits`](@ref) defines `OD`,
+the relative fluorescence unit `RFU`, `X` for an unspecified concentration such as 2X media, and
+`xg` for relative centrifugal force. It is loaded with `CHESSCore`.
+
 Multiplying a `Biomass` quantity by an `Organism` writes an inoculum, as multiplying a quantity by
 a `Reagent` builds a `Mixture` or `Solution`:
 

@@ -125,6 +125,14 @@ physically impossible pairings such as a bench into a well. A cost defaults to z
 kind's `@location_kind` declaration sets `default_parent_cost`/`default_child_cost`, or an exact or
 category-based rule is registered with `set_occupancy_cost!`.
 
+The explicit rules are held in [`occupancy_rules`](@ref), keyed by the names of the parent and child
+kinds. Change them with `set_occupancy_cost!` and not by editing the dictionary:
+
+```jldoctest movement
+julia> occupancy_rules[(:SmallIncubator, :WP96)]
+1//4
+```
+
 The occupancy of a `Labware` or `Well` is always 1 (full), however many of its wells hold material.
 Their slots are fixed at construction, so no partial occupancy exists. The occupancy of a
 `GenericLocation` is derived from `occupancy_cost`.
@@ -166,6 +174,51 @@ julia> move_into!(nothing, plate)
 
 julia> parent(plate) === nothing
 true
+```
+
+## Querying the hierarchy
+
+Four functions answer questions about the hierarchy:
+
+- [`ancestors`](@ref) returns the chain of parents of a location, from the nearest to the farthest.
+  The keyword `rev=true` reverses the order.
+- [`get_all_within`](@ref) returns every location of a given type inside a location, at any depth.
+- [`children_named`](@ref) returns every direct child with a given name as a vector, which can be
+  empty. Names are not unique. Indexing a location by name, as in `plate["A1"]`, throws an error if
+  no child or more than one child has the name, and `children_named` leaves that case to the caller.
+- [`childtype`](@ref) returns the type of the locations that fill the slots of a `Labware`.
+
+```jldoctest movement
+julia> move_into!(bench, plate)
+
+julia> ancestors(plate)
+3-element Vector{Location}:
+ Plate 1
+ Bench
+ Lab
+
+julia> ancestors(plate; rev=true)
+3-element Vector{Location}:
+ Lab
+ Bench
+ Plate 1
+
+julia> get_all_within(lab, Labware)
+1-element Vector{Labware}:
+ Plate 1
+
+julia> length(get_all_within(lab, Well))
+96
+
+julia> children_named(lab, "Bench")
+1-element Vector{Location}:
+ Bench
+
+julia> children_named(lab, "Shelf")
+Location[]
+
+julia> childtype(plate)
+Well
 ```
 
 [Environmental Attributes & Inheritance](attributes.md) describes the environment a location

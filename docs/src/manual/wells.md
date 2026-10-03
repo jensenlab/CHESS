@@ -86,6 +86,29 @@ julia> stock(a2)
  water    water  40.0 μL          100 %
 ```
 
+## Well names and positions
+
+[`plate_namer`](@ref) returns the standard microplate name of a well from its row and column.
+[`add_stock!`](@ref) deposits a stock into the well at a row and column of a `Labware` and is a
+shorthand for `deposit!` on that well. It shows a warning if the well is not empty and then deposits
+anyway:
+
+```jldoctest wells
+julia> plate_namer(1, 1), plate_namer(8, 12)
+("A1", "H12")
+
+julia> add_stock!(plate, 50u"µL" * rgt"water", 2, 1);
+
+julia> stock(plate["B1"])
+50.0 μL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  50.0 μL          100 %
+```
+
+With `LabwarePlotting` and `Plots` loaded, `plot_well_heatmap!` overlays a heatmap of the quantity
+in each well, in µL, on a plot. Empty wells count as zero.
+
 ## Clearing a well
 
 [`empty!`](@ref) resets a well to `Empty()`. [`sterilize!`](@ref) and [`drain!`](@ref) remove only

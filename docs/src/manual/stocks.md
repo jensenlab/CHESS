@@ -118,6 +118,82 @@ ERROR: Mixing Error with sodium_chloride
 : attempted to add a negative quantity to a Stock
 ```
 
+## Components
+
+Reagents and organisms are the two kinds of component that a stock tracks. Both are
+[`StockComponent`](@ref)s. [`all_reagents`](@ref) lists the solid and liquid reagents of a stock or
+of a vector of stocks without duplicates, and [`all_components`](@ref) also lists the organisms.
+[`set_component`](@ref) returns a copy of a stock with one component at an exact quantity, which is
+a mass for a solid, a volume for a liquid, and a [`Biomass`](@ref CHESSCore.Biomass) for an organism.
+A zero quantity removes the component:
+
+```jldoctest stocks
+julia> all_reagents(saline)
+2-element Vector{Reagent}:
+ sodium_chloride
+ water
+
+julia> all_components(saline + 1u"OD*mL" * org"SMU_UA159")
+3-element Vector{StockComponent}:
+ sodium_chloride
+ water
+ SMU_UA159
+
+julia> set_component(saline, rgt"sodium_chloride", 2u"g")
+1.00 mL Solution (2 reagent(s))
+ Solids           Name             Amount  Concentration
+─────────────────────────────────────────────────────────
+ sodium_chloride  Sodium Chloride  2.00 g    2.00 g mL⁻¹
+
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
+
+julia> set_component(saline, rgt"sodium_chloride", 0u"g")
+1.00 mL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  1.00 mL          100 %
+```
+
+[`reagent_df`](@ref) tabulates a vector of stocks with one row for each stock and one column for each
+reagent. The cells hold the concentration of the reagent, or its quantity with `measure=quantity`.
+[`component_df`](@ref) also has columns for organisms. The column names come from
+[`component_to_string`](@ref). It uses the registered name of a component when it finds the component
+in the `reagent_context` that is passed as a keyword, and the display name otherwise:
+
+```jldoctest stocks
+julia> reagent_df([saline, tenmL])
+2×2 DataFrame
+ Row │ Sodium Chloride  water
+     │ Any              Any
+─────┼──────────────────────────
+   1 │ 5.0 g mL⁻¹       100.0 %
+   2 │ 5.0 g mL⁻¹       100.0 %
+
+julia> reagent_df([saline, tenmL]; measure=quantity)
+2×2 DataFrame
+ Row │ Sodium Chloride  water
+     │ Any              Any
+─────┼─────────────────────────────
+   1 │ 5 g              1000 μL
+   2 │ 50.0 g           10000.0 μL
+```
+
+[`reagent_display`](@ref) returns the solids, liquids, and organisms of a stock as dictionaries from
+name to amount and concentration, which are the values that the printed table of a stock shows:
+
+```jldoctest stocks
+julia> solids, liquids, organisms = reagent_display(saline);
+
+julia> collect(keys(solids))
+1-element Vector{String}:
+ "Sodium Chloride"
+
+julia> solids["Sodium Chloride"]["Amount"]
+(5.0, "g")
+```
+
 ## Named stocks
 
 [`@stock`](@ref) registers a named stock, like [`@location_kind`](@ref), [`@reagent`](@ref),

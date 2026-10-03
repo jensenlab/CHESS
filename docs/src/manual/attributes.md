@@ -47,7 +47,8 @@ AttributeKind(Temperature)
 
 Calling an attribute kind with a value creates an attribute.
 [`set_attribute!(loc, attribute)`](@ref) sets a location's own attribute, and
-[`attributes(x)`](@ref) reads that own set back.
+[`attributes(x)`](@ref) reads that own set back as an `AttributeDict`, an alias of
+`Dict{Symbol, Attribute}`.
 
 ```jldoctest attributes
 julia> set_attribute!(room, attr"Temperature"(21u"°C"))
