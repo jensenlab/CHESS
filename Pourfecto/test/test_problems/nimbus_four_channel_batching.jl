@@ -214,6 +214,10 @@ reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Po
         targets = Labware[target]
         config = configurations["nimbus_four_channel"]
         slotting = slotting_greedy(vcat(sources,targets),config)
+        # slotting_greedy takes slots in the iteration order of a Set, which is not guaranteed, so pin
+        # the two conicals into two different racks instead of relying on its choice
+        slotting[sources[1]] = (Pourfecto.tuberack50mL_0001_4ch,1)
+        slotting[sources[2]] = (Pourfecto.tuberack50mL_0002_4ch,1)
         R,C = size(target)
         well_col(letter_row,col) = (col-1)*R + letter_row
 
@@ -225,9 +229,8 @@ reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Po
         base_df = convert_design_four_channel(design2,sources,targets,slotting,config)
 
         @testset "different source labware -> Aspirate stays separate" begin
-            # this sub-case is only meaningful if slotting actually put the 2 conicals on 2
-            # distinct physical Labware IDs -- assert that precondition explicitly rather than
-            # assume it, since slotting_greedy could in principle pack both into one shared rack
+            # this sub-case is only meaningful if the 2 conicals are on 2 distinct physical
+            # Labware IDs, which the pinned slotting above sets up -- assert that precondition
             @test length(unique(base_df[!,"Source Labware ID"])) == 2
 
             action_df = batch_design_four_channel(base_df,config;insert_blowouts=false,channel_order=reagent_order(base_df))
