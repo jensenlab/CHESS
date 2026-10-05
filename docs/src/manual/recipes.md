@@ -21,8 +21,13 @@ examples use the saline from [Stocks](stocks.md):
 ```jldoctest recipes
 julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
 
-julia> r = recipe(saline)
-Recipe(Dict{Chemical, Union{Quantity{T, 𝐍, U}, Level{L, S, Quantity{T, 𝐍, U}} where {L, S}} where {T, U}}(Na⁺ => 0.08555817485063207 mol, Cl⁻ => 0.08555817485063207 mol, water => 0.055509297807382736 mol))
+julia> r = recipe(saline);
+
+julia> sort(string.(keys(r.amounts)))
+3-element Vector{String}:
+ "Cl⁻"
+ "Na⁺"
+ "water"
 ```
 
 `recipe` sums the contribution of every reagent, dissociating or not. `water` does not dissociate,

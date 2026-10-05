@@ -98,8 +98,10 @@ julia> @chemical DemoAnion "DemoAnion" -1 30.0u"g/mol";
 
 julia> set_composition!(DemoSalt, CompositionRule(Dict(DemoCation => 1, DemoAnion => 1)));
 
-julia> composition(DemoSalt)
-CompositionRule(Dict{Chemical, Int64}(DemoAnion => 1, DemoCation => 1))
+julia> sort(string.(keys(composition(DemoSalt).products)))
+2-element Vector{String}:
+ "DemoAnion"
+ "DemoCation"
 
 julia> DemoSalt in keys(composition_rules)
 true

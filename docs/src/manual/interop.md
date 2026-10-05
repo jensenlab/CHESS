@@ -154,15 +154,14 @@ only values that every programming language can read: `Dict`, `Vector`, `String`
 ```jldoctest interop
 julia> d = stock_to_dict(10u"g" * rgt"paba"; reagent_context=ctx);
 
-julia> keys(d)
-KeySet for a Dict{String, Any} with 3 entries. Keys:
-  "organisms"
-  "solids"
-  "liquids"
+julia> sort(collect(keys(d)))
+3-element Vector{String}:
+ "liquids"
+ "organisms"
+ "solids"
 
-julia> d["solids"]
-Dict{String, Any} with 1 entry:
-  "paba" => Dict{String, Any}("amount"=>10, "unit"=>"g")
+julia> d["solids"]["paba"]["amount"], d["solids"]["paba"]["unit"]
+(10, "g")
 ```
 
 [`dict_to_attribute`](@ref) and [`dict_to_read`](@ref) are the inverses of `attribute_to_dict` and
