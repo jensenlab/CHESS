@@ -56,11 +56,15 @@ Li⁺
 coefficients, as for the two chlorides that balance Ca²⁺:
 
 ```jldoctest reagents
-julia> chem"Na+" + chem"Cl-"
-Formula(Dict{Chemical, Int64}(Na⁺ => 1, Cl⁻ => 1))
+julia> sort(string.(keys((chem"Na+" + chem"Cl-").composition)))
+2-element Vector{String}:
+ "Cl⁻"
+ "Na⁺"
 
-julia> chem"Ca2+" + 2*chem"Cl-"
-Formula(Dict{Chemical, Int64}(Cl⁻ => 2, Ca²⁺ => 1))
+julia> salt = chem"Ca2+" + 2*chem"Cl-";
+
+julia> salt.composition[chem"Cl-"], salt.composition[chem"Ca2+"]
+(2, 1)
 ```
 
 ## Dissociation

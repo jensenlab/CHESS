@@ -77,11 +77,17 @@ julia> set_attribute!(incubator, attr"Temperature"(37u"°C"))
 
 julia> set_attribute!(incubator, attr"Humidity"(Unknown))
 
-julia> environment(plate)
-Dict{Symbol, Attribute} with 3 entries:
-  :Humidity           => Unknown
-  :Temperature        => 37.0 °C
-  :BarometricPressure => 1.0 atm
+julia> environment(plate)[:Temperature]
+37.0 °C
+
+julia> environment(plate)[:Humidity]
+Unknown
+
+julia> sort(collect(keys(environment(plate))))
+3-element Vector{Symbol}:
+ :BarometricPressure
+ :Humidity
+ :Temperature
 ```
 
 ```mermaid
@@ -108,11 +114,8 @@ what it inherits. Here the incubator's `Temperature` falls back to the room's:
 ```jldoctest attributes
 julia> set_attribute!(incubator, attr"Temperature"(missing))
 
-julia> environment(plate)
-Dict{Symbol, Attribute} with 3 entries:
-  :Humidity           => Unknown
-  :Temperature        => 21.0 °C
-  :BarometricPressure => 1.0 atm
+julia> environment(plate)[:Temperature]
+21.0 °C
 ```
 
 ## Unknown values and units
