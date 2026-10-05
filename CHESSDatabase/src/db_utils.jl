@@ -130,12 +130,12 @@ end
 
 
 """
-    julia_time(time::Float64) -> DateTime
+    julia_time(time::Real) -> DateTime
 
 Convert a Unix-time number stored in the database back to a `DateTime`. Inverse of
 [`db_time`](@ref).
 """
-function julia_time(time::Float64)
+function julia_time(time::Real)
     return Dates.unix2datetime(time)
 end 
 
