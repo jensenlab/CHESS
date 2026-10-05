@@ -80,7 +80,7 @@ function _pretty_quantity(q::Unitful.Quantity; sigdigits::Integer=3)
         end
         u = ladder[i]
     end
-    return string(_format_sigdigits(ustrip(uconvert(u, q)), sigdigits), " ", sprint(show, u))
+    return string(_format_sigdigits(ustrip(uconvert(u, q)), sigdigits), " ", sprint(show, u; context=:fancy_exponent=>true))
 end
 
 # Print one component table (solids, liquids, or organisms) of a stock's text/plain display.

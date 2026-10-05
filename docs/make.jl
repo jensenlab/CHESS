@@ -1,3 +1,7 @@
+# Unitful prints superscript exponents (mL⁻¹) by default only on macOS. Doctests record the superscript
+# form, so turn it on for every platform.
+ENV["UNITFUL_FANCY_EXPONENTS"] = "true"
+
 using Documenter
 using DocumenterMermaid
 using CHESS
