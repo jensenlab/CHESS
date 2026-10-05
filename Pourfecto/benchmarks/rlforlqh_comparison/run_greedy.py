@@ -72,7 +72,7 @@ def greedy(grid, goal, k, max_iters, rng):
                             candidates.append((i, j))
             if not candidates:
                 break  # nothing left with excess: unreachable goal under this heuristic
-            x, y = rng.choice(candidates)
+            x, y = candidates[0] if rng is None else rng.choice(candidates)
             head = grid[x][y].copy()
             grid[x][y] -= head
             distance += abs(x - prev_x) + abs(y - prev_y)
@@ -94,7 +94,7 @@ def greedy(grid, goal, k, max_iters, rng):
                 # partial-dispense fallback here either (action_ratio branch is dead code, since
                 # ratio_code is always 0 from `np.random.randint(0, 1)`), so this is a genuine stall.
                 break
-            x, y = rng.choice(candidates)
+            x, y = candidates[0] if rng is None else rng.choice(candidates)
             grid[x][y] += head
             head = np.zeros((k,))
             n_transfers += 1
@@ -119,13 +119,13 @@ def instance_to_arrays(instance):
     return grid, goal, n, k
 
 
-def run_restarts(grid0, goal0, k, max_iters, n_restarts, base_seed):
+def run_restarts(grid0, goal0, k, max_iters, n_restarts, base_seed, deterministic=False):
     successes = []
     transfers_list = []
     distance_list = []
     times = []
     for seed in range(n_restarts):
-        rng = random.Random((base_seed, seed))
+        rng = None if deterministic else random.Random((base_seed, seed))
         t0 = time.time()
         done, n_transfers, distance = greedy(grid0.copy(), goal0.copy(), k, max_iters, rng)
         times.append(time.time() - t0)
@@ -142,6 +142,10 @@ def main():
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "results", "greedy.csv"))
     ap.add_argument("--iters-per-unit", type=float, default=3.0)
     ap.add_argument("--restarts", type=int, default=100)
+    ap.add_argument("--deterministic", action="store_true",
+                     help="disable this benchmark's random tie-breaking, reproducing the original "
+                          "rlforlqh code's deterministic first-found-candidate behavior exactly "
+                          "(useful with --restarts 1 for a faithful single-shot reproduction)")
     args = ap.parse_args()
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
@@ -157,7 +161,7 @@ def main():
         name = os.path.splitext(os.path.basename(path))[0]
 
         successes, transfers_list, distance_list, times = run_restarts(
-            grid, goal, k, max_iters, args.restarts, base_seed=name)
+            grid, goal, k, max_iters, args.restarts, base_seed=name, deterministic=args.deterministic)
 
         n_success = sum(successes)
         success_rate = n_success / args.restarts

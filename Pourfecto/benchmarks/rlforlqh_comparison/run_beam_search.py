@@ -54,14 +54,14 @@ def instance_to_start_goal(instance):
     return start, goal, n, k
 
 
-def run_restarts(start, goal, n, k, beam_size, timeout, n_restarts, base_seed):
+def run_restarts(start, goal, n, k, beam_size, timeout, n_restarts, base_seed, deterministic=False):
     successes = []
     transfers_list = []
     distance_list = []
     times = []
     n_timed_out = 0
     for seed in range(n_restarts):
-        rng = random.Random((base_seed, seed))
+        rng = None if deterministic else random.Random((base_seed, seed))
         machine = Machine()
         t0 = time.time()
         deadline = t0 + timeout
@@ -82,7 +82,7 @@ def run_restarts(start, goal, n, k, beam_size, timeout, n_restarts, base_seed):
     return successes, transfers_list, distance_list, times, n_timed_out
 
 
-def process_instance(path, beam_size, timeout, n_restarts):
+def process_instance(path, beam_size, timeout, n_restarts, deterministic=False):
     with open(path) as f:
         instance = json.load(f)
     start, goal, n, k = instance_to_start_goal(instance)
@@ -90,7 +90,7 @@ def process_instance(path, beam_size, timeout, n_restarts):
 
     t0 = time.time()
     successes, transfers_list, distance_list, times, n_timed_out = run_restarts(
-        start, goal, n, k, beam_size, timeout, n_restarts, base_seed=name)
+        start, goal, n, k, beam_size, timeout, n_restarts, base_seed=name, deterministic=deterministic)
     wall = time.time() - t0
 
     n_success = sum(successes)
@@ -117,6 +117,10 @@ def main():
     ap.add_argument("--beam-size", type=int, default=3)
     ap.add_argument("--timeout", type=float, default=2.0, help="per-restart wall-clock budget, seconds")
     ap.add_argument("--restarts", type=int, default=100)
+    ap.add_argument("--deterministic", action="store_true",
+                     help="disable this benchmark's random tie-breaking, reproducing the original "
+                          "rlforlqh code's deterministic ordering exactly (useful with --restarts 1 "
+                          "for a faithful single-shot reproduction)")
     ap.add_argument("--workers", type=int, default=os.cpu_count(),
                      help="instances processed in parallel (default: all cores)")
     ap.add_argument("--max-grid-n", type=int, default=None,
@@ -138,7 +142,7 @@ def main():
     t_start = time.time()
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         futures = {
-            pool.submit(process_instance, path, args.beam_size, args.timeout, args.restarts): path
+            pool.submit(process_instance, path, args.beam_size, args.timeout, args.restarts, args.deterministic): path
             for path in paths
         }
         for fut in as_completed(futures):
