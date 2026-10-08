@@ -1,5 +1,15 @@
 
 
+"""
+    reconstruct_children(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Location
+    reconstruct_children(location_ids::Vector{<:Integer}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Vector{<:Location}
+
+Rebuild each location's children (as bare locations, not themselves reconstructed) for the given location IDs, as of `sequence_id` and `time`, and return new
+locations holding that state. [`reconstruct_location`](@ref) rebuilds everything at once; the
+arguments work the same way (see [`reconstruct_location!`](@ref)).
+
+See also: [`reconstruct_children!`](@ref).
+"""
 function reconstruct_children(location_ids::Vector{<:Integer},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     all_locs=Dict{Integer,Location}() 
     cache_feet=[]
@@ -45,6 +55,13 @@ function reconstruct_children(location_id::Integer,sequence_id::Integer=get_last
     return reconstruct_children([location_id],sequence_id,time,max_cache;encumbrances=encumbrances)[1]
 end 
 
+"""
+    reconstruct_children!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+    reconstruct_children!(locations::Vector{<:Location}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+
+Set the children of existing locations to their reconstructed state. Arguments work as in
+[`reconstruct_children`](@ref).
+"""
 function reconstruct_children!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     parallel_locs=reconstruct_children(locations,sequence_id,time,max_cache;encumbrances=encumbrances)
     for i in eachindex(locations)

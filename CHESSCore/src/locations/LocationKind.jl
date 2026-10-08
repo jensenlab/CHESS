@@ -104,6 +104,13 @@ function _locationkinds(m::Module)
     end
 end
 
+"""
+    const location_kinds::Dict{Symbol,LocationKind}
+
+Registry of every [`LocationKind`](@ref) defined with [`@location_kind`](@ref), keyed by name. Kinds
+registered in any module are also added here, so this one table covers the whole session. Look up a
+single kind with [`@loc_str`](@ref) (`loc"WP96"`) rather than indexing this directly.
+"""
 const location_kinds = _locationkinds(CHESSCore)
 
 function locationkind_expr(m::Module,n,ls)

@@ -1,52 +1,59 @@
 # The Ledger
 
-The `Ledger` table (`ID`, `SequenceID`, `Time`) numbers every recorded event in order, deliberately
-kept separate from both the order rows happen to be stored in and the real-world clock time
-(`Time`). Every other persisted table references a `LedgerID` to place itself in this history.
+```@meta
+DocTestSetup = :(using CHESS)
+```
 
-## Two timelines: what happened, and when we recorded it
+The `Ledger` table (`ID`, `SequenceID`, `Time`) numbers every recorded event in order. The
+numbering is separate from both the order in which rows are stored and the clock time of the
+event. Every other persisted table has a `LedgerID` that places its rows in this history.
 
-`SequenceID` says where an event sits in the story -- and can be revised, if a mistake needs
-correcting later. `Time` (paired with `ID`) says when the system actually recorded it, and never
-changes once written. Keeping these separate means you can ask two different questions
-independently: "what did the story say happened at this point?" and "what did we believe as of a
-given moment?"
+## Sequence and time
 
-## Three ways to write
+`SequenceID` is the event's place in the history. It can be revised if a mistake needs correcting
+later. `Time`, together with `ID`, is when the system recorded the event, and it never changes once
+written. The two answer different questions: what the history says happened at a given point, and
+what the database held as of a given moment.
 
-Only two of the three have their own names -- all three funnel through the same low-level
-primitive, `update_ledger(sequence_id)`, which inserts a new row stamped with the current time and
-returns its `ID`:
+## Writing to the ledger
 
-- [`append_ledger()`](@ref) -- a new slot at the end of history.
-- [`insert_ledger(sequence_id)`](@ref) -- a new slot in the middle: shifts every existing
-  `SequenceID` greater than or equal to `sequence_id` forward by one to make room.
-- [`replace_ledger(sequence_id)`](@ref) -- a new revision of an *already-occupied* slot. The logical
-  position doesn't move; a new row (higher `ID`, later `Time`) supersedes the old one for
-  reconstructions as of any transaction-time at or after the replacement, while the old row remains
-  reconstructable for any "as of time T" query where T predates it. Unlike the other two,
-  `replace_ledger` asserts the slot is already occupied first -- `error("sequence_id $sequence_id
-  does not exist yet -- use append_ledger or insert_ledger")` if not.
+All writes call the low-level function `update_ledger(sequence_id)`, which inserts a new row
+stamped with the current time and returns its `ID`. Three functions wrap it:
 
-```julia-repl
+- [`append_ledger()`](@ref) adds a new slot at the end of the history.
+- [`insert_ledger(sequence_id)`](@ref) adds a new slot in the middle. Every existing `SequenceID`
+  greater than or equal to `sequence_id` moves forward by one to make room.
+- [`replace_ledger(sequence_id)`](@ref) adds a new revision of an occupied slot. The slot keeps its
+  place in the history. The new row, with a higher `ID` and a later `Time`, supersedes the old one
+  for reconstructions as of any time at or after the replacement. The old row remains available for
+  any as-of-time query that predates the replacement. `replace_ledger` first checks that the slot
+  is occupied and raises an error pointing to `append_ledger` or `insert_ledger` if it is not.
+
+```jldoctest ledger
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
 julia> before = get_last_sequence_id()
+1
 
 julia> new_id = append_ledger()
+2
 
 julia> get_sequence_id(new_id) == before + 1
 true
 ```
 
-Calling `update_ledger` directly on an already-occupied `sequenceID` is silently the "replace"
-operation too -- `replace_ledger` is preferred specifically because it asserts the slot exists
-first, rather than succeeding either way.
+Calling `update_ledger` directly on an occupied sequence ID also replaces the slot.
+`replace_ledger` is preferred because it checks that the slot exists.
 
 ## Resolving a slot to its current revision
 
-Because more than one row can share a `SequenceID` -- a fresh revision of an existing slot is the
-point, not a mistake -- every reconstruction query in `CHESSDatabase` resolves a `SequenceID` slot
-to its current revision the same way. In plain terms, this asks: for each position in the story,
-what is the most recent entry recorded no later than a given moment?
+More than one row can share a `SequenceID`, because a revision of a slot is a new row. Every
+reconstruction query in `CHESSDatabase` resolves a slot to its current revision in the same way: for
+each sequence ID, it takes the most recent row recorded no later than a given time.
 
 ```sql
 SELECT Max(ID), SequenceID, Time
@@ -55,27 +62,39 @@ WHERE Time <= cutoff
 GROUP BY SequenceID
 ```
 
-The highest-`ID` (most recently written) row no later than the requested cutoff wins. This same
-query recurs throughout [Reconstruction](reconstruction.md) and [Caching & Repair](caching-repair.md)
--- it's also precisely what cache-repair's invalidation check tests: "has this slot been amended
-since the cache was taken."
+The row with the highest `ID`, the most recently written, wins among those no later than the
+cutoff. The same query is used throughout [Reconstruction](reconstruction.md) and
+[Caching & Repair](caching-repair.md). Cache repair uses it to test whether a slot has been amended
+since a cache was taken.
+
+## Times
+
+The database stores times as Unix time, a floating-point number of seconds. [`db_time`](@ref)
+converts a `DateTime` to that number, and [`julia_time`](@ref) converts it back:
+
+```jldoctest ledger
+julia> using Dates
+
+julia> stored = db_time(DateTime(2026, 1, 1, 9, 30))
+1.7672598e9
+
+julia> julia_time(stored)
+2026-01-01T09:30:00
+```
 
 ## Query helpers
 
-`get_last_sequence_id(time=now())` -- the newest `SequenceID` as of `time`. `get_sequence_id(ledger_id)`
--- which slot a given `Ledger` row belongs to. `get_all_ledger_ids(sequence_id, time=now())` -- every
-revision of one slot up to `time`.
+- `get_last_sequence_id(time=now())` returns the newest `SequenceID` as of `time`.
+- `get_sequence_id(ledger_id)` returns the slot that a `Ledger` row belongs to.
+- `get_all_ledger_ids(sequence_id, time=now())` returns every revision of one slot up to `time`.
 
-`get_last_ledger_id` has two forms that are **not interchangeable**:
+`get_last_ledger_id` has two forms that are not interchangeable:
 
-- `get_last_ledger_id(sequence_id, time=now())` resolves *a given slot* to its current revision --
-  the one safe to use for bounding a reconstruction query.
-- `get_last_ledger_id(time=now())` (bare) returns the physically newest row in the whole table,
-  regardless of which slot it revises. It's appropriate for timestamping something meant to attach
-  to "whatever just happened" (its only current caller is `upload_protocol`'s
-  `ledger_id_entered_at` default, provenance metadata never used to bound a query) -- but it is not
-  a substitute for "the current end of the story" once anything has ever been replaced.
+- `get_last_ledger_id(sequence_id, time=now())` resolves one slot to its current revision. Use it
+  to bound a reconstruction query.
+- `get_last_ledger_id(time=now())`, with no slot, returns the most recently written row in the
+  table, whichever slot it revises. It suits timestamping metadata that attaches to whatever
+  happened last. Once any slot has been replaced, it is not the end of the history.
 
-[Committing & Uploading](committing-uploading.md) covers the higher-level API (`upload`/`update`)
-built on top of these primitives -- the entry points actually used to write real operations, rather
-than manipulating `Ledger` slots directly.
+[Committing & Uploading](committing-uploading.md) describes `upload` and `update`, which write real
+operations on top of these functions.

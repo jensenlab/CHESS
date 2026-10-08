@@ -3,8 +3,25 @@
 
 
 
+"""
+    upload_operation(fun::Function) -> Function
 
+The database-writing function that [`upload`](@ref) and [`update`](@ref) call to persist an operation
+`fun`. Supported operations:
 
+| Operation | Written by |
+|---|---|
+| `move_into!` | `upload_movement` |
+| `transfer!` | [`upload_transfer`](@ref) |
+| `set_attribute!` | `upload_environment_attribute` |
+| `record_read!` | [`upload_read`](@ref) |
+| `lock!`, `unlock!`, `toggle_lock!` | `upload_lock` |
+| `activate!`, `deactivate!`, `toggle_activity!` | [`upload_activity`](@ref) |
+| `assign_barcode!` | `update_barcode` |
+| `observe!` | [`upload_observation`](@ref) |
+
+Throws a `KeyError` for any other function.
+"""
 function upload_operation(fun::Function)
     opfun_dict=Dict(
         activate! => upload_activity,
@@ -119,7 +136,7 @@ end
     get_component_id(reagent::Reagent)
 
 Return the `Components.ID`/`Reagents.ComponentID` for `reagent`, uploading it first (via
-[`upload_component`](@ref)) if no row with a matching natural key (name/type/molecular weight/
+`upload_component`) if no row with a matching natural key (name/type/molecular weight/
 density/pubchem ID) already exists. `Reagent` has a small, fixed set of scalar fields, so identity is
 looked up directly by those fields rather than via a content hash.
 """
@@ -203,7 +220,7 @@ end
     get_component_id(str::Organism)
 
 Return the `Components.ID`/`Organisms.ComponentID` for `str`, uploading it first (via
-[`upload_component`](@ref)) if no row with a matching natural key (genus/species/strain) already
+`upload_component`) if no row with a matching natural key (genus/species/strain) already
 exists.
 """
 function get_component_id(str::Organism)
@@ -272,12 +289,24 @@ function upload_environment_attribute(loc::Location,attr::Attribute;ledger_id::I
 end
 
 
+"""
+    upload_barcode(bc::Barcode)
+
+Record a barcode in the database, with its current location if it has one. A barcode already
+recorded is left unchanged.
+"""
 function upload_barcode(bc::Barcode)
     loc_id=location_id(bc)
     n=name(bc)
     execute_db("INSERT OR IGNORE INTO Barcodes(Barcode,LocationID,Name) Values(?,?,?)",(string(barcode(bc)),loc_id,n))
 end
 
+"""
+    update_barcode(bc::Barcode, loc::Location; kwargs...)
+
+Record in the database that `bc` is attached to `loc`. This is the database write for
+`assign_barcode!` (see [`upload_operation`](@ref CHESSDatabase.upload_operation)).
+"""
 function update_barcode(bc::Barcode,loc::Location;kwargs...)
     loc_id=location_id(bc)
     if !ismissing(loc_id) && loc_id != location_id(loc)
@@ -292,7 +321,7 @@ end
     upload_read(loc::Location,read::Read; ledger_id, time, instrument_id, instrument_time)
 
 Persist `read` (a [`Read`](@ref)) for `loc`. Pure persistence -- matches
-[`upload_movement`](@ref)/[`upload_transfer`](@ref)/[`upload_environment_attribute`](@ref): the
+`upload_movement`/[`upload_transfer`](@ref)/`upload_environment_attribute`: the
 in-memory mutation ([`record_read!`](@ref)) is the caller's responsibility (normally
 `upload(record_read!,loc,read;instrument=...)`, which calls both). `instrument_time` is accepted and
 ignored -- `read`'s own [`read_time`](@ref) is what's stored as `Reads.InstrumentTime`, since a `Read`
@@ -315,7 +344,7 @@ end
     upload_instrument_setting(instrument::Location,setting::String,value; ledger_id, time, instrument_time)
 
 Append a new revision of `instrument`'s `setting` to `InstrumentSettings` -- the ledger's "amend"
-operation for instrument settings, mirroring [`upload_environment_attribute`](@ref)'s shape.
+operation for instrument settings, mirroring `upload_environment_attribute`'s shape.
 `value` is stored as text (see the design note on `InstrumentSettings` -- settings may be non-numeric).
 Returns `ledger_id` -- since `SequenceID` can shift after the fact (`insert_ledger`/`replace_ledger`),
 resolve this revision's *current* sequence position later via `get_sequence_id(ledger_id)` rather than
@@ -332,6 +361,11 @@ end
 
 
 
+"""
+    upload_experiment(name, user::String, is_public=false; time=Dates.now()) -> Integer
+
+Create an experiment record and return its ID. Protocols and runs belong to an experiment.
+"""
 function upload_experiment(name::AbstractString,user::String,is_public=false;time=Dates.now())
     upload_time=db_time(time)
     execute_db("""INSERT INTO Experiments(Name,User,IsPublic,Time) Values(?,?,?,?)""",
@@ -339,6 +373,11 @@ function upload_experiment(name::AbstractString,user::String,is_public=false;tim
     return get_last_experiment_id()
 end
 
+"""
+    upload_run(run::Run) -> Integer
+
+Record `run` in the database and return its ID.
+"""
 function upload_run(run::Run)
     control_str = join(controls(run),",")
     blank_str = join(blanks(run),",")

@@ -1,66 +1,101 @@
 # Database Architecture
 
-`CHESSDatabase` persists everything built with `CHESSCore` to a SQLite database. `create_db(path)`
-builds a fresh schema at `path`; `connect_SQLite(path)` opens the connection every other function in
-the package uses:
-
-```julia-repl
-julia> create_db("lab.db")
-
-julia> connect_SQLite("lab.db")
+```@meta
+DocTestSetup = :(using CHESS)
 ```
 
-`create_db` also turns on a setting that makes the database reject any write that would leave a
-reference pointing at something that doesn't exist, so the relationships described below are
-actually enforced, not just documented.
+`CHESSDatabase` persists everything built with `CHESSCore` to a SQLite database. `create_db(path)`
+builds a new schema at `path`, and `connect_SQLite(path)` opens the connection that every other
+function in the package uses:
+
+```jldoctest db_architecture
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+```
+
+`create_db` also enables foreign-key enforcement, so the database rejects any write that would
+leave a reference pointing at a row that does not exist. The relationships described below are
+enforced by the database.
 
 Each table below is listed as `Name(column, column, ...)`.
 
 ## Core identity
 
-- `Ledger(ID, SequenceID, Time)` -- numbers every event in order; every other table's history hangs
-  off of it. Covered in full in [The Ledger](ledger.md).
-- `LocationTypes(Name)`, `Locations(ID, Name, Type)` -- every committed `Location` gets one row
-  here, regardless of concrete Julia type.
-- `Barcodes(Barcode, LocationID, Name)` -- maps a physical barcode string to a `Location`.
+- `Ledger(ID, SequenceID, Time)` numbers every event in order, and the history in every other
+  table refers to it. See [The Ledger](ledger.md).
+- `LocationTypes(Name)` and `Locations(ID, Name, Type)` hold one row for every committed
+  `Location`, whatever its Julia type.
+- `Barcodes(Barcode, LocationID, Name)` maps a physical barcode string to a `Location`.
 
 ## Components and chemistry
 
 `Components(ID, Type)`, `Reagents(ComponentID, Name, Type, MolecularWeight, Density, CID)`,
 `Chemicals(ID, Name, Charge, MolecularWeight)`, `CompositionRules(ID, ReagentComponentID,
-ChemicalID, Coefficient)`, `Organisms(ID, ComponentID, Genus, Species, Strain)` -- the persisted
-counterparts of `CHESSCore`'s `Reagent`/`Chemical`/`Organism`/`CompositionRule` types.
+ChemicalID, Coefficient)`, and `Organisms(ID, ComponentID, Genus, Species, Strain)` persist the
+`Reagent`, `Chemical`, `Organism`, and `CompositionRule` types of `CHESSCore`.
 
 ## Environment
 
-`Attributes(Attribute, BaseUnit)` -- the registry of attribute kinds. `EnvironmentAttributes(ID,
-LedgerID, LocationID, Attribute, Value, Unit, Time, InstrumentID, InstrumentTime)` -- every
-`set_attribute!` call, ever, one row each.
+`Attributes(Attribute, BaseUnit)` is the registry of attribute kinds, and [`get_all_attributes`](@ref)
+returns it as a `DataFrame`. `EnvironmentAttributes(ID,
+LedgerID, LocationID, Attribute, Value, Unit, Time, InstrumentID, InstrumentTime)` has one row for
+every `set_attribute!` call.
 
 ## Operations
 
 Every mutating `CHESSCore` operation has a matching append-only table: `Transfers`, `Movements`,
-`Reads`, `Locks`, `Activity`, `InstrumentSettings`. Each carries its own `LedgerID` (tying it to a
-point in history) and its own `InstrumentID`/`InstrumentTime` pair (tying it to whichever
-`Instrument` performed it, if any) -- these `InstrumentID` columns are indexed from day one, not
-added later as an afterthought. [Instrument Interfaces](instrument-interfaces.md) covers exactly how
-that attribution gets written.
+`Reads`, `Locks`, `Activity`, and `InstrumentSettings`. Each has a `LedgerID`, which places the row
+in the history, and an `InstrumentID` and `InstrumentTime`, which record the instrument that
+performed the operation, if any. The `InstrumentID` columns are indexed. See
+[Instrument Interfaces](instrument-interfaces.md).
 
 ## Caching
 
-A parallel `Cached*` family (`CachedAncestors`, `CachedDescendants`, `CachedEnvironments`,
-`CachedContents`, `CachedLockActivity`, plus the backing tables that store each shared
-child-set/attribute-set/stock once, `CachedChildSets`/`CachedAttributeSets`/`CachedStocks`) stores
-periodic snapshots of derived state,
-so reconstructing a location doesn't always mean replaying its entire history. Covered in full in
-[Caching & Repair](caching-repair.md).
+A family of `Cached*` tables stores snapshots of derived state, so that reconstructing a location
+does not always replay its entire history. The tables are `CachedAncestors`, `CachedDescendants`,
+`CachedEnvironments`, `CachedContents`, and `CachedLockActivity`. The backing tables
+`CachedChildSets`, `CachedAttributeSets`, and `CachedStocks` store each shared child set, attribute
+set, and stock once. See [Caching & Repair](caching-repair.md).
 
 ## Experiments, runs, protocols, and encumbrances
 
-`Experiments`, `Runs`, `Protocols`, `ProtocolEnforcement`, `Encumbrances`, `EncumbranceCompletion`,
-and a mirrored `Encumbered*` family of operation tables exist for grouping and reserving future work
-against an experiment. [Encumbrances](encumbrances.md) covers this in depth; `Runs`/`Experiments`
-themselves are outside this pass's scope.
+The tables `Experiments`, `Runs`, `Protocols`, `ProtocolEnforcement`, `Encumbrances`, and
+`EncumbranceCompletion`, and a matching `Encumbered*` family of operation tables, group and reserve
+future work for an experiment. See [Encumbrances](encumbrances.md) for protocols and encumbrances.
 
-[The Ledger](ledger.md) covers how `Ledger`/`SequenceID` actually get written, and why they're kept
-deliberately separate from both physical insertion order and wall-clock time.
+## Running SQL
+
+[`query_db`](@ref) runs a statement that returns rows and gives a `DataFrame`. [`execute_db`](@ref)
+runs a statement that changes the database, such as `INSERT`, `UPDATE`, or `CREATE`. Both take a
+vector of parameters for the `?` placeholders of the statement. Parameters are safer than building
+the SQL with string interpolation. Both raise an error if no database is connected.
+
+[`sql_transaction`](@ref) runs a function in a transaction. If the function throws, every write that
+it made is rolled back, and otherwise it returns the value of the function. `upload` and `update` use
+it, so an operation and its database record succeed or fail together. [`sql_commit`](@ref) and
+[`sql_rollback`](@ref) commit and roll back a named savepoint, and most code uses
+`sql_transaction` instead:
+
+```jldoctest db_architecture
+julia> execute_db("CREATE TABLE Scratch (Name TEXT)");
+
+julia> execute_db("INSERT INTO Scratch (Name) VALUES (?)", ["first"]);
+
+julia> try
+           sql_transaction() do
+               execute_db("INSERT INTO Scratch (Name) VALUES (?)", ["second"])
+               error("fail after the insert")
+           end
+       catch
+       end
+
+julia> query_db("SELECT Name FROM Scratch")
+1×1 DataFrame
+ Row │ Name
+     │ String
+─────┼────────
+   1 │ first
+```

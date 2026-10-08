@@ -62,9 +62,11 @@
 @stock brain_heart_infusion_agar_1000mL (brain_heart_infusion_broth_1000mL + 15u"g" * agar)
 
 # M9 Minimal Medium (ATCC 2511) 
+# Phosphates as the lab makes it: ANHYDROUS Na2HPO4 (Sigma S9763, confirmed in the 2026-10 M9 repeat; ~1.9x the
+# moles of 12.8 g heptahydrate) and monobasic KH2PO4 (not K2HPO4). The ATCC sheet says only "Na2HPO4".
 m9_salts = 
-12.8u"g" * sodium_phosphate_di +
-3u"g" * potassium_phosphate_di + 
+12.8u"g" * sodium_phosphate_di_anhydrous +
+3u"g" * potassium_phosphate_mono + 
 0.5u"g" * sodium_chloride + 
 1u"g" * ammonium_chloride + 
 478u"mL" * water 

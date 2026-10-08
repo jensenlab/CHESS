@@ -3,7 +3,7 @@
     get_reads(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
 
 Return every `Reads` row for `location_id` up to `sequence_id`/`time`, as a `DataFrame`. Unlike
-`get_*_caches` (e.g. [`get_attribute_caches`](@ref)), there is no latest-wins collapsing here -- reads
+`get_*_caches` (e.g. `get_attribute_caches`), there is no latest-wins collapsing here -- reads
 never supersede each other, only accumulate (see [`Read`](@ref)'s docstring).
 """
 function get_reads(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())

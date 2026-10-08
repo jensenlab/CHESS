@@ -20,7 +20,7 @@ function plot_plate_data end
 Per-plate categorical scatter of `values` by role (`relations...` plus `:run` for wells present but
 not in any relation's mask) -- the restored, generalized successor to `CHESSQC.plot_control_data`
 (hardcoded to exactly `run`/`positive control`/`negative control`), now supporting an arbitrary
-relation set and colored via [`LabwarePlotting.role_palette`](@ref) for consistency with every other
+relation set and colored via `LabwarePlotting.role_palette` for consistency with every other
 role-colored plot in the CHESS ecosystem.
 
 Extension point: see [`plot_plate_data`](@ref).

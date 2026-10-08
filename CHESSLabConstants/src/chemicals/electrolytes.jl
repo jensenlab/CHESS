@@ -75,6 +75,7 @@ function _register_electrolyte_compositions!()
     set_composition!(sodium_acetate_trihydrate,CompositionRule((Na⁺+OAc⁻+3*H2O).composition))
     set_composition!(sodium_citrate_dihydrate,CompositionRule((3*Na⁺+Citrate³⁻+2*H2O).composition))
     set_composition!(sodium_phosphate_di,CompositionRule((2*Na⁺+HPO4²⁻+7*H2O).composition)) # heptahydrate
+    set_composition!(sodium_phosphate_di_anhydrous,CompositionRule((2*Na⁺+HPO4²⁻).composition)) # anhydrous (e.g. Sigma S9763)
     set_composition!(sodium_phosphate_mono,CompositionRule((Na⁺+H2PO4⁻+H2O).composition)) # monohydrate
     set_composition!(sodium_succinate_hexahydrate,CompositionRule((2*Na⁺+C4H4O4²⁻+6*H2O).composition))
     # cysteine is really L-Cysteine hydrochloride monohydrate (Thermo Fisher BP376, PubChem CID

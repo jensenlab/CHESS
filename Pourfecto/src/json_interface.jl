@@ -287,6 +287,12 @@ function pourcast_to_json(p::Pourcast)
 end 
 
 
+# JSON writes an N-d array as nested column-major lists (the outermost list indexes the last
+# dimension), so `stack` over the raised inner lists rebuilds the original shape.
+raise_array(x) = x
+raise_array(v::AbstractVector) = all(x -> x isa Real, v) ? Float64.(v) : stack(raise_array.(v))
+
+
 """
     json_to_pourcast(j::String) -> Pourcast
 
@@ -322,7 +328,7 @@ function json_to_pourcast(j::String)
 
     m = json_dict["model_solution"]
 
-    m = Dict(Symbol.(keys(m)) .=> values(m))
+    m = Dict{Symbol,Any}(Symbol(k) => raise_array(v) for (k,v) in m)
 
     return Pourcast(ss, ts, sl,tl , c,p,m,obj_val)
 end

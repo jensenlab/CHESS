@@ -1,4 +1,11 @@
 
+"""
+    create_db(path)
+
+Create a new CHESS database at `path`: every table described on the Database Architecture manual
+page, plus the first ledger entry (sequence ID 1). The file must not already contain these tables.
+`create_db` does not connect to the new database; call [`connect_SQLite`](@ref) afterward.
+"""
 function create_db(path)
     # Create database connection
     db = SQLite.DB(path)

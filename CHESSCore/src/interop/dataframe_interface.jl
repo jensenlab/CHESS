@@ -48,6 +48,19 @@ end
 
 ## Parsers for different dispensesolver inputs
 
+"""
+    vc_to_stock(vc::DataFrame, units::DataFrame; kwargs...) -> Vector{Stock}
+
+Build one [`Stock`](@ref) per row of a table in the volume/concentration ("vc") format: a `"volume"`
+column for each stock's total, plus one concentration column per reagent or organism. `units` gives
+the unit string for every column, either in one row shared by all stocks or one row per stock.
+Column names are parsed with [`string_to_component`](@ref), which takes the `reagent_context` and
+`org_context` keywords. Throws an error if `units` holds quantity units (use [`q_to_stock`](@ref))
+or a concentration unit that does not combine with the volume.
+
+See the Interop manual page for the table formats. [`df_to_stock`](@ref) picks the format
+automatically.
+"""
 function vc_to_stock(vc::DataFrame,units::DataFrame;kwargs...)
     check_csv_inputs(vc,units)
 
@@ -84,6 +97,13 @@ end
 
 
 
+"""
+    stock_to_vc(stocks::Vector{<:Stock}; kwargs...) -> (DataFrame, DataFrame)
+
+Inverse of [`vc_to_stock`](@ref): write `stocks` as a volume/concentration table and a matching
+units table. Each stock's total quantity goes in the `"volume"` column, and each component's
+[`concentration`](@ref) in its own column. `kwargs` are passed to [`component_to_string`](@ref).
+"""
 function stock_to_vc(stocks::Vector{<:CHESSCore.Stock}; kwargs...)
     concs = component_df(stocks;measure=concentration,kwargs...)
     vols = CHESSCore.quantity.(stocks)
@@ -101,6 +121,14 @@ function stock_to_vc(stocks::Vector{<:CHESSCore.Stock}; kwargs...)
 end
 
 
+"""
+    q_to_stock(quant::DataFrame, units::DataFrame; kwargs...) -> Vector{Stock}
+
+Build one [`Stock`](@ref) per row of a table in the quantity ("q") format: one column per reagent
+or organism holding an absolute amount (mass, volume, moles, or biomass). `units` works as in
+[`vc_to_stock`](@ref), and so do the `reagent_context`/`org_context` keywords. Throws an error if
+`units` holds concentration units (use [`vc_to_stock`](@ref)).
+"""
 function q_to_stock(quant::DataFrame,units::DataFrame;kwargs...)
     check_csv_inputs(quant,units)
     single_unit = is_single_row(units)
@@ -128,6 +156,13 @@ function q_to_stock(quant::DataFrame,units::DataFrame;kwargs...)
     return stocks
 end
 
+"""
+    stock_to_q(stocks::Vector{<:Stock}; kwargs...) -> (DataFrame, DataFrame)
+
+Inverse of [`q_to_stock`](@ref): write `stocks` as a quantity table and a matching units table,
+with each component's absolute [`quantity`](@ref) in its own column. `kwargs` are passed to
+[`component_to_string`](@ref).
+"""
 function stock_to_q(stocks::Vector{<:CHESSCore.Stock};kwargs...)
     quants = component_df(stocks;measure=quantity,kwargs...)
 
@@ -215,7 +250,7 @@ end
 
 Reconstruct labware (and deposited well contents) from a dataframe representation.
 
-`df_to_labware` expects labware metadata (labware, name, and well) plus the stock columns needed to reconstruct well contents. Stock content may be encoded in any stock dataframe format supported by [`df_to_stock`](@ref) ].
+`df_to_labware` expects labware metadata (labware, name, and well) plus the stock columns needed to reconstruct well contents. Stock content may be encoded in any stock dataframe format supported by [`df_to_stock`](@ref).
 
 ## Required columns in `df`
 `df` must include the following columns:

@@ -19,21 +19,18 @@ Pourfecto builds directly on [CHESSCore](https://jensenlab.github.io/CHESS/dev/)
 
 ## Installation
 
-Pourfecto is not published to a package registry -- it lives in the [CHESS](https://github.com/jensenlab/CHESS) monorepo as a Julia `[workspace]` member alongside `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, resolving those dependencies via local paths. Pourfecto must be used from a local clone of CHESS:
+Pourfecto is a package of the [CHESS](https://github.com/jensenlab/CHESS) repository and is installed with it. Follow the [CHESS installation instructions](https://jensenlab.github.io/CHESS/dev/#Installation), then, in the clone, start Julia with the Pourfecto environment:
+
+```bash
+julia --project=Pourfecto
+```
+
+and load the package:
 
 ```julia
-# git clone https://github.com/jensenlab/CHESS && cd CHESS
-using Pkg
-Pkg.activate("Pourfecto")
-Pkg.instantiate()
 using Pourfecto
 ```
 
 !!! note 
     By default, Pourfecto's planning and scheduling algorithms use [Gurobi](https://www.gurobi.com) (licenses are free for academic users as of the time of writing), but a Gurobi license isn't required — any JuMP-compatible optimizer can be used instead via the `optimizer` keyword. See [Choosing a solver](@ref pourfecto_choosing_a_solver) for the free alternatives Pourfecto is tested against and their tradeoffs.
-
----
-
-
-
 

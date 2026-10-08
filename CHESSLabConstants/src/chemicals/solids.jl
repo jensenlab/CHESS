@@ -276,6 +276,7 @@
 # molybdate dihydrate"). molecular_weight derives from the CompositionRule (electrolytes.jl), now
 # including 2 H2O.
 @reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid missing missing 6096963
+@reagent sodium_phosphate_di_anhydrous "sodium phosphate dibasic anhydrous" Solid missing missing 24203
 @reagent sodium_phosphate_mono "sodium phosphate mononbasic monohydrate" Solid missing missing 516949
 @reagent sodium_selenite "Sodium Selenite" Solid missing 3.1u"g/mL" 24934
 @reagent sodium_succinate_hexahydrate "Sodium Succinate Hexahydrate" Solid missing missing 3083938

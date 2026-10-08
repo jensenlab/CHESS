@@ -4,54 +4,47 @@
 CurrentModule = Pourfecto
 ```
 
-This page is for anyone building support for a liquid handler Pourfecto doesn't already know about --
-typically a different lab, writing an instrument definition in **their own package**. You do not need
-to fork Pourfecto. Everything below is achievable with `using Pourfecto` and Julia's multiple
-dispatch: you define a new [`InstrumentModel`](@ref) subtype in your own module, then add methods to
-Pourfecto's exported generic functions (`Mask`, `write_instrument_files`, `packing_greedy`, ...) --
-multiple dispatch lets you add a method to a function defined in another package, as long as one of
-the method's argument types is your own.
+This page is for building support for a liquid handler that Pourfecto does not already include,
+typically in an instrument definition kept in a separate package. Forking Pourfecto is not
+necessary. A new [`InstrumentModel`](@ref) subtype defined in the new package, together with methods
+added to the exported generic functions of Pourfecto (`Mask`, `write_instrument_files`,
+`packing_greedy`, and others), is enough. Julia's multiple dispatch allows a package to add a method
+to a function from another package when one of the argument types belongs to the new package.
 
-A complete instrument definition has four pieces:
+A complete instrument definition has four parts:
 
-1. A data model -- [`InstrumentModel`](@ref) subtype, [`Head`](@ref), `Deck`, and
-   [`Configuration`](@ref). Covered in [Configurations](@ref pourfecto_configurations); not repeated
-   here.
-2. A [`Mask`](@ref) method -- which (well, position, channel) combinations are actually valid. Covered
-   below.
-3. Compiler hooks -- how a solved plan turns into files your instrument's control software can run.
-   Covered below.
-4. Registration and tests -- making your instrument discoverable and verifying it's correct. Covered
-   below.
+1. A data model: an [`InstrumentModel`](@ref) subtype, a [`Head`](@ref), a `Deck`, and a
+   [`Configuration`](@ref). [Configurations](@ref pourfecto_configurations) describes them.
+2. A [`Mask`](@ref) method, which defines the valid `(well, position, channel)` combinations.
+3. Compiler hooks, which turn a solved plan into files that the instrument control software can run.
+4. Registration and tests, which make the instrument discoverable and verify it.
 
-Cobra (`Pourfecto/src/instruments/Cobra.jl`) is Pourfecto's own worked example of all four pieces
-together -- read it end to end as a template. It is **Jensen-Lab-specific** (hardcoded lab file path,
-lab-specific plate-name mapping, and a vendor XML format tied to that lab's SoftLinx installation) and
-will not run correctly unmodified in another lab -- see the caveats documented on the `Cobra` type
-itself. That's expected: it's a template to adapt, not a drop-in default.
+The Cobra instrument is a worked example of all four parts. Its source is
+`Pourfecto/src/instruments/Cobra.jl`, and it is a good template to read from start to finish. Cobra
+is specific to the Jensen Lab: it has a hardcoded lab file path, a lab-specific plate-name mapping,
+and a vendor XML format tied to the SoftLinx installation of the lab. It will not run correctly in
+another lab without changes. The caveats are documented on the `Cobra` type.
 
----
+## Masks
 
-## The Mask/MaskRule system
+A [`Mask`](@ref) records, for a `(Head, Labware)` pair, which combinations of well, head position,
+and channel are physically valid for aspirating and dispensing. If an instrument has no `Mask`
+method, the default always returns `false`. This is not an error. It means the instrument cannot
+aspirate or dispense from anything yet.
 
-A [`Mask`](@ref) records, for a given `(Head, Labware)` pairing, which combinations of well, head
-position, and channel are physically valid for aspirating and dispensing. If you don't define a
-`Mask` method for your instrument, the default is a trivial always-`false` predicate -- this is *not*
-an error, it just means your instrument can't actually aspirate or dispense from anything yet.
+The [`Mask`](@ref) entry in the [API Reference](@ref) gives its fields.
 
-See the [`Mask`](@ref) entry in the [API Reference](@ref) for its exact field layout.
+### Mask rules
 
-### The declarative pattern: MaskRule
+The recommended way to define a mask is a table of [`MaskRule`](@ref)s, one for each combination of
+labware kinds, direction, and geometry archetype. [`build_mask_from_rules`](@ref) turns the table
+into a mask. Deriving both the mask and the deck admissibility (the `labware` field of
+`ConstrainedPosition`) from one table keeps them consistent, and the table is what the
+[conformance test kit](@ref pourfecto_testing_instruments) uses for automatic coverage testing.
+[`MaskRule`](@ref), [`build_mask_from_rules`](@ref), and [`mask_rules_for`](@ref) are described in
+the [API Reference](@ref).
 
-Rather than hand-writing predicate closures, the recommended approach is a declarative table of
-[`MaskRule`](@ref)s -- one entry per (labware kind set, direction, geometry archetype) combination --
-consumed by [`build_mask_from_rules`](@ref). This keeps your `Mask` logic and your deck admissibility
-(`ConstrainedPosition`'s `labware` field) derived from a single source of truth, and is what plugs
-into the [conformance test kit](@ref pourfecto_testing_instruments) for automatic coverage testing.
-See [`MaskRule`](@ref), [`build_mask_from_rules`](@ref), and [`mask_rules_for`](@ref) in the
-[API Reference](@ref) for exact signatures.
-
-### Worked example: Cobra's mask rules
+### Example: mask rules for Cobra
 
 ```julia
 const cobra_mask_rules = [
@@ -63,29 +56,28 @@ const cobra_mask_rules = [
 const cobra_wellplate_kinds = union((r.kinds for r in cobra_mask_rules)...)
 ```
 
-Reading this: Cobra's head can aspirate from and dispense into `:WP96`/`:DeepWP96` plates using the
-`:sliding_window` archetype (the head's channel grid slides across the labware's well grid); dispense
-is additionally allowed to overhang the plate edge vertically (`v_out=true`); `:WP384` plates use the
-same archetype but with `v_spacing=2` (Cobra's 4-channel head only touches every other row on a
-384-well plate's finer pitch). `cobra_wellplate_kinds` -- the set of labware kinds Cobra's deck
-positions admit -- is *derived* from this same table via `union`, so the deck and the mask can never
-drift out of sync.
+The Cobra head aspirates from and dispenses into `:WP96` and `:DeepWP96` plates with the
+`:sliding_window` archetype, in which the channel grid of the head slides across the well grid of the
+labware. Dispensing can also overhang the plate edge vertically (`v_out=true`). `:WP384` plates use
+the same archetype with `v_spacing=2`, because the 4-channel head of the Cobra touches only every
+other row at the finer pitch of a 384-well plate. `cobra_wellplate_kinds`, the set of labware kinds
+that the deck positions of the Cobra admit, is derived from the same table with `union`, so the deck
+and the mask stay consistent.
 
-Once you have a rule table, two one-liners wire it into your instrument:
+Two lines connect the rule table to the instrument:
 
 ```julia
 Mask(h::Head{Cobra}, l::Labware) = build_mask_from_rules(h, l, cobra_mask_rules)
 mask_rules_for(::Configuration{Cobra}) = cobra_mask_rules
 ```
 
-The first is required for scheduling to work at all. The second is optional but strongly
-recommended -- without it, the conformance test kit's mask-coverage check silently skips your
-instrument (it warns rather than failing, since a `Mask` method with no rule table isn't wrong, just
-unverified).
+The first line is required for scheduling. The second is optional but recommended. Without it, the
+mask-coverage check of the conformance test kit skips the instrument and shows a warning. A `Mask`
+method without a rule table is not wrong, only unverified.
 
-If your instrument's geometry doesn't fit `:sliding_window` or `:blanket`, you can call the lower-level
-primitives directly, or write a fully custom predicate -- `Mask`'s fields (`asp`, `disp`,
-`asp_positions`, `disp_positions`) are exported accessors for exactly this case.
+An instrument whose geometry does not fit `:sliding_window` or `:blanket` can call the lower-level
+functions directly or use a custom predicate. The fields of `Mask` (`asp`, `disp`, `asp_positions`,
+`disp_positions`) are exported accessors for this purpose.
 
 ```@docs
 sliding_window_mask
@@ -93,28 +85,25 @@ blanket_mask
 effective_head_size
 ```
 
-### Asymmetric aspirate/dispense topology
+### Asymmetric aspirate and dispense topology
 
-Most instruments aspirate and dispense with the same channel topology, but some genuinely don't --
-Tempest's 8 pistons share one intake channel while aspirating, but fan out to 8 independent nozzles
-while dispensing. For these, build your `Head` with the `channel_routing` keyword rather than the
-simple 3-argument constructor:
+Most instruments aspirate and dispense with the same channel topology, but some do not. The 8 pistons
+of the Tempest share one intake channel while aspirating and fan out to 8 independent nozzles while
+dispensing. For these instruments, build the `Head` with the `channel_routing` keyword instead of
+the three-argument constructor:
 
 ```julia
 Head{Tempest}(pistons, aspirate_channels, aspirate_mask, dispense_channels, dispense_mask; channel_routing)
 ```
 
-See the [`Head`](@ref) docstring for the full explanation of `channel_routing`'s semantics, and
-`Pourfecto/src/instruments/Tempest.jl` or `Nimbus.jl` for worked examples.
-
----
+The [`Head`](@ref) docstring describes `channel_routing`. The Tempest and Nimbus definitions in
+`Pourfecto/src/instruments/` are worked examples.
 
 ## The compiler pipeline
 
-Once a `Pourcast` is solved, [`compile`](@ref) turns it into protocol files on disk, per instrument
-configuration. For the user-facing view of this pipeline -- running `compile` and inspecting its
-output -- see [Compiling Protocols](@ref pourfecto_compiling); this section covers the same pipeline
-from the perspective of someone extending it for a new instrument.
+[`compile`](@ref) turns a solved `Pourcast` into protocol files on disk for each instrument
+configuration. [Compiling Protocols](@ref pourfecto_compiling) describes running `compile` and
+reading its output. This section describes the same pipeline for someone extending it.
 
 ```
 pourfecto(...) solves a Pourcast
@@ -128,7 +117,7 @@ pourfecto(...) solves a Pourcast
 
 ### write_instrument_files
 
-This is the required extension point for a custom protocol file format:
+`write_instrument_files` is the required extension point for a custom protocol file format:
 
 ```julia
 write_instrument_files(directory::AbstractString, design::DataFrame,
@@ -138,24 +127,23 @@ write_instrument_files(directory::AbstractString, design::DataFrame,
                         kwargs...) -> Nothing
 ```
 
-If you don't override this, the generic fallback writes a plain `transfer_table.csv` -- so a
-brand-new instrument with zero custom compiler code already produces valid (if generic) output the
-moment it has a `Configuration` and a `Mask`. Instrument-specific file formats (Cobra's SoftLinx XML,
-Mantis's `.dl.txt`, Tempest's `.mdl.txt`) are an optional enhancement layered on top, dispatched on
+Without an override, a generic fallback writes a plain `transfer_table.csv`. An instrument with a
+`Configuration` and a `Mask` and no custom compiler code therefore already produces valid, generic
+output. Instrument-specific formats, such as the SoftLinx XML of the Cobra, the `.dl.txt` file of the
+Mantis, and the `.mdl.txt` file of the Tempest, are optional and are dispatched on
 `Configuration{YourInstrument}`.
 
-You'll often see instrument files delegate to a private helper (e.g. `convert_design`) inside their
-own `write_instrument_files` method -- this is just an author-chosen internal naming convention, not
-something Pourfecto dispatches on generically. Name your own helpers however you like.
+Existing instruments often move work into a private helper such as `convert_design` inside their
+`write_instrument_files` method. The name is a local convention, and Pourfecto does not dispatch on
+it.
 
 ### packing_greedy
 
-Most instruments never need to override this -- the generic [`packing_greedy`](@ref)/
-[`slotting_greedy`](@ref) pair handles typical bin-packing-style slotting. Cobra is the one exception:
-it only has two deck slots and deliberately wants exactly one protocol per source/target pairing
-(to force a fresh protocol whenever the labware pairing changes), so it overrides `packing_greedy` to
-loop trivially instead of using the generic bin-packer. Only override this if your instrument has
-similarly unusual slotting constraints.
+Most instruments do not need to override [`packing_greedy`](@ref). It works with
+[`slotting_greedy`](@ref) to handle typical bin-packing slotting. Cobra overrides it because it has
+two deck slots and needs exactly one protocol for each source and target pairing, so that every
+change of labware pairing starts a new protocol. Override `packing_greedy` only for similarly
+unusual slotting constraints.
 
 ```@docs
 write_instrument_files
@@ -163,29 +151,25 @@ packing_greedy
 slotting_greedy
 ```
 
----
-
-## Registering your instrument
+## Registering an instrument
 
 ```@docs
 register_instrument!
 ```
 
-Call this once per `Configuration` you define -- typically at your package's module top level, right
-after building the `Configuration`. If your settings need to read from `Preferences.jl` or other
-environment state at load time (e.g. a lab-specific file path, the way Cobra's `cobra_path` works --
-see [`set_cobra_path!`](@ref)), do this from your package's `__init__()` instead so it re-evaluates on
-every load.
+Call `register_instrument!` once for each `Configuration`, usually at the top level of the package
+module right after the `Configuration` is built. If the settings read `Preferences.jl` or other
+state at load time, such as the lab-specific file path that `cobra_path` supplies (see
+[`set_cobra_path!`](@ref)), do so in the `__init__()` function of the package, which runs on every
+load.
 
----
+## [Testing an instrument](@id pourfecto_testing_instruments)
 
-## [Testing your instrument](@id pourfecto_testing_instruments)
+`Pourfecto.TestUtils` is a submodule of reusable conformance checks. The test suite of Pourfecto runs
+the same checks on its seven built-in instruments. `using Pourfecto.TestUtils` loads them in another
+test suite.
 
-`Pourfecto.TestUtils` is a submodule of reusable conformance checks -- the same checks Pourfecto's own
-test suite runs against its seven built-in instruments. Bring it into your own test suite with
-`using Pourfecto.TestUtils`.
-
-**Tier 1 -- no solver required, safe for any CI:**
+**Tier 1** needs no solver and is safe for any CI:
 
 ```julia
 using Pourfecto, Pourfecto.TestUtils
@@ -193,22 +177,22 @@ using Pourfecto, Pourfecto.TestUtils
 @test test_instrument_interface(my_config)
 ```
 
-This runs `test_mask_coverage` (brute-force-verifies your `Mask` against your `mask_rules_for` table,
-if you defined one) and `test_json_roundtrip` (verifies your `Configuration` survives a JSON
-serialize/deserialize round trip).
+It runs `test_mask_coverage`, which checks the `Mask` against the `mask_rules_for` table by brute
+force if the table exists, and `test_json_roundtrip`, which checks that the `Configuration` survives
+JSON serialization and deserialization.
 
-**Tier 2 -- requires a real solve:**
+**Tier 2** needs a real solve:
 
 ```julia
 pc = pourfecto(source_labware, target_labware, [my_config]; optimizer=SCIP.Optimizer)
 test_pourcast_compilation("My Instrument Compilation", pc)
 ```
 
-This compiles the solved `Pourcast` to a temp directory and asserts the expected output structure
-exists -- verifying `write_instrument_files` actually produces files, not just that your `Mask`/deck
-logic is internally consistent. It doesn't run a solver itself; you need one already configured (SCIP
-is already a Pourfecto dependency and works as a free default -- see
-[Choosing a solver](@ref pourfecto_choosing_a_solver) for tradeoffs between SCIP, HiGHS, and Gurobi).
+It compiles the solved `Pourcast` into a temporary directory and checks that the expected output
+structure exists. This verifies that `write_instrument_files` produces files, which the mask and
+deck checks do not. The test does not run a solver itself, so one must already be configured. SCIP is
+a Pourfecto dependency and works as a free default. [Choosing a solver](@ref pourfecto_choosing_a_solver)
+compares SCIP, HiGHS, and Gurobi.
 
 ```@docs
 Pourfecto.TestUtils.test_instrument_interface
@@ -217,12 +201,9 @@ Pourfecto.TestUtils.test_json_roundtrip
 Pourfecto.TestUtils.test_pourcast_compilation
 ```
 
----
+## Example: Cobra
 
-## Full worked example: Cobra
-
-Read `Pourfecto/src/instruments/Cobra.jl` end to end as a template covering all four pieces above --
-piston/head/deck/settings, a real `MaskRule` table, a custom `packing_greedy` override, and a full
-`write_instrument_files` implementation emitting vendor XML. Its module docstring documents exactly
-which parts are Jensen-Lab-specific and would need to change for another lab or another Cobra
-deployment.
+`Pourfecto/src/instruments/Cobra.jl` covers all four parts: the piston, head, deck, and settings, a
+`MaskRule` table, a `packing_greedy` override, and a `write_instrument_files` implementation that
+writes vendor XML. Its module docstring lists which parts are specific to the Jensen Lab and would
+change for another lab or another Cobra deployment.

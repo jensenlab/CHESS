@@ -7,6 +7,7 @@ using
     UUIDs, # used for generating default labware names
     DataFrames, # DataFrame<->domain-object interop
     Dates, # Read's own recorded time
+    Printf, # fixed-precision number formatting for stock displays
     StringDistances # used for computing chemical and organism hints
 import Base: +,-,*,/,convert, show ,sort , promote_rule,round , in, ==,empty!, hash, isapprox # all overloaded by this package
 import AbstractTrees: children,parent,nodevalue

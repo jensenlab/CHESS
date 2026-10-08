@@ -260,6 +260,7 @@ function _register_acid_base_systems!()
     set_acid_base_system!(potassium_phosphate_di,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_mono,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_di,phosphoric_acid_system)
+    set_acid_base_system!(sodium_phosphate_di_anhydrous,phosphoric_acid_system)
 
     # Carbonic acid family: H2CO3 ⇌ HCO3⁻ ⇌ CO3²⁻ -- pKa1/pKa2 = 6.352/10.329 (CRC Handbook, 25°C).
     # pKa1 here is the *apparent* constant that folds in dissolved CO2(aq)/H2CO3 partitioning (the

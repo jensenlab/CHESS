@@ -56,6 +56,10 @@ function write_read_json_roundtrip(pc::Pourcast; basename::AbstractString="pourc
     # ---- Assert: file exists and essential structure matches ----
     @test isfile(path)
     @test typeof(pc2) == typeof(pc)
+    @test transfers(pc2) == transfers(pc)
+    @test flows(pc2) == flows(pc)
+    @test slacks(pc2) == slacks(pc)
+    @test all(isapprox.(planned_stocks(pc2), planned_stocks(pc)))
         end
     end
 end

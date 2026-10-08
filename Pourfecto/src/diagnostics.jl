@@ -101,6 +101,10 @@ function check_solve_status!(model::JuMP.Model, level)
         tl = JuMP.time_limit_sec(model)
         if primal_status(model) == MOI.FEASIBLE_POINT
             @warn "a solution was found for level $level, but it may be sub-optimal because the solver stopped due to reaching its $(tl)s time limit."
+        elseif result_count(model) > 0
+            # Some solvers (e.g. Gurobi.jl) report UNKNOWN_RESULT_STATUS rather than FEASIBLE_POINT when a
+            # time-limited incumbent slightly exceeds a feasibility tolerance. The incumbent is still usable.
+            @warn "a solution was found for level $level, but the solver stopped at its $(tl)s time limit without confirming the solution is feasible within tolerance (primal status $(primal_status(model))). Check the result, e.g. by comparing planned_stocks against target_stocks."
         else
             throw(error("the solver was unable to find a feasible solution for level $level in the $(tl)s time limit."))
         end

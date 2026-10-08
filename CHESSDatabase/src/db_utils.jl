@@ -6,6 +6,13 @@ function _require_db()
     return db
 end
 
+"""
+    connect_SQLite(path)
+
+Open the SQLite database at `path` and make it the database that every `CHESSDatabase` function
+reads and writes. SQLite creates the file if it does not exist; use [`create_db`](@ref) to set up
+the CHESS tables in a new file. Calling it again switches to a different database.
+"""
 function connect_SQLite(path)
     _current_db[] = SQLite.DB(path)
     return nothing
@@ -16,12 +23,32 @@ end
 # from CHESSCore.JensenLabUnits) have to be listed explicitly.
 _parse_unit(str::AbstractString) = Unitful.uparse(str;unit_context=[Unitful,CHESSCore.JensenLabUnits])
 
+"""
+    execute_db(query::String)
+    execute_db(query::String, params)
+
+Run a SQL statement that changes the connected database (`INSERT`, `UPDATE`, `CREATE`, ...).
+`params` fills the statement's `?` placeholders; prefer it over building SQL with string
+interpolation. Foreign-key constraints are switched on for every call. Throws an error if no
+database is connected (see [`connect_SQLite`](@ref)).
+
+See also: [`query_db`](@ref) for statements that return rows.
+"""
 function execute_db(query::String)
     db=_require_db()
     DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.
     SQLite.execute(db, query)
 end
 
+"""
+    query_db(query::String) -> DataFrame
+    query_db(query::String, params) -> DataFrame
+
+Run a SQL query against the connected database and return the result as a `DataFrame`. `params`
+fills the query's `?` placeholders. Foreign-key constraints are switched on for every call.
+
+See also: [`execute_db`](@ref).
+"""
 function query_db(query::String)
     db=_require_db()
     DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.
@@ -40,16 +67,35 @@ function query_db(query::String, params)
     DataFrame(DBInterface.execute(db, query, params))
 end
 
+"""
+    sql_transaction(f::Function)
+
+Run `f()` inside a SQL transaction on the connected database: if `f` throws, every write it made
+is rolled back. Returns `f()`'s value. [`upload`](@ref) and [`update`](@ref) use this so an operation
+and its database record succeed or fail together.
+"""
 function sql_transaction(f::Function)
     db=_require_db()
     SQLite.transaction(f,db)
 end
 
+"""
+    sql_commit(name::String)
+
+Commit the named SQL savepoint on the connected database. Most code uses [`sql_transaction`](@ref)
+instead.
+"""
 function sql_commit(name::String)
     db=_require_db()
     SQLite.commit(db,name)
 end
 
+"""
+    sql_rollback(name::String)
+
+Roll back to the named SQL savepoint on the connected database. Most code uses
+[`sql_transaction`](@ref) instead.
+"""
 function sql_rollback(name::String)
     db=_require_db()
     SQLite.rollback(db,name)
@@ -73,15 +119,31 @@ function query_join_vector(entry::Vector{String})
 end
 
 
+"""
+    db_time(time::DateTime) -> Float64
+
+Convert `time` to the Unix-time number the database stores. See [`julia_time`](@ref).
+"""
 function db_time(time::Dates.DateTime)
     return Dates.datetime2unix(time)
 end 
 
 
+"""
+    julia_time(time::Real) -> DateTime
+
+Convert a Unix-time number stored in the database back to a `DateTime`. Inverse of
+[`db_time`](@ref).
+"""
 function julia_time(time::Real)
     return Dates.unix2datetime(time)
 end 
 
+"""
+    get_all_attributes() -> DataFrame
+
+Every attribute kind recorded in the connected database's `Attributes` table, with its base unit.
+"""
 function get_all_attributes()
     x="SELECT * FROM Attributes"
     return query_db(x)

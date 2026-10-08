@@ -112,6 +112,12 @@ not `levels`, to avoid colliding with `DataFrames`/`DataAPI`/`Missings`' own exp
 """
 factor_levels(f::CategoricalFactor) = f.levels()
 
+"""
+    const factor_registry::Dict{Symbol,Factor}
+
+Every registered [`Factor`](@ref), keyed by name. Add to it with [`register_factor!`](@ref) and
+look factors up with [`get_factor`](@ref) rather than using it directly.
+"""
 const factor_registry = Dict{Symbol,Factor}()
 
 """

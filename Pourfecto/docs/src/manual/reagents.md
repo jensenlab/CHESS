@@ -1,40 +1,39 @@
 # [Reagents](@id pourfecto_reagents)
 
-
 ```@meta
 CurrentModule = Pourfecto
 ```
 
-Pourfecto uses [CHESSCore](https://jensenlab.github.io/CHESS/dev/)'s `Reagent` interface directly — `Solid`/`Liquid`/`Gas` types, registration, and unit conversions are all CHESSCore's, not Pourfecto's own. For the full reagent/chemical type reference, see CHESSCore's [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) manual page.
+Pourfecto uses the `Reagent` interface of [CHESSCore](https://jensenlab.github.io/CHESS/dev/). The `Solid`, `Liquid`, and `Gas` types, registration, and unit conversions all belong to CHESSCore. Its [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) page describes them.
 
-This page covers only the one piece of that interface Pourfecto workflows use directly: creating reagents on the fly.
+This page describes the one part of that interface that Pourfecto workflows use directly: creating reagents from a name.
 
 ## Creating reagents on the fly
 
-Most Pourfecto workflows don't require full reagent registration. `string_to_reagent` is the shortcut: given a name and a concrete `Reagent` subtype, it returns the registered reagent if one exists, or otherwise creates an under-defined one (only the name is known; physical properties are `missing`) with a warning.
+Most Pourfecto workflows do not need reagents to be registered. `string_to_component` takes a name and a concrete `Reagent` subtype. It returns the registered reagent if one exists. Otherwise it creates a reagent with only a name, leaves the physical properties `missing`, and shows a warning. Given `Organism` instead of a reagent type, it parses an organism name in the same way, and an organism name that is neither registered nor in the form "genus species strain" is an error.
 
 ```julia
 using Pourfecto, CHESSCore
 
-buffer = string_to_reagent("custom buffer", Liquid)
-salt = string_to_reagent("custom salt", Solid)
-gas = string_to_reagent("oxygen mixture", Gas)
+buffer = string_to_component("custom buffer", Liquid)
+salt = string_to_component("custom salt", Solid)
+gas = string_to_component("oxygen mixture", Gas)
 ```
 
 ```julia
-julia> string_to_reagent("custom buffer", Liquid)
+julia> string_to_component("custom buffer", Liquid)
 ┌ Warning: reagent custom buffer not registered. parsing custom buffer assuming it is a chemical. No chemical properties known.
 └ @ CHESSCore ...
 custom buffer
 ```
 
-The returned object is still usable as a reagent identifier in Pourfecto — for planning and labeling a workflow — but calculations that require molecular weight or density (e.g. mass ↔ mole or mass ↔ volume conversions) need a registered reagent instead. See CHESSCore's [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) page for registration (the `@reagent` macro, `register_lab`, and the `reagent_context` keyword) and for `reagent_to_string`, the inverse operation.
+The returned reagent identifies the reagent in planning and labeling. Calculations that need molecular weight or density, such as conversions between mass and moles or between mass and volume, need a registered reagent. CHESSCore's [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) page describes registration with the `@reagent` macro, `register_lab`, and the `reagent_context` keyword, and `component_to_string`, the inverse of `string_to_component`.
 
-This is the form used throughout Pourfecto's own examples and tests; it's also what Pourfecto calls internally when parsing reagent names out of [stock](@ref pourfecto_stocks) tables.
+Pourfecto's examples and tests use this form, and Pourfecto calls it when it parses reagent names from [stock](@ref pourfecto_stocks) tables.
 
 !!! note
-    CHESSCore's `reagent_context` keyword (used with `stock_to_dict`/`dict_to_stock` round-tripping
-    -- see [Interop](https://jensenlab.github.io/CHESS/dev/manual/interop/)) isn't used anywhere in
-    Pourfecto's own DataFrame interface (`df_to_labware`/`labware_to_df`), which resolves reagents
-    through `string_to_reagent` instead. If you're only using Pourfecto's table-based workflow, the
-    `reagent_context` silent-fallback failure mode described in that chapter doesn't apply to you.
+    The `reagent_context` keyword of CHESSCore is used when converting stocks with `stock_to_dict` and
+    `dict_to_stock` (see [Interop](https://jensenlab.github.io/CHESS/dev/manual/interop/)). Pourfecto's
+    table interface, `df_to_labware` and `labware_to_df`, does not use it. It resolves reagents with
+    `string_to_component`. A table-based workflow is therefore not affected by the silent fallback
+    that the Interop page describes for `reagent_context`.

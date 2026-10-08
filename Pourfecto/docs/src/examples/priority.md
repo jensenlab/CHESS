@@ -36,9 +36,9 @@ concentrated (10 µg of drug per µL of DMSO), so a few microliters covers
 even the high dose. A third reservoir supplies pure water for backfilling.
 
 ```julia
-drug = string_to_reagent("drug", Solid)
-dmso = string_to_reagent("dmso", Liquid)
-water = string_to_reagent("water", Liquid)
+drug = string_to_component("drug", Solid)
+dmso = string_to_component("dmso", Liquid)
+water = string_to_component("water", Liquid)
 
 water_drug_reservoir = build_location(location_kinds[:DeepReservoir])
 children(water_drug_reservoir)[1].stock = 10u"mg" * drug + 100u"mL" * water

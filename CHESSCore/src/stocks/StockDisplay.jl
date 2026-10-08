@@ -1,8 +1,7 @@
-
-function Base.show(io::IO,::MIME"text/plain",s::Empty;digits::Integer=2)
+function Base.show(io::IO,::MIME"text/plain",s::Empty;sigdigits::Integer=3)
     printstyled(io, "Empty Stock";bold=true)
 end
-function Base.show(io::IO,s::Empty;digits::Integer=2)
+function Base.show(io::IO,s::Empty;sigdigits::Integer=3)
     printstyled(io, "Empty Stock";bold=true)
 end
 """
@@ -22,75 +21,118 @@ end
 """
     _reagent_table(dict::Union{SolidDict,LiquidDict,OrganismDict}, total; digits=2)
 
-Shared display logic behind both `show(::MIME"text/plain",::Stock)` and [`reagent_display`](@ref):
-sort `dict`'s reagents by name and compute each one's raw amount and concentration relative to
-`total` (the stock's overall `quantity`/`volume_estimate`), via [`_relative_amount`](@ref). Returns
+Shared logic behind both `show(::MIME"text/plain",::Stock)` and [`reagent_display`](@ref): sort
+`dict`'s reagents by name and compute each one's amount and concentration relative to `total` (the
+stock's overall `quantity`/`volume_estimate`), via [`_relative_amount`](@ref). Returns
 `(sorted_reagents, amounts, concentrations)`, all empty if `dict` is empty. For an `OrganismDict`,
 "concentration" comes out as `Biomass/total` -- i.e. the current, on-demand-derived OD -- since
-`Biomass`'s dimension differs from `total`'s (see [`_relative_amount`](@ref)).
+`Biomass`'s dimension differs from `total`'s (see [`_relative_amount`](@ref)). `digits=nothing`
+leaves the values unrounded, for display formatting by [`_pretty_quantity`](@ref).
 """
 function _reagent_table(dict::Union{SolidDict,LiquidDict,OrganismDict}, total; digits=2)
     arr = sort(reagents(dict), by=name)
     isempty(arr) && return arr, Unitful.Quantity[], Unitful.Quantity[]
-    amounts = round.([dict[x] for x in arr]; digits=digits)
+    raw = [dict[x] for x in arr]
+    amounts = isnothing(digits) ? raw : round.(raw; digits=digits)
     concs = [_relative_amount(dict[x],total;digits=digits) for x in arr]
     return arr, amounts, concs
 end
 
-function Base.show(io::IO,::MIME"text/plain",s::Mixture;digits::Integer=2)
-    typstr=string(typeof(s))
-    q=quantity(s)
-    printstyled(io,round(q;digits=digits)," ";bold=true)
-    printstyled(io, "$typstr ($(length(solids(s))) reagent(s))\n";bold=true)
-    arr_sol,amt_sol,conc_sol=_reagent_table(solids(s),q;digits=digits)
-    df_sol=DataFrame(Solids=arr_sol,Name=name.(arr_sol),Amount=amt_sol,Concentration=conc_sol)
-    show(io,df_sol;eltypes=false,show_row_number=false,summary=false)
+# Units a displayed quantity may be rescaled between, largest first, keyed by physical dimension.
+# Concentrations keep a per-mL denominator and only rescale the numerator.
+const _display_unit_ladders = Dict(
+    dimension(u"L") => [u"L", u"mL", u"µL", u"nL"],
+    dimension(u"g") => [u"kg", u"g", u"mg", u"µg", u"ng"],
+    dimension(u"mol") => [u"mol", u"mmol", u"µmol", u"nmol"],
+    dimension(u"OD*mL") => [u"OD*L", u"OD*mL", u"OD*µL", u"OD*nL"],
+    dimension(u"g/mL") => [u"g/mL", u"mg/mL", u"µg/mL", u"ng/mL"],
+    dimension(u"mol/L") => [u"M", u"mM", u"µM", u"nM"],
+)
+
+# `x` formatted to `sigdigits` significant figures, keeping trailing zeros ("2.00", "19.8", "198").
+function _format_sigdigits(x::Real, sigdigits::Integer)
+    iszero(x) && return "0"
+    isfinite(x) || return string(Float64(x)) # e.g. the Inf OD of a culture with no liquid
+    r = round(Float64(x); sigdigits=sigdigits)
+    decimals = max(sigdigits - 1 - floor(Int, log10(abs(r))), 0)
+    return Printf.format(Printf.Format("%.$(decimals)f"), r)
+end
+
+"""
+    _pretty_quantity(q; sigdigits=3) -> String
+
+Display string for `q` with `sigdigits` significant figures. Volumes, masses, molar amounts,
+biomass, mass-per-volume and molar concentrations are rescaled to the metric prefix that puts the
+number in `[1, 1000)` -- `2.00 mg` rather than `0.0 g`, `198 μL` rather than `0.2 mL` -- clamped to
+the smallest and largest prefixes CHESS displays. Any other unit (percent, OD, ...) keeps its unit.
+Zero keeps `q`'s own unit, and `missing` displays as `"missing"`.
+"""
+_pretty_quantity(::Missing; sigdigits::Integer=3) = "missing"
+function _pretty_quantity(q::Unitful.Quantity; sigdigits::Integer=3)
+    ladder = get(_display_unit_ladders, dimension(q), nothing)
+    if isnothing(ladder) || iszero(ustrip(q))
+        u = unit(q)
+    else
+        i = something(findfirst(u -> abs(ustrip(uconvert(u, q))) >= 1, ladder), length(ladder))
+        # rounding can carry into the next prefix up (999.6 μL -> 1.00 mL)
+        if i > 1 && abs(round(ustrip(uconvert(ladder[i], q)); sigdigits=sigdigits)) >= 1000
+            i -= 1
+        end
+        u = ladder[i]
+    end
+    return string(_format_sigdigits(ustrip(uconvert(u, q)), sigdigits), " ", sprint(show, u; context=:fancy_exponent=>true))
+end
+
+# Print one component table (solids, liquids, or organisms) of a stock's text/plain display.
+function _show_component_table(io::IO, label::Symbol, dict, total, amount_header::Symbol,
+        conc_header::Symbol; sigdigits::Integer=3)
+    arr, amounts, concs = _reagent_table(dict, total; digits=nothing)
+    df = DataFrame(label => arr, :Name => name.(arr),
+        amount_header => String[_pretty_quantity(a; sigdigits=sigdigits) for a in amounts],
+        conc_header => String[_pretty_quantity(c; sigdigits=sigdigits) for c in concs])
+    show(io, df; eltypes=false, show_row_number=false, summary=false, alignment=[:l, :l, :r, :r])
+end
+
+function _show_stock_header(io::IO, s::Stock, n_reagents::Integer; sigdigits::Integer=3)
+    q = quantity(s)
+    ismissing(q) || printstyled(io, _pretty_quantity(q; sigdigits=sigdigits), " "; bold=true)
+    printstyled(io, "$(typeof(s)) ($n_reagents reagent(s))"; bold=true)
+end
+
+function Base.show(io::IO,::MIME"text/plain",s::Mixture;sigdigits::Integer=3)
+    _show_stock_header(io, s, length(solids(s)); sigdigits=sigdigits)
+    print(io, "\n")
+    _show_component_table(io, :Solids, solids(s), quantity(s), :Amount, :Concentration; sigdigits=sigdigits)
     print(io,"\n\n")
 end
 
-function Base.show(io::IO,::MIME"text/plain",s::Solution;digits::Integer=2)
-    typstr=string(typeof(s))
-    q=quantity(s)
-    printstyled(io,round(q;digits=digits)," ";bold=true)
-    printstyled(io, "$typstr ($(length(solids(s))+length(liquids(s))) reagent(s))\n";bold=true)
+function Base.show(io::IO,::MIME"text/plain",s::Solution;sigdigits::Integer=3)
+    _show_stock_header(io, s, length(solids(s))+length(liquids(s)); sigdigits=sigdigits)
+    print(io, "\n")
     if length(solids(s)) > 0
-        arr_sol,amt_sol,conc_sol=_reagent_table(solids(s),q;digits=digits)
-        df_sol=DataFrame(Solids=arr_sol,Name=name.(arr_sol),Amount=amt_sol,Concentration=conc_sol)
-        show(io,df_sol;eltypes=false,show_row_number=false,summary=false)
+        _show_component_table(io, :Solids, solids(s), quantity(s), :Amount, :Concentration; sigdigits=sigdigits)
         print(io,"\n\n")
     end
-    arr_liq,amt_liq,conc_liq=_reagent_table(liquids(s),q;digits=digits)
-    df_liq=DataFrame(Liquids=arr_liq,Name=name.(arr_liq),Amount=amt_liq,Concentration=conc_liq)
-    show(io,df_liq;eltypes=false,show_row_number=false,summary=false)
+    _show_component_table(io, :Liquids, liquids(s), quantity(s), :Amount, :Concentration; sigdigits=sigdigits)
 end
-function Base.show(io::IO,::MIME"text/plain",s::Culture;digits::Integer=2)
-    typstr=string(typeof(s))
-    q=quantity(s)
-    printstyled(io,round(q;digits=digits)," ";bold=true)
-    printstyled(io, "$typstr ($(length(solids(s))+length(liquids(s))) reagent(s))\n";bold=true)
-    arr_org,amt_org,conc_org=_reagent_table(organisms(s),q;digits=digits)
-    df_org=DataFrame(Organisms=arr_org,Name=name.(arr_org),Biomass=amt_org,OD=conc_org)
-    show(io,df_org;eltypes=false,show_row_number=false,summary=false)
+
+function Base.show(io::IO,::MIME"text/plain",s::Culture;sigdigits::Integer=3)
+    _show_stock_header(io, s, length(solids(s))+length(liquids(s)); sigdigits=sigdigits)
+    print(io, "\n")
+    _show_component_table(io, :Organisms, organisms(s), quantity(s), :Biomass, :OD; sigdigits=sigdigits)
     print(io,"\n\n")
     if length(solids(s)) > 0
-        arr_sol,amt_sol,conc_sol=_reagent_table(solids(s),q;digits=digits)
-        df_sol=DataFrame(Solids=arr_sol,Name=name.(arr_sol),Amount=amt_sol,Concentration=conc_sol)
-        show(io,df_sol;eltypes=false,show_row_number=false,summary=false)
+        _show_component_table(io, :Solids, solids(s), quantity(s), :Amount, :Concentration; sigdigits=sigdigits)
         print(io,"\n\n")
     end
     if length(liquids(s)) > 0
-        arr_liq,amt_liq,conc_liq=_reagent_table(liquids(s),q;digits=digits)
-        df_liq=DataFrame(Liquids=arr_liq,Name=name.(arr_liq),Amount=amt_liq,Concentration=conc_liq)
-        show(io,df_liq;eltypes=false,show_row_number=false,summary=false)
+        _show_component_table(io, :Liquids, liquids(s), quantity(s), :Amount, :Concentration; sigdigits=sigdigits)
         print(io,"\n\n")
     end
 end
-function Base.show(io::IO,s::Stock;digits::Integer=2)
-    typstr=string(typeof(s))
-    if !ismissing(quantity(s))
-        printstyled(io,round(quantity(s);digits=digits)," ";bold=true)
-    end
-    printstyled(io, "$typstr ($(length(solids(s))+length(liquids(s))) reagent(s))";bold=true)
+
+function Base.show(io::IO,s::Stock;sigdigits::Integer=3)
+    _show_stock_header(io, s, length(solids(s))+length(liquids(s)); sigdigits=sigdigits)
 end
 
 function out_dict(chems,amts,concs)

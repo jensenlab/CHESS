@@ -1,4 +1,11 @@
 
+"""
+    struct Run
+    Run(loc::Location, exp_id::Integer, controls=Integer[], blanks=Integer[])
+
+One run of an experiment: the location it was performed in, the experiment's ID, and the location
+IDs of its controls and blanks. Record it with [`upload_run`](@ref).
+"""
 struct Run
     location_id::Integer
     exp_id::Integer

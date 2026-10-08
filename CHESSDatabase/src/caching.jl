@@ -1,3 +1,12 @@
+"""
+    cache(loc::Location, sequence_id=nothing, time=Dates.now())
+
+Store a snapshot of `loc`'s current parent, children, environment, lock and activity state, and
+(for a well) contents, stamped with the ledger entry at `sequence_id` (default: the end of the
+ledger). Later reconstructions start from the snapshot instead of replaying the whole history.
+`loc` and everything inside it must already be committed. Caching is always explicit; nothing
+caches automatically. See the Caching & Repair manual chapter.
+"""
 function cache(loc::Location,sequence_id::Union{Integer,Nothing}=nothing,time::DateTime=Dates.now())
     CHESSCore.assert_all_committed(loc)
     CHESSCore.assert_all_committed(get_all_within(loc,Location)...)

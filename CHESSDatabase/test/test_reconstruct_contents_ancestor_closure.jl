@@ -113,4 +113,24 @@
         @test isapprox(ustrip(uconvert(u"µL",bacl_liquids3[rgt"water"])), 5.0, atol=1e-6)
     end
 
+    @testset "a source's future transfer doesn't pull its earlier transfers into the closure" begin
+        # A bottle fills W1, then W2. Reconstructing W2 between the two fills must return an empty
+        # well: the bottle only becomes W2's ancestor at the second fill, so its first transfer (to
+        # W1) must not be replayed as a collateral row against an un-bootstrapped bottle.
+        bacl_bottle4 = generate_location(Bottle1L,"bacl bottle 4")
+        bacl_bw4 = bacl_bottle4[1,1]
+        deposit!(bacl_bw4,500u"mL"*rgt"water",1)
+        cache(bacl_bw4)
+        bacl_plate4 = generate_location(WP96,"bacl plate 4")
+        bacl_W1, bacl_W2 = bacl_plate4[1,1], bacl_plate4[1,2]
+
+        first_fill = upload(transfer!,bacl_bw4,bacl_W1,10u"µL")
+        upload(transfer!,bacl_bw4,bacl_W2,10u"µL")
+
+        between = reconstruct_location(location_id(bacl_W2),get_sequence_id(first_fill))
+        @test stock(between) isa Empty
+        after = reconstruct_location(location_id(bacl_W2))
+        @test isapprox(ustrip(uconvert(u"µL",liquids(stock(after))[rgt"water"])), 10.0, atol=1e-6)
+    end
+
 end

@@ -57,6 +57,13 @@ function _attributekinds(m::Module)
     end
 end
 
+"""
+    const attribute_kinds::Dict{Symbol,AttributeKind}
+
+Registry of every [`AttributeKind`](@ref) defined with [`@attribute`](@ref), keyed by name. Kinds
+registered in any module are also added here. Look up a single kind with [`@attr_str`](@ref)
+(`attr"Temperature"`) rather than indexing this directly.
+"""
 const attribute_kinds = _attributekinds(CHESSCore)
 
 function attributekind_expr(m::Module,n,ak)
@@ -209,7 +216,7 @@ const AttributeDict=Dict{Symbol,Attribute}
 
 Set the value for key `attribute.kind.name` of `dict` to `attribute`.
 
-We use this method to ensure a proper pairing between the attribute kind and the attribute in the dict.
+This method keeps each attribute under the name of its own kind, so the key and the attribute always match.
 """
 function set_attribute!(dict::AttributeDict,attribute::Attribute)
     dict[attribute.kind.name]=attribute ;

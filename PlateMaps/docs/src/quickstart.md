@@ -2,13 +2,12 @@
 CurrentModule = PlateMaps
 ```
 
-# Quick Start Guide
+# Quick Start
 
 ## Standalone scheduling
 
-Build edges with [`mkedge`](@ref) -- `(node1, node2, role, metadata)` -- and hand them to
-[`schedule_platemap`](@ref) along with the nodes you want fixed first (typically "runs") and an active-well
-mask:
+[`mkedge`](@ref) builds an edge from `(node1, node2, role, metadata)`. [`schedule_platemap`](@ref)
+takes the edges, the nodes to place first (typically runs), and a mask of the active wells:
 
 ```julia
 using PlateMaps
@@ -21,9 +20,9 @@ append!(edges, [mkedge(Symbol("run$i"), :neg1, :negative) for i in 1:4])
 pms = schedule_platemap(wells, edges, run_nodes)
 ```
 
-`schedule_platemap` always returns a `Vector{PlateMap}` -- one entry per plate actually used. Edge-connected
-components are atomic (never split across plates): if everything fits on one plate, you get a 1-element
-vector back.
+`schedule_platemap` returns a `Vector{PlateMap}` with one entry for each plate used. A set of
+nodes connected by edges is never split across plates. If everything fits on one plate, the vector
+has one element.
 
 ```julia
 pm = only(pms)
@@ -31,15 +30,16 @@ well_position(pm, :run1)   # CartesianIndex of run1's well
 nodes(pm)                  # every placed node
 ```
 
-`solver="exchange"` (default, heuristic) or `solver="MILP"` (exact, `objective=:distance` only) picks the
-control-placement algorithm; `plate_solver="greedy"` (default) or `"MILP"` picks how components are binned
-onto plates when more than one is needed.
+The `solver` keyword selects the control-placement algorithm: `"exchange"` is the default heuristic,
+and `"MILP"` is exact and supports only `objective=:distance`. The `plate_solver` keyword selects how
+connected sets are assigned to plates when more than one plate is needed: `"greedy"` is the default,
+and `"MILP"` is the alternative.
 
 ## With RunMaps
 
-`RunMaps.RunMap` models run/control relationships as a graph with open-ended `relation_type` edges -- it has
-no structural "run" vs. "control" distinction, so you tell `schedule_platemap` which relation types mark a
-node as *placeable* (optimized) rather than fixed:
+`RunMaps.RunMap` models run and control relationships as a graph whose edges have a `relation_type`.
+It does not distinguish runs from controls. The relation types passed to `schedule_platemap` mark
+which nodes are placeable, meaning optimized, instead of fixed:
 
 ```julia
 using PlateMaps, RunMaps
@@ -58,12 +58,12 @@ plot(pm, rm)              # role-colored layout
 DataFrame(pm, rm)         # joined well + role/metadata view
 ```
 
-Any node that participates, as either endpoint, in an edge whose `relation_type` is in `placeable_roles`
-is placed by the control-placement stage; every other node is fixed first via `place_runs`.
+A node that is an endpoint of an edge whose `relation_type` is in `placeable_roles` is placed by the
+control-placement stage. Every other node is placed first by `place_runs`.
 
 ## With CHESSCore
 
-A registered plate `LocationKind` can stand in for a hand-built `wells::BitMatrix`:
+A registered plate `LocationKind` replaces a hand-built `wells::BitMatrix`:
 
 ```julia
 using PlateMaps, CHESSCore
@@ -72,8 +72,8 @@ kind = CHESSCore.LocationKind(:MyPlate; shape=(8, 12))
 pms = schedule_platemap(kind, edges, run_nodes)
 ```
 
-This composes with the `RunMaps` extension automatically when both are loaded --
-`schedule_platemap(kind, rm, placeable_roles; kwargs...)` works with no extra glue code.
+This combines with the `RunMaps` extension when both are loaded, so
+`schedule_platemap(kind, rm, placeable_roles; kwargs...)` works without extra code.
 
 ## DataFrame and JSON interfaces
 
@@ -86,8 +86,8 @@ PlateMap(df) == pm
 json_to_platemap(platemap_to_json(pm)) == pm
 ```
 
-A multi-plate batch compiles into one file for each interface, disambiguated by a leading `plate` column
-(DataFrame) or a `"PlateMapBatch"`-tagged wrapper (JSON):
+A batch of several plates converts to one table or one JSON document. The table has a leading
+`plate` column, and the JSON is wrapped with a `"PlateMapBatch"` tag:
 
 ```julia
 df = DataFrame(pms)                    # one "plate" column, stacked rows
@@ -96,4 +96,4 @@ platemaps_from_dataframe(df) == pms
 json_to_platemaps(platemaps_to_json(pms)) == pms
 ```
 
-The `RunMaps`-joined form works the same way: `DataFrame(pms::Vector{PlateMap}, rm::RunMap)`.
+`DataFrame(pms::Vector{PlateMap}, rm::RunMap)` returns the same table joined with the `RunMap`.

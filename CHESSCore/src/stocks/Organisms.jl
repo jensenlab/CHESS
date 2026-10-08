@@ -80,8 +80,16 @@ function orgprops_expr(m::Module,n,orgprops)
 end 
 
 
+"""
+    @org_str(organism)
 
+String macro to recall an [`Organism`](@ref) registered with [`@organism`](@ref) by name, for
+example `org"SMU_UA159"`. It searches `CHESSCore` and any registered lab module loaded where the
+macro is called, and throws an error if no organism by that name exists. This is the organism
+counterpart of [`@rgt_str`](@ref).
 
+See also: [`orgparse`](@ref) for the non-macro form.
+"""
 macro org_str(organism)
     # Bare Symbol lookup, not Meta.parse -- see the comment in @chem_str (Chemicals.jl) for why.
     sym = Symbol(organism)
@@ -97,6 +105,12 @@ macro org_str(organism)
 end
 
 
+"""
+    orgparse(str; org_context=CHESSCore)
+
+Non-macro equivalent of [`@org_str`](@ref): parses `str` as an [`Organism`](@ref) name, looked up
+against `org_context` (a `Module` or list of `Module`s).
+"""
 function orgparse(str; org_context=CHESSCore)
     ex = Meta.parse(str)
     eval(lookup_named_value(org_context, ex, orgstr_check_bool))
@@ -134,7 +148,7 @@ Access the `species` property of a `Organism` object.
 species(x::Organism)= x.species
 """
     strain(x::Organism)
-Acces the  `strain` property of a `Organism` object.
+Access the `strain` property of an `Organism` object.
 """
 strain(x::Organism)= x.strain
 

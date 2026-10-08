@@ -1,23 +1,25 @@
 # Instrument Interfaces
 
-[Reads & Instrument Measurements](reads.md) covered instrument capability gating entirely within
-`CHESSCore` -- `performable_operations` and `_check_capability`, checked in memory, with no notion of
-persistence at all. This chapter covers the other half: how `CHESSDatabase` records *which*
-instrument actually performed a persisted operation.
+```@meta
+DocTestSetup = :(using CHESS)
+```
 
-## A clean package boundary
+[Reads & Instrument Measurements](reads.md) describes the capability check, which `CHESSCore`
+performs in memory with no persistence. This page describes how `CHESSDatabase` records which
+instrument performed a persisted operation.
 
-`CHESSCore` owns instrument capability -- `performable_operations` and `_check_capability` -- it
-has zero concept of a database, an `InstrumentID` column, or a ledger. `CHESSDatabase` owns zero capability
-logic -- it never calls `_check_capability` directly, never inspects `performable_operations` -- and
-owns 100% of the attribution: the `InstrumentID`/`InstrumentTime` columns on `Transfers`/
-`Movements`/`EnvironmentAttributes`/`Reads`.
+## Package responsibilities
 
-## One `instrument` argument, two separate uses
+`CHESSCore` owns instrument capability, meaning `performable_operations` and the check that uses it.
+It has no concept of a database, an `InstrumentID` column, or a ledger. `CHESSDatabase` has no
+capability logic. It never checks `performable_operations`. It records which instrument performed
+an operation, in the `InstrumentID` and `InstrumentTime` columns of `Transfers`, `Movements`,
+`EnvironmentAttributes`, and `Reads`.
 
-[`upload`](@ref) (`fun, args...; instrument=...`) is the single point where the two packages meet. The
-same `instrument` value is used for two unrelated purposes, at two separate call sites, in the same
-call:
+## The instrument argument
+
+[`upload`](@ref) takes `fun, args...; instrument=...` and is where the two packages meet. The same
+`instrument` value is used twice in one call, for two unrelated purposes:
 
 ```julia
 function upload(fun::Function, args...; instrument=nothing, kwargs...)
@@ -30,51 +32,72 @@ function upload(fun::Function, args...; instrument=nothing, kwargs...)
 end
 ```
 
-`fun(args...; instrument=instrument)` runs the actual `CHESSCore` operation, which checks capability
-internally via `_check_capability` -- if the instrument can't perform `fun`, this throws
-`ArgumentError`, and since the in-memory change and the database write happen as one step (see
-[Committing & Uploading](committing-uploading.md)), nothing is written and no `InstrumentID` is
-ever recorded. Separately, `location_id(instrument)` is computed by `upload` itself and threaded
-into the matching `upload_*`
-call for the actual `INSERT`.
+`fun(args...; instrument=instrument)` runs the `CHESSCore` operation, which checks capability. If
+the instrument cannot perform `fun`, the call throws `ArgumentError`. The in-memory change and the
+database write are one step (see [Committing & Uploading](committing-uploading.md)), so nothing is
+written and no `InstrumentID` is recorded. Separately, `upload` computes `location_id(instrument)`
+and passes it to the matching `upload_*` function, which writes the row.
 
-```julia-repl
-julia> incapable = generate_location(IncapableReaderKind, "Incapable Reader")
+The examples use a new database with a plate, CHESS's `Epoch2` plate reader, and an `Autoclave`,
+which cannot record reads:
 
-julia> upload(record_read!, w2, Fluorescence(50u"percent"); instrument=incapable)
-ERROR: ArgumentError: Incapable Reader cannot perform record_read!
+```jldoctest instruments
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
+julia> well = generate_location(loc"WP96", "Plate 1")["A1"];
+
+julia> reader = generate_location(loc"Epoch2", "Reader 1");
+
+julia> autoclave = generate_location(loc"Autoclave", "Autoclave 1");
+
+julia> upload(record_read!, well, read"Fluorescence"(50u"RFU"); instrument=autoclave)
+ERROR: ArgumentError: Autoclave 1 cannot perform record_read!
 ```
 
-The gate only checks `performable_operations` -- `readable_types` is descriptive-only, not enforced
-(already covered in [Reads & Instrument Measurements](reads.md)), so a capable instrument can record
-any registered `ReadKind` through this same gate:
+The check covers only `performable_operations`. The `readable_types` field is descriptive and is
+not enforced (see [Reads & Instrument Measurements](reads.md)), so a capable instrument can record
+any registered `ReadKind`. `Epoch2` lists only `:Absorbance` and `:Fluorescence`, but it can still
+record a free-text note:
 
-```julia-repl
-julia> upload(record_read!, w2, Fluorescence(50u"percent"); instrument=reader1)
+```jldoctest instruments
+julia> upload(record_read!, well, read"Fluorescence"(50u"RFU"); instrument=reader)
+3
+
+julia> @read ReaderNote
+ReadKind(ReaderNote)
+
+julia> upload(record_read!, well, ReaderNote("condensation on lid"); instrument=reader)
+4
 ```
 
-succeeds even if `reader1`'s `readable_types` only lists `:Absorbance`.
+## Instrument settings
 
-## Instrument settings: a different axis entirely
+[`get_instrument_settings`](@ref) takes `instrument_id, sequence_id=..., time=...`. It is unrelated
+to capability. It returns the configuration of one instrument, which changes over time, as
+free-text `Setting` and `Value` pairs such as `"Gain"` and `"2.0"`. Each setting holds its latest
+value, like an `Attribute` and unlike the accumulating history of `Read`s:
 
-[`get_instrument_settings`](@ref) (`instrument_id, sequence_id=..., time=...`) is not related to
-capability at all -- it's the actual time-varying configuration of one specific instrument instance
-(free-text `Setting`/`Value` pairs, e.g. `"Gain"` = `"2.0"`), latest-wins per setting name, much like
-an `Attribute`'s single current value rather than a `Read`'s accumulating history:
+```jldoctest instruments
+julia> upload_instrument_setting(reader, "Gain", 1.5);
 
-```julia-repl
-julia> upload_instrument_setting(reader1, "Gain", 1.5)
+julia> upload_instrument_setting(reader, "Gain", 2.0);
 
-julia> upload_instrument_setting(reader1, "Gain", 2.0)
-
-julia> get_instrument_settings(location_id(reader1))
+julia> get_instrument_settings(CHESSCore.location_id(reader))
+1×3 DataFrame
+ Row │ Setting  Value   SequenceID
+     │ String   String  Int64
+─────┼─────────────────────────────
+   1 │ Gain     2.0              6
 ```
 
-`performable_operations`/`actuatable_attributes`/`readable_types` are static capability data on a
-`LocationKind`, checked (only the first) at call time and never themselves persisted as time-varying
-state. `InstrumentSettings` is the reverse: real, ledger-ordered, persisted data with no capability
-semantics attached.
+`performable_operations`, `actuatable_attributes`, and `readable_types` are fixed capability data
+on a `LocationKind`. Only the first is checked at call time, and none is persisted as changing
+state. `InstrumentSettings` is the opposite: it is persisted in ledger order and has no capability
+meaning.
 
-[Interop](interop.md) covers a different topic entirely -- `CHESSCore`'s data-interchange formats for
-exchanging `Location`/`Stock` data with tools outside CHESS -- not to be confused with the
-package-responsibility boundary covered in this chapter.
+[Interop](interop.md) describes the formats that `CHESSCore` uses to exchange `Location` and
+`Stock` data with tools outside CHESS.

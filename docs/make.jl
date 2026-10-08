@@ -1,3 +1,7 @@
+# Unitful prints superscript exponents (mL⁻¹) by default only on macOS. Doctests record the superscript
+# form, so turn it on for every platform.
+ENV["UNITFUL_FANCY_EXPONENTS"] = "true"
+
 using Documenter
 using DocumenterMermaid
 using CHESS
@@ -5,6 +9,8 @@ using CHESS.CHESSCore
 using CHESS.CHESSDatabase
 using CHESS.CHESSLabConstants
 using CHESSParsers # not re-exported by CHESS (like Pourfecto/PlateMaps), so used directly
+using CHESSExperiments, RunMaps, PlateMaps, CHESSProcessing # also separate packages; PlateMaps
+# loads CHESSExperiments' scheduling extension, and has its own docs site
 
 # register_format!'s jldoctest example (src/registry.jl) refers to CHESSParsers/register_format!/
 # format_registry without importing them itself -- innocuous while CHESSParsers was outside
@@ -14,23 +20,16 @@ Documenter.DocMeta.setdocmeta!(CHESSParsers, :DocTestSetup, :(using CHESSParsers
 
 makedocs(
     sitename="CHESS.jl",
-    modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants, CHESSParsers],
-    checkdocs=:none, # the manual/API pages are being built up incrementally -- don't fail the
-    # build over docstring coverage gaps (CHESSLabConstants in particular is mostly generated
-    # data with few standalone docstrings by design, see manual/registering-lab-constants.md)
+    modules=[CHESS, CHESS.CHESSCore, CHESS.CHESSDatabase, CHESS.CHESSLabConstants, CHESSParsers,
+        CHESSExperiments, RunMaps, CHESSProcessing],
+    checkdocs=:exports, # every exported name must have a docstring included on some page
     repo=Documenter.Remotes.GitHub("jensenlab", "CHESS"),
-    format=Documenter.HTML(size_threshold=300_000, size_threshold_warn=200_000), # api/core.md and
-    # api/labconstants.md are large by design (CHESSCore/CHESSLabConstants have hundreds of
-    # documented reagents/organisms/functions) -- raise the hard failure threshold rather than
-    # splitting those pages, now that real source links (added once `repo` was set above) push
-    # their generated size past Documenter's 200 KiB default.
-    warnonly=[:cross_references], # several existing docstrings across CHESSCore/CHESSDatabase have
-    # stale @ref cross-references (renamed/unexported functions, typos) -- pre-existing docstring
-    # hygiene debt uncovered by this being the first-ever Documenter build, not introduced here, and
-    # out of scope for the docs scaffolding/manual pass. Downgrade to a build warning rather than a
-    # hard failure; auditing/fixing these individually is a good follow-up task.
+    # api/labconstants.md lists hundreds of registered reagents and organisms.
+    format=Documenter.HTML(size_threshold_warn=150_000),
     pages=[
         "Home" => "index.md",
+        "Quick Start" => "quickstart.md",
+        "Tutorial" => "tutorial.md",
         "Manual" => [
             "Locations" => "manual/core-concepts.md",
             "Movement & Occupancy" => "manual/movement.md",
@@ -45,11 +44,17 @@ makedocs(
             ],
             "Reads & Instrument Measurements" => "manual/reads.md",
             "Parsing Instrument Files" => "manual/parsing-instrument-files.md",
+            "Experiments & Data" => [
+                "Experimental Designs" => "manual/experiments.md",
+                "Run Maps" => "manual/runmaps.md",
+                "Processing Experiment Data" => "manual/processing.md",
+            ],
             "Registering Lab Constants" => "manual/registering-lab-constants.md",
             "CHESS Databases" => [
                 "Database Architecture" => "manual/db-architecture.md",
                 "The Ledger" => "manual/ledger.md",
                 "Committing & Uploading" => "manual/committing-uploading.md",
+                "Observations" => "manual/observations.md",
                 "Reconstruction" => "manual/reconstruction.md",
                 "Caching & Repair" => "manual/caching-repair.md",
                 "Encumbrances" => "manual/encumbrances.md",
@@ -59,16 +64,38 @@ makedocs(
             "Troubleshooting" => "manual/troubleshooting.md",
         ],
         "API Reference" => [
-            "CHESSCore" => "api/core.md",
+            "CHESSCore" => [
+                "Overview & Errors" => "api/core.md",
+                "Locations & Operations" => "api/core-locations.md",
+                "Stocks" => "api/core-stocks.md",
+                "Solution Chemistry" => "api/core-chemistry.md",
+                "Attributes & Reads" => "api/core-environment.md",
+                "Interop" => "api/core-interop.md",
+            ],
             "CHESSDatabase" => "api/database.md",
             "CHESSLabConstants" => "api/labconstants.md",
             "CHESSParsers" => "api/parsers.md",
+            "CHESSExperiments" => "api/experiments.md",
+            "RunMaps" => "api/runmaps.md",
+            "CHESSProcessing" => "api/processing.md",
         ],
     ],
 )
 
-deploydocs(
-    repo="github.com/jensenlab/CHESS.git",
-    devbranch="main",
-    push_preview=true,
-)
+# The CHESS, Pourfecto, PlateMaps, and LabwarePlotting workflows all push to the same gh-pages
+# branch, so a push can lose a race with another workflow. deploydocs fetches the current gh-pages
+# on every call, so calling it again picks up the other push.
+for attempt in 1:5
+    try
+        deploydocs(
+            repo="github.com/jensenlab/CHESS.git",
+            devbranch="main",
+            push_preview=true,
+        )
+        break
+    catch err
+        attempt == 5 && rethrow()
+        @warn "deploydocs failed; retrying" attempt exception=err
+        sleep(5 * attempt + 10 * rand())
+    end
+end

@@ -39,8 +39,8 @@ Random.seed!(48207531)
 ## Reagents and source labware
 
 ```julia
-reagents = [string_to_reagent("R$i", Solid) for i in 1:48]
-water = string_to_reagent("water", Liquid)
+reagents = [string_to_component("R$i", Solid) for i in 1:48]
+water = string_to_component("water", Liquid)
 ```
 
 The deep 96-well source plate holds each reagent stock twice, in different
@@ -124,7 +124,7 @@ pc1, time1 = @timed pourfecto(source_labware_all, target_plates, configs; priori
 
 pc2, time2 = @timed pourfecto(source_labware_no_reservoir, target_plates, configs; priority=priority, solver_timelimit=45)
 
-pc3, time3 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_active_flow", solver_timelimit=100)
+pc3, time3 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_active_flow", solver_timelimit=300)
 
 pc4, time4 = @timed pourfecto(source_labware_all, target_plates, configs; priority=priority, objective="min_config", solver_timelimit=100)
 ```
@@ -180,6 +180,25 @@ Finally, the comparison table is saved alongside the example for reference.
 
 ```julia
 CSV.write(joinpath(@__DIR__, "combinatorial_media_results.csv"), df)
+```
+
+## Saving the pourcasts
+
+Each pourcast is written to JSON with [`pourcast_to_json`](@ref), so the
+schedules can be inspected later without re-solving. The companion script
+`analyze_pourcasts.jl` loads these files and compares each pourcast's
+planned stocks against its target stocks.
+
+```julia
+slugs = ["all_sources", "no_reservoir", "min_active_flows", "min_configurations"]
+pourcast_dir = joinpath(@__DIR__, "pourcasts")
+mkpath(pourcast_dir)
+
+for i in eachindex(pcs)
+    open(joinpath(pourcast_dir, "$(slugs[i]).json"), "w") do io
+        write(io, pourcast_to_json(pcs[i]))
+    end
+end
 ```
 
 ---

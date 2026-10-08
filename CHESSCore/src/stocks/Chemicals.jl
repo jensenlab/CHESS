@@ -91,6 +91,12 @@ struct Liquid <: Reagent
     pubchemid::Union{Integer,Missing}
 end
 
+"""
+    struct Gas <: Reagent
+
+Gases are [`Reagent`](@ref) subtypes that exist in gas phase at STP. They have the same fields as
+[`Solid`](@ref) and [`Liquid`](@ref).
+"""
 struct Gas <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
@@ -542,7 +548,7 @@ const allowed_funcs = [:*, :/, :^, :sqrt, :√, :+, :-, ://]
 Shared lookup machinery behind [`@chem_str`](@ref), [`@rgt_str`](@ref), [`@org_str`](@ref), and
 [`@loc_str`](@ref): resolve a bare symbol (or an arithmetic expression/tuple of symbols) against a
 list of modules, using `check(value)` to decide whether a candidate binding is of the desired kind.
-Falls back to searching all globally registered [`labmodules`](@ref) for a helpful "did you mean"
+Falls back to searching all globally registered `labmodules` for a helpful "did you mean"
 suggestion (Levenshtein distance) when nothing matches.
 """
 function lookup_named_value(labmods, ex::Expr, check::Function)

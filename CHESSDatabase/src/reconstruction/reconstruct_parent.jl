@@ -1,3 +1,13 @@
+"""
+    reconstruct_parent(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Location
+    reconstruct_parent(location_ids::Vector{<:Integer}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Vector{<:Location}
+
+Rebuild each location's parent for the given location IDs, as of `sequence_id` and `time`, and return new
+locations holding that state. [`reconstruct_location`](@ref) rebuilds everything at once; the
+arguments work the same way (see [`reconstruct_location!`](@ref)).
+
+See also: [`reconstruct_parent!`](@ref).
+"""
 function reconstruct_parent(location_ids::Vector{<:Integer},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     all_locs=Dict{Integer,Location}() # constant defined in reconstruction_utils.jl Columns are location id, sequence id, location
     cache_feet=[]
@@ -43,6 +53,13 @@ function reconstruct_parent(location_id::Integer,sequence_id::Integer=get_last_s
 end
 
 
+"""
+    reconstruct_parent!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+    reconstruct_parent!(locations::Vector{<:Location}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
+
+Set the parent of existing locations to their reconstructed state. Arguments work as in
+[`reconstruct_parent`](@ref).
+"""
 function reconstruct_parent!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     parallel_locs=reconstruct_parent(location_id.(locations),sequence_id,time,max_cache;encumbrances=encumbrances)
 

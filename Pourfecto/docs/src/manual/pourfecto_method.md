@@ -1,7 +1,5 @@
 # [The `pourfecto` method](@id pourfecto_method)
 
-
-
 ```@meta
 CurrentModule = Pourfecto
 ```
@@ -11,18 +9,14 @@ Pourfecto separates liquid-handling protocol design into two related stages:
 1. **Planning**: determines how source stocks can be combined to produce target stocks.
 2. **Scheduling**: determines how the plan can be executed using specific labware and instrument configurations.
 
+[`pourfecto`](@ref) is the main function for planning and scheduling. It chooses the workflow from the types of its inputs. It runs in one of two modes:
 
-The main user-interface for planning and scheduling is [`pourfecto`](@ref). This method dispatches on the types of inputs you provide and chooses the appropriate workflow automatically.
+- **planning mode** computes source-to-target transfer volumes.
+- **planning and scheduling mode** also maps those transfers onto liquid-handler configurations.
 
-`pourfecto` can run in either:
+The examples on this page use these names. `sources` and `targets` are vectors of CHESSCore `Stock`s, `source_labware` and `target_labware` are vectors of CHESSCore `Labware`, and `configs` is a vector of [`Configuration`](@ref)s. The [Quick Start](@ref pourfecto_quickstart) shows how to build them from tables.
 
-- **planning mode**, where it computes source-to-target transfer volumes, or
-- **planning and scheduling mode**, where it also maps those transfers onto liquid-handler configurations.
-
-
----
-
-## Planning 
+## Planning
 
 ### Planning from stocks
 
@@ -32,46 +26,34 @@ If you only have source and target `CHESSCore.Stock` objects, call:
 pourfecto(sources::Vector{<:CHESSCore.Stock}, targets::Vector{<:CHESSCore.Stock})
 ```
 
-
-This runs Pourfecto in **planning mode**. The result is a [`Pourcast`](@ref) containing the planned transfer matrix. Planning is useful to verify that the stock inputs result in a feasible liquid transfer plan. Planning **does not** consider any of the logistical details of the liquid handling workflow. 
-
-
----
+This runs in **planning mode**. The result is a [`Pourcast`](@ref) that holds the planned transfer matrix. Planning checks whether the stocks give a feasible transfer plan. It does not consider the logistics of the liquid handling workflow.
 
 ### Planning from labware
 
-If your source and target stocks are already placed in labware, you can pass labware directly:
+If the source and target stocks are already in labware, the labware can be passed directly:
 
 ```julia
 pc = pourfecto(source_labware::Vector{<:CHESSCore.Labware}, target_labware::Vector{<:CHESSCore.Labware})
 ```
 
-This also runs in **planning mode**. Pourfecto extracts the stocks from the supplied labware and plans transfers between those stocks.
-
-
----
+This also runs in **planning mode**. Pourfecto takes the stocks from the labware and plans transfers between them.
 
 ## Planning and scheduling
 
-To run in both planning and scheduling modes, provide source labware, target labware, and instrument configurations:
+Planning and scheduling mode takes source labware, target labware, and instrument configurations:
 
 ```julia
 pc = pourfecto(source_labware::Vector{<:CHESSCore.Labware}, target_labware::Vector{<:CHESSCore.Labware},configs::Vector{<:Configuration})
 ```
 
-This mode plans the required transfers and then schedules them using the provided liquid-handler configurations.
-
-The resulting [`Pourcast`](@ref) contains both:
+It plans the required transfers and schedules them on the liquid-handler configurations. The resulting [`Pourcast`](@ref) contains both:
 
 - transfer volumes, available with [`transfers`](@ref), and
 - scheduled flow volumes, available with [`flows`](@ref).
 
-
----
-
 ### Planning and scheduling from configuration names
 
-If configurations have been registered in Pourfecto’s `configurations` dictionary, you can provide their string identifiers instead of the configuration objects themselves:
+Configurations registered in the `configurations` dictionary can be given by their string identifiers instead of as objects:
 
 ```julia
 pc = pourfecto(source_labware, target_labware, config_names)
@@ -92,15 +74,10 @@ pc = pourfecto(
     ["single_channel_pipette"],
 )
 ```
----
 
+## Planning, scheduling, and compiling
 
-
-
-
-## Planning, Scheduling, and Compiling 
-
-Finally, Pourfecto also provides a high-level method that runs the full planning and scheduling workflow, checks the quality of the resulting [`Pourcast`](@ref), and automatically compiles output files into a directory.
+A fourth method runs the full workflow. It plans and schedules, checks the quality of the resulting [`Pourcast`](@ref), and compiles output files into a directory.
 
 ```julia
 pc = pourfecto(directory, source_labware, target_labware, configs)
@@ -115,19 +92,12 @@ target_labware::Vector{<:CHESSCore.Labware}
 configs::Union{Vector{<:AbstractString}, Vector{<:Configuration}}
 ```
 
-This is the most automated `pourfecto` interface. It is useful when you want to go directly from populated labware and instrument configurations to compiled protocol outputs.
+This is the most automated interface. It goes from populated labware and instrument configurations to compiled protocol files. It performs these steps:
 
-This method performs the following steps:
-
-1. Runs Pourfecto in **planning and scheduling** mode
-3. Checks the quality of the solution
-4. If the solution passes quality control, compiles the `Pourcast` into the output directory
-5. Returns the resulting [`Pourcast`](@ref).
-
-
-
-
---- 
+1. Runs in **planning and scheduling** mode.
+2. Checks the quality of the solution.
+3. If the solution passes the check, compiles the `Pourcast` into the output directory.
+4. Returns the [`Pourcast`](@ref).
 
 ## Dispatch summary
 
@@ -139,13 +109,20 @@ This method performs the following steps:
 | `pourfecto(source_labware, target_labware, config_names)` | Planning + scheduling |
 | `pourfecto(directory, source_labware, target_labware, configs)` | Planning + scheduling + compiling | 
 
----
-
 ## Keyword arguments
 
-Most high-level [`pourfecto`](@ref) methods accept the same keyword arguments and pass them through to the planning, scheduling, and compilation steps as needed.
+Most high-level [`pourfecto`](@ref) methods accept the same keyword arguments and pass them to the planning, scheduling, and compilation steps as needed. The options control the solver, planning tolerances, reagent priorities, and scheduling objectives.
 
-These options control solver behavior, planning tolerances, reagent priorities, and scheduling objectives.
+Most runs need only a few of them:
+
+- `optimizer` selects the solver. The default needs a Gurobi license.
+- `solver_timelimit` raises the time limit for larger problems.
+- `priority` states which reagents must be matched most closely when some matter more than others.
+- `objective` selects what the scheduler optimizes, and `config_costs` weights the configurations.
+- `enforce_minimum_shot` makes the schedule respect the minimum dispense volume of each instrument.
+- `allow_in_place` is for adding to labware that already holds material.
+
+The other keywords set tolerances and solver details, and their defaults suit most problems.
 
 ```julia
 pc = pourfecto(
@@ -164,35 +141,31 @@ pc = pourfecto(
 | `quiet` | `true` | `Bool` | Solver | Suppresses solver output when `true`. |
 | `optimizer` | `Gurobi.Optimizer` | any JuMP-compatible optimizer | Solver | Sets the solver used for planning and scheduling. See [Choosing a solver](@ref pourfecto_choosing_a_solver). |
 | `solver_timelimit` | `30` | `Real` | Solver | Sets the solver's time limit, in seconds. Applies to any solver. |
-| `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Also reused as the indicator/big-M epsilon inside every MILP scheduling objective regardless of the active solver, so it isn't purely a Gurobi-only setting in practice. |
+| `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Every MILP scheduling objective also uses it as the indicator and big-M epsilon, whichever solver is active. |
 | `min_vol_threshold` | `0.1` | `Real` | Planning | Sets the minimum volume threshold in µL. Any required transfer must be at least this large. |
 | `require_nonzero` | `true` | `Bool` | Planning | If a target contains a reagent, require that some amount of that reagent is delivered, even if the optimal relaxed solution would deliver none. |
 | `enforce_minimum_shot` | `false` | `Bool` | Scheduling | Enforces minimum shot-volume constraints for each instrument. **Caution:** this introduces binary variables and turns the problem into a MILP. |
 | `slack_tol` | `1e-2` | `Real` | Planning | Sets the tolerance for preserving slack values across priority levels. A value of `0.01` corresponds to a 1% tolerance. |
 | `config_costs` | `ones(length(configs))` | `Vector{Real}` | Scheduling objective | Sets the relative cost of using each configuration. Used by objectives such as `"min_cost_flow"`. |
 | `solution_tolerance` | `1e-2` | `Real` | Quality control / planning | Sets the allowable magnitude for individual slacks in solution-quality checks. Slacks are normalized per chemical, so a value of `1` allows a chemical's slack to be as large as the largest target quantity *of that chemical*, not the largest target in the whole model. |
-| `allow_in_place` | `false` | `Bool` | Planning | Allows the same physical labware to appear in both `source_labware` and `target_labware`, for in-place transfers (e.g. adding a reagent to a plate's existing stocks). Wells shared between source and target keep their existing content by construction, bounded by physical well capacity rather than the target's declared quantity. See [Allow in-place transfers](@ref) below. |
+| `allow_in_place` | `false` | `Bool` | Planning | Allows the same physical labware to appear in both `source_labware` and `target_labware`, for in-place transfers such as adding a reagent to a plate's existing stocks. Wells shared by the source and target keep their existing content, limited by the physical well capacity and not by the declared target quantity. See [Allow in-place transfers](@ref) below. |
 
 !!! note
-    Keyword arguments are stored in the [`ParameterDict`](@ref) inside the returned [`Pourcast`](@ref). You can inspect them with:
+    The keyword arguments are stored in the [`ParameterDict`](@ref) of the returned [`Pourcast`](@ref). `params` shows them:
 
     ```julia
     params(pc)
     ```
 
----
-
 ## [Choosing a solver](@id pourfecto_choosing_a_solver)
 
-`pourfecto`'s `optimizer` keyword accepts any [JuMP](https://jump.dev)-compatible optimizer. Pourfecto
-defaults to `Gurobi.Optimizer` (free for academic use, but otherwise a commercial license), and is
-tested against two free, open-source alternatives:
+The `optimizer` keyword of `pourfecto` accepts any [JuMP](https://jump.dev)-compatible optimizer. The default is `Gurobi.Optimizer`, which is free for academic use and otherwise needs a commercial license. Pourfecto is also tested against two free, open-source solvers:
 
 | Solver | License | Handles MIQP (`enforce_minimum_shot = true`) | Notes |
 |---|---|---|---|
-| [`Gurobi.Optimizer`](https://www.gurobi.com) | Commercial (free for academic use) | Yes | The production default; no known limitations against any of Pourfecto's objectives or constraints. |
-| [`SCIP.Optimizer`](https://scipopt.org) | Free, open-source | Yes | Pourfecto's own test suite runs on SCIP by default. Handles every objective and constraint Pourfecto can build, but is noticeably slower than Gurobi/HiGHS on large continuous QPs (many reagents × many wells). |
-| [`HiGHS.Optimizer`](https://highs.dev) | Free, open-source | **No** | Much faster than SCIP on large continuous QPs. However, HiGHS has no indicator- or quadratic-constraint support, so it **cannot** be used with `enforce_minimum_shot = true` or with scheduling objectives that require indicator constraints. It's safe with `enforce_minimum_shot = false` and objectives like the default `"min_cost_flow"` that don't need them. |
+| [`Gurobi.Optimizer`](https://www.gurobi.com) | Commercial (free for academic use) | Yes | The default. No known limitations with any Pourfecto objective or constraint. |
+| [`SCIP.Optimizer`](https://scipopt.org) | Free, open-source | Yes | The Pourfecto test suite runs on SCIP by default. It handles every objective and constraint that Pourfecto builds but is noticeably slower than Gurobi and HiGHS on large continuous QPs with many reagents and wells. |
+| [`HiGHS.Optimizer`](https://highs.dev) | Free, open-source | **No** | Much faster than SCIP on large continuous QPs. HiGHS does not support indicator or quadratic constraints, so it **cannot** be used with `enforce_minimum_shot = true` or with scheduling objectives that need indicator constraints. It can be used with `enforce_minimum_shot = false` and with objectives that need none, such as the default `"min_cost_flow"`. |
 
 ```julia
 using SCIP
@@ -205,9 +178,7 @@ pc = pourfecto(sources, targets, configs; optimizer = HiGHS.Optimizer, enforce_m
 ```
 
 !!! warning
-    HiGHS silently fails to model indicator/quadratic constraints correctly if you request them — always pair `optimizer = HiGHS.Optimizer` with `enforce_minimum_shot = false` and an objective that doesn't need indicator constraints, or use SCIP/Gurobi instead.
-
----
+    HiGHS does not warn when it models indicator or quadratic constraints incorrectly. Use `optimizer = HiGHS.Optimizer` only with `enforce_minimum_shot = false` and an objective that needs no indicator constraints. Otherwise use SCIP or Gurobi.
 
 ## Common examples
 
@@ -233,11 +204,9 @@ pc = pourfecto(
 )
 ```
 
----
-
 ### Set a solver time limit
 
-The default solver time limit is 30 seconds, and applies regardless of which `optimizer` is used:
+The default solver time limit is 30 seconds for every `optimizer`:
 
 ```julia
 pc = pourfecto(
@@ -257,8 +226,6 @@ pc = pourfecto(
     solver_timelimit = 300,
 )
 ```
-
----
 
 ### Reagent Priority 
 
@@ -293,11 +260,9 @@ Priority values are interpreted as:
 | `2`, `3`, ... | Lower optimization priority |
 | `typemax(UInt64)` | Very low priority / effectively optimized last |
 
----
-
 ### Require nonzero reagent delivery
 
-By default, `require_nonzero = true`. This means that if a target contains a reagent, Pourfecto requires some amount of that reagent to be delivered.
+By default `require_nonzero = true`: if a target contains a reagent, Pourfecto requires some amount of that reagent to be delivered.
 
 ```julia
 pc = pourfecto(
@@ -310,10 +275,7 @@ pc = pourfecto(
 
 Here, any required transfer must be at least `0.1 µL`.
 
-This can be useful for ensuring that required reagents are physically transferred rather than ignored because of slack tolerances.
-
----
-
+This ensures that required reagents are transferred and not ignored because of slack tolerances.
 
 ### Adjust slack tolerance
 
@@ -344,8 +306,6 @@ pc = pourfecto(
     slack_tol = 5e-2,
 )
 ```
-
----
 
 ### Choose a scheduling objective
 
@@ -388,8 +348,6 @@ pc = pourfecto(
 
 When a vector of objectives is supplied, Pourfecto applies and solves each objective in the order provided.
 
----
-
 ### Set relative configuration costs
 
 The `config_costs` keyword controls the relative cost of using each configuration in the default `"min_cost_flow"` objective. By default, all configurations have equal cost:
@@ -412,8 +370,6 @@ pc = pourfecto(
 
 This encourages Pourfecto to use the first two configurations when possible and avoid the third unless it improves feasibility or objective quality.
 
----
-
 ### Enforce minimum shot volumes
 
 By default, Pourfecto does not enforce minimum-shot constraints:
@@ -435,8 +391,6 @@ pc = pourfecto(
 
 !!! warning
     Setting `enforce_minimum_shot = true` introduces binary variables and can make the scheduling problem significantly harder to solve.
-
----
 
 ### Adjust solution-quality tolerance
 
@@ -470,8 +424,6 @@ pc = pourfecto(
 )
 ```
 
----
-
 ### Planning with priorities and tolerances
 
 ```julia
@@ -493,17 +445,15 @@ pc = pourfecto(
 )
 ```
 
----
-
 ### Allow in-place transfers
 
-By default, Pourfecto rejects a source and target labware that share a name -- reusing a name changes the physical meaning of the transfer, so it's treated as a likely mistake unless you opt in:
+By default, Pourfecto rejects source and target labware that share a name, because a repeated name changes the physical meaning of the transfer and is likely a mistake:
 
 ```julia
 allow_in_place = false
 ```
 
-Setting `allow_in_place = true` lets the same physical labware appear on both sides, for transfers that add reagent to a plate's existing contents (e.g. adjusting pH, dosing an already-seeded assay plate) rather than filling an empty target from scratch. Source and target wells are matched by labware name and well name; a matched well's existing content is pinned -- forced to carry forward at its full existing quantity -- and bounded by its physical well capacity rather than the naively-summed target composition.
+Setting `allow_in_place = true` lets the same physical labware appear on both sides. This is for transfers that add reagent to a plate's existing contents, such as adjusting pH or dosing a seeded assay plate, instead of filling an empty target. Source and target wells are matched by labware name and well name. The existing content of a matched well is pinned, which forces all of it to carry forward, and is limited by the physical well capacity and not by the sum of the target composition.
 
 ```julia
 pc = pourfecto(
@@ -515,8 +465,5 @@ pc = pourfecto(
 ```
 
 !!! warning
-    Every reagent in an in-place well's existing content must be restated in its target composition (or given explicit nonzero priority) -- a reagent that's never declared in any target defaults to priority `0` (blocked), which directly conflicts with the pin forcing its existing amount to carry forward. See the [in-place transfers example](../examples/in_place.md) for a full worked walkthrough, including this exact pitfall and how the resulting `InfeasibleSolveError` reports it.
-
----
-
+    Every reagent in the existing content of an in-place well must be restated in its target composition or given an explicit nonzero priority. A reagent that no target declares defaults to priority `0`, which blocks it and conflicts with the pin that carries its existing amount forward. The [in-place transfers example](../examples/in_place.md) walks through this case and shows how the resulting `InfeasibleSolveError` reports it.
 

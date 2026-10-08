@@ -1,6 +1,5 @@
 # CHESS.jl
 
-[![Documentation (stable)](https://img.shields.io/badge/docs-stable-blue.svg)](https://jensenlab.github.io/CHESS/stable)
 [![Documentation (dev)](https://img.shields.io/badge/docs-dev-blue.svg)](https://jensenlab.github.io/CHESS/dev)
 [![CI](https://github.com/jensenlab/CHESS/actions/workflows/CI.yml/badge.svg)](https://github.com/jensenlab/CHESS/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -21,11 +20,11 @@ The core engine: recording, reconstructing, and looking up lab state.
 
 | Package | Description | Docs |
 |---|---|---|
-| [`CHESSCore`](CHESSCore) | The "lab engine": `Location`/`Stock`/`Attribute`/`Read` types and the pure, in-memory operations that act on them (`move_into!`, `transfer!`, `set_attribute!`, `record_read!`). | [stable](https://jensenlab.github.io/CHESS/stable/api/core/) / [dev](https://jensenlab.github.io/CHESS/dev/api/core/) |
-| [`CHESSDatabase`](CHESSDatabase) | An append-only SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand. | [stable](https://jensenlab.github.io/CHESS/stable/api/database/) / [dev](https://jensenlab.github.io/CHESS/dev/api/database/) |
-| [`CHESSLabConstants`](CHESSLabConstants) | A starter set of registered lab constants (reagents, organisms, location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining your own lab's constants. | [stable](https://jensenlab.github.io/CHESS/stable/api/labconstants/) / [dev](https://jensenlab.github.io/CHESS/dev/api/labconstants/) |
-| `CHESS` | The umbrella package: `@reexport`s `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, plus `Unitful`, so `using CHESS` alone is enough to get everything except packages from the other categories below. | [stable](https://jensenlab.github.io/CHESS/stable) / [dev](https://jensenlab.github.io/CHESS/dev) |
-| [`CHESSExperiments`](CHESSExperiments) | The experimental-design layer: `Experiment`/`Factor`/design-matrix types, parsing a design into populated well conditions, and blocking -- independent of `RunMaps`/`PlateMaps`, with `schedule_layout` onto them provided by a package extension. | -- |
+| [`CHESSCore`](CHESSCore) | The "lab engine": `Location`/`Stock`/`Attribute`/`Read` types and the pure, in-memory operations that act on them (`move_into!`, `transfer!`, `set_attribute!`, `record_read!`). | [dev](https://jensenlab.github.io/CHESS/dev/api/core/) |
+| [`CHESSDatabase`](CHESSDatabase) | An append-only SQLite-backed history of every operation, plus the reconstruction algorithms that replay it into `CHESSCore` objects on demand. | [dev](https://jensenlab.github.io/CHESS/dev/api/database/) |
+| [`CHESSLabConstants`](CHESSLabConstants) | A starter set of registered lab constants (reagents, organisms, location kinds, instruments, standard stock recipes) built on `CHESSCore`'s registration macros -- a template for defining your own lab's constants. | [dev](https://jensenlab.github.io/CHESS/dev/api/labconstants/) |
+| `CHESS` | The umbrella package: `@reexport`s `CHESSCore`, `CHESSDatabase`, and `CHESSLabConstants`, plus `Unitful`, so `using CHESS` alone is enough to get everything except packages from the other categories below. | [dev](https://jensenlab.github.io/CHESS/dev) |
+| [`CHESSExperiments`](CHESSExperiments) | The experimental-design layer: `Experiment`/`Factor`/design-matrix types, parsing a design into populated well conditions, and blocking -- independent of `RunMaps`/`PlateMaps`, with `schedule_layout` onto them provided by a package extension. | [dev](https://jensenlab.github.io/CHESS/dev/manual/experiments/) |
 
 ### Schedulers
 
@@ -34,7 +33,7 @@ Packages that plan and schedule lab operations against the CHESS engine's data m
 | Package | Description | Docs |
 |---|---|---|
 | [`Pourfecto`](Pourfecto) | Plans and schedules automated liquid-handling workflows -- turns source stocks, target compositions, labware, and instrument configurations into an executable protocol. See [`Pourfecto/README.md`](Pourfecto/README.md) for its own install/quickstart notes (it has extra solver-license setup CHESS itself doesn't need). | [dev](https://jensenlab.github.io/CHESS/pourfecto/dev/) |
-| [`RunMaps`](RunMaps) | Represents and schedules run-graphs -- linked runs, control/duplicate scheduling (greedy and MILP), and JSON round-trip -- pairs naturally with `PlateMaps` for the plate-layout side. | -- |
+| [`RunMaps`](RunMaps) | Represents and schedules run-graphs -- linked runs, control/duplicate scheduling (greedy and MILP), and JSON round-trip -- pairs naturally with `PlateMaps` for the plate-layout side. | [dev](https://jensenlab.github.io/CHESS/dev/manual/runmaps/) |
 | [`PlateMaps`](PlateMaps) | Schedules physical plate layouts (which node occupies which well, across one or more plates) from an edge-linked relationship structure -- pairs naturally with `RunMaps` for the run/control side. | [dev](https://jensenlab.github.io/CHESS/platemaps/dev/) |
 
 ### Data Processing
@@ -43,8 +42,8 @@ Packages for processing and analyzing data recorded through CHESS (e.g. reads an
 
 | Package | Description | Docs |
 |---|---|---|
-| [`CHESSParsers`](CHESSParsers) | Parses instrument-exported data files (starting with BioTek plate readers/incubators: Epoch2, Synergy, Cytation, BioSpa) into a `DataFrame`, `CHESSCore.Read`s, or JSON, through a generic, pluggable per-instrument-format interface. | -- |
-| [`CHESSProcessing`](CHESSProcessing) | A standard library of composable `Experiment`-processing operations -- `resolve`/`aggregate`/`normalize`/`correct`/`flag`/`merge` -- each appending a `ProcessingRecord` to the experiment's append-only processing log for provenance, so any subset or order can be composed rather than following a fixed pipeline. | -- |
+| [`CHESSParsers`](CHESSParsers) | Parses instrument-exported data files (starting with BioTek plate readers/incubators: Epoch2, Synergy, Cytation, BioSpa) into a `DataFrame`, `CHESSCore.Read`s, or JSON, through a generic, pluggable per-instrument-format interface. | [dev](https://jensenlab.github.io/CHESS/dev/manual/parsing-instrument-files/) |
+| [`CHESSProcessing`](CHESSProcessing) | A standard library of composable `Experiment`-processing operations -- `resolve`/`aggregate`/`normalize`/`correct`/`flag`/`merge` -- each appending a `ProcessingRecord` to the experiment's append-only processing log for provenance, so any subset or order can be composed rather than following a fixed pipeline. | [dev](https://jensenlab.github.io/CHESS/dev/manual/processing/) |
 
 ### Visualization
 
@@ -56,30 +55,35 @@ Shared plotting utilities consumed by packages across the other categories.
 
 ## Installation
 
-CHESS requires **Julia 1.12 or later** -- the repository ties its packages together as a Julia
-`[workspace]`, a Pkg feature introduced in 1.12. The workspace members (`CHESSCore`,
-`CHESSDatabase`, `CHESSLabConstants`, `Pourfecto`) resolve each other via local paths, not a
-package registry, so **CHESS must be used from a local clone** -- `Pkg.add(url="...")` from another
-project will not work (Pkg does not carry a workspace's local path resolution to consumers that
-merely add it as a dependency), and none of these packages are published to a registry.
+CHESS requires **Julia 1.12 or later**. The repository is a Julia workspace, a feature of the
+package manager that was introduced in 1.12, and its packages find each other through local paths.
+None of the packages is published to a registry. CHESS must therefore be used from a local clone.
+Adding it to another project from its URL does not work, because the package manager does not carry
+the local paths of a workspace over to a project that depends on it.
 
-```julia
-# git clone https://github.com/jensenlab/CHESS && cd CHESS
-using Pkg
-Pkg.instantiate()
+Clone the repository and instantiate its environment:
+
+```bash
+git clone https://github.com/jensenlab/CHESS
+cd CHESS
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-## Quickstart
+Instantiating installs every package in the workspace from its local path, together with their
+dependencies. To start a session, run `julia --project=.` in the clone. To work with a package
+other than CHESS, such as Pourfecto, set `--project` to the directory of that package instead.
+
+## Quick Start
 
 ```julia
 using CHESS
 
-room = GenericLocation(nothing, "Main Room", Room)
-plate = build_location(WP96, "Plate 1")
+room = build_location(loc"Room", "Main Room")
+plate = build_location(loc"WP96", "Plate 1")
 move_into!(room, plate)
 
-set_attribute!(room, Temperature(25u"°C"))
-deposit!(plate["A1"], 100u"µL" * water)
+set_attribute!(room, attr"Temperature"(25u"°C"))
+deposit!(plate["A1"], 100u"µL" * rgt"water")
 
 environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
 ```
@@ -87,9 +91,9 @@ environment(plate["A1"])[:Temperature] # inherited from room -> plate -> well
 ## Documentation
 
 The full manual and API reference are published at
-**[http://jensenlab.net/CHESS](https://jensenlab.net/CHESS)**. The manual works through
+**[jensenlab.github.io/CHESS](https://jensenlab.github.io/CHESS/dev/)**. The manual works through
 CHESS's core concepts in the order they build on one another, starting with
-[Locations](https://jensenlab.github.io/CHESS/stable/manual/core-concepts/).
+[Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/).
 
 ## License
 

@@ -12,6 +12,12 @@ Every distinct *kind* of location/labware (`:Room`, `:Incubator`, `:WP96`, ...) 
 abstract type Location end
 
 # The four definitions below jointly implement AbstractTrees.jl's node interface for Location.
+"""
+    children(x::Location)
+
+The locations directly inside `x`. For a [`GenericLocation`](@ref) this is a `Vector`; for a
+[`Labware`](@ref) it is the fixed `Matrix` of slots; a [`Well`](@ref) has none.
+"""
 AbstractTrees.children(x::Location) = x.children
 AbstractTrees.parent(x::Location) =x.parent
 AbstractTrees.nodevalue(x::Location)=location_id(x)
@@ -26,6 +32,11 @@ AbstractTrees.ParentLinks(::Type{<:Location})=StoredParent()
 # Location is ordinary (not type piracy -- Location is CHESSCore's own type) and makes the bare name
 # resolve correctly with nothing extra required, since Base.parent is already visible everywhere by
 # default. Do not remove this thinking the asymmetry with children/nodevalue is a mistake to "clean up".
+"""
+    parent(x::Location)
+
+The location directly containing `x`, or `nothing` if `x` is at the root of its tree.
+"""
 Base.parent(x::Location) = AbstractTrees.parent(x)
 childtype(::Location)=Location
 # No generic `stock` fallback here -- only Well actually holds a Stock (see Well.jl); a fallback that
@@ -163,7 +174,7 @@ reads(x::Location,name::Symbol) = sort(filter(r -> read_kind(r).name === name,re
 
 Access the state of the `is_locked` property of a location. Locked locations cannot be moved from their current parent, but *children of locked locations can be moved*.
 
-See also: [`unlock!`](@ref),[`lock!`](@ref),[`toggle_lock!`](@ref),[`unlock`](@ref),[`lock`](@ref),[`toggle_lock`](@ref).
+See also: [`unlock!`](@ref),[`lock!`](@ref),[`toggle_lock!`](@ref).
 """
 is_locked(x::Location)=x.is_locked # locked locations cannot be moved from their current parent. Children of locked locations CAN be moved.
 
@@ -172,7 +183,7 @@ is_locked(x::Location)=x.is_locked # locked locations cannot be moved from their
 Change the state of the `is_locked` property of a location to `false`.
 
 See also: [`is_locked`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function unlock!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_locked=false
@@ -183,7 +194,7 @@ end
 Change the state of the `is_locked` property of a location to `true`.
 
 See also: [`is_locked`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function lock!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_locked=true
@@ -195,7 +206,7 @@ end
 Flip the state of the `is_locked` property of a location.
 
 See also: [`is_locked`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function toggle_lock!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_locked=!is_locked(x)
@@ -220,7 +231,7 @@ end
 Set the `is_active` property of [`Location`](@ref) `x` to `true`
 
 See also: [`is_active`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function activate!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_active=true
@@ -231,7 +242,7 @@ end
 Set the `is_active` property of [`Location`](@ref) `x` to `false`
 
 See also: [`is_active`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function deactivate!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_active=false
@@ -243,7 +254,7 @@ end
 Switch the `is_active` property of [`Location`](@ref) `x` from its current state.
 
 See also: [`is_active`](@ref). To preview this without mutating `x`, see
-[`reconstruct_location`](@ref)/[`build_location`](@ref).
+[`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`).
 """
 function toggle_activity!(x::Location;instrument::Union{Location,Nothing}=nothing)
     x.is_active=!is_active(x)

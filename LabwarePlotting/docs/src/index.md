@@ -4,29 +4,41 @@ CurrentModule = LabwarePlotting
 
 # LabwarePlotting.jl
 
-`LabwarePlotting` is the shared plate/grid plotting layer for CHESS: gridlines, lettered rows, shape
-markers, heatmap overlays, and role-based coloring, factored out of the several packages that each
-draw some version of "a grid of wells" on top of `Plots`.
+`LabwarePlotting` is the shared plate and grid plotting layer of CHESS. It provides gridlines,
+lettered rows, shape markers, heatmap overlays, and role-based colors on top of `Plots`. The several
+packages that draw a grid of wells share it.
 
-`LabwarePlotting` is a dependency-free leaf package -- it knows nothing about `CHESSCore.Labware`,
-`PlateMaps.PlateMap`, or any other domain type. Each package that has a grid-shaped type of its own
-(`CHESSCore`, `PlateMaps`, `Pourfecto`, `CHESSProcessing`) adds its own `plot` method (or plotting
-function) for that type, built on these primitives, via its own package-level extension or source
-file. This keeps the dependency graph a simple star (everyone can depend on `LabwarePlotting`, nothing
-circular) and makes the scheme extensible: a future package with a new grid-shaped type follows the
-identical convention.
+`LabwarePlotting` is a leaf package with no dependencies on other CHESS packages. It has no knowledge
+of `CHESSCore.Labware`, `PlateMaps.PlateMap`, or any other domain type. Each package with its own
+grid-shaped type (`CHESSCore`, `PlateMaps`, `Pourfecto`, and `CHESSProcessing`) adds a `plot` method
+or plotting function for that type, built on these primitives, in a package extension or a source
+file. Every package can depend on `LabwarePlotting` without a circular dependency. A new package with
+a grid-shaped type follows the same convention.
 
 ## Two layers
 
-1. **Grid skeleton** ([`plot_grid`](@ref)/[`plot_grid!`](@ref)) -- axis limits, optional per-cell flat
-   color fill, gridlines, and the standard lettered-row/numbered-column styling. This is the one
-   skeleton every plate plot in the CHESS ecosystem shares.
-2. **Markers and overlays** ([`place_shape!`](@ref), [`plot_heatmap!`](@ref)) -- for cases that don't
-   fill a whole grid: highlighting specific wells, drawing deck-slot outlines, or overlaying a
-   continuous-value heatmap on top of the skeleton.
+1. **Grid skeleton.** [`plot_grid`](@ref) and [`plot_grid!`](@ref) draw the axis limits, an optional
+   flat color for each cell, the gridlines, and the standard styling with lettered rows and numbered
+   columns. Every plate plot in CHESS shares this skeleton.
+2. **Markers and overlays.** [`place_shape!`](@ref) and [`plot_heatmap!`](@ref) handle cases that do
+   not fill a whole grid: highlighting specific wells, drawing deck-slot outlines, and overlaying a
+   heatmap of continuous values on the skeleton.
 
-[`letter_code`](@ref)/[`wellnames`](@ref) (bijective base-26 row naming) and [`role_palette`](@ref)
-(a consistent role-to-color mapping) are the supporting naming/coloring primitives used by both
-layers.
+[`letter_code`](@ref) and [`wellnames`](@ref) name rows in bijective base 26, and
+[`role_palette`](@ref) maps roles to consistent colors. Both layers use them.
 
-See the [Quick Start Guide](@ref) for a full walkthrough.
+The [Quick Start](@ref) shows each of these.
+
+## Installation
+
+LabwarePlotting is a package of the [CHESS](https://github.com/jensenlab/CHESS) repository and is installed with it. Follow the [CHESS installation instructions](https://jensenlab.github.io/CHESS/dev/#Installation), then, in the clone, start Julia with the LabwarePlotting environment:
+
+```bash
+julia --project=LabwarePlotting
+```
+
+and load the package:
+
+```julia
+using LabwarePlotting
+```

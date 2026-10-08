@@ -46,7 +46,7 @@ where `<config_type> = string(get_config_type(configs(pourcast)[c]))` and
 - `packing_method::Function = packing_greedy`: Packing/slotting routine called as
   `packing_method(slotting_pairs, config)`. It must return a collection of
   slotting dictionaries (one per generated protocol).
-- `kwargs...`: Forwarded keyword arguments passed to `write_instrument_files(...)`.
+- `kwargs...`: Forwarded keyword arguments passed to `write_instrument_files(...)` and `plot_slotting(...)`.
 
 
 # Side Effects

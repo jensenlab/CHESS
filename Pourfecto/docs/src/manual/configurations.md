@@ -1,6 +1,5 @@
 # [Configurations](@id pourfecto_configurations)
 
-
 ```@meta
 CurrentModule = Pourfecto
 ```
@@ -16,29 +15,22 @@ Pourfecto uses **configurations** to describe the liquid-handling instruments av
 
 Configurations are supplied to Pourfecto when solving for a [`Pourcast`](@ref). They tell the algorithm what operations are physically possible.
 
-A `Configuration` is a different concept from CHESSCore's capability-bearing `Instrument` location
-(see [Reads & Instrument Measurements](https://jensenlab.github.io/CHESS/dev/manual/reads/)):
-`Instrument` capability gates *recording* an operation against a physical device in the ledger,
-while a `Configuration` describes a device for *scheduling* purposes only. There's no automatic
-bridge between the two today -- compiling a `Pourcast` writes protocol files rather than calling
-`upload(...; instrument=...)`.
+A `Configuration` is not the same as a capability-bearing instrument location in CHESSCore (see [Reads & Instrument Measurements](https://jensenlab.github.io/CHESS/dev/manual/reads/)). In CHESSCore, an instrument's capabilities control which operations can be recorded against a physical device in the ledger. A `Configuration` describes a device for scheduling only. The two are not linked: compiling a `Pourcast` writes protocol files and does not call `upload(...; instrument=...)`.
 
 !!! note
-    Most users only need [Using pre-defined Configurations](@ref) below. The rest of this page
-    (building custom `Piston`/`Head`/`Configuration` machinery) is for adding support for a new
-    physical liquid handler -- see [Defining a New Instrument](@ref pourfecto_new_instrument).
+    Most users need only [Using pre-defined Configurations](@ref) below. The rest of this page
+    describes building `Piston`, `Head`, and `Configuration` objects, which adds support for a new
+    physical liquid handler. See [Defining a New Instrument](@ref pourfecto_new_instrument).
 
----
 ## Using pre-defined Configurations 
 
-Pourfecto provides a set of pre-defined instrument configurations with the [`configurations`](@ref) dictionary. These are default configurations commonly used within the Jensen Lab's liquid handling platform. 
+The [`configurations`](@ref) dictionary holds pre-defined instrument configurations. They are the defaults commonly used on the Jensen Lab's liquid handling platform.
 
 ```julia 
 configurations 
 ``` 
 !!! warning 
-    Pre-defined configurations may need to be modified on a case-by-case basis to use in other labs or workflows. For example, the ARI Cobra default configuration contains Jensen Lab-specific file paths in its settings. 
-
+    Pre-defined configurations may need changes for other labs or workflows. For example, the ARI Cobra configuration contains Jensen Lab file paths in its settings.
 
 ## Creating New Configurations 
 
@@ -59,9 +51,6 @@ where:
 - `deck` is a collection of [`DeckPosition`](@ref)s,
 - `settings` is an [`InstrumentSettings`](@ref) dictionary.
 
-
-
-
 ## Instruments
 
 An [`InstrumentModel`](@ref) is an abstract type used to identify a class of liquid handler.
@@ -72,7 +61,7 @@ To define a new instrument type, create a subtype of `InstrumentModel`:
 abstract type MyNewInstrument <: InstrumentModel end
 ```
 
-Instrument types are used as parameters for [`Head`](@ref) and [`Configuration`](@ref):
+Instrument types are the type parameters of [`Head`](@ref) and [`Configuration`](@ref).
 
 ## Heads
 
@@ -82,18 +71,11 @@ A [`Head`](@ref) describes the liquid-handling apparatus of an instrument. A hea
 - an array of channels,
 - a mask defining which pistons are connected to which channels.
 
-
 The head defines a Configuration's ability to move liquid and how it interacts with labware. 
-
-
-
----
 
 ### Pistons
 
-
 A [`Piston`](@ref) describes how liquid is moved by an instrument head.
-
 
 ```julia
 Piston{A, R}(
@@ -125,10 +107,6 @@ piston = Piston{ContinuousActuator, SingleRepeater}(
 
 This piston can aspirate between `20 µL` and `200 µL`, dispense between `20 µL` and `200 µL`, and uses no additional dead-padding correction.
 
-
-
----
-
 #### Actuator types
 
 An [`Actuator`](@ref) describes the mechanism used by a piston to move liquid.
@@ -138,11 +116,7 @@ Pourfecto currently defines two abstract actuator styles:
 - [`ContinuousActuator`](@ref)
 - [`DiscreteActuator`](@ref)
 
-A continuous actuator represents a mechanism that can move liquid as a continuous flow. A discrete actuator represents a mechanism that dispenses in discrete shots. The mechanism type is passed to the scheduling algorithm a constraint. 
-
-
-
----
+A continuous actuator represents a mechanism that can move liquid as a continuous flow. A discrete actuator represents a mechanism that dispenses in discrete shots. The mechanism type is passed to the scheduling algorithm as a constraint.
 
 #### Repeater styles
 
@@ -155,19 +129,9 @@ Pourfecto defines two repeater styles:
 
 A `SingleRepeater` must dispense its aspirated volume in a single shot. A `MultiRepeater` can dispense a single aspiration across multiple shots. The Repeater style is useful for creating objectives that minimize the number of individual aspirations and dispenses in a liquid handling plan. For example, a `MultiRepeater` can execute multiple dispenses per aspiration, and may thus be faster than a `SingleRepeater`. 
 
-
-
-
----
-
-
-
-
 ### Channels
 
 A [`Channel`](@ref) describes how much liquid an instrument channel can carry.
-
-
 
 ```julia
 channel = Channel(220u"µL")
@@ -181,8 +145,6 @@ Channel(-10u"µL")    # errors
 ```
 
 Channels are independent of pistons. This allows an instrument to have a piston with one volume range and a channel with a separate carrying capacity.
-
----
 
 ### Head Masks 
 
@@ -214,16 +176,12 @@ head = Head{EightChannelPipette}(
 )
 ```
 
-Here, all eight channels are connected to a single piston with the  `1 × 8` head mask
-
---- 
+All eight channels are connected to a single piston, and the head mask is `1 × 8`.
 
 ## Decks
 
- A [`Deck`](@ref) represents the physical platform upon which the [`Head`](@ref) has access. It is assumed that the head can visit every deck position. 
+A [`Deck`](@ref) represents the physical platform that the [`Head`](@ref) can reach. The head is assumed to be able to visit every deck position. A deck is an array of deck positions.
 
-
-A Deck is an array of deck positions.
 ### Deck positions
 
 A [`DeckPosition`](@ref) describes a physical position on the instrument deck.
@@ -233,10 +191,6 @@ Pourfecto defines three deck position types:
 - [`EmptyPosition`](@ref)
 - [`UnconstrainedPosition`](@ref)
 - [`ConstrainedPosition`](@ref)
-
-
-
----
 
 ### Empty positions
 
@@ -258,8 +212,6 @@ can_aspirate(pos)   # false
 can_dispense(pos)   # false
 slots(pos)          # (0, 0)
 ```
-
----
 
 ### Unconstrained positions
 
@@ -290,8 +242,6 @@ By default, `slots(pos)` for an unconstrained position returns:
 ```
 
 which provides a practical cap of 24 labware slots.
-
----
 
 ### Constrained positions
 
@@ -332,8 +282,6 @@ plate_position = ConstrainedPosition(
 )
 ```
 
----
-
 ### Creating Decks from multiple positions 
 
 As mentioned, a [`Deck`](@ref) is an array of deck positions.
@@ -360,12 +308,6 @@ deck = [
 ]
 ```
 
-
-
----
-
-
-
 ## Instrument settings
 
 [`InstrumentSettings`](@ref) is an alias for:
@@ -388,10 +330,6 @@ settings = InstrumentSettings(
 ```
 
 Settings are typically used by instrument-specific compiling functions to pass important parameters to different liquid handler control software. 
-
-
-
----
 
 ## Example: Creating a new configuration 
 
@@ -435,24 +373,17 @@ config = Configuration{ExamplePipette}(
 
 This configuration describes a simple single-channel pipette that can aspirate from one deck position and dispense into another.
 
-`config` above isn't yet schedulable or testable -- it still needs a `Mask` method, registration in the global `configurations` registry, and (if it has a custom protocol file format) a compiler hook. See [Defining a New Instrument](@ref pourfecto_new_instrument) for masks, compiling, registration, and testing -- including how to do all of this from your own external package, without modifying Pourfecto itself.
-
----
-
+`config` cannot yet be scheduled or tested. It still needs a `Mask` method, registration in the `configurations` registry, and, for a custom protocol file format, a compiler hook. [Defining a New Instrument](@ref pourfecto_new_instrument) describes masks, compiling, registration, and testing, including how to do all of this from an external package without modifying Pourfecto.
 
 ## JSON Serialization
 
-Configurations can be converted to JSON, and vice-versa
-
-
-
-During serialization, each configuration is converted with:
+Configurations can be converted to JSON and back. `config_to_json` serializes a configuration:
 
 ```julia
 j_config  = config_to_json(config)
 ```
 
-During deserialization, configurations are reconstructed with:
+`json_to_config` reconstructs it:
 
 ```julia
 json_to_config(j_config)
@@ -462,8 +393,6 @@ json_to_config(j_config)
 config_to_json
 json_to_config
 ```
-
----
 
 ## Best practices and reminders 
 
@@ -477,4 +406,3 @@ When defining configurations:
 - Use `can_aspirate` and `can_dispense` behavior to separate source and target positions.
 - Store extra parameters in `InstrumentSettings`.
 
----

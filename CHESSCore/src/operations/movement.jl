@@ -71,7 +71,7 @@ end
     add_to!(parent::Labware,child::Location)
     add_to!(parent::Well,child::Location)
 
-`Labware` slots are fixed at creation (populated by [`generate_location`](@ref)) and `Well`s never
+`Labware` slots are fixed at creation (populated by [`build_location`](@ref)) and `Well`s never
 have children — both throw [`FixedMembershipError`](@ref) rather than allowing `move_into!` to
 mutate their (structurally fixed) membership.
 """

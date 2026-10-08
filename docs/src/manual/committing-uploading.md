@@ -1,36 +1,44 @@
 # Committing & Uploading
 
-[`build_location`](@ref) (`CHESSCore`) builds a `Location` entirely in memory -- no database calls
-are made, and it has no `location_id`. `CHESSDatabase` adds the other half: functions that turn an
-in-memory location real, and functions that persist an operation performed on one.
+```@meta
+DocTestSetup = :(using CHESS)
+```
 
-## The uncommitted/committed boundary
+[`build_location`](@ref) from `CHESSCore` builds a `Location` in memory. It makes no database calls
+and the location has no `location_id`. `CHESSDatabase` provides functions that commit a location to
+the database and functions that persist operations performed on it.
 
-[`generate_location`](@ref) (`kind, name=..., child_namer=...`) is `build_location`'s
-database-connected counterpart -- it connects location-creation directly to the database, so every
-location it builds already has a real, database-assigned ID, and the tree it returns is already
-committed, in one step:
+## Committed and uncommitted locations
 
-```julia-repl
-julia> room = generate_location(Room, "Room A")
-Room A
+[`generate_location`](@ref) takes `kind, name=..., child_namer=...`. It is the database counterpart
+of `build_location`: every location it builds gets an ID from the database, and the tree it returns
+is committed in one step. The examples on this page use a new, empty database:
+
+```jldoctest committing
+julia> path = joinpath(mktempdir(), "lab.db");
+
+julia> create_db(path);
+
+julia> connect_SQLite(path)
+
+julia> room = generate_location(loc"Room", "Room A");
 
 julia> CHESSCore.location_id(room)
 1
 ```
 
-[`commit_location!(loc)`](@ref) does the same for a location that was already built with
-`build_location`. It returns a **new** committed `Location` -- `loc` itself is left unchanged,
-because `location_id`/`name`/`kind` are immutable fields on every concrete `Location` subtype:
+[`commit_location!(loc)`](@ref) commits a location that was already built with `build_location`.
+It returns a new committed `Location` and leaves `loc` unchanged, because `location_id`, `name`,
+and `kind` are immutable fields of every `Location` subtype:
 
-```julia-repl
-julia> eph_root = build_location(loc"Room", "merge test room")
+```jldoctest committing
+julia> eph_root = build_location(loc"Room", "merge test room");
 
-julia> eph_plate = build_location(loc"WP96", "merge test plate")
+julia> eph_plate = build_location(loc"WP96", "merge test plate");
 
 julia> move_into!(eph_root, eph_plate)
 
-julia> committed = commit_location!(eph_root)
+julia> committed = commit_location!(eph_root);
 
 julia> CHESSCore.is_committed(committed)
 true
@@ -39,45 +47,100 @@ julia> CHESSCore.is_committed(eph_root)
 false
 ```
 
-[`release_location(loc)`](@ref) is the inverse: builds an uncommitted copy, stripping every
-`location_id` in the subtree, without touching the database. It exists for merging subtrees
-reconstructed from different databases -- `release_location` each piece to strip its source IDs,
-recombine in memory with `build_location`/`move_into!`, then `commit_location!` the merged result
-against the target database.
+[`release_location(loc)`](@ref) is the inverse. It builds an uncommitted copy of the tree with every
+`location_id` removed, without touching the database. It is used to merge subtrees reconstructed
+from different databases: release each piece to remove its source IDs, combine the pieces in memory
+with `build_location` and `move_into!`, and commit the merged result to the target database.
 
-## `upload`: the write path
+## Uploading an operation
 
-[`upload`](@ref) (`fun, args...; instrument=nothing`) is the entry point for persisting an operation.
-It runs `fun` (the in-memory `CHESSCore` change) and then the matching database write as one step:
-if either fails, neither happens:
+[`upload`](@ref) takes `fun, args...; instrument=nothing` and persists an operation. It runs `fun`,
+the in-memory `CHESSCore` change, and then the matching database write as one step. If either
+fails, neither takes effect. It returns the ledger ID of the new entry:
 
-```julia-repl
-julia> upload(set_attribute!, room, Temperature(21u"°C"))
-2
+```jldoctest committing
+julia> upload(set_attribute!, room, attr"Temperature"(21u"°C"))
+3
 ```
 
-`upload` first checks that every argument is already committed (`CHESSCore.assert_all_committed`) --
-uploading a change to an uncommitted location fails before anything is written, including before a
-`Ledger` row is allocated, so no stray, incomplete entry is left behind by that failure.
+`upload` first checks that every argument is committed with `CHESSCore.assert_all_committed`.
+Uploading a change to an uncommitted location fails before anything is written, including the
+`Ledger` row, so a failure leaves no incomplete entry.
 
-`upload_operation` (`fun`) is the lookup `upload` uses to find the right database-writing function
-for each operation: `move_into! -> upload_movement`, `transfer! -> upload_transfer`, `set_attribute! ->
-upload_environment_attribute`, `record_read! -> upload_read`, plus `lock!`/`unlock!`/
-`toggle_lock!`/`activate!`/`deactivate!`/`toggle_activity!` -> `upload_lock`/`upload_activity`, and
-`assign_barcode! -> update_barcode`.
+[`upload_operation`](@ref CHESSDatabase.upload_operation) takes `fun` and returns the function that
+writes that operation to the database:
 
-## `update`: amending history
+| Operation | Database function |
+|---|---|
+| `move_into!` | `upload_movement` |
+| `transfer!` | `upload_transfer` |
+| `set_attribute!` | `upload_environment_attribute` |
+| `record_read!` | `upload_read` |
+| `lock!`, `unlock!`, `toggle_lock!` | `upload_lock` |
+| `activate!`, `deactivate!`, `toggle_activity!` | `upload_activity` |
+| `assign_barcode!` | `update_barcode` |
+| `observe!` | `upload_observation` |
 
-`update` (`fun, args...; ledger_id=...`) is the counterpart used with
-[`replace_ledger`](@ref)/[`insert_ledger`](@ref) (from [The Ledger](ledger.md)) instead of the
-default `append_ledger()` -- it amends an existing point in history rather than appending a new one.
-After running `fun` and its persistence call, `update` also triggers `process_update`, which
-validates the edit and repairs any caches it invalidates -- covered in full in
-[Caching & Repair](caching-repair.md).
+## Amending history
 
-```julia
-update(transfer!, cr_a, cr_b, 1u"g"; ledger_id=replace_ledger(54))
+[`update`](@ref) takes `fun, args...; replace=s` or `insert=s`. It amends a point in the history
+instead of appending a new entry. With `replace=s`, it records a new revision of the entry at
+sequence ID `s`. With `insert=s`, it adds an entry there and moves later entries back (see
+[The Ledger](ledger.md)). After running `fun` and writing it to the database, `update` validates the
+edit and repairs the caches that the edit invalidates (see [Caching & Repair](caching-repair.md)).
+All of this happens in one SQL transaction, so a failed `update` leaves the database unchanged.
+
+For example, recording a 50 µL transfer and then correcting it to 20 µL:
+
+```jldoctest committing
+julia> plate = build_location(loc"WP96", "Plate 1");
+
+julia> deposit!(plate["A1"], 200u"µL" * rgt"water")
+
+julia> plate = commit_location!(plate);
+
+julia> ledger_id = upload(transfer!, plate["A1"], plate["A2"], 50u"µL");
+
+julia> update(transfer!, plate["A1"], plate["A2"], 20u"µL"; replace=get_sequence_id(ledger_id));
+caches updated: 0
+
+julia> stock(reconstruct_location(CHESSCore.location_id(plate["A2"])))
+20.0 μL Solution (1 reagent(s))
+ Liquids  Name   Amount   Concentration
+────────────────────────────────────────
+ water    water  20.0 μL          100 %
 ```
 
-[Reconstruction](reconstruction.md) covers the other direction: building a `Location` back out of
-everything committed and uploaded so far.
+Like `upload`, `update` runs `fun` on the objects passed to it, so after the amendment those
+in-memory objects hold both transfers, 70 µL in A2. The database holds the corrected history.
+Reconstructing from it, as above, gives the amended state.
+
+## Barcodes
+
+A [`Barcode`](@ref) is a physical barcode string with an optional name and the ID of the location
+that it is attached to, which is `missing` until it is assigned. [`assign_barcode!`](@ref) attaches a
+barcode to a location in memory and raises an error if it is already attached to a different
+location. `upload` records the assignment in the database. [`get_barcode`](@ref) looks up a recorded
+barcode and raises an error if there is none. [`upload_barcode`](@ref) records a barcode, and a barcode that is
+already recorded is left unchanged. A barcode must be recorded before it is assigned, because the
+assignment of an unrecorded barcode writes nothing. [`barcode`](@ref) returns the string of a
+`Barcode`:
+
+```jldoctest committing
+julia> bc = Barcode("PLATE-0001", "Growth plate");
+
+julia> upload_barcode(bc);
+
+julia> upload(assign_barcode!, bc, plate);
+
+julia> found = get_barcode("PLATE-0001");
+
+julia> barcode(found)
+"PLATE-0001"
+
+julia> found.location_id == CHESSCore.location_id(plate)
+true
+```
+
+[Observations](observations.md) describes recording what the state of a location is.
+[Reconstruction](reconstruction.md) describes building a `Location` back from the committed history.

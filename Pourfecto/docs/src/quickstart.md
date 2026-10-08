@@ -1,96 +1,125 @@
-# [Quickstart](@id pourfecto_quickstart)
+# [Quick Start](@id pourfecto_quickstart)
 
-The workflow for using Pourfecto is: 
+Using Pourfecto takes five steps:
 
-1. Define source labware containing reagent stocks.
+1. Define source labware that holds reagent stocks.
 2. Define target labware.
-3. Select available instrument configurations.
-4. Run the Pourfecto planning and scheduling algorithm to create a solved [`Pourcast`](@ref)
-5. Compile and Inspect the resulting `Pourcast`.
+3. Select the available instrument configurations.
+4. Run the planning and scheduling algorithm to create a solved [`Pourcast`](@ref).
+5. Compile and inspect the `Pourcast`.
 
-The code below shows the shape of each step, but the file paths in it are placeholders -- it isn't
-meant to be copied and run as-is. For a complete, runnable example that builds its own source and
-target data inline, see [Checkerboard Assay](@ref) in the Examples section.
+The example on this page is complete and runs as written. It mixes water and ethanol into three wells
+of a plate. It uses the free SCIP solver. The default solver, Gurobi, needs a license, and
+[Choosing a solver](@ref pourfecto_choosing_a_solver) describes the options. The
+[Checkerboard Assay](@ref) example in the Examples section is a larger, runnable workflow.
 
-## Defining Source and Labware
+## Define the source and target labware
 
-The easiest way to define the source and target labware inputs is to use Pourfecto's DataFrame interface. 
+Pourfecto reads source and target labware from tables. Each row describes one well: the labware kind,
+the name of the labware, the well, the total volume, and the composition. A second table gives the
+units of the values in the first. Here the sources are two 50 mL conical tubes, one of water and one
+of ethanol, and the target is a 96-well plate with three filled wells:
 
 ```julia
-using Pourfecto, CSV, DataFrames
+using Pourfecto, DataFrames, SCIP
 
-# load properly formatted source DataFrames 
-source_value_df = CSV.read("<source_value_file>.csv",DataFrame)
-source_unit_df = CSV.read("<source_unit_file>.csv",DataFrame)
-# generate source labware 
-sources = df_to_labware(source_value_df,source_unit_df)
-# load target DataFrames
-target_value_df = CSV.read("<target_value_file>.csv")
-target_unit_df = CSV.read("<target_unit_file>.csv")
-# generate target labware 
-targets = df_to_labware(target_value_df,target_unit_df)
-```
-!!! note 
-    Pourfecto internally converts the DataFrames into [CHESSCore](https://jensenlab.github.io/CHESS/dev/) `Labware` objects. See the [Labware](@ref pourfecto_labware) manual page for details.
+source_values = DataFrame(
+    labware = ["Conical50", "Conical50"],
+    name = ["water_tube", "ethanol_tube"],
+    well = ["A1", "A1"],
+    volume = [40_000, 40_000],
+    water = [100, 0],
+    ethanol = [0, 100],
+)
 
-## Selecting Available Configurations 
+target_values = DataFrame(
+    labware = fill("WP96", 3),
+    name = fill("target_plate", 3),
+    well = ["A1", "A2", "A3"],
+    volume = [200, 200, 200],
+    water = [80, 50, 20],
+    ethanol = [20, 50, 80],
+)
 
-Pourfecto defines liquid handler instances as [`Configuration`](@ref) objects. Configurations combine an instrument's pipetting [`Head`](@ref) with a [`Deck`](@ref) that can hold the source and target labware. Users can define custom configurations, but Pourfecto provides an assortment of default configurations in the [`configurations`](@ref) dictionary.
+units = DataFrame(volume = ["µL"], water = ["percent"], ethanol = ["percent"])
 
-This example selects two default Configurations: 
-1) an eight channel pipette (oriented in the vertical direction)
-2) a Hamilton Nimbus (configured with slots for 50 mL conical tubes and a single SLAS plate slot, a common configuration in the Jensen Lab)
-
-```julia 
- 
-available_configs = [configurations["eight_channel_vertical"],configurations["nimbus"]] 
+sources = df_to_labware(source_values, units)
+targets = df_to_labware(target_values, units)
 ```
 
-## Running the Pourfecto algorithm 
+[`df_to_labware`](@ref) converts the tables to CHESSCore `Labware` objects. Pourfecto shows a warning
+for each reagent that is not registered, here water and ethanol, and continues with a reagent that
+has only a name. The [Labware](@ref pourfecto_labware) and [Stocks](@ref pourfecto_stocks) pages
+describe the table formats.
 
-Pourfecto's main function, [`pourfecto`](@ref), is a flexible method for running the Pourfecto algorithm and compiling Pourcasts. Given an output directory, `pourfecto` creates an optimal liquid handling plan and schedule, saves it as a `Pourcast`, and compiles the Pourcast into executable instrument files. When run in this mode, the pourfecto method automatically checks the solution quality before compiling, and throws errors if the solution falls outside a pre-specified tolerance. 
+## Select the configurations
 
-```julia 
-pourcast = pourfecto("<output_directory>", sources, targets, available_configs) 
+A [`Configuration`](@ref) describes a liquid handler: its pipetting [`Head`](@ref) and a
+[`Deck`](@ref) that can hold the source and target labware. The [`configurations`](@ref) dictionary
+holds the pre-defined configurations. This example offers two of them:
+
+1. an eight-channel pipette, oriented vertically, and
+2. a Hamilton Nimbus, configured with slots for 50 mL conical tubes and one SLAS plate slot, a
+   common configuration in the Jensen Lab.
+
+```julia
+configs = [configurations["eight_channel_vertical"], configurations["nimbus"]]
 ```
 
-Pourcasts can also be generated without providing an output directory. In this case, the pourcast must be manually compiled.
+## Run the algorithm
 
-```julia 
-pourcast = pourfecto(sources,targets,available_configs) 
-compile("<output_directory>",pourcast) 
+[`pourfecto`](@ref) plans and schedules, saves the result as a `Pourcast`, and compiles the
+`Pourcast` into instrument files in the output directory. It checks the quality of the solution
+before compiling and raises an error if the solution is outside the tolerance.
+
+```julia
+pc = pourfecto("quickstart_output", sources, targets, configs; optimizer = SCIP.Optimizer)
 ```
-!!! warning 
-    Pourfecto does not guarantee solutions that perfectly generate targets or make efficient use of resources. It is highly recommended that users check solutions before compiling Pourcasts and executing them in the lab. 
 
+Without a directory, `pourfecto` returns a `Pourcast` and compiles nothing. [`compile`](@ref) then
+writes the files:
 
-## Inspecting Solutions 
+```julia
+pc = pourfecto(sources, targets, configs; optimizer = SCIP.Optimizer)
+compile("quickstart_output", pc)
+```
 
-`pourfecto` creates the following file structure when provided with an `<output_directory>` 
+!!! warning
+    Pourfecto does not guarantee a solution that generates the targets exactly or uses resources
+    efficiently. Check a solution before compiling it and running it in the lab.
+
+## Inspect the solution
+
+With an output directory, `pourfecto` creates this file structure:
 
 ```
 <output_directory>/
 ├── pourcast.json
 ├── target_plate_images/
 │   ├── <plate name 1>.png
-│   └── ... 
+│   └── ...
 ├── <Configuration 1>/
-│   ├── <protocol 1>/  
-│   │   ├── loading_instructions.png 
+│   ├── <protocol 1>/
+│   │   ├── loading_instructions.png
 │   │   ├── loading_table.csv
-│   │   └── instrument files ... 
-│   ├── <protocol2>/  ... 
-│   └── ... 
+│   │   └── instrument files ...
+│   ├── <protocol 2>/ ...
+│   └── ...
 ├── <Configuration 2>/
-│   ├── <protocol 1>/  
-│   │   ├── loading_instructions.png 
+│   ├── <protocol 1>/
+│   │   ├── loading_instructions.png
 │   │   ├── loading_table.csv
-│   │   └── instrument files ... 
+│   │   └── instrument files ...
 │   └── ...
 └── ...
-``` 
+```
 
-- `pourcast.json`: The Pourcast is automatically saved in a .json format
-- `target_plate_images/`: A heatmap of each target plate is generated showing the planned final volume of each well, which is helpful for verifying solutions visually. 
-- `<Configuration>/`: Instrument files are written into Configuration-specific folders, where each subfolder within is an executable protocol with a randomly generated name. Protocol subfolders each contain instrument loading instructions in table and image formats. 
+- `pourcast.json` is the saved `Pourcast`.
+- `target_plate_images/` holds a heatmap of the planned final volume of each well in each target
+  plate, which helps to verify the solution visually.
+- Each `<Configuration>/` folder holds the instrument files for one configuration. Each subfolder is
+  an executable protocol with a randomly generated name, and it contains the instrument loading
+  instructions as a table and as an image. A configuration that the solution does not use has no
+  folder. In this example the solution uses the Nimbus only.
 
+The [Pourcasts](@ref pourfecto_pourcasts) page describes how to inspect the `Pourcast` itself.

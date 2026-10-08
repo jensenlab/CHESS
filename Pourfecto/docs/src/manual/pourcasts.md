@@ -4,20 +4,15 @@
 CurrentModule = Pourfecto
 ```
 
-A [`Pourcast`](@ref) is the main result object returned by Pourfecto. It stores the inputs, results, and metadata from a `pourfecto` run.
-
-Most users create `Pourcast` objects by calling [`pourfecto`](@ref):
-
+A [`Pourcast`](@ref) is the result of a `pourfecto` run. It stores the inputs, results, and metadata of the run. [`pourfecto`](@ref) creates it. In the examples on this page, `sources` and `targets` are vectors of CHESSCore `Stock`s, `source_labware` and `target_labware` are vectors of CHESSCore `Labware`, and `configs` is a vector of [`Configuration`](@ref)s, as in the [Quick Start](@ref pourfecto_quickstart):
 
 ```julia
 pc = pourfecto(source_labware, target_labware, configs)
 ```
 
-The returned `pc` contains everything needed to inspect the planned transfers, scheduled flows, target errors, instrument configurations, and run parameters.
+The returned `pc` holds the planned transfers, scheduled flows, target errors, instrument configurations, and run parameters.
 
----
-
-## Stored Features of Pourcasts
+## Stored features
 
 A [`Pourcast`](@ref) contains:
 
@@ -30,26 +25,21 @@ A [`Pourcast`](@ref) contains:
 - raw model solution variables,
 - final objective value.
 
-
----
-
 ### Planning-only Pourcasts
 
-If you call `pourfecto` with stocks:
+Calling `pourfecto` with stocks:
 
 ```julia
 pc = pourfecto(sources, targets)
 ```
 
-or with labware but no configurations:
+or with labware and no configurations:
 
 ```julia
 pc = pourfecto(source_labware, target_labware)
 ```
 
-Pourfecto runs in **planning mode**.
-
-A planning-only `Pourcast` contains:
+runs in **planning mode**. A planning-only `Pourcast` contains:
 
 - source stocks,
 - target stocks,
@@ -57,17 +47,11 @@ A planning-only `Pourcast` contains:
 - the transfer matrix `V`,
 - slack variables.
 
-It may not contain instrument-level flow variables, because no scheduling configurations were supplied.
-
----
-
+It has no instrument-level flow variables, because no configurations were supplied.
 
 ### Accessing Pourcast fields
 
-Pourfecto provides accessor functions for each field of a `Pourcast`.
-
-
-For example:
+Each field of a `Pourcast` has an accessor function:
 
 ```julia
 source_stocks(pc)
@@ -75,8 +59,6 @@ target_stocks(pc)
 params(pc)
 scheduling_objective_value(pc)
 ```
-
----
 
 ### Source and target stocks
 
@@ -87,9 +69,7 @@ S = source_stocks(pc)
 T = target_stocks(pc)
 ```
 
-The source stocks are the materials Pourfecto was allowed to use. The target stocks are the desired outputs Pourfecto attempted to create.
-
----
+The source stocks are the materials that Pourfecto could use. The target stocks are the outputs that it tried to create.
 
 ### Source and target labware
 
@@ -107,9 +87,7 @@ source_labware(pc) == Labware[]
 target_labware(pc) == Labware[]
 ```
 
-Labware is stored separately from stocks because the same planning machinery can be used with or without physical labware placement.
-
----
+Labware is stored separately from stocks because planning works with or without labware.
 
 ### Configurations
 
@@ -121,8 +99,6 @@ configs(pc)
 
 Planning-only `Pourcast`s do not use configurations and usually store an empty configuration vector.
 
----
-
 ### Parameters
 
 Use [`params`](@ref) to inspect the `ParameterDict` associated with a run.
@@ -131,9 +107,7 @@ Use [`params`](@ref) to inspect the `ParameterDict` associated with a run.
 p = params(pc)
 ```
 
-This dictionary stores user-provided keyword arguments, defaults, metadata, and run information.
-
-Common entries include:
+The dictionary holds the keyword arguments, defaults, metadata, and run information. Common entries include:
 
 ```julia
 params(pc)[:objective]
@@ -147,15 +121,7 @@ params(pc)[:solution_tolerance]
 params(pc)[:solver_elapsed]
 ```
 
-For example:
-
-```julia
-params(pc)[:solver_elapsed]
-```
-
-returns the elapsed solve time recorded by Pourfecto.
-
----
+`params(pc)[:solver_elapsed]` is the elapsed solve time.
 
 ### Raw model solution
 
@@ -181,8 +147,6 @@ Important entries include:
 
 Most users should use the convenience accessors [`transfers`](@ref), [`flows`](@ref), and [`slacks`](@ref) instead of reading `model_solution(pc)` directly.
 
----
-
 ### Objective value
 
 Use [`scheduling_objective_value`](@ref) to inspect the final objective value.
@@ -191,11 +155,9 @@ Use [`scheduling_objective_value`](@ref) to inspect the final objective value.
 scheduling_objective_value(pc)
 ```
 
-The interpretation of this value depends on the objective used during the run. For example, if the scheduling objective is `"min_cost_flow"`, the value corresponds to that objective’s final optimized cost.
+The meaning of this value depends on the objective of the run. For `"min_cost_flow"`, it is the final optimized cost.
 
----
-
-## Computed Features 
+## Computed features
 
 ### Transfer variables
 
@@ -219,14 +181,11 @@ V[1, 2]
 
 is the planned volume transferred from source stock `1` to target stock `2`.
 
-Rows correspond to `source_stocks(pc)`, and columns correspond to `target_stocks(pc)`:
-
----
+Rows correspond to `source_stocks(pc)` and columns to `target_stocks(pc)`.
 
 ### Flow variables
 
 Scheduled flow variables are accessed with [`flows`](@ref):
-
 
 ```julia
 Q = flows(pc)
@@ -238,23 +197,11 @@ Q = flows(pc)
 Q[asp_node_index, disp_node_index]
 ```
 
-Flow variables are only available for scheduled `Pourcast`s created with configurations.
+Flow variables exist only for `Pourcast`s created with configurations. A planning-only `Pourcast` has no `:Q` variable.
 
-For example:
+### Slack variables
 
-```julia
-pc = pourfecto(source_labware, target_labware, configs)
-
-Q = flows(pc)
-```
-
-If a `Pourcast` was created in planning-only mode, it may not contain a `:Q` variable.
-
----
-
-## Slack variables
-
-Slack variables are accessed with [`slacks`](@ref):
+[`slacks`](@ref) returns the slack variables:
 
 ```@docs
 slacks
@@ -264,17 +211,13 @@ slacks
 E = slacks(pc)
 ```
 
-Slack variables describe the difference between requested target compositions and the compositions produced by the solved plan.
-
-Conceptually, the planning model enforces:
+Slack variables are the differences between the requested target compositions and the compositions that the solved plan produces. The planning model enforces:
 
 ```julia
 planned_target - slack == requested_target
 ```
 
-Small slack values indicate that the planned stock closely matches the requested target. Large slack values indicate that Pourfecto could not exactly produce one or more target components under the supplied constraints.
-
-Slack variables are useful for diagnosing:
+A small slack means that the planned stock closely matches the target. A large slack means that Pourfecto could not produce a target component exactly under the constraints. Slack variables help diagnose:
 
 - insufficient source material,
 - missing reagents,
@@ -282,19 +225,11 @@ Slack variables are useful for diagnosing:
 - priority tradeoffs,
 - target compositions that cannot be made exactly.
 
----
+## Quality control and reporting
 
-## Quality Control and Reporting
+`pourfecto(directory, source_labware, target_labware, configs; kwargs...)` checks solution quality before compiling. It compares [`slacks`](@ref) with `params(pc)[:solution_tolerance]`, which is `1e-2` by default. A slack whose magnitude exceeds the tolerance fails the check. [Adjust solution-quality tolerance](@ref pourfecto_method) describes how to change the tolerance.
 
-`pourfecto(directory, source_labware, target_labware, configs; kwargs...)` automatically checks
-solution quality before compiling. It compares [`slacks`](@ref) against
-`params(pc)[:solution_tolerance]` (default `1e-2`) -- any slack whose magnitude exceeds the tolerance
-fails the check. See [Adjust solution-quality tolerance](@ref pourfecto_method) for how to change the
-tolerance.
-
-If any slack fails, `pourfecto` writes `solution_quality_report.csv` and `pourcast.json` to
-`directory`, then raises an error instead of compiling -- no protocol files are written. There is
-currently no way to downgrade this to a warning or skip the check.
+If any slack fails, `pourfecto` writes `solution_quality_report.csv` and `pourcast.json` to `directory` and raises an error. No protocol files are written. The check cannot be turned into a warning or skipped.
 
 ### Reading the quality report
 
@@ -316,17 +251,12 @@ report = CSV.read(joinpath(directory, "solution_quality_report.csv"), DataFrame)
 
 ### Checking quality manually
 
-The same check can be run on an already-solved `Pourcast` before attempting to compile it.
-`solution_quality` and `solution_quality_report` are not exported, so call them with the qualified
-name:
+The same check can be run on a solved `Pourcast` before compiling. `solution_quality` and `solution_quality_report` are not exported, so they are called with the module name:
 
 ```julia
 flags = Pourfecto.solution_quality(pc)         # BitMatrix, true where a slack fails tolerance
 report = Pourfecto.solution_quality_report(pc) # DataFrame of just the failures
 ```
-
----
-
 
 ### Comparing planned and target stocks
 
@@ -336,31 +266,19 @@ Use [`planned_stocks`](@ref) to reconstruct the stocks implied by the planned tr
 planned = planned_stocks(pc)
 ```
 
-Then compare these to the requested targets:
-
-```julia
-target_stocks(pc)
-planned_stocks(pc)
-```
-
-This is often the easiest way to check whether the plan produced the intended outputs.
-
----
+Comparing `planned_stocks(pc)` with `target_stocks(pc)` is the simplest check that the plan produced the intended outputs.
 
 ## Visualizing scheduled flows
 
-For scheduled `Pourcast`s, use:
+`plot_flows` plots the flows of a scheduled `Pourcast`:
 
 ```julia
 plot_flows(pc)
 ```
 
-
----
-
 ## Serializing Pourcasts
 
-Pourcasts can be saved to JSON and loaded later.
+A `Pourcast` can be saved to JSON and loaded later.
 
 ```julia
 json = pourcast_to_json(pc)
@@ -377,16 +295,11 @@ json = read("pourcast.json", String)
 pc2 = json_to_pourcast(json)
 ```
 
-This is useful for archiving results, debugging failed runs, or passing Pourcasts to downstream compilation tools.
-
-To turn a solved `Pourcast` into protocol files ready to run on an instrument, see
-[Compiling Protocols](@ref pourfecto_compiling).
-
----
+This archives results, helps debug failed runs, and passes a `Pourcast` to downstream compilation tools. [Compiling Protocols](@ref pourfecto_compiling) describes turning a solved `Pourcast` into protocol files for an instrument.
 
 ## Common inspection workflow
 
-After running Pourfecto, a typical inspection workflow is:
+A typical inspection workflow after a run:
 
 ```julia
 pc = pourfecto(source_labware, target_labware, configs)
@@ -411,33 +324,15 @@ planned_stocks(pc)
 plot_flows(pc)
 ```
 
----
-
 ## Troubleshooting
 
 ### `flows(pc)` is unavailable
 
-If `flows(pc)` fails or the `:Q` variable is missing, the `Pourcast` was likely created in planning-only mode.
-
-Use scheduling mode:
-
-```julia
-pc = pourfecto(source_labware, target_labware, configs)
-```
-
-instead of:
-
-```julia
-pc = pourfecto(sources, targets)
-```
-
----
+If `flows(pc)` fails or the `:Q` variable is missing, the `Pourcast` was probably created in planning-only mode. Call `pourfecto(source_labware, target_labware, configs)`, which schedules, and not `pourfecto(sources, targets)`, which only plans.
 
 ### Large slack values
 
-Large slack values indicate that the requested targets could not be matched exactly.
-
-Possible causes include:
+Large slack values mean that the requested targets could not be matched exactly. Possible causes:
 
 - missing reagents in the source stocks,
 - insufficient source volume,
@@ -453,23 +348,18 @@ params(pc)[:priority]
 transfers(pc)
 ```
 
-See [Quality Control and Reporting](@ref) for the automated check `pourfecto` runs against these slack
-values, and the report it produces when they fail tolerance.
-
----
+[Quality control and reporting](@ref) describes the automatic check of these slack values and the report written when they fail.
 
 ### Unexpectedly small transfer values
 
-Transfer and flow values are rounded according to `params(pc)[:min_vol_threshold]`.
-
-Check:
+Transfer and flow values are rounded according to `params(pc)[:min_vol_threshold]`. Check:
 
 ```julia
 params(pc)[:min_vol_threshold]
 vol_sigdigs(pc)
 ```
 
-If needed, rerun Pourfecto with a smaller threshold:
+To keep smaller transfers, rerun with a smaller threshold:
 
 ```julia
 pc = pourfecto(
@@ -478,5 +368,3 @@ pc = pourfecto(
     min_vol_threshold = 0.01,
 )
 ```
-
----
