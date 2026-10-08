@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Experimental Designs · CHESS.jl</title><meta name="title" content="Experimental Designs · CHESS.jl"/><meta property="og:title" content="Experimental Designs · CHESS.jl"/><meta property="twitter:title" content="Experimental Designs · CHESS.jl"/><meta name="description" content="Documentation for CHESS.jl."/><meta property="og:description" content="Documentation for CHESS.jl."/><meta property="twitter:description" content="Documentation for CHESS.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img class="docs-light-only" src="../../assets/logo.png" alt="CHESS.jl logo"/><img class="docs-dark-only" src="../../assets/logo-dark.png" alt="CHESS.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">CHESS.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../quickstart/">Quick Start</a></li><li><a class="tocitem" href="../../tutorial/">Tutorial</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../core-concepts/">Locations</a></li><li><a class="tocitem" href="../movement/">Movement &amp; Occupancy</a></li><li><a class="tocitem" href="../attributes/">Environmental Attributes &amp; Inheritance</a></li><li><input class="collapse-toggle" id="menuitem-4-4" type="checkbox"/><label class="tocitem" for="menuitem-4-4"><span class="docs-label">Stocks &amp; Chemistry</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../reagents-chemicals/">Reagents &amp; Chemicals</a></li><li><a class="tocitem" href="../stocks/">Stocks</a></li><li><a class="tocitem" href="../organisms-cultures/">Organisms &amp; Cultures</a></li><li><a class="tocitem" href="../recipes/">Recipes &amp; Solution Chemistry</a></li><li><a class="tocitem" href="../acid-base/">Acid/Base Chemistry</a></li><li><a class="tocitem" href="../wells/">Wells: Depositing &amp; Transferring Material</a></li></ul></li><li><a class="tocitem" href="../reads/">Reads &amp; Instrument Measurements</a></li><li><a class="tocitem" href="../parsing-instrument-files/">Parsing Instrument Files</a></li><li><input class="collapse-toggle" id="menuitem-4-7" type="checkbox" checked/><label class="tocitem" for="menuitem-4-7"><span class="docs-label">Experiments &amp; Data</span><i class="docs-chevron"></i></label><ul class="collapsed"><li class="is-active"><a class="tocitem" href>Experimental Designs</a><ul class="internal"><li><a class="tocitem" href="#Experiments"><span>Experiments</span></a></li><li><a class="tocitem" href="#How-design-columns-are-read"><span>How design columns are read</span></a></li><li><a class="tocitem" href="#Parsing-a-spreadsheet"><span>Parsing a spreadsheet</span></a></li><li><a class="tocitem" href="#Resolving-a-row"><span>Resolving a row</span></a></li><li><a class="tocitem" href="#Controls-and-replicates"><span>Controls and replicates</span></a></li><li><a class="tocitem" href="#Scheduling-onto-plates"><span>Scheduling onto plates</span></a></li><li><a class="tocitem" href="#Saving-designs-and-runs"><span>Saving designs and runs</span></a></li><li><a class="tocitem" href="#QC-methods"><span>QC methods</span></a></li></ul></li><li><a class="tocitem" href="../runmaps/">Run Maps</a></li><li><a class="tocitem" href="../processing/">Processing Experiment Data</a></li></ul></li><li><a class="tocitem" href="../registering-lab-constants/">Registering Lab Constants</a></li><li><input class="collapse-toggle" id="menuitem-4-9" type="checkbox"/><label class="tocitem" for="menuitem-4-9"><span class="docs-label">CHESS Databases</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../db-architecture/">Database Architecture</a></li><li><a class="tocitem" href="../ledger/">The Ledger</a></li><li><a class="tocitem" href="../committing-uploading/">Committing &amp; Uploading</a></li><li><a class="tocitem" href="../observations/">Observations</a></li><li><a class="tocitem" href="../reconstruction/">Reconstruction</a></li><li><a class="tocitem" href="../caching-repair/">Caching &amp; Repair</a></li><li><a class="tocitem" href="../encumbrances/">Encumbrances</a></li><li><a class="tocitem" href="../instrument-interfaces/">Instrument Interfaces</a></li></ul></li><li><a class="tocitem" href="../interop/">Interop</a></li><li><a class="tocitem" href="../troubleshooting/">Troubleshooting</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><input class="collapse-toggle" id="menuitem-5-1" type="checkbox"/><label class="tocitem" for="menuitem-5-1"><span class="docs-label">CHESSCore</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../api/core/">Overview &amp; Errors</a></li><li><a class="tocitem" href="../../api/core-locations/">Locations &amp; Operations</a></li><li><a class="tocitem" href="../../api/core-stocks/">Stocks</a></li><li><a class="tocitem" href="../../api/core-chemistry/">Solution Chemistry</a></li><li><a class="tocitem" href="../../api/core-environment/">Attributes &amp; Reads</a></li><li><a class="tocitem" href="../../api/core-interop/">Interop</a></li></ul></li><li><a class="tocitem" href="../../api/database/">CHESSDatabase</a></li><li><a class="tocitem" href="../../api/labconstants/">CHESSLabConstants</a></li><li><a class="tocitem" href="../../api/parsers/">CHESSParsers</a></li><li><a class="tocitem" href="../../api/experiments/">CHESSExperiments</a></li><li><a class="tocitem" href="../../api/runmaps/">RunMaps</a></li><li><a class="tocitem" href="../../api/processing/">CHESSProcessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li><a class="is-disabled">Experiments &amp; Data</a></li><li class="is-active"><a href>Experimental Designs</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Experimental Designs</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/jensenlab/CHESS" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/jensenlab/CHESS/blob/main/docs/src/manual/experiments.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Experimental-Designs"><a class="docs-heading-anchor" href="#Experimental-Designs">Experimental Designs</a><a id="Experimental-Designs-1"></a><a class="docs-heading-anchor-permalink" href="#Experimental-Designs" title="Permalink"></a></h1><p><code>CHESSExperiments</code> describes what an experiment is meant to test, before anything is prepared: a design matrix of treatments, the factors its columns stand for, and the controls and replicates it needs. It turns that design into <code>CHESSCore</code> stocks and per-plate conditions, and, with <code>RunMaps</code> and <code>PlateMaps</code> loaded, into a plate layout. It is a separate package that is loaded separately from <code>CHESS</code>.</p><h2 id="Experiments"><a class="docs-heading-anchor" href="#Experiments">Experiments</a><a id="Experiments-1"></a><a class="docs-heading-anchor-permalink" href="#Experiments" title="Permalink"></a></h2><p>An <a href="../../api/experiments/#CHESSExperiments.Experiment"><code>Experiment</code></a> has two fields. <code>design</code> is a <code>DataFrame</code> with one row per planned trial and one column per factor; a treatment run three times is the same row three times. <code>metadata</code> holds everything that describes, schedules, or processes the design without being part of it: the name, the plate layout once scheduled, per-plate conditions, and so on.</p><pre><code class="language-julia-repl hljs">julia&gt; using CHESSExperiments
+
+julia&gt; expt = Experiment(DataFrame(glucose = [10, 5]); name = &quot;glucose screen&quot;);
+
+julia&gt; get_parameter(expt, :name)
+&quot;glucose screen&quot;</code></pre><p>Metadata keys can be registered as a <a href="../../api/experiments/#CHESSExperiments.ParameterKind"><code>ParameterKind</code></a> with <a href="../../api/experiments/#CHESSExperiments.register_parameter!-Tuple{Symbol, Type}"><code>register_parameter!</code></a>, giving them a type, a default, and an optional validator that <a href="../../api/experiments/#CHESSExperiments.get_parameter-Tuple{Experiment, Symbol}"><code>get_parameter</code></a> enforces. <a href="../../api/experiments/#CHESSExperiments.parameter_registry"><code>parameter_registry</code></a> holds the registered kinds, keyed by name. Unregistered keys remain ordinary <code>Dict</code> entries. <a href="../../api/experiments/#CHESSExperiments.with_parameter-Tuple{Experiment, Symbol, Any}"><code>with_parameter</code></a> returns a copy of the experiment with one key set, leaving the original unchanged.</p><h2 id="How-design-columns-are-read"><a class="docs-heading-anchor" href="#How-design-columns-are-read">How design columns are read</a><a id="How-design-columns-are-read-1"></a><a class="docs-heading-anchor-permalink" href="#How-design-columns-are-read" title="Permalink"></a></h2><p>Every column in a design must mean something CHESS understands. <a href="../../api/experiments/#CHESSExperiments.factor_destination-Tuple{Symbol}"><code>factor_destination</code></a> checks a column name in this order:</p><ol><li>One of the <a href="../../api/experiments/#CHESSExperiments.RESERVED_DESIGN_COLUMNS"><code>RESERVED_DESIGN_COLUMNS</code></a> (<code>:control_role</code>, <code>:duplicates</code>), used by scheduling.</li><li>A registered reagent: the column holds an amount of that reagent (destination <code>:reagent</code>).</li><li>A registered organism: the column holds a biomass of that organism (destination <code>:organism</code>).</li><li>A registered <a href="../../api/experiments/#CHESSExperiments.Factor"><code>Factor</code></a>, which names its own destination, usually <code>:condition</code>.</li></ol><p>Anything else is an error. Reagent and organism columns need no registration of their own, since CHESS already knows those names. Other factors do. A <a href="../../api/experiments/#CHESSExperiments.CategoricalFactor"><code>CategoricalFactor</code></a> takes values from a set of levels; a <a href="../../api/experiments/#CHESSExperiments.ContinuousFactor"><code>ContinuousFactor</code></a> is numeric. Either can be <em>blocking</em>: two rows that differ in a blocking factor must never share a plate, as with an incubation atmosphere:</p><pre><code class="language-julia-repl hljs">julia&gt; register_factor!(CategoricalFactor(:atmosphere;
+           levels = () -&gt; (:aerobic, :anaerobic), blocking = true, destination = :condition));</code></pre><p><a href="../../api/experiments/#CHESSExperiments.factor_registry"><code>factor_registry</code></a> holds the registered factors, keyed by name, and <a href="../../api/experiments/#CHESSExperiments.get_factor-Tuple{Symbol}"><code>get_factor</code></a> looks one up and raises a <code>KeyError</code> for an unregistered name. <a href="../../api/experiments/#CHESSExperiments.factor_levels-Tuple{CategoricalFactor}"><code>factor_levels</code></a> returns the currently valid levels of a categorical factor, and <a href="../../api/experiments/#CHESSExperiments.is_blocking-Tuple{Factor}"><code>is_blocking</code></a> tests whether a factor is blocking:</p><pre><code class="language-julia-repl hljs">julia&gt; factor = get_factor(:atmosphere);
+
+julia&gt; factor_levels(factor)
+(:aerobic, :anaerobic)
+
+julia&gt; is_blocking(factor)
+true</code></pre><p>Registering a name that is already taken raises a <a href="../../api/experiments/#CHESSExperiments.DuplicateRegistrationError"><code>DuplicateRegistrationError</code></a>.</p><h2 id="Parsing-a-spreadsheet"><a class="docs-heading-anchor" href="#Parsing-a-spreadsheet">Parsing a spreadsheet</a><a id="Parsing-a-spreadsheet-1"></a><a class="docs-heading-anchor-permalink" href="#Parsing-a-spreadsheet" title="Permalink"></a></h2><p><a href="../../api/experiments/#CHESSExperiments.parse_design-Tuple{AbstractString}"><code>parse_design</code></a> reads a design from a CSV file. Spreadsheet headers and values rarely match CHESS&#39;s names, so a <a href="../../api/experiments/#CHESSExperiments.DesignColumnMap"><code>DesignColumnMap</code></a> translates them for this one file: <code>columns</code> maps each header to a factor name, <code>values</code> maps free-text cell values, and <code>units</code> gives one unit per reagent or organism column. Here glucose is a concentration, the <em>S. mutans</em> inoculum is a biomass, and the last two rows are control templates (see <a href="#Controls-and-replicates">Controls and replicates</a>):</p><pre><code class="language-julia-repl hljs">julia&gt; path = joinpath(mktempdir(), &quot;design.csv&quot;);
+
+julia&gt; write(path, &quot;&quot;&quot;
+       Glucose (g/L),S. mutans (OD*mL),Atmosphere,control_role
+       10,0.01,aerobic,
+       5,0.01,aerobic,
+       10,0.01,anaerobic,
+       5,0.01,anaerobic,
+       0,0.01,,positive
+       0,,,negative
+       &quot;&quot;&quot;);
+
+julia&gt; cmap = DesignColumnMap(
+           columns = Dict(&quot;Glucose (g/L)&quot; =&gt; :glucose, &quot;S. mutans (OD*mL)&quot; =&gt; :SMU_UA159,
+                          &quot;Atmosphere&quot; =&gt; :atmosphere),
+           values = Dict(:atmosphere =&gt; Dict(&quot;aerobic&quot; =&gt; :aerobic, &quot;anaerobic&quot; =&gt; :anaerobic)),
+           units = Dict(:glucose =&gt; &quot;g/L&quot;, :SMU_UA159 =&gt; &quot;OD*mL&quot;));
+
+julia&gt; ctx = [CHESSCore, CHESSLabConstants];
+
+julia&gt; expt = parse_design(path; column_map = cmap, reagent_context = ctx, org_context = ctx);
+
+julia&gt; expt.design
+6×4 DataFrame
+ Row │ glucose  SMU_UA159   atmosphere  control_role
+     │ Int64    Float64?    Symbol?     String15?
+─────┼───────────────────────────────────────────────
+   1 │      10        0.01  aerobic     missing
+   2 │       5        0.01  aerobic     missing
+   3 │      10        0.01  anaerobic   missing
+   4 │       5        0.01  anaerobic   missing
+   5 │       0        0.01  missing     positive
+   6 │       0  missing     missing     negative
+
+julia&gt; classify_columns(propertynames(expt.design); reagent_context = ctx, org_context = ctx)
+(reagent = [:glucose], organism = [:SMU_UA159], condition = [:atmosphere])</code></pre><p><code>reagent_context</code> and <code>org_context</code> list the modules whose registered names count, here CHESS&#39;s own constants. <a href="../../api/experiments/#CHESSExperiments.is_registered_reagent-Tuple{Symbol}"><code>is_registered_reagent</code></a> is the test that identifies a reagent column:</p><pre><code class="language-julia-repl hljs">julia&gt; is_registered_reagent(:glucose; reagent_context = ctx), is_registered_reagent(:atmosphere; reagent_context = ctx)
+(true, false)</code></pre><p>The column map is stored in the experiment&#39;s metadata, so the translation stays on record.</p><h2 id="Resolving-a-row"><a class="docs-heading-anchor" href="#Resolving-a-row">Resolving a row</a><a id="Resolving-a-row-1"></a><a class="docs-heading-anchor-permalink" href="#Resolving-a-row" title="Permalink"></a></h2><p><a href="../../api/experiments/#CHESSExperiments.resolve_stock-Tuple{Any, AbstractVector{Symbol}, AbstractVector{Symbol}}"><code>resolve_stock</code></a> turns one row&#39;s reagent and organism columns into a single <code>CHESSCore</code> <a href="../../api/core-stocks/#CHESSCore.Stock"><code>Stock</code></a>. Concentrations need a total volume, and <code>solvent</code> fills whatever volume the other reagents leave. It also returns each organism&#39;s biomass value, for per-well records:</p><pre><code class="language-julia-repl hljs">julia&gt; stock, organisms = resolve_stock(expt.design[1, :], [:glucose], [:SMU_UA159];
+           units = cmap.units, reagent_context = ctx, org_context = ctx,
+           total_volume = 200u&quot;µL&quot;, solvent = :water);
+
+julia&gt; stock
+200 μL Culture (2 reagent(s))
+ Organisms  Name                        Biomass     OD
+──────────────────────────────────────────────────────────────
+ SMU_UA159  Streptococcus mutans UA159  10.0 μL OD  0.0500 OD
+
+ Solids   Name       Amount   Concentration
+────────────────────────────────────────────
+ glucose  D-glucose  2.00 mg   10.0 mg mL⁻¹
+
+ Liquids  Name   Amount  Concentration
+───────────────────────────────────────
+ water    water  200 μL          100 %
+
+julia&gt; organisms
+Dict{Symbol, Any} with 1 entry:
+  :SMU_UA159 =&gt; 0.01</code></pre><p><a href="../../api/experiments/#CHESSExperiments.resolve_conditions-Tuple{Any, AbstractVector{Symbol}}"><code>resolve_conditions</code></a> returns a row&#39;s <code>:condition</code> values as a plain <code>Dict</code>, checking categorical values against their levels. Conditions are only recorded. A plate cannot be set to &quot;anaerobic&quot; the way a well can be filled.</p><pre><code class="language-julia-repl hljs">julia&gt; resolve_conditions(expt.design[1, :], [:atmosphere])
+Dict{Symbol, Any} with 1 entry:
+  :atmosphere =&gt; :aerobic</code></pre><h2 id="Controls-and-replicates"><a class="docs-heading-anchor" href="#Controls-and-replicates">Controls and replicates</a><a id="Controls-and-replicates-1"></a><a class="docs-heading-anchor-permalink" href="#Controls-and-replicates" title="Permalink"></a></h2><p>Controls are not ordinary design rows. A row with a <code>:control_role</code> is a <em>template</em>: a blank cell in a blocking column means &quot;one copy for every block&quot;. <a href="../../api/experiments/#CHESSExperiments.expand_control_templates-Tuple{Experiment}"><code>expand_control_templates</code></a> makes those copies, one per blocking combination that the sample rows actually use, and tags each with the block it belongs to. The positive and negative templates above each become two controls, one per atmosphere:</p><pre><code class="language-julia-repl hljs">julia&gt; expand_control_templates(expt).design
+8×5 DataFrame
+ Row │ glucose  SMU_UA159   atmosphere  control_role  _block_key
+     │ Int64    Float64?    Symbol?     String15?     Tuple…?
+─────┼──────────────────────────────────────────────────────────────
+   1 │      10        0.01  aerobic     missing       missing
+   2 │       5        0.01  aerobic     missing       missing
+   3 │      10        0.01  anaerobic   missing       missing
+   4 │       5        0.01  anaerobic   missing       missing
+   5 │       0        0.01  aerobic     positive      (:aerobic,)
+   6 │       0        0.01  anaerobic   positive      (:anaerobic,)
+   7 │       0  missing     aerobic     negative      (:aerobic,)
+   8 │       0  missing     anaerobic   negative      (:anaerobic,)</code></pre><p><a href="../../api/experiments/#CHESSExperiments.partition_by_blocking-Tuple{Experiment}"><code>partition_by_blocking</code></a> groups the rows of an expanded design by the values of its blocking factors. It returns the names of the blocking columns and a list of groups, each with the shared values of the blocking factors and the indices of its rows. Rows in different groups never share a plate:</p><pre><code class="language-julia-repl hljs">julia&gt; blocking_cols, groups = partition_by_blocking(expand_control_templates(expt));
+
+julia&gt; blocking_cols
+1-element Vector{Symbol}:
+ :atmosphere
+
+julia&gt; [(g.key, length(g.rows)) for g in groups]
+2-element Vector{Tuple{Tuple{Symbol}, Int64}}:
+ ((:aerobic,), 4)
+ ((:anaerobic,), 4)</code></pre><p>A <code>:duplicates</code> column (not used here) gives a row more than one physical well; the extra wells are linked to the original so <code>CHESSProcessing</code> can average them later.</p><h2 id="Scheduling-onto-plates"><a class="docs-heading-anchor" href="#Scheduling-onto-plates">Scheduling onto plates</a><a id="Scheduling-onto-plates-1"></a><a class="docs-heading-anchor-permalink" href="#Scheduling-onto-plates" title="Permalink"></a></h2><p>With <code>RunMaps</code> and <code>PlateMaps</code> also loaded, <a href="../../api/experiments/#CHESSExperiments.schedule_blocked_layout"><code>schedule_blocked_layout</code></a> expands the control templates, splits the rows by blocking factor, and schedules each group onto its own plates. It takes the usable wells of one plate as a <code>BitMatrix</code> and the control roles to place:</p><pre><code class="language-julia-repl hljs">julia&gt; using RunMaps, PlateMaps
+
+julia&gt; scheduled = schedule_blocked_layout(expt, trues(2, 4), (:positive, :negative);
+           reagent_context = ctx, org_context = ctx);
+
+julia&gt; unique(layout(scheduled).labware)
+2-element Vector{Union{Missing, String}}:
+ &quot;g1_p1&quot;
+ &quot;g2_p1&quot;
+
+julia&gt; sort(collect(get_parameter(scheduled, :plate_conditions)); by = first)
+2-element Vector{Pair{Any, Dict{Symbol, Any}}}:
+ &quot;g1_p1&quot; =&gt; Dict(:atmosphere =&gt; :aerobic)
+ &quot;g2_p1&quot; =&gt; Dict(:atmosphere =&gt; :anaerobic)
+</code></pre><p>The aerobic rows went to plate <code>g1_p1</code> and the anaerobic rows to <code>g2_p1</code>. The result records:</p><ul><li><code>:layout</code>, a <code>DataFrame</code> with one row per well giving the design row it holds (<code>run_index</code>) and whether it is a positive or negative control;</li><li><code>:plate_conditions</code>, each plate&#39;s shared blocking values;</li><li><code>:well_conditions</code>, each placed well&#39;s organism and non-blocking condition values, keyed by <code>(labware, well)</code>;</li><li><code>:run_map</code> and <code>:plate_maps</code>, the scheduling structures <code>CHESSProcessing</code> uses later.</li></ul><p>The layout has the columns in <a href="../../api/experiments/#CHESSExperiments.LAYOUT_COLUMNS"><code>LAYOUT_COLUMNS</code></a>. <a href="../../api/experiments/#CHESSExperiments.populate_well_conditions-Tuple{Experiment}"><code>populate_well_conditions</code></a> fills <code>:well_conditions</code> for any scheduled experiment, however it was scheduled, because it reads only the layout and the design:</p><pre><code class="language-julia-repl hljs">julia&gt; LAYOUT_COLUMNS
+10-element Vector{Symbol}:
+ :well
+ :row
+ :col
+ :run
+ :positive
+ :negative
+ :run_index
+ :labware
+ :location_id
+ :metadata
+
+julia&gt; repopulated = populate_well_conditions(scheduled; reagent_context = ctx, org_context = ctx);
+
+julia&gt; length(get_parameter(repopulated, :well_conditions)) == length(get_parameter(scheduled, :well_conditions))
+true</code></pre><p>Placement within a plate is randomized, so the exact wells vary from run to run. Looking a well up by its design row works regardless. Design row 7 is the aerobic negative control, which has no inoculum:</p><pre><code class="language-julia-repl hljs">julia&gt; lay = layout(scheduled);
+
+julia&gt; well7 = only(filter(r -&gt; isequal(r.run_index, 7), eachrow(lay)));
+
+julia&gt; get_parameter(scheduled, :well_conditions)[(well7.labware, well7.well)]
+Dict{Symbol, Any} with 1 entry:
+  :SMU_UA159 =&gt; missing</code></pre><p><a href="../../api/experiments/#CHESSExperiments.schedule_layout"><code>schedule_layout</code></a> is the lower-level form for a <code>RunMap</code> and plates you have already built yourself.</p><h2 id="Saving-designs-and-runs"><a class="docs-heading-anchor" href="#Saving-designs-and-runs">Saving designs and runs</a><a id="Saving-designs-and-runs-1"></a><a class="docs-heading-anchor-permalink" href="#Saving-designs-and-runs" title="Permalink"></a></h2><p><code>CHESSDatabase</code> stores designs and runs in the database of a lab (see <a href="../db-architecture/">Database Architecture</a>). <a href="../../api/database/#CHESSDatabase.upload_experiment"><code>upload_experiment</code></a> creates an experiment record from a name and a user and returns its ID. Protocols and runs belong to an experiment. <a href="../../api/database/#CHESSDatabase.upload_design-Tuple{Experiment, Integer}"><code>upload_design</code></a> stores an <code>Experiment</code> under an experiment record and returns the ID of the design. It stores the design matrix, the metadata, and, if the design is scheduled, one row for each well of the layout. <a href="../../api/database/#CHESSDatabase.get_design-Tuple{Integer}"><code>get_design</code></a> rebuilds the <code>Experiment</code> from the ID, including its layout:</p><pre><code class="language-julia-repl hljs">julia&gt; path = joinpath(mktempdir(), &quot;lab.db&quot;);
+
+julia&gt; create_db(path);
+
+julia&gt; connect_SQLite(path)
+
+julia&gt; exp_id = upload_experiment(&quot;glucose screen&quot;, &quot;docs&quot;)
+1
+
+julia&gt; design_id = upload_design(scheduled, exp_id)
+1
+
+julia&gt; restored = get_design(design_id);
+
+julia&gt; size(restored.design) == size(scheduled.design)
+true
+
+julia&gt; nrow(layout(restored)) == nrow(layout(scheduled))
+true</code></pre><p>A scheduled well is only a name until a real location is made for it. <a href="../../api/database/#CHESSDatabase.commit_run_location!-Tuple{Integer, AbstractString, AbstractString, Integer}"><code>commit_run_location!</code></a> attaches a committed location to a well of the layout. It takes the design ID, the name of the labware, the well, and the ID of the location. The name of the labware is needed because the same well name occurs on every plate:</p><pre><code class="language-julia-repl hljs">julia&gt; first_well = first(eachrow(layout(scheduled)));
+
+julia&gt; plate = generate_location(loc&quot;WP96&quot;, first_well.labware);
+
+julia&gt; well_id = CHESSCore.location_id(plate[first_well.well]);
+
+julia&gt; commit_run_location!(design_id, first_well.labware, first_well.well, well_id)</code></pre><p>A <a href="../../api/database/#CHESSDatabase.Run"><code>Run</code></a> is one run of an experiment. It holds the location that the run was performed in, the ID of the experiment, and the location IDs of its controls and blanks. <a href="../../api/database/#CHESSDatabase.upload_run-Tuple{Run}"><code>upload_run</code></a> records a run and returns its ID, <a href="../../api/database/#CHESSDatabase.get_run-Tuple{Integer}"><code>get_run</code></a> looks it up, and <a href="../../api/database/#CHESSDatabase.get_all_runs-Tuple{Integer}"><code>get_all_runs</code></a> lists the runs of an experiment:</p><pre><code class="language-julia-repl hljs">julia&gt; run_id = upload_run(Run(plate, exp_id))
+1
+
+julia&gt; length(get_all_runs(exp_id))
+1
+
+julia&gt; get_run(run_id) isa Run
+true</code></pre><h2 id="QC-methods"><a class="docs-heading-anchor" href="#QC-methods">QC methods</a><a id="QC-methods-1"></a><a class="docs-heading-anchor-permalink" href="#QC-methods" title="Permalink"></a></h2><p>A <a href="../../api/experiments/#CHESSExperiments.QCMethod"><code>QCMethod</code></a> is a quality-control or correction method. <a href="../../api/experiments/#CHESSExperiments.register_qc_method!-Union{Tuple{T}, Tuple{Symbol, Type{T}}} where T&lt;:QCMethod"><code>register_qc_method!</code></a> lets another package register a method type under a name, <a href="../../api/experiments/#CHESSExperiments.qc_method-Tuple{Symbol}"><code>qc_method</code></a> finds it again, and <a href="../../api/experiments/#CHESSExperiments.qc_methods-Tuple{}"><code>qc_methods</code></a> lists the registered names. Registering a name that is taken raises a <code>DuplicateRegistrationError</code>. <code>CHESSExperiments</code> owns only the registry. The methods themselves live in the packages that implement them.</p><p>The <a href="../../api/experiments/">CHESSExperiments API reference</a> lists every function.</p><script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+    startOnLoad: true,
+    theme: "neutral"
+});
+</script></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../parsing-instrument-files/">« Parsing Instrument Files</a><a class="docs-footer-nextpage" href="../runmaps/">Run Maps »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Thursday 8 October 2026 14:27">Thursday 8 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
