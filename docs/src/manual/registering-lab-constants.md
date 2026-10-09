@@ -111,7 +111,7 @@ with `@stock`.
 
 `CHESSLabConstants` has four functions that help write the registrations of a lab module. They are
 used while the module is being written and are not needed to use registered constants.
-[`register_reagent!`](@ref), [`register_chemical!`](@ref), and [`register_organism!`](@ref) each
+[`register_reagent!`](@ref), [`register_species!`](@ref), and [`register_organism!`](@ref) each
 return a line of code that registers the constant, ready to paste into the source of the module.
 They do not register anything and do not write to any source file.
 
@@ -121,7 +121,7 @@ density in a local cache. If the cache has no entry, it fetches them from PubChe
 needs a PubChem ID and a network connection. The returned line gives the formula in place of a
 molecular weight, so the weight is derived from atomic masses (see [Reagents & Species](reagents-species.md)).
 A species has no density, so the fetched density is discarded. PubChem writes the charge of an ion as a
-suffix of its formula, and `register_chemical!` removes it after checking that it agrees with the
+suffix of its formula, and `register_species!` removes it after checking that it agrees with the
 charge given. When PubChem's formula cannot be used, because its charge disagrees or it cannot be read
 as an elemental formula, the function warns and the line keeps the stored molecular weight. For an
 organism, the function does not look anything up. It records the genus, species, strain, and optional
@@ -133,7 +133,7 @@ using CHESSLabConstants
 register_reagent!(CHESSCore.Solid, "boric_acid", "Boric Acid", 7628)
 # "@reagent boric_acid \"Boric Acid\" Solid \"BH3O3\" 1.435u\"g/mL\" 7628"
 
-register_chemical!("Na⁺", "Na+", 1, 923)
+register_species!("Na⁺", "Na+", 1, 923)
 # "@species Na⁺ \"Na+\" 1 \"Na\""
 
 register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "700610", notes = "wild type")

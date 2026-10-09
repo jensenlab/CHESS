@@ -4,7 +4,7 @@
 
 Path to the SQLite cache of PubChem-derived properties, keyed by `LabID`: `Reagents`
 (`Name`/`Type`/`MolecularWeight`/`Density`/`CID`/`Formula`, backing [`register_reagent!`](@ref)) and
-`Chemicals` (`Name`/`Charge`/`MolecularWeight`/`CID`/`Formula`, backing [`register_chemical!`](@ref),
+`Species` (`Name`/`Charge`/`MolecularWeight`/`CID`/`Formula`, backing [`register_species!`](@ref),
 which produces [`CHESSCore.Species`](@ref) definitions). Used only by those two author-time tools -- package load
 never touches this file or the network.
 """
@@ -177,11 +177,16 @@ function register_reagent!(type::DataType,lab_id::AbstractString,name::AbstractS
     return _reagent_line(lab_id,name,type,molecular_weight,density,pubchemid;formula,opaque)
 end
 
-function _chemical_cache_db()
+function _species_cache_db()
     db = SQLite.DB(chemical_cache_path)
     DBInterface.execute(db,"PRAGMA foreign_keys = ON;")
+    # a cache written when this table was called Chemicals keeps its rows
+    tables = DBInterface.execute(db,"SELECT name FROM sqlite_master WHERE type='table'") |> DataFrame
+    if "Chemicals" in tables.name && !("Species" in tables.name)
+        DBInterface.execute(db,"ALTER TABLE Chemicals RENAME TO Species")
+    end
     DBInterface.execute(db,"""
-        CREATE TABLE IF NOT EXISTS Chemicals(
+        CREATE TABLE IF NOT EXISTS Species(
             LabID TEXT PRIMARY KEY,
             Name TEXT,
             Charge INTEGER,
@@ -192,30 +197,30 @@ function _chemical_cache_db()
             Unique(CID)
         );
         """)
-    _ensure_formula_column!(db,"Chemicals")
+    _ensure_formula_column!(db,"Species")
     return db
 end
 
-function _cached_chemical(lab_id::AbstractString)
-    db = _chemical_cache_db()
-    out = DBInterface.execute(db,"SELECT * FROM Chemicals WHERE LabID = ?",(lab_id,)) |> DataFrame
+function _cached_species(lab_id::AbstractString)
+    db = _species_cache_db()
+    out = DBInterface.execute(db,"SELECT * FROM Species WHERE LabID = ?",(lab_id,)) |> DataFrame
     return nrow(out) == 0 ? nothing : out[1,:]
 end
 
-function _cache_chemical!(lab_id::AbstractString,name::AbstractString,charge::Integer,
+function _cache_species!(lab_id::AbstractString,name::AbstractString,charge::Integer,
         molecular_weight::Union{Real,Missing},pubchemid::Integer,formula::Union{AbstractString,Missing}=missing)
-    db = _chemical_cache_db()
+    db = _species_cache_db()
     mw = ismissing(molecular_weight) ? "NULL" : molecular_weight
-    DBInterface.execute(db,"INSERT OR IGNORE INTO Chemicals(LabID,Name,Charge,MolecularWeight,CID,Formula) VALUES(?,?,?,$mw,?,?)",
+    DBInterface.execute(db,"INSERT OR IGNORE INTO Species(LabID,Name,Charge,MolecularWeight,CID,Formula) VALUES(?,?,?,$mw,?,?)",
         (lab_id,name,charge,pubchemid,formula))
     return nothing
 end
 
-_chemical_line(lab_id,name,charge,mw;formula=missing) =
+_species_line(lab_id,name,charge,mw;formula=missing) =
     "@species $lab_id \"$name\" $charge $(ismissing(formula) ? "$(mw)u\"g/mol\"" : "\"$formula\"")"
 
 """
-    register_chemical!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
+    register_species!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
 
 Author-time tool, mirroring [`register_reagent!`](@ref) for [`CHESSCore.Species`](@ref) (ions and
 neutral species) instead of [`CHESSCore.Reagent`](@ref)s: looks up `lab_id`'s formula and molecular
@@ -231,12 +236,12 @@ returned line into the appropriate file in `chemicals/` and commit.
 
 Example:
 ```julia-repl
-julia> register_chemical!("Na⁺","Na+",1,923)
+julia> register_species!("Na⁺","Na+",1,923)
 "@species Na⁺ \\"Na+\\" 1 \\"Na\\""
 ```
 """
-function register_chemical!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
-    cached = _cached_chemical(lab_id)
+function register_species!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
+    cached = _cached_species(lab_id)
     if !isnothing(cached)
         mw = ismissing(cached.MolecularWeight) ? missing : cached.MolecularWeight
         formula = ismissing(cached.Formula) ? missing : cached.Formula
@@ -244,15 +249,15 @@ function register_chemical!(lab_id::AbstractString,name::AbstractString,charge::
             # a row cached before formulas were recorded: look the formula up now
             formula = _fetch_formula(pubchemid,charge)
             if !ismissing(formula)
-                DBInterface.execute(_chemical_cache_db(),"UPDATE Chemicals SET Formula = ? WHERE LabID = ?",(formula,lab_id))
+                DBInterface.execute(_species_cache_db(),"UPDATE Species SET Formula = ? WHERE LabID = ?",(formula,lab_id))
             end
         end
         ismissing(formula) || _check_formula_mass(lab_id,formula,mw)
-        return _chemical_line(lab_id,name,charge,mw;formula)
+        return _species_line(lab_id,name,charge,mw;formula)
     end
     molecular_weight,_ = get_mw_density(pubchemid)
     formula = _fetch_formula(pubchemid,charge)
     ismissing(formula) || _check_formula_mass(lab_id,formula,molecular_weight)
-    _cache_chemical!(lab_id,name,charge,molecular_weight,pubchemid,formula)
-    return _chemical_line(lab_id,name,charge,molecular_weight;formula)
+    _cache_species!(lab_id,name,charge,molecular_weight,pubchemid,formula)
+    return _species_line(lab_id,name,charge,molecular_weight;formula)
 end

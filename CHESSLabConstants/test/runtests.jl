@@ -128,11 +128,18 @@ end
     @test orgline == "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""
 end
 
-@testset "register_chemical! author-time tool (cache hit, no network)" begin
-    CHESSLabConstants.DBInterface.execute(CHESSLabConstants._chemical_cache_db(),"DELETE FROM Chemicals WHERE LabID = 'Na⁺'")
-    CHESSLabConstants._cache_chemical!("Na⁺","Na+",1,22.9897693,923,"Na")
-    line = CHESSLabConstants.register_chemical!("Na⁺","Na+",1,923)
+@testset "register_species! author-time tool (cache hit, no network)" begin
+    CHESSLabConstants.DBInterface.execute(CHESSLabConstants._species_cache_db(),"DELETE FROM Species WHERE LabID = 'Na⁺'")
+    CHESSLabConstants._cache_species!("Na⁺","Na+",1,22.9897693,923,"Na")
+    line = CHESSLabConstants.register_species!("Na⁺","Na+",1,923)
     @test line == "@species Na⁺ \"Na+\" 1 \"Na\""
+    # a cache written when the table was called Chemicals keeps its rows
+    db = CHESSLabConstants._species_cache_db()
+    CHESSLabConstants.DBInterface.execute(db,"ALTER TABLE Species RENAME TO Chemicals")
+    @test CHESSLabConstants.register_species!("Na⁺","Na+",1,923) == line
+    tables = CHESSLabConstants.DBInterface.execute(CHESSLabConstants._species_cache_db(),"SELECT name FROM sqlite_master WHERE type='table'") |> CHESSLabConstants.DataFrame
+    @test "Species" in tables.name && !("Chemicals" in tables.name)
+
     # the formula in the line is the one CHESS defines for Na⁺
     @test endswith(line,"\""*CHESSCore.formula_string(CHESSCore.formula(CHESSLabConstants.Na⁺))*"\"")
 end
@@ -159,7 +166,7 @@ end
 
     # the line builders fall back to the stored molecular weight when there is no formula
     @test CHESSLabConstants._reagent_line("x","X",CHESSCore.Solid,100.0,1.0,5) == "@reagent x \"X\" Solid 100.0u\"g/mol\" 1.0u\"g/mL\" 5"
-    @test CHESSLabConstants._chemical_line("Y","Y",1,12.5) == "@species Y \"Y\" 1 12.5u\"g/mol\""
+    @test CHESSLabConstants._species_line("Y","Y",1,12.5) == "@species Y \"Y\" 1 12.5u\"g/mol\""
 
     # a stored weight that disagrees with the formula's mass is reported
     @test_logs (:warn,r"disagrees") CHESSLabConstants._check_formula_mass("x","H2O",30.0)
