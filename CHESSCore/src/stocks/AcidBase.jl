@@ -22,7 +22,7 @@ each successive state carries exactly one fewer positive charge, which the const
 against each [`Species`](@ref)'s own registered `charge`.
 
 Registered against a [`Reagent`](@ref) via [`set_acid_base_system!`](@ref) -- independent of (and
-additional to) that reagent's [`CompositionRule`](@ref), which continues to answer the separate
+additional to) that reagent's [`Dissolution`](@ref), which continues to answer the separate
 question of complete-dissociation mass bookkeeping (`molecular_weight`/`recipe`). A `Reagent` may have
 both, neither, or just one.
 """
@@ -48,7 +48,7 @@ Base.hash(a::AcidBaseSystem,h::UInt) = hash(a.species,hash(a.pKa,h))
     const acid_base_systems
 
 Registry mapping a specific [`Reagent`](@ref) *value* to its [`AcidBaseSystem`](@ref) -- mirrors
-[`composition_rules`](@ref) (a per-value, not per-type, registry, for the same reason: individual
+[`dissolutions`](@ref) (a per-value, not per-type, registry, for the same reason: individual
 reagents are themselves named values of a small set of types). Prefer [`set_acid_base_system!`](@ref)
 over mutating this directly. Absence (see [`acid_base_system`](@ref)) means "inert with respect to
 proton transfer," not an error -- the overwhelming majority of reagents (salts, sugars, antibiotics,

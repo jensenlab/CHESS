@@ -38,9 +38,9 @@ AcidBaseSystem(Species[AspartateCation, L-aspartic acid, AspartateAnion, Asparta
 
 [`set_acid_base_system!`](@ref) registers a system for a [`Reagent`](@ref), and
 [`acid_base_system`](@ref) looks it up. The systems are held in [`acid_base_systems`](@ref), keyed
-by the reagent, like the composition rules. The lookup returns `nothing` for a reagent with no
+by the reagent, like the dissolutions. The lookup returns `nothing` for a reagent with no
 registered weak acid or base, which is the default. This registry is independent of a reagent's
-[`CompositionRule`](@ref) (see [Reagents & Chemicals](reagents-chemicals.md)). A `Reagent` can have
+[`Dissolution`](@ref) (see [Reagents & Chemicals](reagents-chemicals.md)). A `Reagent` can have
 either, both, or neither, because they answer different questions: complete-dissociation mass
 bookkeeping and pH-dependent equilibrium speciation.
 

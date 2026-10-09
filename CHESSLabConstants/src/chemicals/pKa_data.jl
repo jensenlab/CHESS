@@ -1,5 +1,5 @@
 # Acid/base equilibrium (AcidBaseSystem) data -- registers weak acid/base families against reagents
-# already defined in solids.jl. Independent of (and additional to) those reagents' CompositionRules
+# already defined in solids.jl. Independent of (and additional to) those reagents' Dissolutions
 # in electrolytes.jl, which continue to answer the separate question of complete-dissociation mass
 # bookkeeping; this file answers "how does this reagent's dissolved chemistry actually speciate as a
 # function of pH." See CHESSCore/src/stocks/AcidBase.jl for the AcidBaseSystem type and solver.
@@ -8,7 +8,7 @@
 # applied at solve time (see CHESSCore.activity_coefficient), not baked in here. Sourced from the CRC
 # Handbook of Chemistry and Physics (acid dissociation constants table) unless noted otherwise.
 #
-# Like electrolytes.jl's set_composition! calls, these set_acid_base_system! calls are wrapped in a
+# Like electrolytes.jl's set_dissolution! calls, these set_acid_base_system! calls are wrapped in a
 # function invoked from CHESSLabConstants's own __init__ rather than running at top-level here, for
 # the same precompilation-safety reason (acid_base_systems is a global Dict owned by CHESSCore).
 
@@ -19,9 +19,9 @@
 
 # Organic acid conjugate-base endpoints. Each acid's fully-protonated (neutral, as-weighed) reference
 # state deliberately reuses `name(reagent)`/`molecular_weight(reagent)` exactly -- this makes it
-# identical (by Species's value equality) to the identity Species composition(::Reagent)'s default
-# fallback already produces for a reagent with no registered CompositionRule, so none of these acids
-# need a CompositionRule registration of their own: `recipe()` already reports their moles under
+# identical (by Species's value equality) to the identity Species dissolution(::Reagent)'s default
+# fallback already produces for a reagent with no registered Dissolution, so none of these acids
+# need a Dissolution registration of their own: `recipe()` already reports their moles under
 # exactly the Species that appears as a species in their AcidBaseSystem below.
 @species Citrate³⁻ "Citrate3-" -3 187.09u"g/mol"
 @species HCitrate²⁻ "HCitrate2-" -2 188.09u"g/mol"
@@ -42,7 +42,7 @@
 # amine + carboxylic acid). The reagent's own stored/derived molecular_weight is the *neutral* form in
 # every case (the species actually weighed out) -- consistent with the trick above, that neutral state
 # is one of AcidBaseSystem's own `species` entries (not necessarily `species[1]`, since the
-# fully-protonated *cation* carries a real net charge here), so again no CompositionRule registration
+# fully-protonated *cation* carries a real net charge here), so again no Dissolution registration
 # is needed.
 @species AspartateCation "Aspartate(cation)" 1 134.11u"g/mol" # L-aspartic acid + H+
 @species AspartateAnion "Aspartate(anion)" -1 132.09u"g/mol" # L-aspartic acid - H+
@@ -56,7 +56,7 @@
 # MOPS (a Good's buffer) is weighed out as its zwitterion (protonated morpholinium + sulfonate, net
 # charge 0 -- the reagent's own default identity, same trick as above). Its sulfonic acid group is a
 # strong acid (pKa ≈ -1) and is always fully deprotonated in any realistic aqueous solution, so it's
-# not modeled as an equilibrium step at all (same reasoning as HCl/NaOH staying CompositionRule-only) --
+# not modeled as an equilibrium step at all (same reasoning as HCl/NaOH staying Dissolution-only) --
 # only the morpholinium's own deprotonation (pKa ≈ 7.20, 25°C) is registered.
 @species MOPS⁻ "MOPS-" -1 208.25u"g/mol" # PubChem CID 70807 shares parent; deprotonated morpholine
 
@@ -125,12 +125,12 @@
 # Tier-1: common acids. pyruvate/butyrate/tartrate turned out to be real sodium salts (confirmed
 # against the lab's actual stocklist, Reagent_StockList.xlsx -- see electrolytes.jl), so their
 # reagent's own identity is charged (the anion/dianion), not neutral: `_identity(reagent)` always
-# constructs charge 0 (matching composition()'s own default fallback), so it cannot be used for
+# constructs charge 0 (matching dissolution()'s own default fallback), so it cannot be used for
 # these three -- each instead gets an explicit, correctly-charged Species matching the stored MW
-# exactly (their CompositionRule, registered in electrolytes.jl, adds the real Na+ counter-ion).
+# exactly (their Dissolution, registered in electrolytes.jl, adds the real Na+ counter-ion).
 # ascorbate, by contrast, is the plain free acid (also confirmed against the stocklist -- both
 # catalog lines there are "L-ASCORBIC ACID") once its stored name/MW/PubChem CID are corrected, so
-# it uses the ordinary `_identity(ascorbate)` trick like citric_acid/lactic_acid, no CompositionRule.
+# it uses the ordinary `_identity(ascorbate)` trick like citric_acid/lactic_acid, no Dissolution.
 @species EDTAAnion "EDTA(anion)" -1 291.232u"g/mol"
 @species EDTADianion "EDTA(dianion)" -2 290.224u"g/mol"
 @species EDTATrianion "EDTA(trianion)" -3 289.216u"g/mol"
@@ -153,7 +153,7 @@
 # mass (confirmed by exact arithmetic, e.g. tetracycline free base 444.43 + HCl 36.46 = 480.89 ≈
 # stored 480.9 -- true even for chlortetracycline/doxycycline, whose display names don't say
 # "hydrochloride" but whose masses confirm it), so none of their chain states reuse the reagent's own
-# identity at all -- see their CompositionRule registration in electrolytes.jl and the fresh
+# identity at all -- see their Dissolution registration in electrolytes.jl and the fresh
 # free-base-derived Species below.
 @species SulfadiazineCation "Sulfadiazine(cation)" 1 251.288u"g/mol"
 @species SulfadiazineAnion "Sulfadiazine(anion)" -1 249.272u"g/mol"
@@ -220,7 +220,7 @@
 @species FeOH²⁺ "FeOH2+" 2 72.847u"g/mol" # Fe3+ + H2O - H+
 @species FeOH⁺ "FeOH+" 1 72.847u"g/mol" # Fe2+ + H2O - H+ (same mass as FeOH2+, one less charge)
 
-# Succinic acid: sodium_succinate_hexahydrate's own CompositionRule already dissociates to the fully
+# Succinic acid: sodium_succinate_hexahydrate's own Dissolution already dissociates to the fully
 # deprotonated dianion (C4H4O4²⁻, already in ions.jl), same situation as pyruvate/butyrate/tartrate --
 # these two new endpoints are the more-protonated states above it in the chain.
 @species SuccinicAcid "Succinic acid" 0 118.086u"g/mol" # matches real succinic acid's MW (118.09) -- consistency check
@@ -254,7 +254,7 @@
 function _register_acid_base_systems!()
     # Phosphoric acid family: H3PO4 ⇌ H2PO4⁻ ⇌ HPO4²⁻ ⇌ PO4³⁻ -- pKa1/pKa2/pKa3 = 2.148/7.198/12.375
     # (CRC Handbook, 25°C). Shared across all four phosphate salts -- same conjugate family regardless
-    # of counter-ion (K⁺ vs Na⁺, already handled by each reagent's own CompositionRule).
+    # of counter-ion (K⁺ vs Na⁺, already handled by each reagent's own Dissolution).
     phosphoric_acid_system = AcidBaseSystem([H3PO4,H2PO4⁻,HPO4²⁻,PO4³⁻],[2.148,7.198,12.375])
     set_acid_base_system!(potassium_phosphate_mono,phosphoric_acid_system)
     set_acid_base_system!(potassium_phosphate_di,phosphoric_acid_system)
@@ -276,7 +276,7 @@ function _register_acid_base_systems!()
     # condition, fixed [CO2(aq)] rather than a fixed total dose, so it correctly absorbs more into
     # HCO3-/CO3(2-) as pH rises, unlike a naive fixed-mole-dose approach). Free [CO2(aq)] concentration
     # calibrated against an empirical measurement (2026): a 20 g/L NaCl solution (NaCl itself has no
-    # acid/base chemistry of its own -- confirmed via composition/acid_base_system elsewhere in this
+    # acid/base chemistry of its own -- confirmed via dissolution/acid_base_system elsewhere in this
     # package -- so this measurement isolates the water's own background acidity, with enough ionic
     # strength for a stable probe reading) read pH 5.93. Solved (via bisection on the free
     # concentration, matching pH under this exact open-system model, ionic_strength_correction on) for
@@ -288,14 +288,14 @@ function _register_acid_base_systems!()
     CHESSCore.set_default_water_correction!(CHESSCore.OpenSystemSpecies(carbonic_acid_system,1.7005985e-6u"mol/L"))
 
     # Organic acids -- each fully-protonated (neutral) reference state is built from the reagent's own
-    # name/molecular_weight, so it's `==` to what composition(reagent) already returns by default (see
+    # name/molecular_weight, so it's `==` to what dissolution(reagent) already returns by default (see
     # the comment above the Species definitions).
     _identity(r::Reagent) = CHESSCore.Species(name(r),0,molecular_weight(r))
 
     citric_acid_system = AcidBaseSystem([_identity(citric_acid),H2Citrate⁻,HCitrate²⁻,Citrate³⁻],[3.13,4.76,6.40])
     set_acid_base_system!(citric_acid,citric_acid_system)
     # sodium_citrate_dihydrate is the same conjugate family from the fully-deprotonated end (its
-    # CompositionRule, electrolytes.jl, already dissociates it straight to Citrate3-) -- shared
+    # Dissolution, electrolytes.jl, already dissociates it straight to Citrate3-) -- shared
     # AcidBaseSystem instance, same pattern as acetic_acid/sodium_acetate below.
     set_acid_base_system!(sodium_citrate_dihydrate,citric_acid_system)
     set_acid_base_system!(lactic_acid,AcidBaseSystem(
@@ -313,7 +313,7 @@ function _register_acid_base_systems!()
     set_acid_base_system!(propionic_acid,AcidBaseSystem(
         [_identity(propionic_acid),Propionate⁻],[4.87]))
     # reuses the existing OAc⁻ ion constant (ions.jl) already shared with the sodium acetate salts'
-    # CompositionRules -- same conjugate species, whether reached via complete salt dissociation or
+    # Dissolutions -- same conjugate species, whether reached via complete salt dissociation or
     # partial acid equilibrium. Registered against the sodium acetate salts too (shared AcidBaseSystem
     # instance, same pattern as the phosphate/carbonate families) -- without this, OAc⁻ contributed by
     # sodium_acetate_anhydrous/trihydrate was wrongly treated as an inert strong ion instead of the
@@ -408,7 +408,7 @@ function _register_acid_base_systems!()
     # literature, so this is a documented simplification (same spirit as boric acid's).
     set_acid_base_system!(edta,AcidBaseSystem(
         [_identity(edta),EDTAAnion,EDTADianion,EDTATrianion,EDTATetraanion],[2.0,2.68,6.11,10.17]))
-    # ascorbate is the plain free acid (identity = neutral, matches composition()'s default):
+    # ascorbate is the plain free acid (identity = neutral, matches dissolution()'s default):
     set_acid_base_system!(ascorbate,AcidBaseSystem([_identity(ascorbate),AscorbateAnion,AscorbateDianion],[4.1,11.6]))
     # pyruvate/butyrate/tartrate: identity is a real, charged salt component (see the Species
     # definitions' comment above) -- chains are built around that fact, not the assumption that
@@ -422,7 +422,7 @@ function _register_acid_base_systems!()
 
     # Free-acid counterparts of already-registered salts, reusing the same conjugate chain/pKa (see
     # the Species definitions' comment above) -- these reagents' identity is the plain neutral acid
-    # (matches composition()'s default), unlike the pyruvate/butyrate/tartrate salts just above.
+    # (matches dissolution()'s default), unlike the pyruvate/butyrate/tartrate salts just above.
     set_acid_base_system!(butyric_acid,AcidBaseSystem([_identity(butyric_acid),ButyrateAnion],[4.82]))
     set_acid_base_system!(succinic_acid,AcidBaseSystem(
         [_identity(succinic_acid),SuccinateMonoanion,C4H4O4²⁻],[4.21,5.64]))
@@ -460,7 +460,7 @@ function _register_acid_base_systems!()
     set_acid_base_system!(carbenicillin,AcidBaseSystem([_identity(carbenicillin),CarbenicillinAnion],[2.6]))
     set_acid_base_system!(oxacillin,AcidBaseSystem([_identity(oxacillin),OxacillinAnion],[2.7]))
     # Tetracyclines: stored molecular_weight is the HCl salt mass (see Species comment above), so
-    # none of these 4 chain states reuse the reagent's own identity -- their CompositionRule
+    # none of these 4 chain states reuse the reagent's own identity -- their Dissolution
     # (salt -> cation + Cl-) is registered in electrolytes.jl instead. Representative 3-pKa triad
     # (real values vary slightly by derivative).
     tetracycline_pKa = [3.3,7.7,9.7]

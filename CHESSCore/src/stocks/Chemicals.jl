@@ -9,7 +9,7 @@ the lab, tracked in [`Stock`](@ref)'s `SolidDict`/`LiquidDict`.
 
 All `Reagent` subtypes have four fields utilized by CHESSCore:
 1) `name`: the name by which the reagent will be referred to
-2) `molecular_weight`: the reagent's *stored* molecular weight, used as a fallback -- see [`molecular_weight`](@ref), which prefers deriving the value from the reagent's registered [`composition`](@ref) (`composition_rules`) whenever one exists, since that's the more authoritative, harder-to-drift source. If neither is known, `missing`.
+2) `molecular_weight`: the reagent's *stored* molecular weight, used as a fallback -- see [`molecular_weight`](@ref), which prefers deriving the value from the reagent's registered [`dissolution`](@ref) (`dissolutions`) whenever one exists, since that's the more authoritative, harder-to-drift source. If neither is known, `missing`.
 3) `density`: the reagent's density at STP, if known, is used by CHESSCore to facilitate conversions between mass and volume quantities of the reagent. If `density` is unknown or undefined, it is assigned a value of `missing`
 4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) connects the reagent to registered substances in the pubchem database. the [`@reagent`](@ref) macro uses `pubchemid` to query the PubChem database for the reagent's properties automatically.
 
@@ -40,15 +40,15 @@ name(x::Reagent)=x.name
 """
     molecular_weight(x::Reagent)
 
-The molecular weight of a reagent: derived from its registered [`composition`](@ref)
-(`composition_rules`) when one exists (the sum of each product [`Species`](@ref)'s molecular weight
+The molecular weight of a reagent: derived from its registered [`dissolution`](@ref)
+(`dissolutions`) when one exists (the sum of each product [`Species`](@ref)'s molecular weight
 times its coefficient), falling back to the reagent's stored value otherwise. Deriving from
-composition is safe because every registered [`CompositionRule`](@ref) is required to be
+the dissolution is safe because every registered [`Dissolution`](@ref) is required to be
 non-negative, real stoichiometry (see its constructor).
 """
 function molecular_weight(x::Reagent)
-    haskey(composition_rules,x) || return x.molecular_weight
-    rule = composition_rules[x]
+    haskey(dissolutions,x) || return x.molecular_weight
+    rule = dissolutions[x]
     return sum(v*molecular_weight(k) for (k,v) in rule.products)
 end
 """
@@ -105,7 +105,7 @@ struct Gas <: Reagent
 end
 
 # Reagent has a name::String field, so it isn't isbits and Julia's default ==/hash fall back to
-# object identity rather than value equality. SolidDict/LiquidDict/composition_rules use Reagent as
+# object identity rather than value equality. SolidDict/LiquidDict/dissolutions use Reagent as
 # a Dict key and currently only work because callers happen to reuse the same canonical `const`
 # binding everywhere -- this makes that safe by construction (mirrors the equivalent fix already
 # applied to Species). Constrained to same-concrete-type pairs so a Solid and a Liquid with
@@ -114,7 +114,7 @@ end
 # molecular_weight/density are hashed via a canonical unit (g/mol, g/mL), not the raw stored
 # Quantity -- Unitful's own hash isn't unit-normalized, so e.g. 1.98u"g/L" and 0.00198u"g/mL" are
 # `==`/`isequal` (same physical value) but would otherwise hash differently, breaking Julia's
-# hash/equality contract (and any Dict/Set lookup, including composition_rules) for a Reagent whose
+# hash/equality contract (and any Dict/Set lookup, including dissolutions) for a Reagent whose
 # fields weren't given in exactly the same unit every time it was constructed. Confirmed live: this
 # is exactly what happened round-tripping a Gas reagent through the database, which canonicalizes
 # density to g/mL on upload.
@@ -131,7 +131,7 @@ Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.mo
 Represents a *species* — what a [`Reagent`](@ref) behaves as once it's part of a reactive system
 (e.g. Na⁺, Cl⁻ from dissolved NaCl; or, trivially, glucose's own identity for a non-dissociating
 reagent). `Species` values are never added directly to a [`Stock`](@ref) — they exist purely as the
-output vocabulary of [`composition`](@ref) (per-`Reagent`) and [`Recipe`](@ref) (per-`Stock`),
+output vocabulary of [`dissolution`](@ref) (per-`Reagent`) and [`Recipe`](@ref) (per-`Stock`),
 without changing how `Stock` stores its (undissociated) `Reagent` components.
 
 A species carries a `name`, an integer `charge` (`0` for neutral species), and one of two
@@ -148,7 +148,7 @@ julia> Species("mystery ion",1,missing)
 ```
 
 Unlike `Reagent`, `Species` has real value-based equality/hash (not Julia's identity-based default)
-because composition rules and the identity-default fallback (see [`composition`](@ref)) routinely
+because dissolutions and the identity-default fallback (see [`dissolution`](@ref)) routinely
 construct `Species` values on the fly, and those must compare equal to independently-constructed-but-
 identical values for `Dict` lookups (e.g. `Recipe`/`total_concentration`) to work correctly. Two
 species are equal when their name, charge, and formula are equal (and, for species without a
@@ -210,8 +210,8 @@ charge(x::Species)=x.charge
     const H⁺
 
 The canonical hydrogen ion (proton), used by [`pH`](@ref)/[`total_concentration`](@ref). Any custom
-[`composition`](@ref) rule representing proton transfer (e.g. a strong base contributing a
-*negative* count, so it nets against acids in the same composition summation) should reuse this
+[`dissolution`](@ref) rule representing proton transfer (e.g. a strong base contributing a
+*negative* count, so it nets against acids in the same sum) should reuse this
 exact value rather than defining its own separate "H+" `Species`, so contributions net correctly.
 """
 const H⁺ = Species("H+",1,"H")
@@ -221,83 +221,79 @@ const H⁺ = Species("H+",1,"H")
 
 The canonical hydroxide ion, used by [`net_hydrogen_ion_concentration`](@ref)/[`pH`](@ref). Bases
 should register their real dissociation formula using this value (e.g. `Na⁺ + OH⁻` for NaOH) rather
-than a negative [`H⁺`](@ref) count -- see [`CompositionRule`](@ref).
+than a negative [`H⁺`](@ref) count -- see [`Dissolution`](@ref).
 """
 const OH⁻ = Species("OH-",-1,"OH")
 
 """
-    struct CompositionRule
+    struct Dissolution
 
 Describes the stoichiometric products of a [`Reagent`](@ref) breaking down into [`Species`](@ref)s
-— e.g. `CompositionRule(Dict(Na⁺=>1, Cl⁻=>1))` for NaCl, or `CompositionRule(Dict(glucose_chem=>1))`
+— e.g. `Dissolution(Dict(Na⁺=>1, Cl⁻=>1))` for NaCl, or `Dissolution(Dict(glucose_chem=>1))`
 for a non-dissociating reagent (its own identity). Coefficients must be non-negative -- represent an
 acid/base's hydroxide contribution via [`OH⁻`](@ref), not a negative [`H⁺`](@ref) count (see
 [`net_hydrogen_ion_concentration`](@ref)) -- since [`molecular_weight`](@ref) sums a reagent's
 registered products directly.
+
+`+` and `*` build a `Dissolution` from [`Species`](@ref) values: `spc"Na+" + spc"Cl-"`, or
+`spc"Mg2+" + 2*spc"Cl-"`. A reagent is defined from one by [`@reagent_formula`](@ref) or registered
+with [`set_dissolution!`](@ref).
 """
-struct CompositionRule
+struct Dissolution
     products::Dict{Species,Int}
-    function CompositionRule(products::Dict{Species,Int})
+    function Dissolution(products::Dict{Species,Int})
         all(c->c>=0, values(products)) || throw(ArgumentError(
-            "CompositionRule coefficients must be non-negative -- represent bases via OH⁻ (see `OH⁻`), not a negative H⁺ count"))
+            "Dissolution coefficients must be non-negative -- represent bases via OH⁻ (see `OH⁻`), not a negative H⁺ count"))
         new(products)
     end
 end
 
+Base.:(==)(a::Dissolution,b::Dissolution) = a.products == b.products
+Base.hash(a::Dissolution,h::UInt) = hash(a.products,hash(:Dissolution,h))
+
 """
-    const composition_rules
+    const dissolutions
 
 Registry mapping a specific [`Reagent`](@ref) *value* (e.g. the `NaCl` returned by `@reagent`) to its
-[`CompositionRule`](@ref). A per-value registry, not per-type dispatch, because individual reagents
+[`Dissolution`](@ref). A per-value registry, not per-type dispatch, because individual reagents
 are themselves named *values* of a small set of types (`Solid`/`Liquid`/`Gas`) — dispatch on
 `typeof(reagent)` cannot distinguish e.g. `HCl` from `NaOH` (both `Solid`). Prefer
-[`set_composition!`](@ref) over mutating this directly.
+[`set_dissolution!`](@ref) over mutating this directly.
 """
-const composition_rules = Dict{Reagent,CompositionRule}()
+const dissolutions = Dict{Reagent,Dissolution}()
 
 """
-    set_composition!(r::Reagent,rule::CompositionRule)
+    set_dissolution!(r::Reagent,rule::Dissolution)
 
 Register that `r` breaks down into ions/chemicals according to `rule` when dissolved — see
-[`composition`](@ref).
+[`dissolution`](@ref).
 """
-function set_composition!(r::Reagent,rule::CompositionRule)
-    composition_rules[r]=rule
+function set_dissolution!(r::Reagent,rule::Dissolution)
+    dissolutions[r]=rule
     return nothing
 end
 
 """
-    composition(x::Reagent)
+    dissolution(x::Reagent)
 
-Return the [`CompositionRule`](@ref) describing how `x` breaks down into [`Species`](@ref)s when
-dissolved. Every `Reagent` has a composition — a non-electrolyte's default (for anything not
-registered via [`set_composition!`](@ref)) is simply its own identity `Species`
-(`CompositionRule(Dict(Species(name(x),0,molecular_weight(x))=>1))`), not "no composition."
+Return the [`Dissolution`](@ref) describing how `x` breaks down into [`Species`](@ref)s when
+dissolved. Every `Reagent` has a dissolution — a non-electrolyte's default (for anything not
+registered via [`set_dissolution!`](@ref)) is simply its own identity `Species`
+(`Dissolution(Dict(Species(name(x),0,molecular_weight(x))=>1))`), not "no dissolution."
 """
-function composition(x::Reagent)
-    haskey(composition_rules,x) && return composition_rules[x]
-    return CompositionRule(Dict(Species(name(x),0,molecular_weight(x))=>1))
+function dissolution(x::Reagent)
+    haskey(dissolutions,x) && return dissolutions[x]
+    return Dissolution(Dict(Species(name(x),0,molecular_weight(x))=>1))
 end
 
-"""
-    struct Formula
-
-A stoichiometric formula built from [`Species`](@ref) values via the algebra below — e.g.
-`spc"Na+" + spc"Cl-"` or `spc"Mg2+" + 2*spc"Cl-"`. Used to define a [`Reagent`](@ref) from its
-chemical composition via [`@reagent_formula`](@ref), which derives both the reagent's
-`molecular_weight` and its registered [`composition`](@ref) from the formula.
-"""
-struct Formula
-    composition::Dict{Species,Int}
-end
-
-Base.:*(n::Integer,c::Species) = Formula(Dict(c=>n))
+Base.:*(n::Integer,c::Species) = Dissolution(Dict(c=>n))
 Base.:*(c::Species,n::Integer) = n*c
-Base.:*(n::Integer,f::Formula) = Formula(Dict(k=>v*n for (k,v) in f.composition))
-Base.:+(a::Species,b::Species) = Formula(mergewith(+,Dict(a=>1),Dict(b=>1)))
-Base.:+(a::Formula,b::Species) = Formula(mergewith(+,a.composition,Dict(b=>1)))
-Base.:+(a::Species,b::Formula) = b+a
-Base.:+(a::Formula,b::Formula) = Formula(mergewith(+,a.composition,b.composition))
+Base.:*(n::Integer,d::Dissolution) = Dissolution(Dict(k=>v*n for (k,v) in d.products))
+Base.:*(d::Dissolution,n::Integer) = n*d
+Base.:+(a::Species,b::Species) = Dissolution(mergewith(+,Dict(a=>1),Dict(b=>1)))
+Base.:+(a::Dissolution,b::Species) = Dissolution(mergewith(+,a.products,Dict(b=>1)))
+Base.:+(a::Species,b::Dissolution) = b+a
+Base.:+(a::Dissolution,b::Dissolution) = Dissolution(mergewith(+,a.products,b.products))
 
 
 """
@@ -318,7 +314,7 @@ D-glucose
 ```
 
 See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@spc_str`](@ref),
-[`Formula`](@ref).
+[`Dissolution`](@ref).
 """
 macro species(labsymb,name,charge,formula)
     ls = Symbol(labsymb)
@@ -342,8 +338,8 @@ end
 Define a new reagent (a physical `Solid`/`Liquid`/`Gas`) and import it into the workspace under
 `labname`. The `name` argument is the display name for the reagent, which can include a larger set
 of characters and formatting than the `labname`. Automatically registers the reagent's identity
-[`Species`](@ref) via [`set_composition!`](@ref) (discoverable in [`composition_rules`](@ref)),
-matching the default [`composition`](@ref) would compute anyway for a non-dissociating reagent.
+[`Species`](@ref) via [`set_dissolution!`](@ref) (discoverable in [`dissolutions`](@ref)),
+matching the default [`dissolution`](@ref) would compute anyway for a non-dissociating reagent.
 
 There are three valid type parameters for reagents:
 1) [`Solid`](@ref)
@@ -414,7 +410,7 @@ Example:
 julia> spc"Na+"
 Na+
 ```
-The [`@spc_str`](@ref) macro is most useful for building [`CHESSCore.Formula`](@ref) values:
+The [`@spc_str`](@ref) macro is most useful for building [`Dissolution`](@ref) values:
 
 ```julia
 julia> spc"Na+" + spc"Cl-"
@@ -486,7 +482,7 @@ macro reagent_symbols(labsymb,name,type,molecular_weight,density,pubchemid)
 
         $(chemprops_expr(__module__,ln,cprops))
         const global $ls = $type($name,$molecular_weight,$density,$pubchemid)
-        CHESSCore.set_composition!($ls,CHESSCore.CompositionRule(Dict(CHESSCore.Species($name,0,$molecular_weight)=>1)))
+        CHESSCore.set_dissolution!($ls,CHESSCore.Dissolution(Dict(CHESSCore.Species($name,0,$molecular_weight)=>1)))
         @doc $docstr $ls
     end)
 end
@@ -494,23 +490,23 @@ end
 """
     @reagent_formula labname name type formula density pubchemid
 
-Define a new reagent whose [`composition`](@ref) is set from an explicit [`Formula`](@ref) (built from
+Define a new reagent whose [`dissolution`](@ref) is set from an explicit [`Dissolution`](@ref) (built from
 [`Species`](@ref) values via `+`/`*`), rather than a separately-specified molecular weight. No
 `molecular_weight` is stored directly -- [`molecular_weight`](@ref) derives it on demand from the
-registered composition, so there's only ever one number, not a baked-in copy that could drift from
-the formula. Use this when a reagent's real stoichiometry matters (e.g. an ionic solid); use
+registered dissolution, so there's only ever one number, not a baked-in copy that could drift from
+the stoichiometry. Use this when a reagent's real stoichiometry matters (e.g. an ionic solid); use
 [`@reagent`](@ref) for the simpler common case.
 
-Registers `composition` immediately (like [`@reagent`](@ref) does for its own default identity
-composition) -- safe for direct/interactive use in a single running session (a script, a notebook, a
+Registers the dissolution immediately (like [`@reagent`](@ref) does for its own default identity
+dissolution) -- safe for direct/interactive use in a single running session (a script, a notebook, a
 REPL), but **not** safe for reagents defined inside a precompiled package's top-level code: mutating
-`composition_rules` (owned by CHESSCore) as a side effect of a *dependent* package's own
+`dissolutions` (owned by CHESSCore) as a side effect of a *dependent* package's own
 precompilation isn't guaranteed to survive into a fresh session loading that package's precompiled
 cache (Julia's module-initialization guidance is that such state belongs in `__init__`, which runs on
 every load, not just once at compile time). A lab-constants package with real, non-default
 [`Species`](@ref) formulas to register (e.g. ionic salts) should instead register them explicitly
-from its own `__init__()`, via [`set_composition!`](@ref) called on a [`Formula`](@ref)'s
-`.composition` -- see `CHESSLabConstants/src/chemicals/electrolytes.jl` for a worked example of this
+from its own `__init__()`, via [`set_dissolution!`](@ref) called on a [`Dissolution`](@ref)
+built with `+`/`*` -- see `CHESSLabConstants/src/chemicals/electrolytes.jl` for a worked example of this
 pattern.
 
 Example:
@@ -521,14 +517,14 @@ NaCl
 julia> molecular_weight(NaCl) # derived: sum of each species' molecular_weight × its coefficient
 ```
 
-See also: [`@reagent`](@ref), [`Formula`](@ref), [`set_composition!`](@ref)
+See also: [`@reagent`](@ref), [`Dissolution`](@ref), [`set_dissolution!`](@ref)
 """
 macro reagent_formula(labsymb,name,type,formula,density,pubchemid)
     ls = Symbol(labsymb)
     esc(quote
-        local f = $formula
+        local d = $formula
         const global $ls = $type($name,missing,$density,$pubchemid)
-        CHESSCore.set_composition!($ls,CHESSCore.CompositionRule(f.composition))
+        CHESSCore.set_dissolution!($ls,d)
         $ls
     end)
 end
@@ -723,7 +719,7 @@ looking a value up via [`@spc_str`](@ref)/[`@rgt_str`](@ref)/[`@org_str`](@ref).
 reliable way to get back the identifier you'd use to reference `x` in code; [`name`](@ref) is a
 separate, display-oriented string not guaranteed to correspond to any actual binding (e.g. `H⁺` is
 bound under `:H⁺`, but `name(H⁺) == "H+"`). Throws `ArgumentError` if no matching binding is found
-(common for ephemeral values, e.g. `Species` values built on the fly by [`composition`](@ref)'s default
+(common for ephemeral values, e.g. `Species` values built on the fly by [`dissolution`](@ref)'s default
 branch, which were never bound to a constant at all).
 """
 function symbol(x; context=vcat([CHESSCore],CHESSCore.labmodules))

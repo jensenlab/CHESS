@@ -43,44 +43,44 @@ missing
 ## Species type
 
 `Species` is a single concrete type with the fields `name`, `charge` (zero for neutral species),
-and an elemental `formula` such as `"C6H12O6"`, from which the molecular weight is derived from atomic
-masses. A species without a registered formula carries a stored molecular weight instead. CHESS registers common ions such as Na⁺, Cl⁻, and Ca²⁺. [`@species`](@ref)
-registers a new one:
+and an elemental formula such as `"C6H12O6"`. The molecular weight is derived from the formula and
+atomic masses. A species without a registered formula carries a stored molecular weight instead.
+CHESS registers common ions such as Na⁺, Cl⁻, and Ca²⁺. [`@species`](@ref) registers a new one:
 
 ```jldoctest reagents
 julia> @species Li⁺ "Li+" 1 "Li"
 Li⁺
 ```
 
-[`@spc_str`](@ref) recalls a registered chemical (`spc"Na+"`). It is mainly used to build a
-[`Formula`](@ref), a stoichiometric expression that adds `Species` values together and multiplies them by
-coefficients, as for the two chlorides that balance Ca²⁺:
+[`@spc_str`](@ref) recalls a registered species (`spc"Na+"`). It is mainly used to build a
+[`Dissolution`](@ref), a stoichiometric expression that adds `Species` values together and multiplies
+them by coefficients, as for the two chlorides that balance Ca²⁺:
 
 ```jldoctest reagents
-julia> sort(string.(keys((spc"Na+" + spc"Cl-").composition)))
+julia> sort(string.(keys((spc"Na+" + spc"Cl-").products)))
 2-element Vector{String}:
  "Cl⁻"
  "Na⁺"
 
 julia> salt = spc"Ca2+" + 2*spc"Cl-";
 
-julia> salt.composition[spc"Cl-"], salt.composition[spc"Ca2+"]
+julia> salt.products[spc"Cl-"], salt.products[spc"Ca2+"]
 (2, 1)
 ```
 
-## Dissociation
+## Dissolution
 
-Every `Reagent` has a [`composition`](@ref), a [`CompositionRule`](@ref) that describes which
-`Species` values it breaks down into when dissolved. The default rule is the reagent's own identity as a
-single `Species`, which means no dissociation.
+Every `Reagent` has a [`dissolution`](@ref), a [`Dissolution`](@ref) that describes which
+`Species` values it breaks down into when dissolved. The default dissolution is the reagent's own
+identity as a single `Species`, which means no dissociation.
 
 ```jldoctest reagents
-julia> composition(rgt"water")
-CompositionRule(Dict{Species, Int64}(water => 1))
+julia> dissolution(rgt"water")
+Dissolution(Dict{Species, Int64}(water => 1))
 ```
 
-[`@reagent_formula`](@ref) registers a reagent and its dissociation formula in one step. It
-derives `molecular_weight` from the formula, so the two cannot disagree:
+[`@reagent_formula`](@ref) registers a reagent and its dissolution in one step. It
+derives `molecular_weight` from the dissolution, so the two cannot disagree:
 
 ```jldoctest reagents
 julia> @reagent_formula LiCl "lithium chloride" Solid (Li⁺ + spc"Cl-") missing missing
@@ -90,8 +90,8 @@ julia> molecular_weight(LiCl)
 42.39 g mol⁻¹
 ```
 
-[`set_composition!`](@ref) registers the composition rule of a reagent that is already defined. The
-rules are held in [`composition_rules`](@ref), keyed by the reagent itself and not by its type,
+[`set_dissolution!`](@ref) registers the dissolution of a reagent that is already defined. The
+dissolutions are held in [`dissolutions`](@ref), keyed by the reagent itself and not by its type,
 because every reagent is a value of one of three types and the type cannot tell two solids apart:
 
 ```jldoctest reagents
@@ -101,21 +101,21 @@ julia> @species DemoCation "DemoCation" 1 20.0u"g/mol"; # a stored molecular wei
 
 julia> @species DemoAnion "DemoAnion" -1 30.0u"g/mol";
 
-julia> set_composition!(DemoSalt, CompositionRule(Dict(DemoCation => 1, DemoAnion => 1)));
+julia> set_dissolution!(DemoSalt, Dissolution(Dict(DemoCation => 1, DemoAnion => 1)));
 
-julia> sort(string.(keys(composition(DemoSalt).products)))
+julia> sort(string.(keys(dissolution(DemoSalt).products)))
 2-element Vector{String}:
  "DemoAnion"
  "DemoCation"
 
-julia> DemoSalt in keys(composition_rules)
+julia> DemoSalt in keys(dissolutions)
 true
 ```
 
-`CompositionRule` coefficients must be non-negative. A base's hydroxide is represented by the
+`Dissolution` coefficients must be non-negative. A base's hydroxide is represented by the
 canonical [`OH⁻`](@ref) `Species`, not a negative [`H⁺`](@ref) count. This lets `pH` (see
 [Recipes & Solution Chemistry](recipes.md)) net acid and base contributions by explicit
 subtraction instead of signed stoichiometry.
 
-A weak acid or base only partially dissociates, so a fixed `CompositionRule` cannot describe it.
+A weak acid or base only partially dissociates, so a fixed `Dissolution` cannot describe it.
 It is registered as an [`AcidBaseSystem`](@ref) instead. See [Acid/Base Chemistry](acid-base.md).

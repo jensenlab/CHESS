@@ -28,7 +28,7 @@ include("test_reconstruct_contents_bootstrap.jl")
 
 include("test_reconstruct_encumbrances.jl")
 
-include("test_migrate_species.jl")
+include("test_migrate_chemistry.jl")
 
 include("test_reconstruct_contents_ancestor_closure.jl")
 
@@ -181,25 +181,25 @@ end
     @test rows[1,:MolecularWeight] == 137.14 && rows[1,:Density] == 1.35
     @test rows[2,:MolecularWeight] == 200.0 && rows[2,:Density] == 0.9
 
-    # composition round-trips through the Species/CompositionRules tables
+    # dissolution round-trips through the Species/Dissolutions tables
     hcl_db = Solid("hcl_dbtest",36.46u"g/mol",1.0u"g/mL",missing)
-    set_composition!(hcl_db,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
+    set_dissolution!(hcl_db,Dissolution(Dict(H⁺=>1,Cl⁻=>1)))
     id_hcl = CHESSDatabase.upload_component(hcl_db)
     comp_rows = query_db("""
         SELECT c.Name, c.Charge, c.Formula, c.MolecularWeight, r.Coefficient
-        FROM CompositionRules r INNER JOIN Species c ON r.SpeciesID = c.ID
+        FROM Dissolutions r INNER JOIN Species c ON r.SpeciesID = c.ID
         WHERE r.ReagentComponentID = $id_hcl
     """)
     @test nrow(comp_rows) == 2
     @test all(ismissing,comp_rows.MolecularWeight) # species with a formula store the formula, not a weight
     @test sort(comp_rows.Formula) == ["Cl","H"]
     fetched = Dict(CHESSCore.Species(row.Name,row.Charge,row.Formula) => row.Coefficient for row in eachrow(comp_rows))
-    @test fetched == composition_rules[hcl_db].products
+    @test fetched == dissolutions[hcl_db].products
 
     # get_component restores the dissociation rule -- reconstructed reagent behaves identically
     reconstructed = CHESSDatabase.get_component(id_hcl)
     @test molecular_weight(reconstructed) == molecular_weight(hcl_db)
-    @test composition(reconstructed).products == composition(hcl_db).products
+    @test dissolution(reconstructed).products == dissolution(hcl_db).products
 end
 
 @testset "DB round-trip equivalence, natural-key dedup, SQL escaping, hash precision" begin

@@ -26,7 +26,7 @@ quantities of chemical identities ("5g of Na⁺") without committing to which ph
 supplies them. See [`recipe`](@ref) for the (one-directional) derivation from a `Stock`.
 
 Stores molar `amounts` natively (not mass) -- this is what dissociation math (`_reagent_moles`,
-`composition(::Reagent)`) naturally produces, and what [`total_concentration`](@ref)/[`pH`](@ref)
+`dissolution(::Reagent)`) naturally produces, and what [`total_concentration`](@ref)/[`pH`](@ref)
 need, with no dependency on any individual `Species`'s own `molecular_weight`. [`mass`](@ref) is
 therefore the *derived* accessor, returning `missing` when a chemical is present but its mass can't
 be computed (unknown `molecular_weight`) -- as opposed to `0u"g"` when the chemical isn't present at
@@ -41,7 +41,7 @@ end
 
 Derive the [`Recipe`](@ref) (chemical-level composition, in real molar quantities) of `s`: for each
 `Reagent` in `s`, convert its tracked quantity to moles (via [`_reagent_moles`](@ref)) and distribute
-across its [`composition(::Reagent)`](@ref) rule's `Species`s, summing across every reagent present.
+across its [`dissolution(::Reagent)`](@ref) rule's `Species`s, summing across every reagent present.
 
 There is deliberately no `Stock`-from-`Recipe` conversion — going the other way is underdetermined (a
 target chemical profile doesn't uniquely determine which reagent(s) produce it).
@@ -51,7 +51,7 @@ function recipe(s::Stock)
     for (reagent,quantity) in Iterators.flatten((solids(s),liquids(s)))
         moles=_reagent_moles(reagent,quantity)
         ismissing(moles) && continue
-        for (chem,coeff) in composition(reagent).products
+        for (chem,coeff) in dissolution(reagent).products
             out[chem]=get(out,chem,0u"mol") + coeff*moles
         end
     end
@@ -114,7 +114,7 @@ end
 
 Return the net molar concentration of hydrogen ions in `s`: [`H⁺`](@ref) minus [`OH⁻`](@ref),
 derived from [`recipe(::Stock)`](@ref). This nets the one acid/base ion pair explicitly by
-name rather than relying on signed stoichiometry in registered [`CompositionRule`](@ref)s (which
+name rather than relying on signed stoichiometry in registered [`Dissolution`](@ref)s (which
 are otherwise always non-negative, real formulas) — see [`pH`](@ref), its only consumer.
 """
 function net_hydrogen_ion_concentration(s::Stock)
@@ -141,7 +141,7 @@ computes the exact original closed-form formula directly from
 if acidic, `14 - (-log10(...))` if basic) -- guaranteed bit-identical to CHESSCore's original
 strong-electrolyte-only `pH`, not merely expected to converge to the same place via the general
 solver. Strong bases should still register their real dissociation formula (e.g. `Na⁺ + OH⁻` for
-NaOH) via [`composition(::Reagent)`](@ref) -- mixing an acid and a base nets out through this same
+NaOH) via [`dissolution(::Reagent)`](@ref) -- mixing an acid and a base nets out through this same
 mechanism either way.
 
 If `s` has *no* registered `AcidBaseSystem` and *no* charged species at all (e.g. a `Mixture` of pure

@@ -13,8 +13,9 @@ Open the SQLite database at `path` and make it the database that every `CHESSDat
 reads and writes. SQLite creates the file if it does not exist; use [`create_db`](@ref) to set up
 the CHESS tables in a new file. Calling it again switches to a different database.
 
-A database created before the `Chemicals` table became the `Species` table is still readable only
-after [`migrate_species!`](@ref) is run on it; `connect_SQLite` warns when it finds one.
+A database created before the `Chemicals` and `CompositionRules` tables became the `Species` and
+`Dissolutions` tables is still readable only
+after [`migrate_chemistry!`](@ref) is run on it; `connect_SQLite` warns when it finds one.
 """
 function connect_SQLite(path)
     _current_db[] = SQLite.DB(path)

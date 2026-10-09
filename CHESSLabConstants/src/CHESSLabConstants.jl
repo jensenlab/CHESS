@@ -30,7 +30,7 @@ export get_mw_density, register_reagent!, register_organism!, register_chemical!
 function __init__()
     CHESSCore.register_lab(CHESSLabConstants)
     _register_occupancy_rules!()
-    _register_electrolyte_compositions!()
+    _register_electrolyte_dissolutions!()
     _register_acid_base_systems!()
     _register_ion_parameters!()
 end

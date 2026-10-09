@@ -134,7 +134,7 @@ end
     @test CHESSCore.molecular_weight(CHESSLabConstants.calcium_chloride) ≈ 147.01u"g/mol" atol=0.01u"g/mol"
 
     # pre-existing data bug in the ported PubChem cache (NaCl stored as 214.25u"g/mol", matching the
-    # wrong CID it was linked to -- since fixed in solids.jl) is masked by composition-derivation,
+    # wrong CID it was linked to -- since fixed in solids.jl) is masked by dissolution-derivation,
     # which takes precedence over the stored field regardless
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_chloride) ≈ 58.44u"g/mol" atol=0.01u"g/mol"
 
@@ -453,8 +453,8 @@ end
     @test CHESSCore.pH(his_stock;ionic_strength_correction=false) ≈ 7.68 atol=0.01
 
     # pyruvate is real sodium pyruvate (confirmed against Reagent_StockList.xlsx, Sigma P5280) --
-    # its CompositionRule dissociates into Na+ and the correctly-charged anion, not a bare ion
-    pyr_products = CHESSCore.composition(CHESSLabConstants.sodium_pyruvate).products
+    # its Dissolution dissociates into Na+ and the correctly-charged anion, not a bare ion
+    pyr_products = CHESSCore.dissolution(CHESSLabConstants.sodium_pyruvate).products
     @test pyr_products[CHESSLabConstants.PyruvateAnion] == 1
     @test pyr_products[CHESSLabConstants.Na⁺] == 1
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_pyruvate) ≈ 110.04u"g/mol" atol=0.01u"g/mol"
@@ -472,25 +472,25 @@ end
     @test 7.0 < pH(pyr_stock;ionic_strength_correction=false) < 8.0
 
     # butyrate is real sodium butyrate (confirmed: Sigma 303410)
-    but_products = CHESSCore.composition(CHESSLabConstants.sodium_butyrate).products
+    but_products = CHESSCore.dissolution(CHESSLabConstants.sodium_butyrate).products
     @test but_products[CHESSLabConstants.ButyrateAnion] == 1
     @test but_products[CHESSLabConstants.Na⁺] == 1
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_butyrate) ≈ 110.09u"g/mol" atol=0.01u"g/mol"
 
     # tartrate is real sodium tartrate dihydrate (confirmed against Reagent_StockList.xlsx, catalog
     # AAA1618730) -- 2 Na+ and 2 waters of hydration, not a bare dianion
-    tart_products = CHESSCore.composition(CHESSLabConstants.tartrate).products
+    tart_products = CHESSCore.dissolution(CHESSLabConstants.tartrate).products
     @test tart_products[CHESSLabConstants.TartrateDianion] == 1
     @test tart_products[CHESSLabConstants.Na⁺] == 2
     @test tart_products[CHESSLabConstants.H2O] == 2
     @test CHESSCore.molecular_weight(CHESSLabConstants.tartrate) ≈ 230.08u"g/mol" atol=0.01u"g/mol"
 
     # ascorbate is the plain free acid (both Reagent_StockList.xlsx catalog lines are "L-ASCORBIC
-    # ACID") -- no CompositionRule needed, identity is neutral like citric_acid/lactic_acid
-    @test !haskey(CHESSCore.composition_rules,CHESSLabConstants.ascorbate)
+    # ACID") -- no Dissolution needed, identity is neutral like citric_acid/lactic_acid
+    @test !haskey(CHESSCore.dissolutions,CHESSLabConstants.ascorbate)
     @test CHESSCore.molecular_weight(CHESSLabConstants.ascorbate) ≈ 176.12u"g/mol" atol=0.01u"g/mol"
 
-    # tetracycline (HCl-salt case): CompositionRule correctly dissociates into Cl- and the cation,
+    # tetracycline (HCl-salt case): Dissolution correctly dissociates into Cl- and the cation,
     # and molecular_weight is now derived (matching the stored HCl-salt mass), not the stale copy
     r = CHESSCore.recipe(0.01u"mol"*CHESSLabConstants.tetracycline)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 0.01u"mol" atol=1e-6u"mol"

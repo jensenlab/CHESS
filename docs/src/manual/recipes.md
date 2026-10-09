@@ -31,7 +31,7 @@ julia> sort(string.(keys(r.amounts)))
 ```
 
 `recipe` sums the contribution of every reagent, dissociating or not. `water` does not dissociate,
-so it contributes its own identity, the default `composition`.
+so it contributes its own identity, the default dissolution.
 
 ## Reading a `Recipe`
 
@@ -78,5 +78,5 @@ julia> pH(acid)
 ```
 
 Because `pH` subtracts `OH⁻` from `H⁺`, a base is registered with its dissociation formula (for
-example `Na⁺ + OH⁻` for NaOH) and not a negative `H⁺` count. `CompositionRule` coefficients must be
+example `Na⁺ + OH⁻` for NaOH) and not a negative `H⁺` count. `Dissolution` coefficients must be
 non-negative, and mixing an acid and a base nets out through the subtraction.

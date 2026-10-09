@@ -58,7 +58,7 @@
 @reagent cellulose_triacetate "Cellulose Triacetate" Solid missing missing missing
 # ^ Thermo Scientific/Acros AC177822500 (CAS 9012-09-3, repeat unit (C24H32O16)n) -- lab_id/name
 # reflect the actual product on the shelf, not plain cellulose. Polymer, no PubChem CID/fixed MW;
-# no CompositionRule/AcidBaseSystem (same non-discrete-material treatment as arabinan/
+# no Dissolution/AcidBaseSystem (same non-discrete-material treatment as arabinan/
 # hydrolyzed_mucin below).
 @reagent chloramphenicol "chloramphenicol" Solid 323.13u"g/mol" missing 5959
 @reagent chlortetracycline "chlortetracycline" Solid 515.3u"g/mol" missing 54682468
@@ -69,21 +69,21 @@
 @reagent cobalt_chloride "Cobalt (II) Chloride Hexahydrate" Solid missing 1.924u"g/mL" 24643
 # ^ fixed 2026-08-14: was registered anhydrous (CID 3032536, real anhydrous density ~3.35 g/mL) but
 # the stored density (1.924) actually matches the hexahydrate's -- corrected to the hexahydrate CID
-# (24643); molecular_weight derives from the CompositionRule (electrolytes.jl), now including 6 H2O.
+# (24643); molecular_weight derives from the Dissolution (electrolytes.jl), now including 6 H2O.
 @reagent cobalt_nitrate "Cobalt (II) Nitrate Hexahydrate" Solid missing 1.88u"g/mL" 24821
 # ^ fixed 2026-08-14: was registered anhydrous (CID 25000, density 1.54 -- neither the anhydrous
 # nor hexahydrate reference density) -- corrected to hexahydrate (CID 24821, density 1.88) per the
 # lab's own purchase record (Sigma 230375-100G, "COBALT(II) NITRATE HEXAHYDRATE, 98%").
-# molecular_weight derives from the CompositionRule (electrolytes.jl), now including 6 H2O.
+# molecular_weight derives from the Dissolution (electrolytes.jl), now including 6 H2O.
 @reagent colistin "colistin" Solid 1155.4u"g/mol" missing 5311054
 @reagent copper_chloride "Copper (II) Chloride Dihydrate" Solid missing 2.54u"g/mL" 61482
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24014, real anhydrous density ~3.4 g/mL) but the
 # stored density (2.54) actually matches the dihydrate's -- corrected to the dihydrate CID (61482);
-# molecular_weight derives from the CompositionRule (electrolytes.jl), now including 2 H2O.
+# molecular_weight derives from the Dissolution (electrolytes.jl), now including 2 H2O.
 @reagent copper_sulfate "Copper (II) Sulfate Pentahydrate" Solid missing 2.29u"g/mL" 24463
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24462, real anhydrous density ~3.6 g/mL) but the
 # stored density (2.29) actually matches the pentahydrate's -- corrected to the pentahydrate CID
-# (24463); molecular_weight derives from the CompositionRule (electrolytes.jl), now including 5 H2O.
+# (24463); molecular_weight derives from the Dissolution (electrolytes.jl), now including 5 H2O.
 @reagent cyclohexamide "cyclohexamide" Solid 281.35u"g/mol" missing 6197
 @reagent cycloserine "cycloserine" Solid 102.09u"g/mol" missing 6234
 @reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing 23462
@@ -225,7 +225,7 @@
 @reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate Dodecahydrate" Solid missing 1.725u"g/mL" 62667
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24856), but the stored density (1.725) is
 # PubChem's own dodecahydrate-labeled value, and potassium alum is essentially never sold anhydrous
-# -- corrected to the dodecahydrate CID (62667); molecular_weight derives from the CompositionRule
+# -- corrected to the dodecahydrate CID (62667); molecular_weight derives from the Dissolution
 # (electrolytes.jl), now including 12 H2O.
 @reagent potassium_chloride "Potassium Chloride" Solid missing 1.984u"g/mL" 4873
 @reagent potassium_phosphate_di "potassium phosphate dibasic" Solid missing missing 24450
@@ -263,17 +263,17 @@
 @reagent sodium_citrate_dihydrate "Sodium Citrate Dihydrate" Solid missing missing 71474
 # ^ Fisherbrand S279-500. Vendor listing says "citrate buffer solution" but the product is actually
 # the raw salt, Sodium Citrate Dihydrate (trisodium citrate dihydrate, CAS 6132-04-3) -- not a
-# premixed buffer. molecular_weight is `missing` and derived instead from its CompositionRule
+# premixed buffer. molecular_weight is `missing` and derived instead from its Dissolution
 # (electrolytes.jl: 3*Na+ + Citrate3- + 2*H2O), matching sodium_acetate_trihydrate's convention.
 @reagent sodium_dichromate "Sodium Dichromate Dihydrate" Solid missing 2.35u"g/mL" 108005
 # ^ fixed 2026-08-14: was registered anhydrous (CID 25408) -- corrected to dihydrate (CID 108005)
 # per the lab's own purchase record (Sigma 398063-100G, whose catalog listing is "Sodium dichromate
 # dihydrate"). Density (2.35) was already the dihydrate's value, unchanged. molecular_weight derives
-# from the CompositionRule (electrolytes.jl), now including 2 H2O.
+# from the Dissolution (electrolytes.jl), now including 2 H2O.
 @reagent sodium_molybdate "Sodium Molybdate Dihydrate" Solid missing 3.5u"g/mL" 16211258
 # ^ fixed 2026-08-14: was registered anhydrous (CID 61424, density 3.78) -- corrected to dihydrate
 # (CID 16211258, density 3.5) per the lab's own purchase record (catalog 243655-100G, "Sodium
-# molybdate dihydrate"). molecular_weight derives from the CompositionRule (electrolytes.jl), now
+# molybdate dihydrate"). molecular_weight derives from the Dissolution (electrolytes.jl), now
 # including 2 H2O.
 @reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid missing missing 6096963
 @reagent sodium_phosphate_di_anhydrous "sodium phosphate dibasic anhydrous" Solid missing missing 24203
@@ -283,7 +283,7 @@
 @reagent sodium_tungstate "Sodium Tungstate Dihydrate" Solid missing 3.25u"g/mL" 150191
 # ^ fixed 2026-08-14: was registered anhydrous (CID 26052, density 4.179) -- corrected to dihydrate
 # (CID 150191, density 3.25) per the lab's own purchase record (Sigma 223336-100G, "SODIUM TUNGSTATE
-# DIHYDRATE, ACS REAGENT"). molecular_weight derives from the CompositionRule (electrolytes.jl), now
+# DIHYDRATE, ACS REAGENT"). molecular_weight derives from the Dissolution (electrolytes.jl), now
 # including 2 H2O.
 @reagent soluble_starch "Soluble Starch" Solid missing missing missing
 @reagent sorbitol "D-sorbitol" Solid 182.17u"g/mol" 1.49u"g/mL" 5780
@@ -328,5 +328,5 @@
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24424, real anhydrous density ~3.8 g/mL) -- the
 # stored density (1.96) actually matched the heptahydrate's, and the lab's own purchase record
 # (Reagent_StockList.xlsx: Sigma Z0251-100G, "ZINC SULFATE HEPTAHYDRATE") confirms it. Corrected to
-# the heptahydrate CID (62640); molecular_weight derives from the CompositionRule (electrolytes.jl),
+# the heptahydrate CID (62640); molecular_weight derives from the Dissolution (electrolytes.jl),
 # now including 7 H2O.

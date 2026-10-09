@@ -26,8 +26,8 @@ end
 
 Reconstruct a bare [`Species`](@ref) from the `Species` table by `ID` -- the direct, standalone
 counterpart of `get_component` for `Reagent`/`Organism`. `Species` reconstruction otherwise
-only happens inline inside [`restore_composition!`](@ref) as part of rebuilding a `Reagent`'s
-`CompositionRule`; this gives it the same testable, direct path.
+only happens inline inside [`restore_dissolution!`](@ref) as part of rebuilding a `Reagent`'s
+`Dissolution`; this gives it the same testable, direct path.
 """
 function get_species(id::Integer)
     row = query_db("SELECT Name, Charge, Formula, MolecularWeight FROM Species WHERE ID = ?",(id,))
@@ -39,23 +39,23 @@ function get_species(id::Integer)
 end
 
 """
-    restore_composition!(reagent::Reagent, component_id::Integer)
+    restore_dissolution!(reagent::Reagent, component_id::Integer)
 
-Restore `reagent`'s dissociation rule from the `CompositionRules`/`Species` tables (see
-`upload_composition`, `src/database/uploads.jl`), registering it via [`set_composition!`](@ref) so a
+Restore `reagent`'s dissociation rule from the `Dissolutions`/`Species` tables (see
+`upload_dissolution`, `src/database/uploads.jl`), registering it via [`set_dissolution!`](@ref) so a
 reagent reconstructed from the database behaves identically to one defined by its original lab module
 in the current session -- no longer dependent on that module being loaded. No-op if nothing was
 persisted for `component_id` (e.g. locations uploaded before this table existed).
 """
-function restore_composition!(reagent::Reagent,component_id::Integer)
+function restore_dissolution!(reagent::Reagent,component_id::Integer)
     rows = query_db("""
         SELECT r.SpeciesID, r.Coefficient
-        FROM CompositionRules r
+        FROM Dissolutions r
         WHERE r.ReagentComponentID = ?
     """,(component_id,))
     nrow(rows)==0 && return nothing
     products = Dict(get_species(row.SpeciesID) => row.Coefficient for row in eachrow(rows))
-    set_composition!(reagent,CompositionRule(products))
+    set_dissolution!(reagent,Dissolution(products))
     return nothing
 end
 
@@ -71,7 +71,7 @@ function get_component(id::Integer)
         c = query_db("SELECT Name, Type,MolecularWeight,Density,CID FROM Reagents WHERE ComponentID = ?",(id,))[1,:]
         typ=eval(Symbol(c["Type"]))
         reagent = typ(c["Name"],c["MolecularWeight"]*u"g/mol",c["Density"]*u"g/mL",c["CID"])
-        restore_composition!(reagent,id)
+        restore_dissolution!(reagent,id)
         return reagent
 
     elseif comp_type =="Organism"

@@ -163,7 +163,7 @@ function upload_component(reagent::Reagent)
     id=query_db("SELECT Max(ID) FROM Components")[1,1]
     execute_db("INSERT INTO Reagents(ComponentID,Name,Type,MolecularWeight,Density,CID) Values(?,?,?,?,?,?)",
         (id,name(reagent),string(typeof(reagent)),mw,d,pc))
-    upload_composition(id,reagent)
+    upload_dissolution(id,reagent)
     return id
 end
 
@@ -206,18 +206,18 @@ function upload_species(spc::Species)
 end
 
 """
-    upload_composition(reagent_component_id::Integer, reagent::Reagent)
+    upload_dissolution(reagent_component_id::Integer, reagent::Reagent)
 
-Persist `reagent`'s currently-resolved [`composition`](@ref) (`composition(reagent).products`) as
-`CompositionRules` rows -- the DB counterpart of the in-memory `composition_rules` registry. Called
+Persist `reagent`'s currently-resolved [`dissolution`](@ref) (`dissolution(reagent).products`) as
+`Dissolutions` rows -- the DB counterpart of the in-memory `dissolutions` registry. Called
 whenever a `Reagent` component is uploaded, so a reagent reconstructed from the database (see
 `get_component`, `reconstruct_contents.jl`) can restore its dissociation rule without depending on the
 defining lab module being loaded in that session.
 """
-function upload_composition(reagent_component_id::Integer,reagent::Reagent)
-    for (spc,coeff) in composition(reagent).products
+function upload_dissolution(reagent_component_id::Integer,reagent::Reagent)
+    for (spc,coeff) in dissolution(reagent).products
         spc_id=get_species_id(spc)
-        execute_db("INSERT OR IGNORE INTO CompositionRules(ReagentComponentID,SpeciesID,Coefficient) Values(?,?,?)",
+        execute_db("INSERT OR IGNORE INTO Dissolutions(ReagentComponentID,SpeciesID,Coefficient) Values(?,?,?)",
             (reagent_component_id,spc_id,coeff))
     end
     return nothing

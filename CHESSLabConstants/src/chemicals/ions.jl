@@ -52,7 +52,7 @@ lines in the `SOLUTION_SPECIES` block for each ion's own reaction), not estimate
 not registered here (e.g. `NH4⁺`, which has no `-gamma` line in that database) falls back to Davies
 (see `CHESSCore.activity_coefficient`'s docstring for that limitation) rather than an invented value.
 Wrapped in a function called from `__init__`, matching every other cross-package registration in this
-package (see `_register_electrolyte_compositions!`/`_register_acid_base_systems!` for why this can't
+package (see `_register_electrolyte_dissolutions!`/`_register_acid_base_systems!` for why this can't
 run at plain top-level include time).
 """
 function _register_ion_parameters!()

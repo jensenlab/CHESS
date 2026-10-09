@@ -477,9 +477,9 @@ const Cl⁻=CHESSCore.Species("Cl-",-1,35.45u"g/mol")
 const Na⁺=CHESSCore.Species("Na+",1,22.99u"g/mol")
 const K⁺=CHESSCore.Species("K+",1,39.10u"g/mol")
 
-set_composition!(HydrochloricAcid,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
-set_composition!(SodiumHydroxide,CompositionRule(Dict(Na⁺=>1,OH⁻=>1)))
-set_composition!(PotassiumChloride,CompositionRule(Dict(K⁺=>1,Cl⁻=>1)))
+set_dissolution!(HydrochloricAcid,Dissolution(Dict(H⁺=>1,Cl⁻=>1)))
+set_dissolution!(SodiumHydroxide,Dissolution(Dict(Na⁺=>1,OH⁻=>1)))
+set_dissolution!(PotassiumChloride,Dissolution(Dict(K⁺=>1,Cl⁻=>1)))
 
 @testset "Ionic dissociation and pH" begin
     neutral=(0.001u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
@@ -497,25 +497,25 @@ set_composition!(PotassiumChloride,CompositionRule(Dict(K⁺=>1,Cl⁻=>1)))
     kcl=0.01u"mol"*PotassiumChloride
     @test total_concentration(kcl,K⁺) > 0u"mol/L"
 
-    # molecular_weight(x::Reagent) now derives from the registered composition rather than the
-    # originally-given stored field, once a composition is registered -- confirms the fix actually
+    # molecular_weight(x::Reagent) now derives from the registered dissolution rather than the
+    # originally-given stored field, once a dissolution is registered -- confirms the fix actually
     # changed which number wins (36.458, not the originally-given 36.46), not just that nothing broke
     @test molecular_weight(HydrochloricAcid) ≈ (1.008+35.45)u"g/mol"
     @test !(molecular_weight(HydrochloricAcid) ≈ 36.46u"g/mol")
 
-    @test_throws ArgumentError CompositionRule(Dict(H⁺=>-1))
+    @test_throws ArgumentError Dissolution(Dict(H⁺=>-1))
 end
 
 @reagent LiquidHCl "liquid hydrochloric acid" Liquid 36.46u"g/mol" 1.20u"g/mL" missing
-set_composition!(LiquidHCl,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
+set_dissolution!(LiquidHCl,Dissolution(Dict(H⁺=>1,Cl⁻=>1)))
 
-@testset "recipe(::Stock) includes liquids; composition reserved for Reagent" begin
-    # composition(::Stock) was eliminated -- Recipe now covers this (see below); composition(x) only
-    # has a Reagent-level method (-> CompositionRule), confirmed here
-    @test !hasmethod(composition,Tuple{Stock})
-    @test composition(PotassiumChloride).products == Dict(K⁺=>1,Cl⁻=>1) # reagent-level, unaffected
+@testset "recipe(::Stock) includes liquids; dissolution reserved for Reagent" begin
+    # Recipe covers stock-level composition (see below); dissolution(x) only
+    # has a Reagent-level method (-> Dissolution), confirmed here
+    @test !hasmethod(dissolution,Tuple{Stock})
+    @test dissolution(PotassiumChloride).products == Dict(K⁺=>1,Cl⁻=>1) # reagent-level, unaffected
 
-    # user-reported bug (now via recipe/molar_amount instead of the removed composition(::Stock)):
+    # user-reported bug (now via recipe/molar_amount instead of the removed dissolution(::Stock)):
     # a pure-water Solution used to yield an empty Dict even though water has a (default,
     # non-dissociating) identity Species
     water_stock = 100u"mL"*rgt"water"
@@ -537,7 +537,7 @@ set_composition!(LiquidHCl,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
     # Recipe is moles-native: a Species with unknown molecular_weight still has a well-defined molar
     # amount (mw-independent), even though mass() for it is missing (genuinely uncomputable) rather
     # than 0. Built directly via Recipe's own construction algebra -- going through a registered
-    # Reagent composition isn't possible here, since molecular_weight(x::Reagent) now derives from
+    # Reagent dissolution isn't possible here, since molecular_weight(x::Reagent) now derives from
     # the sum of *all* its registered products (an earlier plan's fix): a reagent with an unknown-mw
     # product would itself get an unknown derived mw, which would block it from ever being converted
     # to moles in the first place, never reaching Recipe's accumulation at all.
@@ -586,7 +586,7 @@ end
 
 @testset "Acid/base equilibrium pH: warns only when nothing participates" begin
     # b = 10u"g"*rgt"paba" (defined above) -- a pure Mixture of a reagent with no registered
-    # CompositionRule/AcidBaseSystem in this test context, so it has neither a family nor any charged
+    # Dissolution/AcidBaseSystem in this test context, so it has neither a family nor any charged
     # species at all: pH's 7.0 here is a bare default, not a computed result, and should warn
     families_b,strong_ions_b = CHESSCore._analytical_species(b)
     @test isempty(families_b) && isempty(strong_ions_b)
@@ -606,8 +606,8 @@ end
 @reagent TestWeakAcidNa "test sodium weak-acid salt" Solid missing missing missing
 const TestHA = CHESSCore.Species("TestHA",0,60.0u"g/mol")
 const TestAMinus = CHESSCore.Species("TestA-",-1,59.0u"g/mol")
-set_composition!(TestWeakAcid,CompositionRule(Dict(TestHA=>1)))
-set_composition!(TestWeakAcidNa,CompositionRule(Dict(Na⁺=>1,TestAMinus=>1)))
+set_dissolution!(TestWeakAcid,Dissolution(Dict(TestHA=>1)))
+set_dissolution!(TestWeakAcidNa,Dissolution(Dict(Na⁺=>1,TestAMinus=>1)))
 const test_weak_acid_system = AcidBaseSystem([TestHA,TestAMinus],[4.76])
 set_acid_base_system!(TestWeakAcid,test_weak_acid_system)
 set_acid_base_system!(TestWeakAcidNa,test_weak_acid_system)
@@ -637,8 +637,8 @@ const TestH3A_chem = CHESSCore.Species("TestH3A",0,98.0u"g/mol")
 const TestH2AMinus = CHESSCore.Species("TestH2A-",-1,97.0u"g/mol")
 const TestHAMinus2 = CHESSCore.Species("TestHA2-",-2,96.0u"g/mol")
 const TestAMinus3 = CHESSCore.Species("TestA3-",-3,95.0u"g/mol")
-set_composition!(TestKH2A,CompositionRule(Dict(K⁺=>1,TestH2AMinus=>1)))
-set_composition!(TestK2HA,CompositionRule(Dict(K⁺=>2,TestHAMinus2=>1)))
+set_dissolution!(TestKH2A,Dissolution(Dict(K⁺=>1,TestH2AMinus=>1)))
+set_dissolution!(TestK2HA,Dissolution(Dict(K⁺=>2,TestHAMinus2=>1)))
 const test_triprotic_system = AcidBaseSystem([TestH3A_chem,TestH2AMinus,TestHAMinus2,TestAMinus3],[2.148,7.198,12.375])
 set_acid_base_system!(TestKH2A,test_triprotic_system)
 set_acid_base_system!(TestK2HA,test_triprotic_system)
@@ -776,10 +776,10 @@ end
     @test CHESSCore._activity_coefficient(H⁺,1,I) != CHESSCore._activity_coefficient(OH⁻,1,I)
 end
 
-@testset "Formula algebra" begin
-    @test (1*Na⁺).composition == Dict(Na⁺=>1)
-    @test (Na⁺+Cl⁻).composition == Dict(Na⁺=>1,Cl⁻=>1)
-    @test (Na⁺+2*Cl⁻).composition == Dict(Na⁺=>1,Cl⁻=>2)
+@testset "Dissolution algebra" begin
+    @test (1*Na⁺).products == Dict(Na⁺=>1)
+    @test (Na⁺+Cl⁻).products == Dict(Na⁺=>1,Cl⁻=>1)
+    @test (Na⁺+2*Cl⁻).products == Dict(Na⁺=>1,Cl⁻=>2)
 end
 
 const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
@@ -788,7 +788,7 @@ const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
 
 @testset "reagent_formula derivation" begin
     @test molecular_weight(MgCl2) ≈ (24.305+2*35.45)u"g/mol"
-    @test CHESSCore.composition(MgCl2).products == Dict(Mg²⁺=>1,Cl⁻=>2)
+    @test CHESSCore.dissolution(MgCl2).products == Dict(Mg²⁺=>1,Cl⁻=>2)
 end
 
 @testset "Recipe" begin
@@ -822,7 +822,7 @@ CHESSCore.register_lab(AsciiIonLab)
     @test spc"Na+" === AsciiIonLab.var"Na+"
     @test spc"Cl-" === AsciiIonLab.var"Cl-"
     f = spc"Na+" + spc"Cl-"
-    @test f.composition == Dict(spc"Na+"=>1, spc"Cl-"=>1)
+    @test f.products == Dict(spc"Na+"=>1, spc"Cl-"=>1)
     # the non-macro function form still supports compound expressions (unchanged, still Meta.parse-based)
     @test orgparse("(SMU_UA159)",org_context=[CHESSCore,TestChemOrg]) == org"SMU_UA159"
 end
@@ -1023,7 +1023,7 @@ end
 
     # a string-encoded compound expression -- exercises both the :call-head recursive branch and
     # the bare-Number-literal overload (the `2` itself routes through lookup_named_value too)
-    @test speciesparse("2*H⁺";species_context=CHESSCore).composition == (2*H⁺).composition
+    @test speciesparse("2*H⁺";species_context=CHESSCore).products == (2*H⁺).products
 
     # hint branch 1: symbol found in a globally-registered lab module, but not in the given context
     err1 = try
@@ -1053,14 +1053,15 @@ end
 
     @test charge(Cl⁻) == -1
 
-    # composition(::Reagent)'s default-identity fallback -- rgt"water" has no registered composition
-    @test composition(rgt"water").products == Dict(CHESSCore.Species(name(rgt"water"),0,molecular_weight(rgt"water"))=>1)
+    # dissolution(::Reagent)'s default-identity fallback -- rgt"water" has no registered dissolution
+    @test dissolution(rgt"water").products == Dict(CHESSCore.Species(name(rgt"water"),0,molecular_weight(rgt"water"))=>1)
 
-    # commutative Species/Formula operator overloads -- Formula has no custom == (falls back to
-    # identity), so compare .composition Dicts directly, matching the existing "Formula algebra"
-    # testset's style
-    @test (Cl⁻*2).composition == (2*Cl⁻).composition
-    @test (Cl⁻ + (Na⁺+Cl⁻)).composition == ((Na⁺+Cl⁻) + Cl⁻).composition
+    # commutative Species/Dissolution operator overloads
+    @test Cl⁻*2 == 2*Cl⁻
+    @test Cl⁻ + (Na⁺+Cl⁻) == (Na⁺+Cl⁻) + Cl⁻
+    @test hash(Cl⁻*2) == hash(2*Cl⁻)
+    @test (Na⁺+Cl⁻)*2 == 2*Cl⁻ + 2*Na⁺
+    @test_throws ArgumentError -1*Na⁺ # coefficients must be non-negative
 
     # convert(::DensityUnits,::Molarity,...) / convert(::MolarityUnits,::Density,...) -- were dead
     # code (the signature took a full Quantity for `y` but the body called uconvert(y,...), which
