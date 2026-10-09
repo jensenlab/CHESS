@@ -290,7 +290,7 @@ function _register_acid_base_systems!()
     # Organic acids -- each fully-protonated (neutral) reference state is built from the reagent's own
     # name/molecular_weight, so it's `==` to what dissolution(reagent) already returns by default (see
     # the comment above the Species definitions).
-    _identity(r::Reagent) = CHESSCore.Species(name(r),0,molecular_weight(r))
+    _identity(r::Reagent) = only(keys(CHESSCore.dissolution(r).products)) # the reagent's own registered identity species
 
     citric_acid_system = AcidBaseSystem([_identity(citric_acid),H2Citrate⁻,HCitrate²⁻,Citrate³⁻],[3.13,4.76,6.40])
     set_acid_base_system!(citric_acid,citric_acid_system)

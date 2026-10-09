@@ -168,18 +168,6 @@
 @reagent l_lyxose "L-Lyxose" Solid 150.13u"g/mol" missing 644176
 @reagent l_malic_acid "L-Malic Acid" Solid 134.09u"g/mol" missing 222656
 @reagent l_sorbose "L-Sorbose" Solid 180.16u"g/mol" missing 439192
-@reagent lactic_acid "Lactic Acid (85% w/w solution)" Solid 105.976u"g/mol" 1.2u"g/mL" 612
-# ^ real product is Sigma-Aldrich W261114, "Lactic acid, natural, >=85%" -- a LIQUID (85% w/w aqueous
-# solution, remainder water + oligomers), dosed by weight in practice (confirmed with the lab), so
-# it's kept `Solid`-typed here to preserve mass-based dosing (10u"g"*rgt"lactic_acid") rather than
-# switched to `Liquid` (which only supports volume-based dosing, see Stocks.jl). The stored MW is
-# purity-adjusted (90.08/0.85 = 105.976) so mass/MW correctly yields moles of *real* lactic acid per
-# gram of product weighed out -- this is CHESSCore's only lever for "moles per gram," so it takes
-# priority here over representing the true compound's own molar mass. One consequence: the neutral
-# species in lactic_acid's AcidBaseSystem chain (pKa_data.jl) inherits this purity-adjusted mass via
-# `_identity(lactic_acid)`, so it no longer differs from Lactate⁻ by exactly one proton's mass --
-# cosmetically inconsistent, but doesn't affect the pH solve (moles/charges, not absolute masses,
-# drive that). Revisit if CHESSCore ever gains a first-class "purity/assay" concept on Reagent.
 @reagent lactose "D-lactose" Solid 342.3u"g/mol" missing 6134
 @reagent lactulose "Lactulose" Solid 342.3u"g/mol" missing 11333
 @reagent lb "LB Broth" Solid missing missing missing

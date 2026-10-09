@@ -98,7 +98,7 @@ const complex_NaOH_2N = 2u"mol"*rgt"NaOH" + 1u"l"*rgt"water"
 const carbon_sources_20x =
     10u"g"*rgt"glucose" + 10u"g"*rgt"mannitol" + 10u"g"*rgt"trehalose" +
     10u"g"*rgt"sodium_butyrate" + 10u"g"*rgt"mannose" + 10u"g"*rgt"xylose" +
-    10u"g"*rgt"glcnac" + 10u"g"*rgt"lactic_acid" + 10u"g"*rgt"sodium_pyruvate" +
+    10u"g"*rgt"glcnac" + (10u"g"/CHESSCore.density(rgt"lactic_acid"))*rgt"lactic_acid" + 10u"g"*rgt"sodium_pyruvate" +
     10u"g"*rgt"myo_inositol" + 10u"g"*rgt"sodium_acetate_trihydrate" +
     45u"ml"*complex_NaOH_2N + (1000-45)*u"ml"*rgt"water"
 

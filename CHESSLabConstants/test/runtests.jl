@@ -238,16 +238,20 @@ end
     @test CHESSCore.pH(acetate_stock;ionic_strength_correction=false) > 7.0 # a weak base, genuinely basic
 end
 
-@testset "Acid/base equilibrium: lactic_acid is the 85% w/w solution (Sigma W261114), not pure acid" begin
-    # molecular_weight is purity-adjusted (90.08/0.85) so mass/MW yields moles of *real* lactic acid
-    # per gram of the 85% product actually weighed out -- regression test for a real reported pH
+@testset "Acid/base equilibrium: lactic_acid is the 88% w/w solution (Sigma W261106), not pure acid" begin
+    # molecular_weight is purity-adjusted (90.078/0.88) so mass/MW yields moles of *real* lactic acid
+    # per gram of the 88% product actually weighed out -- regression test for a real reported pH
     # discrepancy (carbon_sources_20x stock, predicted 4.94 vs measured 10.38)
-    @test CHESSCore.molecular_weight(CHESSLabConstants.lactic_acid) ≈ 105.976u"g/mol" atol=0.001u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.lactic_acid) ≈ 102.36u"g/mol" atol=0.01u"g/mol"
+    @test CHESSLabConstants.lactic_acid isa CHESSCore.Liquid
+    @test CHESSCore.is_opaque(only(keys(CHESSCore.dissolution(CHESSLabConstants.lactic_acid).products)))
 
-    stock = (10u"g"*CHESSLabConstants.lactic_acid) + (1.0u"L"*CHESSLabConstants.water)
+    # 10 g of the product, dosed by volume through its density
+    lactic_volume = 10u"g"/CHESSCore.density(CHESSLabConstants.lactic_acid)
+    stock = (lactic_volume*CHESSLabConstants.lactic_acid) + (1.0u"L"*CHESSLabConstants.water)
     families,_ = CHESSCore._analytical_species(stock)
     @test length(families) == 1
-    expected_moles = 10u"g"/105.976u"g/mol" # not 10u"g"/90.08u"g/mol" (the pure-acid assumption)
+    expected_moles = 10u"g"/(CHESSCore.formula_mass("C3H6O3")/0.88) # not 10u"g"/90.08u"g/mol" (the pure-acid assumption)
     @test uconvert(u"mol",families[1].total_concentration*CHESSCore.volume_estimate(stock)) ≈ expected_moles atol=1e-6u"mol"
 end
 
