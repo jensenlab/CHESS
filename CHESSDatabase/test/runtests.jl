@@ -240,6 +240,12 @@ end
     @test opaque2 == opaque_rt && CHESSCore.is_opaque(opaque2)
     @test CHESSDatabase.get_species_id(opaque_rt) != CHESSDatabase.get_species_id(CHESSCore.Species("opaque_rt",0,missing))
 
+    # an opaque species keeps its average molecular weight through the database
+    opaque_mw_rt = CHESSCore.Species("opaque_mw_rt",0,CHESSCore.opaque(1415.6u"g/mol"))
+    opaque_mw2 = CHESSDatabase.get_species(CHESSDatabase.get_species_id(opaque_mw_rt))
+    @test opaque_mw2 == opaque_mw_rt && molecular_weight(opaque_mw2) == 1415.6u"g/mol"
+    @test CHESSDatabase.get_species_id(opaque_mw_rt) != CHESSDatabase.get_species_id(opaque_rt)
+
     # a reagent defined by a formula string, and an opaque reagent, round-trip with their dissolutions
     @reagent DBFormulaReagent "db formula reagent" Solid "C6H12O6" 1.2u"g/mL" missing
     rid = CHESSDatabase.get_component_id(DBFormulaReagent)
@@ -250,6 +256,11 @@ end
     @reagent DBOpaqueReagent "db opaque reagent" Solid opaque 1.0u"g/mL" missing
     oid = CHESSDatabase.get_component_id(DBOpaqueReagent)
     @test CHESSCore.is_opaque(only(keys(CHESSCore.dissolution(CHESSDatabase.get_component(oid)).products)))
+    @reagent DBOpaqueMassReagent "db opaque mass reagent" Solid opaque(250.0u"g/mol") 1.0u"g/mL" missing
+    omid = CHESSDatabase.get_component_id(DBOpaqueMassReagent)
+    omreagent = CHESSDatabase.get_component(omid)
+    @test omreagent == DBOpaqueMassReagent
+    @test CHESSCore.dissolution(omreagent) == CHESSCore.dissolution(DBOpaqueMassReagent)
 
     # same name and charge but a different formula is a different species
     @test CHESSDatabase.get_species_id(Species("H+_rt",1,"H2")) != id_spc

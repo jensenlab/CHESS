@@ -193,10 +193,11 @@ name(x::Species)=x.name
 """
     molecular_weight(x::Species)
 Return the molecular weight of a [`Species`](@ref): derived from its elemental formula using atomic
-masses when it has one, otherwise its stored molecular weight (`missing` if none, and always
-`missing` for an opaque species).
+masses when it has one, otherwise its stored molecular weight (`missing` if none). An opaque species
+has the average molecular weight given to `opaque`, or `missing` if none was given.
 """
-molecular_weight(x::Species) = x.formula isa Dict ? formula_mass(x.formula) : x.stored_molecular_weight
+molecular_weight(x::Species) = x.formula isa Dict ? formula_mass(x.formula) :
+    x.formula isa OpaqueFormula ? x.formula.molecular_weight : x.stored_molecular_weight
 """
     formula(x::Species)
 Return the elemental formula of a [`Species`](@ref) as a dictionary from element symbol to atom
@@ -340,7 +341,8 @@ Define a new [`Species`](@ref) value (e.g. an ion like Na⁺, or a standalone ne
 import it into the workspace under `labname`. `charge` is `0` for neutral species. `formula` is an
 elemental formula string such as `"C6H12O6"`; the molecular weight is derived from it. A molar
 mass (or `missing`) may be given instead of a formula for a species whose formula is not registered
-yet, and `opaque` for a species whose atomic content is intentionally not described.
+yet, and `opaque` (or `opaque(mass)` with an average molar mass) for a species whose atomic content
+is intentionally not described.
 
 Example:
 ```julia
@@ -356,7 +358,7 @@ See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@s
 """
 macro species(labsymb,name,charge,formula)
     ls = Symbol(labsymb)
-    formula = formula === :opaque ? :($CHESSCore.opaque) : formula
+    formula = _opaque_marker(formula)
     docstr = """
             $labsymb
 
@@ -389,7 +391,7 @@ The `chemistry` argument says what the reagent is made of, and is one of:
   identity species has no formula and keeps this stored molecular weight;
 - `missing`, when nothing is known about its chemistry; or
 - `opaque`, for an undefined mixture such as yeast extract whose atomic content is intentionally not
-  described.
+  described, or `opaque(1415.6u"g/mol")` for one with a known average molar mass.
 
 The reagent's [`dissolution`](@ref) is registered with [`set_dissolution!`](@ref) (discoverable in
 [`dissolutions`](@ref)), and is kept with the defining module so it survives precompilation.
@@ -410,6 +412,9 @@ water
 julia> @reagent yeast_extract "yeast extract" Solid opaque 1.0u"g/mL" missing
 yeast extract
 
+julia> @reagent bleomycin "bleomycin" Solid opaque(1415.6u"g/mol") missing 5360373
+bleomycin
+
 julia> molecular_weight(water)
 18.015 g mol⁻¹
 ```
@@ -425,7 +430,7 @@ water
 See also: [`Solid`](@ref), [`Liquid`](@ref), [`Gas`](@ref), [`Dissolution`](@ref), [`@species`](@ref)
 """
 macro reagent(labsymb,name,type,chemistry,density,pubchemid)
-    chemistry = chemistry === :opaque ? :($CHESSCore.opaque) : chemistry
+    chemistry = _opaque_marker(chemistry)
 
     expr =Expr(:block)
     push!(expr.args,quote
@@ -547,7 +552,7 @@ function _reagent_chemistry(name::AbstractString,formula::AbstractString)
 end
 _reagent_chemistry(name::AbstractString,d::Dissolution) = (_dissolution_mass(d),d)
 _reagent_chemistry(name::AbstractString,mw::Union{Unitful.MolarMass,Missing}) = (mw,_identity_dissolution(Species(name,0,mw)))
-_reagent_chemistry(name::AbstractString,o::OpaqueFormula) = (missing,_identity_dissolution(Species(name,0,o)))
+_reagent_chemistry(name::AbstractString,o::OpaqueFormula) = (o.molecular_weight,_identity_dissolution(Species(name,0,o)))
 
 
 

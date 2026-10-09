@@ -33,7 +33,10 @@ function get_species(id::Integer)
     row = query_db("SELECT Name, Charge, Formula, MolecularWeight FROM Species WHERE ID = ?",(id,))
     nrow(row)==0 && error("species $id does not exist in the database")
     row = row[1,:]
-    isequal(row["Formula"],"opaque") && return Species(row["Name"],row["Charge"],CHESSCore.opaque)
+    if isequal(row["Formula"],"opaque")
+        ismissing(row["MolecularWeight"]) && return Species(row["Name"],row["Charge"],CHESSCore.opaque)
+        return Species(row["Name"],row["Charge"],CHESSCore.opaque(row["MolecularWeight"]*u"g/mol"))
+    end
     ismissing(row["Formula"]) || return Species(row["Name"],row["Charge"],row["Formula"])
     mw = ismissing(row["MolecularWeight"]) ? missing : row["MolecularWeight"]*u"g/mol"
     return Species(row["Name"],row["Charge"],mw)

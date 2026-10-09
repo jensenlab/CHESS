@@ -182,11 +182,15 @@ end
 
 # The natural key of a species row. A species with a formula stores the formula (as a canonical
 # Hill-order string) and no molecular weight, since its weight derives from the formula. An opaque
-# species stores the text "opaque" as its formula. A species without a formula stores its molecular
-# weight.
+# species stores the text "opaque" as its formula, and its average molecular weight if it has one. A
+# species without a formula stores its molecular weight.
 function _species_key(spc::Species)
     f = CHESSCore.formula(spc)
-    f isa CHESSCore.OpaqueFormula && return ["Name"=>name(spc),"Charge"=>charge(spc),"Formula"=>"opaque","MolecularWeight"=>missing]
+    if f isa CHESSCore.OpaqueFormula
+        mw = molecular_weight(spc)
+        mw = ismissing(mw) ? missing : ustrip(uconvert(u"g/mol",mw))
+        return ["Name"=>name(spc),"Charge"=>charge(spc),"Formula"=>"opaque","MolecularWeight"=>mw]
+    end
     ismissing(f) || return ["Name"=>name(spc),"Charge"=>charge(spc),"Formula"=>CHESSCore.formula_string(f),"MolecularWeight"=>missing]
     mw = molecular_weight(spc)
     mw = ismissing(mw) ? missing : ustrip(uconvert(u"g/mol",mw))

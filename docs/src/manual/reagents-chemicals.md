@@ -54,7 +54,9 @@ missing
 ```
 
 The word `opaque` marks a reagent whose atomic content is intentionally not described, such as
-an undefined mixture like yeast extract. An opaque reagent has no molecular weight:
+an undefined mixture like yeast extract. An opaque reagent has no molecular weight unless one is
+given by calling `opaque` with a molar mass, as for a mixture sold as a salt or a solution whose
+stated purity makes its effective molecular weight differ from the compound's:
 
 ```jldoctest reagents
 julia> @reagent mymixture "my undefined mixture" Solid opaque 1.0u"g/mL" missing
@@ -62,7 +64,16 @@ my undefined mixture
 
 julia> molecular_weight(mymixture)
 missing
+
+julia> @reagent mysolution "my 85% solution" Solid opaque(105.976u"g/mol") 1.2u"g/mL" missing
+my 85% solution
+
+julia> molecular_weight(mysolution)
+105.976 g mol⁻¹
 ```
+
+An opaque reagent with a molar mass has its moles tracked, so concentrations work, but its atoms are
+not counted by [`atoms`](@ref).
 
 ## Species type
 

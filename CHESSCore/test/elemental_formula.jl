@@ -257,3 +257,31 @@ end
     @test_throws ArgumentError atoms(mixed,:Xx)
     @test_throws ArgumentError atoms(mixed,:fe)
 end
+
+@testset "opaque with an average molecular weight" begin
+    o = CHESSCore.opaque(1415.6u"g/mol")
+    @test o isa CHESSCore.OpaqueFormula
+    @test o.molecular_weight == 1415.6u"g/mol"
+    @test o == CHESSCore.opaque(1.4156u"kg/mol") && hash(o) == hash(CHESSCore.opaque(1.4156u"kg/mol"))
+    @test o != CHESSCore.opaque && CHESSCore.opaque == CHESSCore.opaque
+    @test sprint(show,CHESSCore.opaque) == "opaque"
+    @test occursin("opaque(",sprint(show,o))
+
+    s = Species("mixture",0,o)
+    @test CHESSCore.is_opaque(s)
+    @test molecular_weight(s) == 1415.6u"g/mol"
+    @test s != Species("mixture",0,CHESSCore.opaque)
+    @test_throws ArgumentError Species("x",0,o,1.0u"g/mol") # still one description only
+
+    @reagent TestOpaqueWithMass "opaque with mass" Solid opaque(1415.6u"g/mol") missing missing
+    @test molecular_weight(TestOpaqueWithMass) == 1415.6u"g/mol"
+    @test CHESSCore.is_opaque(only(keys(CHESSCore.dissolution(TestOpaqueWithMass).products)))
+    @species TestOpaqueSpeciesWithMass "opaque species with mass" 0 opaque(200.0u"g/mol")
+    @test molecular_weight(TestOpaqueSpeciesWithMass) == 200.0u"g/mol"
+
+    # moles are tracked, so concentrations work, but the atoms are not counted and nothing warns
+    stock = 1415.6u"g"*TestOpaqueWithMass
+    @test molar_amount(composition(stock),only(keys(CHESSCore.dissolution(TestOpaqueWithMass).products))) ≈ 1u"mol"
+    @test_logs atoms(stock)
+    @test isempty(atoms(stock))
+end
