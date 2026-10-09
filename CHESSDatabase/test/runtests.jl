@@ -234,6 +234,23 @@ end
     unknown_rt = CHESSCore.Species("unknown_rt",-1,missing)
     @test CHESSDatabase.get_species(CHESSDatabase.get_species_id(unknown_rt)) == unknown_rt
 
+    # an opaque species round-trips, distinct from a species with an unregistered formula
+    opaque_rt = CHESSCore.Species("opaque_rt",0,CHESSCore.opaque)
+    opaque2 = CHESSDatabase.get_species(CHESSDatabase.get_species_id(opaque_rt))
+    @test opaque2 == opaque_rt && CHESSCore.is_opaque(opaque2)
+    @test CHESSDatabase.get_species_id(opaque_rt) != CHESSDatabase.get_species_id(CHESSCore.Species("opaque_rt",0,missing))
+
+    # a reagent defined by a formula string, and an opaque reagent, round-trip with their dissolutions
+    @reagent DBFormulaReagent "db formula reagent" Solid "C6H12O6" 1.2u"g/mL" missing
+    rid = CHESSDatabase.get_component_id(DBFormulaReagent)
+    reagent2 = CHESSDatabase.get_component(rid)
+    @test reagent2 == DBFormulaReagent
+    @test CHESSCore.dissolution(reagent2) == CHESSCore.dissolution(DBFormulaReagent)
+    @test CHESSCore.formula(only(keys(CHESSCore.dissolution(reagent2).products))) == Dict(:C=>6,:H=>12,:O=>6)
+    @reagent DBOpaqueReagent "db opaque reagent" Solid opaque 1.0u"g/mL" missing
+    oid = CHESSDatabase.get_component_id(DBOpaqueReagent)
+    @test CHESSCore.is_opaque(only(keys(CHESSCore.dissolution(CHESSDatabase.get_component(oid)).products)))
+
     # same name and charge but a different formula is a different species
     @test CHESSDatabase.get_species_id(Species("H+_rt",1,"H2")) != id_spc
 

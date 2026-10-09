@@ -487,7 +487,8 @@ end
 
     # ascorbate is the plain free acid (both Reagent_StockList.xlsx catalog lines are "L-ASCORBIC
     # ACID") -- no Dissolution needed, identity is neutral like citric_acid/lactic_acid
-    @test !haskey(CHESSCore.dissolutions,CHESSLabConstants.ascorbate)
+    asc_products = CHESSCore.dissolution(CHESSLabConstants.ascorbate).products
+    @test length(asc_products) == 1 && only(values(asc_products)) == 1 && CHESSCore.charge(only(keys(asc_products))) == 0
     @test CHESSCore.molecular_weight(CHESSLabConstants.ascorbate) ≈ 176.12u"g/mol" atol=0.01u"g/mol"
 
     # tetracycline (HCl-salt case): Dissolution correctly dissociates into Cl- and the cation,

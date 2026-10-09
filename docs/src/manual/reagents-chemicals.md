@@ -29,14 +29,38 @@ julia> pubchemid(rgt"water")
 962
 ```
 
-[`@reagent`](@ref) registers a new reagent. Any of the three properties can be left unknown, so a
-reagent can be registered and used with incomplete data:
+[`@reagent`](@ref) registers a new reagent. After the name and type, its fourth argument says what
+the reagent is made of. An elemental formula string registers the reagent as a single neutral species
+with that formula, and the molecular weight is derived from the formula and atomic masses:
+
+```jldoctest reagents
+julia> @reagent mysugar "my sugar" Solid "C6H12O6" 1.2u"g/mL" missing
+my sugar
+
+julia> molecular_weight(mysugar)
+180.156 g mol⁻¹
+```
+
+A molar mass may be given instead of a formula, for a reagent whose formula is not registered. The
+reagent then keeps that stored molecular weight and has no formula. Any of the properties can be left
+unknown, so a reagent can be registered and used with incomplete data:
 
 ```jldoctest reagents
 julia> @reagent myreagent "my made-up reagent" Solid missing missing missing
 my made-up reagent
 
 julia> molecular_weight(myreagent)
+missing
+```
+
+The word `opaque` marks a reagent whose atomic content is intentionally not described, such as
+an undefined mixture like yeast extract. An opaque reagent has no molecular weight:
+
+```jldoctest reagents
+julia> @reagent mymixture "my undefined mixture" Solid opaque 1.0u"g/mL" missing
+my undefined mixture
+
+julia> molecular_weight(mymixture)
 missing
 ```
 
@@ -79,11 +103,11 @@ julia> dissolution(rgt"water")
 Dissolution(Dict{Species, Int64}(water => 1))
 ```
 
-[`@reagent_formula`](@ref) registers a reagent and its dissolution in one step. It
-derives `molecular_weight` from the dissolution, so the two cannot disagree:
+A [`Dissolution`](@ref) in the fourth argument of [`@reagent`](@ref) registers a reagent and its
+dissolution in one step. The molecular weight is derived from the species, so the two cannot disagree:
 
 ```jldoctest reagents
-julia> @reagent_formula LiCl "lithium chloride" Solid (Li⁺ + spc"Cl-") missing missing
+julia> @reagent LiCl "lithium chloride" Solid (Li⁺ + spc"Cl-") missing missing
 lithium chloride
 
 julia> molecular_weight(LiCl)

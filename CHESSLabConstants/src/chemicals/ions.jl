@@ -1,6 +1,6 @@
 # Species identities for the ions that appear in this lab's electrolyte salts (see solids.jl's
-# @reagent_formula definitions) and acid/base equilibria (see pKa_data.jl). Included before solids.jl
-# so those `@reagent_formula` calls can reference these constants directly.
+# Dissolution definitions) and acid/base equilibria (see pKa_data.jl). Included before solids.jl
+# so reagent definitions there can reference these constants directly.
 #
 # Each ion is defined by its elemental formula and charge; its molecular weight derives from atomic
 # masses. The PubChem CID cited in each comment identifies the ion.

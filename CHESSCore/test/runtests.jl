@@ -784,11 +784,12 @@ end
 
 const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
 
-@reagent_formula MgCl2 "magnesium chloride" Solid (Mg²⁺+2*Cl⁻) missing missing
+@reagent MgCl2 "magnesium chloride" Solid (Mg²⁺+2*Cl⁻) missing missing
 
-@testset "reagent_formula derivation" begin
+@testset "@reagent with a Dissolution" begin
     @test molecular_weight(MgCl2) ≈ (24.305+2*35.45)u"g/mol"
     @test CHESSCore.dissolution(MgCl2).products == Dict(Mg²⁺=>1,Cl⁻=>2)
+    @test MgCl2.molecular_weight ≈ molecular_weight(MgCl2) # the stored weight is the derived one
 end
 
 @testset "Composition" begin

@@ -103,7 +103,7 @@ export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types
 export is_capable, actuatable_attributes, performable_operations, readable_types
-export @species, @reagent, @reagent_formula, @organism , @attribute, @spc_str, @rgt_str, @org_str, @attr_str # macros for constants
+export @species, @reagent, @organism , @attribute, @spc_str, @rgt_str, @org_str, @attr_str # macros for constants
 export set_occupancy_cost!, occupancy_rules, kind, is_committed, build_location, plate_namer, childtype
 # chemicals/reagents
 export molecular_weight, density, pubchemid , speciesparse, reagentparse, symbol

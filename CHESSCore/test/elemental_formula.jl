@@ -132,3 +132,68 @@ end
     end
     @test_throws ArgumentError fs(Dict{Symbol,Int}())
 end
+
+@testset "@reagent chemistry argument" begin
+    # a formula string: identity species with that formula, molecular weight derived
+    @reagent TestGlucose "D-glucose" Solid "C6H12O6" 1.2u"g/mL" 5793
+    @test molecular_weight(TestGlucose) ≈ 180.156u"g/mol" atol=0.01u"g/mol"
+    d = CHESSCore.dissolution(TestGlucose)
+    @test d == Dissolution(Dict(Species("D-glucose",0,"C6H12O6")=>1))
+    @test CHESSCore.dissolutions[TestGlucose] == d
+    @test TestGlucose.molecular_weight ≈ molecular_weight(TestGlucose) # stored weight is the derived one
+    @test pubchemid(TestGlucose) == 5793
+
+    # a dissolution expression
+    @species TestFe³⁺ "Fe3+" 3 "Fe"
+    @species TestCl⁻ "Cl-" -1 "Cl"
+    @reagent TestIronChloride "iron chloride" Solid (TestFe³⁺ + 3*TestCl⁻) 2.8u"g/mL" 24380
+    @test molecular_weight(TestIronChloride) ≈ 162.2u"g/mol" atol=0.1u"g/mol"
+    @test CHESSCore.dissolution(TestIronChloride).products == Dict(TestFe³⁺=>1,TestCl⁻=>3)
+
+    # the legacy forms: a stored molecular weight, and missing
+    @reagent TestLegacyReagent "legacy reagent" Solid 100.0u"g/mol" 1.0u"g/mL" missing
+    @test molecular_weight(TestLegacyReagent) == 100.0u"g/mol"
+    @test ismissing(CHESSCore.formula(only(keys(CHESSCore.dissolution(TestLegacyReagent).products))))
+    @reagent TestUnknownReagent "unknown reagent" Solid missing missing missing
+    @test ismissing(molecular_weight(TestUnknownReagent))
+    @test ismissing(CHESSCore.formula(only(keys(CHESSCore.dissolution(TestUnknownReagent).products))))
+
+    # opaque: no molecular weight, a species flagged as intentionally undescribed
+    @reagent TestYeastExtract "yeast extract" Solid opaque 1.0u"g/mL" missing
+    @test ismissing(molecular_weight(TestYeastExtract))
+    spc_opaque = only(keys(CHESSCore.dissolution(TestYeastExtract).products))
+    @test CHESSCore.is_opaque(spc_opaque)
+    @test !CHESSCore.is_opaque(only(keys(CHESSCore.dissolution(TestUnknownReagent).products)))
+    @test ismissing(molecular_weight(spc_opaque))
+    # an opaque reagent contributes no moles to a composition
+    @test isempty(composition(5u"g"*TestYeastExtract).amounts)
+
+    # an invalid formula string is rejected when the reagent is defined
+    @test_throws ArgumentError @eval @reagent TestBadFormula "bad" Solid "Xx2" missing missing
+end
+
+@testset "opaque species" begin
+    o = Species("undefined mixture",0,CHESSCore.opaque)
+    @test CHESSCore.is_opaque(o)
+    @test CHESSCore.formula(o) === CHESSCore.opaque
+    @test ismissing(molecular_weight(o))
+    @test o == Species("undefined mixture",0,CHESSCore.opaque)
+    @test o != Species("undefined mixture",0,missing)
+    @test hash(o) == hash(Species("undefined mixture",0,CHESSCore.opaque))
+    @test_throws ArgumentError Species("x",0,CHESSCore.opaque,1.0u"g/mol")
+    @species TestOpaqueSpecies "opaque species" 0 opaque
+    @test CHESSCore.is_opaque(TestOpaqueSpecies)
+end
+
+@testset "set_dissolution! requires a neutral reagent" begin
+    na = Species("Na+",1,"Na")
+    cl = Species("Cl-",-1,"Cl")
+    so4 = Species("SO4 2-",-2,"SO4")
+    salt = Solid("charge_check_salt",missing,missing,missing)
+    @test_throws ArgumentError set_dissolution!(salt,Dissolution(Dict(na=>1)))
+    @test_throws ArgumentError set_dissolution!(salt,Dissolution(Dict(na=>1,cl=>2)))
+    @test !haskey(dissolutions,salt)
+    @test set_dissolution!(salt,Dissolution(Dict(na=>1,cl=>1))) === nothing
+    @test haskey(dissolutions,salt)
+    @test set_dissolution!(salt,Dissolution(Dict(na=>2,so4=>1))) === nothing
+end

@@ -1,19 +1,19 @@
 # Real ionic dissociation chemistry for the electrolyte salts (plus HCl/NaOH and the ammonium salts)
-# defined in solids.jl, expressed as Formula algebra over the cited ion Species in ions.jl rather
+# defined in solids.jl, expressed as Dissolution algebra over the cited ion Species in ions.jl rather
 # than raw Dict literals -- e.g. `Na⁺+Cl⁻` instead of `Dict(Na⁺=>1,Cl⁻=>1)`. molecular_weight(::Reagent)
 # derives its result from a reagent's registered Dissolution once one exists (see
 # CHESSCore/src/stocks/Chemicals.jl), overriding the reagent's own stored value -- these reagents are
-# therefore defined in solids.jl with `missing` molecular_weight, so the Formula below (built entirely
+# therefore defined in solids.jl with `missing` molecular_weight, so the Dissolution below (built entirely
 # from PubChem-cited ion Species) is the *only* source of truth for their molecular weight, with no
 # separately-cached, independently-driftable compound-level number. Hydrates register their waters of
 # hydration as an explicit H2O product (they really are released into solution) to keep the derived
 # weight matching the correct hydrate value.
 #
-# `set_dissolution!` mutates CHESSCore's single global `dissolutions` Dict directly -- like
-# occupancy_rules (see locations/occupancy_rules.jl), there is no per-module registry for it to survive
-# precompilation through, so these calls are wrapped in a function invoked from CHESSLabConstants's own
-# __init__ instead of running at top-level here (see `@reagent_formula`'s docstring in CHESSCore for why
-# registering directly at the reagent's own definition site isn't safe for a precompiled package).
+# `set_dissolution!` mutates CHESSCore's single global `dissolutions` Dict directly, and state written
+# there while this package precompiles is not saved with it, so these calls are wrapped in a function
+# invoked from CHESSLabConstants's own __init__ instead of running at top-level here. (`@reagent` with a
+# formula or Dissolution argument also keeps the dissolution in this module's own registry, which
+# `register_lab` merges, so it does not need this arrangement.)
 function _register_electrolyte_dissolutions!()
     # anhydrous salts (no water-of-hydration term needed)
     set_dissolution!(HCl,(CHESSCore.H⁺+Cl⁻))

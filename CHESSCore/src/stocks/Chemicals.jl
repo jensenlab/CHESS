@@ -134,12 +134,13 @@ reagent). `Species` values are never added directly to a [`Stock`](@ref) — the
 output vocabulary of [`dissolution`](@ref) (per-`Reagent`) and [`Composition`](@ref) (per-`Stock`),
 without changing how `Stock` stores its (undissociated) `Reagent` components.
 
-A species carries a `name`, an integer `charge` (`0` for neutral species), and one of two
-descriptions of its mass:
+A species carries a `name`, an integer `charge` (`0` for neutral species), and one of three
+descriptions of its atomic content:
 
 - an elemental formula string such as `"C6H12O6"` (see `CHESSCore.parse_formula`), from which
-  [`molecular_weight`](@ref) is derived using atomic masses; or
-- a stored molecular weight (or `missing`), for a species whose formula is not registered.
+  [`molecular_weight`](@ref) is derived using atomic masses;
+- a stored molecular weight (or `missing`), for a species whose formula is not registered yet; or
+- `CHESSCore.opaque`, for a species whose atomic content is intentionally not described.
 
 ```julia
 julia> Species("glucose",0,"C6H12O6")
@@ -157,16 +158,17 @@ formula, their stored molecular weights).
 struct Species
     name::String
     charge::Integer
-    formula::Union{Dict{Symbol,Int},Missing}
+    formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula}
     stored_molecular_weight::Union{Unitful.MolarMass,Missing}
-    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing},stored_molecular_weight::Union{Unitful.MolarMass,Missing})
+    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula},stored_molecular_weight::Union{Unitful.MolarMass,Missing})
         !ismissing(formula) && !ismissing(stored_molecular_weight) && throw(ArgumentError(
             "Species \"$name\" was given both a formula and a stored molecular weight; give one or the other"))
-        ismissing(formula) || isempty(formula) && throw(ArgumentError("Species \"$name\" has an empty formula"))
+        formula isa Dict && isempty(formula) && throw(ArgumentError("Species \"$name\" has an empty formula"))
         new(String(name),charge,formula,stored_molecular_weight)
     end
 end
 Species(name::AbstractString,charge::Integer,formula::AbstractString) = Species(name,charge,parse_formula(formula),missing)
+Species(name::AbstractString,charge::Integer,formula::OpaqueFormula) = Species(name,charge,formula,missing)
 Species(name::AbstractString,charge::Integer,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,charge,missing,molecular_weight)
 Species(name::AbstractString,formula::AbstractString) = Species(name,0,formula)
 Species(name::AbstractString,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,0,molecular_weight)
@@ -191,15 +193,22 @@ name(x::Species)=x.name
 """
     molecular_weight(x::Species)
 Return the molecular weight of a [`Species`](@ref): derived from its elemental formula using atomic
-masses when it has one, otherwise its stored molecular weight (`missing` if none).
+masses when it has one, otherwise its stored molecular weight (`missing` if none, and always
+`missing` for an opaque species).
 """
-molecular_weight(x::Species) = ismissing(x.formula) ? x.stored_molecular_weight : formula_mass(x.formula)
+molecular_weight(x::Species) = x.formula isa Dict ? formula_mass(x.formula) : x.stored_molecular_weight
 """
     formula(x::Species)
 Return the elemental formula of a [`Species`](@ref) as a dictionary from element symbol to atom
-count, or `missing` if no formula is registered.
+count, `missing` if no formula is registered, or `CHESSCore.opaque` if the atomic content is
+intentionally not described.
 """
 formula(x::Species)=x.formula
+"""
+    is_opaque(x::Species)
+Return `true` if `x` was declared with `CHESSCore.opaque` atomic content.
+"""
+is_opaque(x::Species)=x.formula isa OpaqueFormula
 """
     charge(x::Species)
 Access the `charge` property of a [`Species`](@ref).
@@ -236,7 +245,7 @@ acid/base's hydroxide contribution via [`OH⁻`](@ref), not a negative [`H⁺`](
 registered products directly.
 
 `+` and `*` build a `Dissolution` from [`Species`](@ref) values: `spc"Na+" + spc"Cl-"`, or
-`spc"Mg2+" + 2*spc"Cl-"`. A reagent is defined from one by [`@reagent_formula`](@ref) or registered
+`spc"Mg2+" + 2*spc"Cl-"`. A reagent is defined from one by [`@reagent`](@ref) or registered
 with [`set_dissolution!`](@ref).
 """
 struct Dissolution
@@ -266,11 +275,39 @@ const dissolutions = Dict{Reagent,Dissolution}()
     set_dissolution!(r::Reagent,rule::Dissolution)
 
 Register that `r` breaks down into ions/chemicals according to `rule` when dissolved — see
-[`dissolution`](@ref).
+[`dissolution`](@ref). A reagent is neutral, so the charges of the products, weighted by their
+coefficients, must sum to zero; otherwise an `ArgumentError` is thrown.
 """
 function set_dissolution!(r::Reagent,rule::Dissolution)
+    net = sum(coeff*charge(spc) for (spc,coeff) in rule.products)
+    net == 0 || throw(ArgumentError(
+        "The dissolution of \"$(name(r))\" has a net charge of $net; a reagent is neutral, so the charges of its products must sum to zero"))
     dissolutions[r]=rule
     return nothing
+end
+
+# Each lab module keeps its own dictionary of the dissolutions it defines, merged into `dissolutions`
+# by `register_lab` -- the same arrangement as `_chemprops`. State written into CHESSCore's registry
+# while a dependent package precompiles is not saved with that package, but the module's own
+# dictionary is.
+function _dissolutions(m::Module)
+    name = Symbol("#JLIMS_dissolutions")
+    if isdefined(m,name)
+        getproperty(m,name)
+    else
+        Core.eval(m,:(const $name = Dict{$Reagent,$Dissolution}()))
+    end
+end
+
+function dissolutions_expr(m::Module,reagent_symbol,dissolution_expr)
+    if m === CHESSCore
+        :($CHESSCore.set_dissolution!($reagent_symbol,$dissolution_expr))
+    else
+        quote
+            $CHESSCore.set_dissolution!($reagent_symbol,$dissolution_expr)
+            $(_dissolutions(m))[$reagent_symbol] = $CHESSCore.dissolutions[$reagent_symbol]
+        end
+    end
 end
 
 """
@@ -302,7 +339,8 @@ Base.:+(a::Dissolution,b::Dissolution) = Dissolution(mergewith(+,a.products,b.pr
 Define a new [`Species`](@ref) value (e.g. an ion like Na⁺, or a standalone neutral species) and
 import it into the workspace under `labname`. `charge` is `0` for neutral species. `formula` is an
 elemental formula string such as `"C6H12O6"`; the molecular weight is derived from it. A molar
-mass (or `missing`) may be given instead of a formula for a species whose formula is not registered.
+mass (or `missing`) may be given instead of a formula for a species whose formula is not registered
+yet, and `opaque` for a species whose atomic content is intentionally not described.
 
 Example:
 ```julia
@@ -318,6 +356,7 @@ See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@s
 """
 macro species(labsymb,name,charge,formula)
     ls = Symbol(labsymb)
+    formula = formula === :opaque ? :($CHESSCore.opaque) : formula
     docstr = """
             $labsymb
 
@@ -333,37 +372,46 @@ end
 
 
 """
-    @reagent labname name type molecular_weight density pubchemid
+    @reagent labname name type chemistry density pubchemid
 
 Define a new reagent (a physical `Solid`/`Liquid`/`Gas`) and import it into the workspace under
 `labname`. The `name` argument is the display name for the reagent, which can include a larger set
-of characters and formatting than the `labname`. Automatically registers the reagent's identity
-[`Species`](@ref) via [`set_dissolution!`](@ref) (discoverable in [`dissolutions`](@ref)),
-matching the default [`dissolution`](@ref) would compute anyway for a non-dissociating reagent.
+of characters and formatting than the `labname`. For a given reagent, its `type` parameter should be
+the phase in which it exists at STP: [`Solid`](@ref), [`Liquid`](@ref), or [`Gas`](@ref).
 
-There are three valid type parameters for reagents:
-1) [`Solid`](@ref)
-2) [`Liquid`](@ref)
-3) [`Gas`](@ref)
+The `chemistry` argument says what the reagent is made of, and is one of:
 
-For a given reagent, its `type` parameter should be the phase in which it exists at STP.
+- an elemental formula string such as `"C6H12O6"`: the reagent dissolves to a single neutral species
+  of the same name with that formula, and its molecular weight is derived from the formula;
+- a [`Dissolution`](@ref) built from species, such as `spc"Fe3+" + 3*spc"Cl-"`: the reagent breaks
+  into those species, and its molecular weight is derived from them;
+- a molar mass such as `180.16u"g/mol"`, for a reagent whose formula is not registered yet: its
+  identity species has no formula and keeps this stored molecular weight;
+- `missing`, when nothing is known about its chemistry; or
+- `opaque`, for an undefined mixture such as yeast extract whose atomic content is intentionally not
+  described.
 
+The reagent's [`dissolution`](@ref) is registered with [`set_dissolution!`](@ref) (discoverable in
+[`dissolutions`](@ref)), and is kept with the defining module so it survives precompilation.
 
 Examples:
 ```julia
 julia> using Unitful
 
+julia> @reagent glucose "D-glucose" Solid "C6H12O6" 1.2u"g/mL" 5793
+D-glucose
+
+julia> @reagent iron_chloride "iron chloride" Solid (spc"Fe3+" + 3*spc"Cl-") 2.8u"g/mL" 24380
+iron chloride
+
 julia> @reagent water "water" Liquid 18.015u"g/mol" 1.00u"g/mL" 962
 water
 
+julia> @reagent yeast_extract "yeast extract" Solid opaque 1.0u"g/mL" missing
+yeast extract
+
 julia> molecular_weight(water)
 18.015 g mol⁻¹
-
-julia> @reagent myreagent "my madeup reagent" Solid missing missing missing # reagents without defined properties can be created with the `missing` keyword
-myreagent
-
-julia> molecular_weight(myreagent)
-missing
 ```
 
 Reagents can also be defined manually with type constructors.
@@ -374,13 +422,14 @@ julia> water=Liquid("water",18.015u"g/mol",1.00u"g/mL",962)
 water
 ```
 
-See also: [`Solid`](@ref), [`Liquid`](@ref), [`Gas`](@ref), [`@reagent_formula`](@ref)
+See also: [`Solid`](@ref), [`Liquid`](@ref), [`Gas`](@ref), [`Dissolution`](@ref), [`@species`](@ref)
 """
-macro reagent(labsymb,name,type,molecular_weight,density,pubchemid)
+macro reagent(labsymb,name,type,chemistry,density,pubchemid)
+    chemistry = chemistry === :opaque ? :($CHESSCore.opaque) : chemistry
 
     expr =Expr(:block)
     push!(expr.args,quote
-        Base.@__doc__ $CHESSCore.@reagent_symbols $labsymb $name $type $molecular_weight $density $pubchemid
+        Base.@__doc__ $CHESSCore.@reagent_symbols $labsymb $name $type $chemistry $density $pubchemid
         end
     )
 
@@ -464,7 +513,7 @@ macro rgt_str(reagent)
 end
 
 
-macro reagent_symbols(labsymb,name,type,molecular_weight,density,pubchemid)
+macro reagent_symbols(labsymb,name,type,chemistry,density,pubchemid)
     ls= Symbol(labsymb)
     ln = Meta.quot(ls)
     docstr= """
@@ -472,62 +521,34 @@ macro reagent_symbols(labsymb,name,type,molecular_weight,density,pubchemid)
 
         The $type reagent $name with [`PubChem ID`](https://pubchem.ncbi.nlm.nih.gov) $pubchemid
 
-        Molecular Weight: $molecular_weight\\
+        Chemistry: $chemistry\\
         Density: $density
 
         See also: [`$type`](@ref)
         """
-    cprops = :($molecular_weight,$density,$pubchemid)
+    cprops = :(__rgt_mw,$density,$pubchemid)
     esc(quote
-
+        local __rgt_chemistry = $CHESSCore._reagent_chemistry($name,$chemistry)
+        local __rgt_mw = __rgt_chemistry[1]
         $(chemprops_expr(__module__,ln,cprops))
-        const global $ls = $type($name,$molecular_weight,$density,$pubchemid)
-        CHESSCore.set_dissolution!($ls,CHESSCore.Dissolution(Dict(CHESSCore.Species($name,0,$molecular_weight)=>1)))
+        const global $ls = $type($name,__rgt_mw,$density,$pubchemid)
+        $(dissolutions_expr(__module__,ls,:(__rgt_chemistry[2])))
         @doc $docstr $ls
     end)
 end
 
-"""
-    @reagent_formula labname name type formula density pubchemid
-
-Define a new reagent whose [`dissolution`](@ref) is set from an explicit [`Dissolution`](@ref) (built from
-[`Species`](@ref) values via `+`/`*`), rather than a separately-specified molecular weight. No
-`molecular_weight` is stored directly -- [`molecular_weight`](@ref) derives it on demand from the
-registered dissolution, so there's only ever one number, not a baked-in copy that could drift from
-the stoichiometry. Use this when a reagent's real stoichiometry matters (e.g. an ionic solid); use
-[`@reagent`](@ref) for the simpler common case.
-
-Registers the dissolution immediately (like [`@reagent`](@ref) does for its own default identity
-dissolution) -- safe for direct/interactive use in a single running session (a script, a notebook, a
-REPL), but **not** safe for reagents defined inside a precompiled package's top-level code: mutating
-`dissolutions` (owned by CHESSCore) as a side effect of a *dependent* package's own
-precompilation isn't guaranteed to survive into a fresh session loading that package's precompiled
-cache (Julia's module-initialization guidance is that such state belongs in `__init__`, which runs on
-every load, not just once at compile time). A lab-constants package with real, non-default
-[`Species`](@ref) formulas to register (e.g. ionic salts) should instead register them explicitly
-from its own `__init__()`, via [`set_dissolution!`](@ref) called on a [`Dissolution`](@ref)
-built with `+`/`*` -- see `CHESSLabConstants/src/chemicals/electrolytes.jl` for a worked example of this
-pattern.
-
-Example:
-```julia
-julia> @reagent_formula NaCl "sodium chloride" Solid (spc"Na+"+spc"Cl-") missing missing
-NaCl
-
-julia> molecular_weight(NaCl) # derived: sum of each species' molecular_weight × its coefficient
-```
-
-See also: [`@reagent`](@ref), [`Dissolution`](@ref), [`set_dissolution!`](@ref)
-"""
-macro reagent_formula(labsymb,name,type,formula,density,pubchemid)
-    ls = Symbol(labsymb)
-    esc(quote
-        local d = $formula
-        const global $ls = $type($name,missing,$density,$pubchemid)
-        CHESSCore.set_dissolution!($ls,d)
-        $ls
-    end)
+# What a `@reagent` chemistry argument means: returns the reagent's molecular weight (stored on the
+# `Reagent`) and its `Dissolution`.
+_identity_dissolution(spc::Species) = Dissolution(Dict(spc=>1))
+_dissolution_mass(d::Dissolution) = sum(coeff*molecular_weight(spc) for (spc,coeff) in d.products)
+function _reagent_chemistry(name::AbstractString,formula::AbstractString)
+    d = _identity_dissolution(Species(name,0,formula))
+    return (_dissolution_mass(d),d)
 end
+_reagent_chemistry(name::AbstractString,d::Dissolution) = (_dissolution_mass(d),d)
+_reagent_chemistry(name::AbstractString,mw::Union{Unitful.MolarMass,Missing}) = (mw,_identity_dissolution(Species(name,0,mw)))
+_reagent_chemistry(name::AbstractString,o::OpaqueFormula) = (missing,_identity_dissolution(Species(name,0,o)))
+
 
 
 

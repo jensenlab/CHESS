@@ -6,6 +6,25 @@ The set of element symbols accepted in formula strings: the 118 named elements o
 """
 const _element_symbols = Set{Symbol}(Symbol(e.symbol) for e in PeriodicTable.elements if e.number <= 118)
 
+"""
+    OpaqueFormula
+
+The type of [`CHESSCore.opaque`](@ref), the marker for a species whose atomic content is
+intentionally not described (an undefined mixture such as yeast extract). It is distinct from a
+missing formula, which means the formula has not been registered yet.
+"""
+struct OpaqueFormula end
+Base.show(io::IO,::OpaqueFormula) = print(io,"opaque")
+
+"""
+    opaque
+
+Marker for intentionally undeterminable atomic content: pass it where a formula string is expected,
+as in `Species("yeast extract",0,CHESSCore.opaque)`, or write `opaque` in the formula position of
+`@species` and `@reagent`.
+"""
+const opaque = OpaqueFormula()
+
 _formula_error(str,pos,msg) = throw(ArgumentError("Invalid formula \"$str\" at position $pos: $msg"))
 
 """
