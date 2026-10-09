@@ -60,7 +60,7 @@ end
     summary = registry_summary([CHESSCore,TestChemOrg])
 
     @test any(r -> r.name === :water && r.module_ === TestChemOrg, summary.reagents)
-    @test any(c -> c.name === Symbol("TestNa⁺") && c.module_ === TestChemOrg, summary.chemicals)
+    @test any(c -> c.name === Symbol("TestNa⁺") && c.module_ === TestChemOrg, summary.species)
     @test any(s -> s.name === :test_stock_recipe && s.module_ === TestChemOrg, summary.stocks)
     @test any(o -> o.name === :SMU_UA159 && o.genus == "Streptococcus", summary.organisms)
     @test any(l -> l.name === :TestWellKind, summary.locations)

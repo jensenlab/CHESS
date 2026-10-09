@@ -69,7 +69,7 @@ All string macros use the same lookup:
    `CHESSCore.labmodules`, keeping only modules that the calling module has itself loaded.
    Registering a lab module globally is not enough on its own.
 2. If nothing matches, try charge-symbol candidates, in which ASCII `+` and `-` are converted to
-   Unicode superscripts (see [Reagents & Chemicals](reagents-chemicals.md)).
+   Unicode superscripts (see [Reagents & Species](reagents-species.md)).
 3. If the name exists in a globally registered lab module that is not visible to the caller, an
    error names the module that must be loaded:
 
@@ -102,9 +102,9 @@ julia> registry_summary([CHESSCore, MyLab]).reagents
 
 With no arguments, `registry_summary()` covers every lab module registered globally. Unlike the
 string macros, it is not limited to modules visible to the caller. The `organisms`, `locations`,
-`attributes`, and `reads` entries come from the central registries. The `reagents`, `chemicals`,
+`attributes`, and `reads` entries come from the central registries. The `reagents`, `species`,
 and `stocks` entries are found by scanning each module's names and filtering by type, because
-reagents and chemicals have no central registry and `stock_recipes` holds only stocks registered
+reagents and species have no central registry and `stock_recipes` holds only stocks registered
 with `@stock`.
 
 ## Generating registration lines
@@ -115,9 +115,9 @@ used while the module is being written and are not needed to use registered cons
 return a line of code that registers the constant, ready to paste into the source of the module.
 They do not register anything and do not write to any source file.
 
-For a reagent or a chemical, the function looks up the molecular weight and density in a local
+For a reagent or a species, the function looks up the molecular weight and density in a local
 cache. If the cache has no entry, it fetches them from PubChem with [`get_mw_density`](@ref) and
-stores them in the cache. The lookup needs a PubChem ID and a network connection. A chemical has no
+stores them in the cache. The lookup needs a PubChem ID and a network connection. A species has no
 density, so the fetched density is discarded. For an organism, the function does not look anything
 up. It records the genus, species, strain, and optional ATCC ID and notes in the cache.
 

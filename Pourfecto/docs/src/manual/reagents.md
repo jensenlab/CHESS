@@ -4,7 +4,7 @@
 CurrentModule = Pourfecto
 ```
 
-Pourfecto uses the `Reagent` interface of [CHESSCore](https://jensenlab.github.io/CHESS/dev/). The `Solid`, `Liquid`, and `Gas` types, registration, and unit conversions all belong to CHESSCore. Its [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) page describes them.
+Pourfecto uses the `Reagent` interface of [CHESSCore](https://jensenlab.github.io/CHESS/dev/). The `Solid`, `Liquid`, and `Gas` types, registration, and unit conversions all belong to CHESSCore. Its [Reagents & Species](https://jensenlab.github.io/CHESS/dev/manual/reagents-species/) page describes them.
 
 This page describes the one part of that interface that Pourfecto workflows use directly: creating reagents from a name.
 
@@ -27,7 +27,7 @@ julia> string_to_component("custom buffer", Liquid)
 custom buffer
 ```
 
-The returned reagent identifies the reagent in planning and labeling. Calculations that need molecular weight or density, such as conversions between mass and moles or between mass and volume, need a registered reagent. CHESSCore's [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/) page describes registration with the `@reagent` macro, `register_lab`, and the `reagent_context` keyword, and `component_to_string`, the inverse of `string_to_component`.
+The returned reagent identifies the reagent in planning and labeling. Calculations that need molecular weight or density, such as conversions between mass and moles or between mass and volume, need a registered reagent. CHESSCore's [Reagents & Species](https://jensenlab.github.io/CHESS/dev/manual/reagents-species/) page describes registration with the `@reagent` macro, `register_lab`, and the `reagent_context` keyword, and `component_to_string`, the inverse of `string_to_component`.
 
 Pourfecto's examples and tests use this form, and Pourfecto calls it when it parses reagent names from [stock](@ref pourfecto_stocks) tables.
 

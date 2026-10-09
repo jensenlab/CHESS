@@ -22,7 +22,7 @@ end
     struct Composition
 
 A `Stock`-level analog acting on [`Species`](@ref) values rather than [`Reagent`](@ref)s. It describes real
-quantities of chemical identities ("5g of Na⁺") without committing to which physical `Reagent`
+quantities of species ("5g of Na⁺") without committing to which physical `Reagent`
 supplies them. See [`composition`](@ref) for the (one-directional) derivation from a `Stock`.
 
 Stores molar `amounts` natively (not mass) -- this is what dissociation math (`_reagent_moles`,
@@ -89,7 +89,7 @@ molar_amount(r::Composition,c::Species) = get(r.amounts,c,0u"mol")
 
 Return the volume of `c` tracked in `Composition` `r`, using an explicit `density` or a reference
 `Reagent` to source it from. `Species` deliberately has no density field of its own — density is a
-property of physical state, not chemical identity (e.g. ice vs. liquid water), so it stays on
+property of physical state, not of the species (e.g. ice vs. liquid water), so it stays on
 `Reagent`. `missing` if [`mass`](@ref) can't be computed (unknown `molecular_weight`).
 """
 volume(r::Composition,c::Species,density::Unitful.Density) = uconvert(u"mL", mass(r,c)/density)
@@ -219,8 +219,8 @@ computes the exact original closed-form formula directly from
 [`net_hydrogen_ion_concentration`](@ref) (`7.0` if net-neutral, `-log10` of the net H⁺ concentration
 if acidic, `14 - (-log10(...))` if basic) -- guaranteed bit-identical to CHESSCore's original
 strong-electrolyte-only `pH`, not merely expected to converge to the same place via the general
-solver. Strong bases should still register their real dissociation formula (e.g. `Na⁺ + OH⁻` for
-NaOH) via [`dissolution(::Reagent)`](@ref) -- mixing an acid and a base nets out through this same
+solver. Strong bases should still register their real dissolution (e.g. `Na⁺ + OH⁻` for
+NaOH) via [`set_dissolution!`](@ref) -- mixing an acid and a base nets out through this same
 mechanism either way.
 
 If `s` has *no* registered `AcidBaseSystem` and *no* charged species at all (e.g. a `Mixture` of pure

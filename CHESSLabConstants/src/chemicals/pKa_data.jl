@@ -18,11 +18,11 @@
 @species H2CO3 "H2CO3" 0 "H2CO3" # PubChem CID 767
 
 # Organic acid conjugate-base endpoints. Each acid's fully-protonated (neutral, as-weighed) reference
-# state deliberately reuses `name(reagent)`/`molecular_weight(reagent)` exactly -- this makes it
-# identical (by Species's value equality) to the identity Species dissolution(::Reagent)'s default
-# fallback already produces for a reagent with no registered Dissolution, so none of these acids
-# need a Dissolution registration of their own: `composition()` already reports their moles under
-# exactly the Species that appears as a species in their AcidBaseSystem below.
+# state is the reagent's own identity species -- the single product of its registered Dissolution --
+# so none of these acids need a Dissolution registration of their own beyond the one `@reagent`
+# makes: `composition()` already reports their moles under exactly the Species that appears in their
+# AcidBaseSystem below (see `_identity`). Each conjugate base is defined by its formula, the acid's
+# formula with the protons removed.
 @species Citrate³⁻ "Citrate3-" -3 "C6H5O7"
 @species HCitrate²⁻ "HCitrate2-" -2 "C6H6O7"
 @species H2Citrate⁻ "H2Citrate-" -1 "C6H7O7"
@@ -61,9 +61,9 @@
 @species MOPS⁻ "MOPS-" -1 "C7H14NO4S" # PubChem CID 70807 shares parent; deprotonated morpholine
 
 # Tier-1 audit pass: amino acid endpoints. Each reagent's identity Species is the neutral zwitterion
-# (matches stored MW in every case, verified) -- new endpoints are identity MW ± 1.008 g/mol per
-# proton, chained outward. See the cluster comments in _register_acid_base_systems! below for each
-# chain's shape/pKa citations.
+# -- the endpoints are its formula with one proton added or removed per unit of charge, chained
+# outward. See the cluster comments in _register_acid_base_systems! below for each chain's
+# shape/pKa citations.
 @species AlanineCation "Alanine(cation)" 1 "C3H8NO2"
 @species AlanineAnion "Alanine(anion)" -1 "C3H6NO2"
 @species ValineCation "Valine(cation)" 1 "C5H12NO2"

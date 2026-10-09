@@ -5,7 +5,7 @@ DocTestSetup = :(using CHESS)
 ```
 
 !!! note
-    The chemistry model on this page covers what a biology lab needs: dissociation into ions, molar
+    The chemistry model on this page covers what a biology lab needs: dissolution into ions, molar
     concentration, and pH. It is not a complete physical chemistry treatment. `pH` here is a
     direct estimate from net `H⁺`/`OH⁻` concentration. It is correct for strong electrolytes but
     not for weak acids, weak bases, or buffers. [Acid/Base Chemistry](acid-base.md) describes
@@ -15,7 +15,7 @@ DocTestSetup = :(using CHESS)
 
 A `Stock` is measured in `Reagent`s, the physical things that are weighed out. A
 [`Composition`](@ref) expresses the same stock as molar quantities of `Species` values, accounting for
-dissociation. [`composition(s::Stock)`](@ref) derives it, and the derivation is one-directional. The
+what each reagent dissolves into. [`composition(s::Stock)`](@ref) derives it, and the derivation is one-directional. The
 examples use the saline from [Stocks](stocks.md):
 
 ```jldoctest composition
@@ -49,7 +49,7 @@ julia> molar_amount(r, spc"Na+")
 
 [`atoms`](@ref) gives the amount of each element in a stock, from the elemental formulas of the
 species in its composition. The reagents here are defined with a formula and with a dissolution
-(see [Reagents & Chemicals](reagents-chemicals.md)):
+(see [Reagents & Species](reagents-species.md)):
 
 ```jldoctest composition
 julia> @reagent formulawater "water with a formula" Liquid "H2O" 1.0u"g/mL" missing
@@ -88,7 +88,7 @@ julia> total_concentration(saline, spc"Na+")
 ## `pH` and `net_hydrogen_ion_concentration`
 
 [`pH`](@ref) is derived from [`net_hydrogen_ion_concentration`](@ref), which nets the canonical
-[`H⁺`](@ref) and [`OH⁻`](@ref) `Species` values (see [Reagents & Chemicals](reagents-chemicals.md))
+[`H⁺`](@ref) and [`OH⁻`](@ref) `Species` values (see [Reagents & Species](reagents-species.md))
 against each other. `saline` is a neutral salt, so the result is neutral:
 
 ```jldoctest composition
@@ -96,7 +96,7 @@ julia> pH(saline)
 7.0
 ```
 
-CHESS registers hydrochloric acid with the dissociation formula `H⁺ + Cl⁻`:
+CHESS registers hydrochloric acid with the dissolution `H⁺ + Cl⁻`:
 
 ```jldoctest composition
 julia> acid = 0.1u"g" * rgt"HCl" + 100u"mL" * rgt"water";
@@ -108,6 +108,6 @@ julia> pH(acid)
 1.5617928406001496
 ```
 
-Because `pH` subtracts `OH⁻` from `H⁺`, a base is registered with its dissociation formula (for
+Because `pH` subtracts `OH⁻` from `H⁺`, a base is registered with its dissolution (for
 example `Na⁺ + OH⁻` for NaOH) and not a negative `H⁺` count. `Dissolution` coefficients must be
 non-negative, and mixing an acid and a base nets out through the subtraction.

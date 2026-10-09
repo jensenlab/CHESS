@@ -101,7 +101,7 @@ end
     summary = CHESSCore.registry_summary()
 
     @test any(r -> r.name === :water && r.module_ === CHESSLabConstants, summary.reagents)
-    @test any(c -> c.name === Symbol("Na⁺") && c.module_ === CHESSLabConstants, summary.chemicals)
+    @test any(c -> c.name === Symbol("Na⁺") && c.module_ === CHESSLabConstants, summary.species)
     @test any(s -> s.name === :thy_350mL && s.module_ === CHESSLabConstants, summary.stocks)
     @test any(o -> o.name === :SMU_UA159 && o.genus == "Streptococcus", summary.organisms)
     @test any(l -> l.name === :WP96, summary.locations)

@@ -12,7 +12,7 @@ Pourfecto builds directly on [CHESSCore](https://jensenlab.github.io/CHESS/dev/)
     Pourfecto's manual assumes familiarity with CHESSCore's
     [Locations](https://jensenlab.github.io/CHESS/dev/manual/core-concepts/),
     [Movement & Occupancy](https://jensenlab.github.io/CHESS/dev/manual/movement/),
-    [Reagents & Chemicals](https://jensenlab.github.io/CHESS/dev/manual/reagents-chemicals/), and
+    [Reagents & Species](https://jensenlab.github.io/CHESS/dev/manual/reagents-species/), and
     [Stocks](https://jensenlab.github.io/CHESS/dev/manual/stocks/) chapters. The ledger/database
     chapters (Committing & Uploading, The Ledger, Caching & Repair, and so on) aren't needed to use
     Pourfecto.

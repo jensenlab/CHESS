@@ -35,7 +35,7 @@ makedocs(
             "Movement & Occupancy" => "manual/movement.md",
             "Environmental Attributes & Inheritance" => "manual/attributes.md",
             "Stocks & Chemistry" => [
-                "Reagents & Chemicals" => "manual/reagents-chemicals.md",
+                "Reagents & Species" => "manual/reagents-species.md",
                 "Stocks" => "manual/stocks.md",
                 "Organisms & Cultures" => "manual/organisms-cultures.md",
                 "Composition & Solution Chemistry" => "manual/composition.md",

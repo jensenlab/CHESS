@@ -3,18 +3,18 @@
 """
     abstract type Reagent end
 
-Represents a *physical form* — a substance you can weigh out and store (renamed from the old
-`Species`). `Reagent`s are used to identify the composition of various mixtures and substances in
-the lab, tracked in [`Stock`](@ref)'s `SolidDict`/`LiquidDict`.
+Represents a physical material: a substance you can weigh out or pipette and store. `Reagent`s
+identify the materials in the lab's mixtures and solutions, tracked in [`Stock`](@ref)'s
+`SolidDict`/`LiquidDict`.
 
 All `Reagent` subtypes have four fields utilized by CHESSCore:
 1) `name`: the name by which the reagent will be referred to
-2) `molecular_weight`: the reagent's *stored* molecular weight, used as a fallback -- see [`molecular_weight`](@ref), which prefers deriving the value from the reagent's registered [`dissolution`](@ref) (`dissolutions`) whenever one exists, since that's the more authoritative, harder-to-drift source. If neither is known, `missing`.
+2) `molecular_weight`: the reagent's stored molecular weight. For a reagent defined by a formula or a [`Dissolution`](@ref), this is the weight derived from it when the reagent was defined, and [`molecular_weight`](@ref) re-derives it from the registered [`dissolution`](@ref) whenever one exists. If the weight is unknown, `missing`.
 3) `density`: the reagent's density at STP, if known, is used by CHESSCore to facilitate conversions between mass and volume quantities of the reagent. If `density` is unknown or undefined, it is assigned a value of `missing`
-4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) connects the reagent to registered substances in the pubchem database. the [`@reagent`](@ref) macro uses `pubchemid` to query the PubChem database for the reagent's properties automatically.
+4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov), which identifies the reagent's compound in the PubChem database.
 
-See also: [`Species`](@ref) for the separate *chemical identity* axis (what a reagent behaves as once
-dissolved), and [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Reagent` shares
+See also: [`Species`](@ref) for what a reagent breaks into once dissolved, [`@reagent`](@ref) for defining
+one, and [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Reagent` shares
 with [`Organism`](@ref).
 """
 abstract type Reagent <: StockComponent end
@@ -230,7 +230,7 @@ const H⁺ = Species("H+",1,"H")
     const OH⁻
 
 The canonical hydroxide ion, used by [`net_hydrogen_ion_concentration`](@ref)/[`pH`](@ref). Bases
-should register their real dissociation formula using this value (e.g. `Na⁺ + OH⁻` for NaOH) rather
+should register their real dissolution using this value (e.g. `Na⁺ + OH⁻` for NaOH) rather
 than a negative [`H⁺`](@ref) count -- see [`Dissolution`](@ref).
 """
 const OH⁻ = Species("OH-",-1,"OH")
