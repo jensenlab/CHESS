@@ -110,9 +110,18 @@ end
 end
 
 @testset "register_reagent!/register_organism! author-time tools (cache hits, no network)" begin
-    CHESSLabConstants._cache_reagent!("boric_acid","Boric Acid",CHESSCore.Solid,61.84,1.435,7628)
+    # a cached formula is used in place of the molecular weight (rows from an earlier run are cleared
+    # first, so the test does not depend on the state of the local cache)
+    CHESSLabConstants.DBInterface.execute(CHESSLabConstants._reagent_cache_db(),"DELETE FROM Reagents WHERE LabID IN ('boric_acid','unknown_broth')")
+    CHESSLabConstants._cache_reagent!("boric_acid","Boric Acid",CHESSCore.Solid,61.84,1.435,7628,"BH3O3")
     line = CHESSLabConstants.register_reagent!(CHESSCore.Solid,"boric_acid","Boric Acid",7628)
-    @test line == "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
+    @test line == "@reagent boric_acid \"Boric Acid\" Solid \"BH3O3\" 1.435u\"g/mL\" 7628"
+
+    # no PubChem ID: unknown chemistry, or opaque on request
+    @test CHESSLabConstants.register_reagent!(CHESSCore.Solid,"unknown_broth","Unknown Broth") ==
+        "@reagent unknown_broth \"Unknown Broth\" Solid missing missing missing"
+    @test CHESSLabConstants.register_reagent!(CHESSCore.Solid,"unknown_broth","Unknown Broth";opaque=true) ==
+        "@reagent unknown_broth \"Unknown Broth\" Solid opaque missing missing"
 
     CHESSLabConstants._cache_organism!("SMU_UA159","Streptococcus","mutans","UA159",missing,"")
     orgline = CHESSLabConstants.register_organism!("SMU_UA159","Streptococcus","mutans","UA159")
@@ -120,9 +129,42 @@ end
 end
 
 @testset "register_chemical! author-time tool (cache hit, no network)" begin
-    CHESSLabConstants._cache_chemical!("Na⁺","Na+",1,22.9897693,923)
+    CHESSLabConstants.DBInterface.execute(CHESSLabConstants._chemical_cache_db(),"DELETE FROM Chemicals WHERE LabID = 'Na⁺'")
+    CHESSLabConstants._cache_chemical!("Na⁺","Na+",1,22.9897693,923,"Na")
     line = CHESSLabConstants.register_chemical!("Na⁺","Na+",1,923)
-    @test line == "@species Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+    @test line == "@species Na⁺ \"Na+\" 1 \"Na\""
+    # the formula in the line is the one CHESS defines for Na⁺
+    @test endswith(line,"\""*CHESSCore.formula_string(CHESSCore.formula(CHESSLabConstants.Na⁺))*"\"")
+end
+
+@testset "PubChem formulas for the authoring tools" begin
+    split = CHESSLabConstants._split_pubchem_charge
+    @test split("C6H12O6") == ("C6H12O6",0)
+    @test split("Na+") == ("Na",1)
+    @test split("Cl-") == ("Cl",-1)
+    @test split("O4S-2") == ("O4S",-2)
+    @test split("Fe+3") == ("Fe",3)
+    @test split("C6H5O7-3") == ("C6H5O7",-3)
+
+    usable = CHESSLabConstants._usable_formula
+    @test usable("C6H12O6",0) == "C6H12O6"
+    @test usable("O4S-2",-2) == "O4S"
+    @test usable("H2O",0) == "H2O"
+    @test usable("C6H5O7-3",-3) == "C6H5O7"
+    @test ismissing(usable(missing,0))
+    # a charge that disagrees, or a formula that cannot be read, is not used, with a warning
+    @test_logs (:warn,r"charge") @test ismissing(usable("C5H14NO+",0))
+    @test_logs (:warn,r"charge") @test ismissing(usable("Na+",2))
+    @test_logs (:warn,r"cannot be read") @test ismissing(usable("(C2H4)n",0))
+
+    # the line builders fall back to the stored molecular weight when there is no formula
+    @test CHESSLabConstants._reagent_line("x","X",CHESSCore.Solid,100.0,1.0,5) == "@reagent x \"X\" Solid 100.0u\"g/mol\" 1.0u\"g/mL\" 5"
+    @test CHESSLabConstants._chemical_line("Y","Y",1,12.5) == "@species Y \"Y\" 1 12.5u\"g/mol\""
+
+    # a stored weight that disagrees with the formula's mass is reported
+    @test_logs (:warn,r"disagrees") CHESSLabConstants._check_formula_mass("x","H2O",30.0)
+    @test_logs CHESSLabConstants._check_formula_mass("x","H2O",18.015)
+    @test_logs CHESSLabConstants._check_formula_mass("x","H2O",missing)
 end
 
 @testset "Dissociation chemistry: derived molecular weights, hydrates, recipe/total_concentration" begin

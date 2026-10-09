@@ -115,28 +115,38 @@ used while the module is being written and are not needed to use registered cons
 return a line of code that registers the constant, ready to paste into the source of the module.
 They do not register anything and do not write to any source file.
 
-For a reagent or a species, the function looks up the molecular weight and density in a local
-cache. If the cache has no entry, it fetches them from PubChem with [`get_mw_density`](@ref) and
-stores them in the cache. The lookup needs a PubChem ID and a network connection. A species has no
-density, so the fetched density is discarded. For an organism, the function does not look anything
-up. It records the genus, species, strain, and optional ATCC ID and notes in the cache.
+For a reagent or a species, the function looks up the elemental formula, molecular weight, and
+density in a local cache. If the cache has no entry, it fetches them from PubChem with
+[`get_molecular_formula`](@ref) and [`get_mw_density`](@ref) and stores them in the cache. The lookup
+needs a PubChem ID and a network connection. The returned line gives the formula in place of a
+molecular weight, so the weight is derived from atomic masses (see [Reagents & Species](reagents-species.md)).
+A species has no density, so the fetched density is discarded. PubChem writes the charge of an ion as a
+suffix of its formula, and `register_chemical!` removes it after checking that it agrees with the
+charge given. When PubChem's formula cannot be used, because its charge disagrees or it cannot be read
+as an elemental formula, the function warns and the line keeps the stored molecular weight. For an
+organism, the function does not look anything up. It records the genus, species, strain, and optional
+ATCC ID and notes in the cache.
 
 ```julia
 using CHESSLabConstants
 
 register_reagent!(CHESSCore.Solid, "boric_acid", "Boric Acid", 7628)
-# "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
+# "@reagent boric_acid \"Boric Acid\" Solid \"BH3O3\" 1.435u\"g/mL\" 7628"
 
 register_chemical!("Na⁺", "Na+", 1, 923)
-# "@species Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+# "@species Na⁺ \"Na+\" 1 \"Na\""
 
 register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "700610", notes = "wild type")
 # "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""
 ```
 
-A compound with no PubChem entry, such as a rich-media broth, is registered without a PubChem ID,
-and its molecular weight and density are recorded as `missing`. [`get_mw_density`](@ref) takes a
-PubChem ID and returns the molecular weight in g/mol and the density in g/mL.
+PubChem describes the compound of the ID it is given, so the ID must be that of the form actually
+weighed out. A hydrate needs the hydrate's PubChem ID. A salt that dissolves into ions needs a
+`Dissolution` in place of the single formula the function returns. A compound with no PubChem entry,
+such as a rich-media broth, is registered without a PubChem ID. The line then has `missing`
+chemistry, or `opaque` when `register_reagent!` is called with `opaque=true` for an undefined mixture.
+[`get_molecular_formula`](@ref) takes a PubChem ID and returns the formula as PubChem writes it, and
+[`get_mw_density`](@ref) returns the molecular weight in g/mol and the density in g/mL.
 
 [Database Architecture](db-architecture.md) describes how CHESSDatabase stores the locations and
 stocks built from registered constants.

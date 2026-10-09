@@ -12,6 +12,7 @@ register_reagent!
 register_organism!
 register_chemical!
 get_mw_density
+get_molecular_formula
 CHESSLabConstants.chemical_cache_path
 ```
 

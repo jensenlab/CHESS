@@ -67,6 +67,23 @@ function get_compound_properties(cid::Integer)
 
 end
 
+"""
+    get_molecular_formula(cid::Integer)
+
+Query [PubChem](https://pubchem.ncbi.nlm.nih.gov) for the molecular formula of the compound with PubChem
+ID `cid`, as PubChem writes it: Hill order, with the charge of an ion as a suffix (`"Na+"`, `"O4S-2"`).
+Returns `missing` if PubChem has no formula for the compound, and throws an `ArgumentError` if the
+compound is not found.
+"""
+function get_molecular_formula(cid::Integer)
+    properties = try
+        get_json_from_url("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/$cid/property/MolecularFormula/json")["PropertyTable"]["Properties"][1]
+    catch
+        throw(ArgumentError("compound $cid not found, enter its formula manually"))
+    end
+    return haskey(properties,"MolecularFormula") ? String(properties["MolecularFormula"]) : missing
+end
+
 
 """
     get_mw_density(cid::Integer)
