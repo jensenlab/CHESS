@@ -21,6 +21,7 @@
 @species Al³⁺ "Al3+" 3 "Al" # PubChem CID 104727
 @species Ag⁺ "Ag+" 1 "Ag" # PubChem CID 104755
 @species Sn²⁺ "Sn2+" 2 "Sn" # PubChem CID 104883
+@species Choline⁺ "Choline+" 1 "C5H14NO" # PubChem CID 305
 
 # anions
 @species Cl⁻ "Cl-" -1 "Cl" # PubChem CID 312

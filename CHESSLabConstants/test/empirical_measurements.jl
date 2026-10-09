@@ -114,7 +114,7 @@ const amino_acids_20x =
 const nps_20x =
     0.2u"g"*rgt"acetamide" + 0.4u"g"*rgt"formamide" + 0.4u"g"*rgt"agmatine" +
     0.4u"g"*rgt"ammonium_nitrate" + 0.4u"g"*rgt"taurine" + 0.4u"g"*rgt"spermidine" +
-    0.4u"g"*rgt"carnitine" + 0.4u"g"*rgt"choline" + 0.4u"g"*rgt"ornithine" + 1u"l"*rgt"water"
+    0.4u"g"*rgt"carnitine" + 0.4u"g"*rgt"choline_chloride" + 0.4u"g"*rgt"ornithine" + 1u"l"*rgt"water"
 
 const phosphates_20x =
     11.6u"g"*rgt"potassium_phosphate_di" + 10u"g"*rgt"sodium_phosphate_di" +

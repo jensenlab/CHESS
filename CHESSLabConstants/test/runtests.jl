@@ -340,7 +340,7 @@ end
     sys = CHESSCore.acid_base_system(CHESSLabConstants.mops)
     @test sys isa AcidBaseSystem
     @test sys.pKa == [7.20]
-    @test sys.species[1] == CHESSCore.Species(name(CHESSLabConstants.mops),0,CHESSCore.molecular_weight(CHESSLabConstants.mops))
+    @test sys.species[1] == only(keys(CHESSCore.dissolution(CHESSLabConstants.mops).products)) # the reagent's own identity species
 
     # MOPS is a Solid -- constructed by moles directly, like the other organic acid reagents
     stock = (0.1u"mol"*CHESSLabConstants.mops) + (1.0u"L"*CHESSLabConstants.water)
@@ -508,4 +508,60 @@ end
     # guanidine: a very strong base (pKa=13.6, near the solver's upper bracket) still solves cleanly
     guan_stock = (0.01u"mol"*CHESSLabConstants.guanidine) + (1.0u"L"*CHESSLabConstants.water)
     @test CHESSCore.pH(guan_stock;ionic_strength_correction=false) > 10.0
+end
+
+@testset "Reagent chemistry: every reagent has a formula or is declared opaque" begin
+    lacking = Symbol[]
+    for sym in sort!(collect(keys(CHESSCore.chemprops)))
+        isdefined(CHESSLabConstants,sym) || continue
+        reagent = getfield(CHESSLabConstants,sym)
+        reagent isa CHESSCore.Reagent || continue
+        species = keys(CHESSCore.dissolution(reagent).products)
+        any(s->ismissing(CHESSCore.formula(s)),species) && push!(lacking,sym)
+    end
+    # the methyl glucoside hemihydrate keeps its stored weight: a half water has no integer formula
+    @test lacking == [:beta_methyl_d_glucoside]
+end
+
+@testset "atoms: formula-defined lab reagents" begin
+    # a formula reagent
+    glucose_atoms = CHESSCore.atoms(0.5u"mol"*CHESSLabConstants.glucose)
+    @test glucose_atoms[:C] ≈ 3u"mol" && glucose_atoms[:H] ≈ 6u"mol" && glucose_atoms[:O] ≈ 3u"mol"
+
+    # a salt: its ions' atoms
+    nacl_atoms = CHESSCore.atoms(0.1u"mol"*CHESSLabConstants.sodium_chloride)
+    @test nacl_atoms[:Na] ≈ 0.1u"mol" && nacl_atoms[:Cl] ≈ 0.1u"mol"
+
+    # a hydrate: waters of hydration are counted, and the weight agrees with PubChem's C6H9Na3O9
+    citrate = CHESSLabConstants.sodium_citrate_dihydrate
+    @test CHESSCore.molecular_weight(citrate) ≈ 294.098u"g/mol" atol=0.01u"g/mol"
+    citrate_atoms = CHESSCore.atoms(1u"mol"*citrate)
+    @test citrate_atoms[:C] ≈ 6u"mol" && citrate_atoms[:Na] ≈ 3u"mol" && citrate_atoms[:O] ≈ 9u"mol" && citrate_atoms[:H] ≈ 9u"mol"
+
+    # choline is supplied as the chloride
+    choline_atoms = CHESSCore.atoms(1u"mol"*CHESSLabConstants.choline_chloride)
+    @test choline_atoms[:Cl] ≈ 1u"mol" && choline_atoms[:N] ≈ 1u"mol" && choline_atoms[:C] ≈ 5u"mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.choline_chloride) ≈ 139.62u"g/mol" atol=0.01u"g/mol"
+
+    # opaque reagents contribute no atoms and do not warn; lactic acid and bleomycin keep their weights
+    @test_logs CHESSCore.atoms(10u"g"*CHESSLabConstants.yeast_extract)
+    @test isempty(CHESSCore.atoms(10u"g"*CHESSLabConstants.yeast_extract))
+    @test CHESSCore.molecular_weight(CHESSLabConstants.bleomycin) == 1415.6u"g/mol"
+    @test_logs CHESSCore.atoms(5u"mL"*CHESSLabConstants.lactic_acid + 1u"g"*CHESSLabConstants.bleomycin)
+
+    # a stock mixing formula reagents, opaque reagents, and water has no gap to warn about
+    media = 10u"g"*CHESSLabConstants.glucose + 5u"g"*CHESSLabConstants.yeast_extract + 1u"L"*CHESSLabConstants.water
+    @test_logs CHESSCore.atoms(media)
+
+    # only the hemihydrate leaves a gap
+    @test_logs (:warn,r"Methyl-beta-D-glucopyranoside Hemihydrate") CHESSCore.atoms(1u"g"*CHESSLabConstants.beta_methyl_d_glucoside)
+end
+
+@testset "Species formulas: acid/base chain endpoints" begin
+    # chain species are formula-defined, so their weights track the neutral identity's formula
+    sys = CHESSCore.acid_base_system(CHESSLabConstants.citric_acid)
+    masses = [ustrip(u"g/mol",CHESSCore.molecular_weight(s)) for s in sys.species]
+    @test all(diff(masses) .< 0) # each deprotonation lowers the mass
+    @test all(isapprox.(abs.(diff(masses)),1.008;atol=0.001)) # by exactly one proton
+    @test CHESSCore.formula(CHESSLabConstants.Citrate³⁻) == Dict(:C=>6,:H=>5,:O=>7)
 end
