@@ -9,6 +9,7 @@ using
     Dates, # Read's own recorded time
     Printf, # fixed-precision number formatting for stock displays
     StringDistances # used for computing chemical and organism hints
+import PeriodicTable # atomic masses for elemental formulas; used qualified so its `elements` and `Element` names stay out of this module
 import Base: +,-,*,/,convert, show ,sort , promote_rule,round , in, ==,empty!, hash, isapprox # all overloaded by this package
 import AbstractTrees: children,parent,nodevalue
 
@@ -61,6 +62,7 @@ include("./environments/Environment.jl")
 include("./operations/capability.jl")
 include("./locations/Labware.jl")
 include("./stocks/StockComponent.jl")
+include("./stocks/ElementalFormula.jl")
 include("./stocks/Chemicals.jl")
 include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")

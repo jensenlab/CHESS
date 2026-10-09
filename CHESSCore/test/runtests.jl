@@ -2,6 +2,7 @@ using CHESSCore, Test, Unitful, AbstractTrees, DataFrames, Dates, LabwarePlottin
 import Plots
 
 include("core_fixtures.jl")
+include("elemental_formula.jl")
 
 # test new unit parsing
 @testset "NewUnitParsing" begin
