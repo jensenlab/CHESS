@@ -23,7 +23,7 @@ against each [`Species`](@ref)'s own registered `charge`.
 
 Registered against a [`Reagent`](@ref) via [`set_acid_base_system!`](@ref) -- independent of (and
 additional to) that reagent's [`Dissolution`](@ref), which continues to answer the separate
-question of complete-dissociation mass bookkeeping (`molecular_weight`/`recipe`). A `Reagent` may have
+question of complete-dissociation mass bookkeeping (`molecular_weight`/`composition`). A `Reagent` may have
 both, neither, or just one.
 """
 struct AcidBaseSystem
@@ -139,7 +139,7 @@ Per-species activity coefficient at ionic strength `I` (dimensionless mol/L): Tr
 (`log10(γ) = -A z² √I/(1+B å √I) + b I`, standard extended-Debye-Hückel constants `A=0.5085`,
 `B=0.3281` at 25°C) using `chem`'s registered `(å,b)` from [`ion_parameters`](@ref) if present, else
 [`activity_coefficient`](@ref) (Davies) as the documented-less-reliable fallback for any species
-without a citable literature parameter (most custom organic `Species`s -- amino acid states,
+without a citable literature parameter (most custom organic `Species` values -- amino acid states,
 antibiotics, etc. -- fall back this way; only the well-characterized inorganic ions a lab module
 registers get the upgrade).
 """
@@ -213,7 +213,7 @@ end
     abstract type AbstractAnalyticalSpecies
 
 Common supertype for the equilibrium solver's per-family inputs -- an [`AnalyticalSpecies`](@ref)
-(fixed total concentration, the mass-balance case; every family a [`Stock`](@ref)'s own recipe
+(fixed total concentration, the mass-balance case; every family a [`Stock`](@ref)'s own composition
 produces) or an [`OpenSystemSpecies`](@ref) (fixed free-species concentration, an open-system boundary
 condition like atmospheric CO2 -- see [`pH`](@ref)'s `water_correction` keyword). Both are consumed
 identically by [`_species_concentrations`](@ref), which dispatches on the concrete type.
@@ -225,7 +225,7 @@ abstract type AbstractAnalyticalSpecies end
 
 An [`AcidBaseSystem`](@ref) family together with its total analytical concentration in a particular
 [`Stock`](@ref) (the sum, across every protonation state already present in the stock's
-[`recipe`](@ref), divided by [`volume_estimate`](@ref)) -- the mass-balance input to the equilibrium
+[`composition`](@ref), divided by [`volume_estimate`](@ref)) -- the mass-balance input to the equilibrium
 solver. Built by [`_analytical_species`](@ref).
 """
 struct AnalyticalSpecies <: AbstractAnalyticalSpecies
@@ -303,10 +303,10 @@ end
 """
     _analytical_species(s::Stock)
 
-Partition `s`'s [`recipe`](@ref) into the equilibrium solver's inputs: one [`AnalyticalSpecies`](@ref)
+Partition `s`'s [`composition`](@ref) into the equilibrium solver's inputs: one [`AnalyticalSpecies`](@ref)
 per distinct [`AcidBaseSystem`](@ref) registered on any reagent actually present in `s` (deduplicated,
 since e.g. potassium and sodium phosphate salts share the same phosphate `AcidBaseSystem`), and a list
-of `(chemical, concentration)` pairs for every other charged [`Species`](@ref) in the recipe --
+of `(chemical, concentration)` pairs for every other charged [`Species`](@ref) in the composition --
 excluding [`H⁺`](@ref)/[`OH⁻`](@ref) themselves (handled as the solver's own pH-dependent unknowns) and
 any chemical that's part of a family (handled via that family's speciation instead). Carrying the
 `Species` itself (not just its charge) lets the activity-correction machinery look up per-species
@@ -314,7 +314,7 @@ Truesdell-Jones parameters (see [`_activity_coefficient`](@ref)) rather than onl
 per-charge-magnitude value.
 """
 function _analytical_species(s::Stock)
-    r = recipe(s)
+    r = composition(s)
     vol = volume_estimate(s)
     systems = Set{AcidBaseSystem}()
     for reagent in Iterators.flatten((reagents(solids(s)),reagents(liquids(s))))

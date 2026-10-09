@@ -68,7 +68,7 @@ include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")
 include("./stocks/StockDisplay.jl")
 include("./stocks/AcidBase.jl")
-include("./stocks/Recipe.jl")
+include("./stocks/Composition.jl")
 include("./locations/Well.jl")
 include("./locations/LocationDisplay.jl")
 include("./locations/build_location.jl")
@@ -112,7 +112,7 @@ export genus, species, strain , orgparse
 # Stocks
 export solids, liquids, reagents, organisms, volume_estimate, quantity, reagent_display
 export total_concentration, pH, net_hydrogen_ion_concentration
-export Recipe, recipe, mass, molar_amount, volume
+export Composition, composition, mass, molar_amount, volume
 # acid/base equilibrium
 export AcidBaseSystem, set_acid_base_system!, acid_base_system, acid_base_systems
 export AnalyticalSpecies, OpenSystemSpecies, AbstractAnalyticalSpecies, SpeciationResult, speciation, activity_coefficient, Kw, adjust_pH

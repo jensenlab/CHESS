@@ -1,4 +1,4 @@
-# Recipes & Solution Chemistry
+# Composition & Solution Chemistry
 
 ```@meta
 DocTestSetup = :(using CHESS)
@@ -14,14 +14,14 @@ DocTestSetup = :(using CHESS)
     below otherwise.
 
 A `Stock` is measured in `Reagent`s, the physical things that are weighed out. A
-[`Recipe`](@ref) expresses the same stock as molar quantities of `Species` values, accounting for
-dissociation. [`recipe(s::Stock)`](@ref) derives it, and the derivation is one-directional. The
+[`Composition`](@ref) expresses the same stock as molar quantities of `Species` values, accounting for
+dissociation. [`composition(s::Stock)`](@ref) derives it, and the derivation is one-directional. The
 examples use the saline from [Stocks](stocks.md):
 
-```jldoctest recipes
+```jldoctest composition
 julia> saline = 1u"mL" * rgt"water" + 5u"g" * rgt"sodium_chloride";
 
-julia> r = recipe(saline);
+julia> r = composition(saline);
 
 julia> sort(string.(keys(r.amounts)))
 3-element Vector{String}:
@@ -30,14 +30,14 @@ julia> sort(string.(keys(r.amounts)))
  "water"
 ```
 
-`recipe` sums the contribution of every reagent, dissociating or not. `water` does not dissociate,
+`composition` sums the contribution of every reagent, dissociating or not. `water` does not dissociate,
 so it contributes its own identity, the default dissolution.
 
-## Reading a `Recipe`
+## Reading a `Composition`
 
-[`mass`](@ref) and [`molar_amount`](@ref) read a `Recipe`'s quantity of a given `Species`:
+[`mass`](@ref) and [`molar_amount`](@ref) read a `Composition`'s quantity of a given `Species`:
 
-```jldoctest recipes
+```jldoctest composition
 julia> mass(r, spc"Na+")
 1.9669627005070887 g
 
@@ -49,7 +49,7 @@ julia> molar_amount(r, spc"Na+")
 
 The molar concentration of a `Species` across the whole stock:
 
-```jldoctest recipes
+```jldoctest composition
 julia> total_concentration(saline, spc"Na+")
 0.08555817487991287 mol mL⁻¹
 ```
@@ -60,14 +60,14 @@ julia> total_concentration(saline, spc"Na+")
 [`H⁺`](@ref) and [`OH⁻`](@ref) `Species` values (see [Reagents & Chemicals](reagents-chemicals.md))
 against each other. `saline` is a neutral salt, so the result is neutral:
 
-```jldoctest recipes
+```jldoctest composition
 julia> pH(saline)
 7.0
 ```
 
 CHESS registers hydrochloric acid with the dissociation formula `H⁺ + Cl⁻`:
 
-```jldoctest recipes
+```jldoctest composition
 julia> acid = 0.1u"g" * rgt"HCl" + 100u"mL" * rgt"water";
 
 julia> net_hydrogen_ion_concentration(acid)

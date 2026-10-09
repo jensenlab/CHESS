@@ -19,11 +19,11 @@ function _reagent_moles(r::Reagent, quantity::Unitful.Volume)
 end
 
 """
-    struct Recipe
+    struct Composition
 
-A `Stock`-level analog acting on [`Species`](@ref)s rather than [`Reagent`](@ref)s — describes real
+A `Stock`-level analog acting on [`Species`](@ref) values rather than [`Reagent`](@ref)s. It describes real
 quantities of chemical identities ("5g of Na⁺") without committing to which physical `Reagent`
-supplies them. See [`recipe`](@ref) for the (one-directional) derivation from a `Stock`.
+supplies them. See [`composition`](@ref) for the (one-directional) derivation from a `Stock`.
 
 Stores molar `amounts` natively (not mass) -- this is what dissociation math (`_reagent_moles`,
 `dissolution(::Reagent)`) naturally produces, and what [`total_concentration`](@ref)/[`pH`](@ref)
@@ -32,21 +32,21 @@ therefore the *derived* accessor, returning `missing` when a chemical is present
 be computed (unknown `molecular_weight`) -- as opposed to `0u"g"` when the chemical isn't present at
 all.
 """
-struct Recipe
+struct Composition
     amounts::Dict{Species,Unitful.Amount}
 end
 
 """
-    recipe(s::Stock)
+    composition(s::Stock)
 
-Derive the [`Recipe`](@ref) (chemical-level composition, in real molar quantities) of `s`: for each
+Derive the [`Composition`](@ref) (species-level, in real molar quantities) of `s`: for each
 `Reagent` in `s`, convert its tracked quantity to moles (via [`_reagent_moles`](@ref)) and distribute
-across its [`dissolution(::Reagent)`](@ref) rule's `Species`s, summing across every reagent present.
+across its [`dissolution(::Reagent)`](@ref) `Dissolution`'s species, summing across every reagent present.
 
-There is deliberately no `Stock`-from-`Recipe` conversion — going the other way is underdetermined (a
+There is deliberately no `Stock`-from-`Composition` conversion — going the other way is underdetermined (a
 target chemical profile doesn't uniquely determine which reagent(s) produce it).
 """
-function recipe(s::Stock)
+function composition(s::Stock)
     out=Dict{Species,Unitful.Amount}()
     for (reagent,quantity) in Iterators.flatten((solids(s),liquids(s)))
         moles=_reagent_moles(reagent,quantity)
@@ -55,20 +55,20 @@ function recipe(s::Stock)
             out[chem]=get(out,chem,0u"mol") + coeff*moles
         end
     end
-    return Recipe(out)
+    return Composition(out)
 end
 
-Base.:*(quantity::Unitful.Amount,c::Species) = Recipe(Dict(c=>quantity))
-Base.:*(quantity::Unitful.Mass,c::Species) = Recipe(Dict(c=>convert(u"mol",quantity,c)))
+Base.:*(quantity::Unitful.Amount,c::Species) = Composition(Dict(c=>quantity))
+Base.:*(quantity::Unitful.Mass,c::Species) = Composition(Dict(c=>convert(u"mol",quantity,c)))
 
 """
-    mass(r::Recipe,c::Species)
+    mass(r::Composition,c::Species)
 
-Return the mass of `c` tracked in `Recipe` `r`: `0u"g"` if `c` isn't present at all, `missing` if `c`
+Return the mass of `c` tracked in `Composition` `r`: `0u"g"` if `c` isn't present at all, `missing` if `c`
 is present but its `molecular_weight` is unknown (so a mass genuinely can't be computed), otherwise
 the mass derived from `r`'s stored molar amount.
 """
-function mass(r::Recipe,c::Species)
+function mass(r::Composition,c::Species)
     haskey(r.amounts,c) || return 0u"g"
     mw = molecular_weight(c)
     ismissing(mw) && return missing
@@ -76,49 +76,49 @@ function mass(r::Recipe,c::Species)
 end
 
 """
-    molar_amount(r::Recipe,c::Species)
+    molar_amount(r::Composition,c::Species)
 
-Return the molar amount of `c` tracked in `Recipe` `r` (`0u"mol"` if absent) -- `Recipe`'s native,
+Return the molar amount of `c` tracked in `Composition` `r` (`0u"mol"` if absent) -- `Composition`'s native,
 directly-stored unit.
 """
-molar_amount(r::Recipe,c::Species) = get(r.amounts,c,0u"mol")
+molar_amount(r::Composition,c::Species) = get(r.amounts,c,0u"mol")
 
 """
-    volume(r::Recipe,c::Species,density::Unitful.Density)
-    volume(r::Recipe,c::Species,source::Reagent)
+    volume(r::Composition,c::Species,density::Unitful.Density)
+    volume(r::Composition,c::Species,source::Reagent)
 
-Return the volume of `c` tracked in `Recipe` `r`, using an explicit `density` or a reference
+Return the volume of `c` tracked in `Composition` `r`, using an explicit `density` or a reference
 `Reagent` to source it from. `Species` deliberately has no density field of its own — density is a
 property of physical state, not chemical identity (e.g. ice vs. liquid water), so it stays on
 `Reagent`. `missing` if [`mass`](@ref) can't be computed (unknown `molecular_weight`).
 """
-volume(r::Recipe,c::Species,density::Unitful.Density) = uconvert(u"mL", mass(r,c)/density)
-volume(r::Recipe,c::Species,source::Reagent) = uconvert(u"mL", mass(r,c)/density(source))
+volume(r::Composition,c::Species,density::Unitful.Density) = uconvert(u"mL", mass(r,c)/density)
+volume(r::Composition,c::Species,source::Reagent) = uconvert(u"mL", mass(r,c)/density(source))
 
-Base.:+(a::Recipe,b::Recipe) = Recipe(mergewith(+,a.amounts,b.amounts))
-Base.:*(num::Real,r::Recipe) = Recipe(Dict(k=>v*num for (k,v) in r.amounts))
-Base.:*(r::Recipe,num::Real) = num*r
+Base.:+(a::Composition,b::Composition) = Composition(mergewith(+,a.amounts,b.amounts))
+Base.:*(num::Real,r::Composition) = Composition(Dict(k=>v*num for (k,v) in r.amounts))
+Base.:*(r::Composition,num::Real) = num*r
 
 """
     total_concentration(s::Stock,chem::Species)
 
-Return the molar concentration of `chem` in `s`, derived from [`recipe(::Stock)`](@ref) — e.g.
+Return the molar concentration of `chem` in `s`, derived from [`composition(::Stock)`](@ref) — e.g.
 the total potassium ion concentration in a stock containing dissolved KCl.
 """
 function total_concentration(s::Stock,chem::Species)
-    return molar_amount(recipe(s),chem) / volume_estimate(s)
+    return molar_amount(composition(s),chem) / volume_estimate(s)
 end
 
 """
     net_hydrogen_ion_concentration(s::Stock)
 
 Return the net molar concentration of hydrogen ions in `s`: [`H⁺`](@ref) minus [`OH⁻`](@ref),
-derived from [`recipe(::Stock)`](@ref). This nets the one acid/base ion pair explicitly by
+derived from [`composition(::Stock)`](@ref). This nets the one acid/base ion pair explicitly by
 name rather than relying on signed stoichiometry in registered [`Dissolution`](@ref)s (which
 are otherwise always non-negative, real formulas) — see [`pH`](@ref), its only consumer.
 """
 function net_hydrogen_ion_concentration(s::Stock)
-    r = recipe(s)
+    r = composition(s)
     net = molar_amount(r,H⁺) - molar_amount(r,OH⁻)
     return net/volume_estimate(s)
 end
@@ -126,7 +126,7 @@ end
 """
     pH(s::Stock; ionic_strength_correction=true, water_correction=false, water_correction_source=nothing)
 
-Estimate the pH of `s`. General case: partitions `s`'s [`recipe`](@ref) into any registered
+Estimate the pH of `s`. General case: partitions `s`'s [`composition`](@ref) into any registered
 [`AcidBaseSystem`](@ref) families (see [`acid_base_system`](@ref)) plus every other charged species,
 and root-finds the generalized electroneutrality condition (see
 [`CHESSCore._charge_balance_residual`](@ref)) -- optionally corrected for ionic strength via the

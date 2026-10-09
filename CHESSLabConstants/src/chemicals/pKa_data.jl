@@ -21,7 +21,7 @@
 # state deliberately reuses `name(reagent)`/`molecular_weight(reagent)` exactly -- this makes it
 # identical (by Species's value equality) to the identity Species dissolution(::Reagent)'s default
 # fallback already produces for a reagent with no registered Dissolution, so none of these acids
-# need a Dissolution registration of their own: `recipe()` already reports their moles under
+# need a Dissolution registration of their own: `composition()` already reports their moles under
 # exactly the Species that appears as a species in their AcidBaseSystem below.
 @species Citrate³⁻ "Citrate3-" -3 187.09u"g/mol"
 @species HCitrate²⁻ "HCitrate2-" -2 188.09u"g/mol"

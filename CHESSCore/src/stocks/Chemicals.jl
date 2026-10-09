@@ -131,7 +131,7 @@ Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.mo
 Represents a *species* — what a [`Reagent`](@ref) behaves as once it's part of a reactive system
 (e.g. Na⁺, Cl⁻ from dissolved NaCl; or, trivially, glucose's own identity for a non-dissociating
 reagent). `Species` values are never added directly to a [`Stock`](@ref) — they exist purely as the
-output vocabulary of [`dissolution`](@ref) (per-`Reagent`) and [`Recipe`](@ref) (per-`Stock`),
+output vocabulary of [`dissolution`](@ref) (per-`Reagent`) and [`Composition`](@ref) (per-`Stock`),
 without changing how `Stock` stores its (undissociated) `Reagent` components.
 
 A species carries a `name`, an integer `charge` (`0` for neutral species), and one of two
@@ -150,7 +150,7 @@ julia> Species("mystery ion",1,missing)
 Unlike `Reagent`, `Species` has real value-based equality/hash (not Julia's identity-based default)
 because dissolutions and the identity-default fallback (see [`dissolution`](@ref)) routinely
 construct `Species` values on the fly, and those must compare equal to independently-constructed-but-
-identical values for `Dict` lookups (e.g. `Recipe`/`total_concentration`) to work correctly. Two
+identical values for `Dict` lookups (e.g. `Composition`/`total_concentration`) to work correctly. Two
 species are equal when their name, charge, and formula are equal (and, for species without a
 formula, their stored molecular weights).
 """

@@ -38,7 +38,7 @@ makedocs(
                 "Reagents & Chemicals" => "manual/reagents-chemicals.md",
                 "Stocks" => "manual/stocks.md",
                 "Organisms & Cultures" => "manual/organisms-cultures.md",
-                "Recipes & Solution Chemistry" => "manual/recipes.md",
+                "Composition & Solution Chemistry" => "manual/composition.md",
                 "Acid/Base Chemistry" => "manual/acid-base.md",
                 "Wells: Depositing & Transferring Material" => "manual/wells.md",
             ],

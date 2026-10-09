@@ -6,7 +6,7 @@ the operations that act on them. It has no database dependency. The reference is
 - [Locations & Operations](core-locations.md): building locations, moving them, occupancy,
   locking and activity, transfers between wells, and instrument capability.
 - [Stocks](core-stocks.md): reagents, chemicals, organisms, stocks, and CHESS's extra units.
-- [Solution Chemistry](core-chemistry.md): molar recipes, pH, and acid/base equilibria.
+- [Solution Chemistry](core-chemistry.md): molar composition, pH, and acid/base equilibria.
 - [Attributes & Reads](core-environment.md): environmental attributes, inheritance, and instrument
   reads.
 - [Interop](core-interop.md): table and JSON conversion of stocks and locations.

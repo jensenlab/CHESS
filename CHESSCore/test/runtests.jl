@@ -509,17 +509,17 @@ end
 @reagent LiquidHCl "liquid hydrochloric acid" Liquid 36.46u"g/mol" 1.20u"g/mL" missing
 set_dissolution!(LiquidHCl,Dissolution(Dict(H⁺=>1,Cl⁻=>1)))
 
-@testset "recipe(::Stock) includes liquids; dissolution reserved for Reagent" begin
-    # Recipe covers stock-level composition (see below); dissolution(x) only
+@testset "composition(::Stock) includes liquids; dissolution reserved for Reagent" begin
+    # Composition covers stock-level composition (see below); dissolution(x) only
     # has a Reagent-level method (-> Dissolution), confirmed here
     @test !hasmethod(dissolution,Tuple{Stock})
     @test dissolution(PotassiumChloride).products == Dict(K⁺=>1,Cl⁻=>1) # reagent-level, unaffected
 
-    # user-reported bug (now via recipe/molar_amount instead of the removed dissolution(::Stock)):
+    # user-reported bug (now via composition/molar_amount instead of the removed dissolution(::Stock)):
     # a pure-water Solution used to yield an empty Dict even though water has a (default,
     # non-dissociating) identity Species
     water_stock = 100u"mL"*rgt"water"
-    r = recipe(water_stock)
+    r = composition(water_stock)
     water_chem = CHESSCore.Species(name(rgt"water"),0,molecular_weight(rgt"water"))
     expected_moles = uconvert(u"mol", 100u"mL"*density(rgt"water")/molecular_weight(rgt"water"))
     @test molar_amount(r,water_chem) ≈ expected_moles
@@ -529,18 +529,18 @@ set_dissolution!(LiquidHCl,Dissolution(Dict(H⁺=>1,Cl⁻=>1)))
     @test pH(acid_stock) < 7.0
     @test total_concentration(acid_stock,Cl⁻) > 0u"mol/L"
 
-    # Mixture's recipe is unchanged -- the liquids loop is a no-op for it
+    # Mixture's composition is unchanged -- the liquids loop is a no-op for it
     paba_chem = CHESSCore.Species(name(rgt"paba"),0,molecular_weight(rgt"paba"))
     expected_paba_moles = uconvert(u"mol",quantity(b)/molecular_weight(rgt"paba"))
-    @test molar_amount(recipe(b),paba_chem) ≈ expected_paba_moles
+    @test molar_amount(composition(b),paba_chem) ≈ expected_paba_moles
 
-    # Recipe is moles-native: a Species with unknown molecular_weight still has a well-defined molar
+    # Composition is moles-native: a Species with unknown molecular_weight still has a well-defined molar
     # amount (mw-independent), even though mass() for it is missing (genuinely uncomputable) rather
-    # than 0. Built directly via Recipe's own construction algebra -- going through a registered
+    # than 0. Built directly via Composition's own construction algebra -- going through a registered
     # Reagent dissolution isn't possible here, since molecular_weight(x::Reagent) now derives from
     # the sum of *all* its registered products (an earlier plan's fix): a reagent with an unknown-mw
     # product would itself get an unknown derived mw, which would block it from ever being converted
-    # to moles in the first place, never reaching Recipe's accumulation at all.
+    # to moles in the first place, never reaching Composition's accumulation at all.
     unknown_mw_chem = CHESSCore.Species("mystery ion",1,missing)
     r = 0.001u"mol" * unknown_mw_chem
     @test molar_amount(r,unknown_mw_chem) == 0.001u"mol"
@@ -791,9 +791,9 @@ const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
     @test CHESSCore.dissolution(MgCl2).products == Dict(Mg²⁺=>1,Cl⁻=>2)
 end
 
-@testset "Recipe" begin
+@testset "Composition" begin
     stock = 0.01u"mol"*PotassiumChloride
-    r = recipe(stock)
+    r = composition(stock)
     @test mass(r,K⁺) ≈ 0.01u"mol"*molecular_weight(K⁺)
     @test molar_amount(r,K⁺) ≈ 0.01u"mol"
     @test mass(r,Cl⁻) ≈ 0.01u"mol"*molecular_weight(Cl⁻)

@@ -5,7 +5,7 @@ DocTestSetup = :(using CHESS)
 ```
 
 !!! note
-    The `pH` in [Recipes & Solution Chemistry](recipes.md) is a direct estimate from net `H⁺`/`OH⁻`
+    The `pH` in [Composition & Solution Chemistry](composition.md) is a direct estimate from net `H⁺`/`OH⁻`
     concentration. It is correct for strong electrolytes (salts, strong acids and bases) but not
     for weak acids, weak bases, or buffers, which partially dissociate and shift with pH. This page
     describes the equilibrium model for those: [`AcidBaseSystem`](@ref), [`speciation`](@ref), and
@@ -79,7 +79,7 @@ julia> pH(vinegar)
 
 `acetic_acid`'s registered [`AcidBaseSystem`](@ref) (`[Acetic Acid, OAc⁻]`, `pKa=4.76`) only
 partially dissociates, so `vinegar` is far less acidic than `acid` at a similar loading. The
-strong-electrolyte formula in [Recipes & Solution Chemistry](recipes.md) cannot capture this.
+strong-electrolyte formula in [Composition & Solution Chemistry](composition.md) cannot capture this.
 
 ## Speciation
 
@@ -125,7 +125,7 @@ julia> pH(buffer)
 
 The equilibrium solver takes its inputs as families. An [`AnalyticalSpecies`](@ref) is an
 [`AcidBaseSystem`](@ref) together with its total concentration in a stock. Every family that comes
-from the recipe of a stock is of this kind. An [`OpenSystemSpecies`](@ref) is a family held at a
+from the composition of a stock is of this kind. An [`OpenSystemSpecies`](@ref) is a family held at a
 fixed concentration of its first species. It models a species in equilibrium with an external
 reservoir, such as dissolved atmospheric carbon dioxide, whose concentration is set by the partial
 pressure and not by how much of the conjugate base forms. Its total concentration grows with pH.

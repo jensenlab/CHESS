@@ -138,16 +138,16 @@ end
     # which takes precedence over the stored field regardless
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_chloride) ≈ 58.44u"g/mol" atol=0.01u"g/mol"
 
-    # recipe()/total_concentration() see the real ionic composition
+    # composition()/total_concentration() see the real ionic composition
     stock = 1u"mol" * CHESSLabConstants.calcium_chloride
-    r = CHESSCore.recipe(stock)
+    r = CHESSCore.composition(stock)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Ca²⁺) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 2u"mol" atol=1e-6u"mol"
 
     # potassium chloride: simple 1:1 strong electrolyte, no acid/base equilibrium
     @test CHESSCore.molecular_weight(CHESSLabConstants.potassium_chloride) ≈ 74.555u"g/mol" atol=0.01u"g/mol"
     kcl_stock = 1u"mol" * CHESSLabConstants.potassium_chloride
-    kcl_r = CHESSCore.recipe(kcl_stock)
+    kcl_r = CHESSCore.composition(kcl_stock)
     @test CHESSCore.molar_amount(kcl_r,CHESSLabConstants.K⁺) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(kcl_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.acid_base_system(CHESSLabConstants.potassium_chloride) === nothing
@@ -156,7 +156,7 @@ end
 @testset "Acid/base equilibrium: cysteine and lysine are HCl salts, not free zwitterions" begin
     # cysteine: L-Cysteine hydrochloride monohydrate (Thermo Fisher BP376, PubChem CID 23462)
     @test CHESSCore.molecular_weight(CHESSLabConstants.cysteine) ≈ 175.63u"g/mol" atol=0.01u"g/mol"
-    cys_r = CHESSCore.recipe(1u"mol"*CHESSLabConstants.cysteine)
+    cys_r = CHESSCore.composition(1u"mol"*CHESSLabConstants.cysteine)
     @test CHESSCore.molar_amount(cys_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(cys_r,CHESSLabConstants.H2O) ≈ 1u"mol" atol=1e-6u"mol"
     cys_sys = CHESSCore.acid_base_system(CHESSLabConstants.cysteine)
@@ -164,7 +164,7 @@ end
 
     # lysine: L-Lysine monohydrochloride (Sigma/Thermo L5626, PubChem CID 69568), anhydrous
     @test CHESSCore.molecular_weight(CHESSLabConstants.lysine) ≈ 182.65u"g/mol" atol=0.01u"g/mol"
-    lys_r = CHESSCore.recipe(1u"mol"*CHESSLabConstants.lysine)
+    lys_r = CHESSCore.composition(1u"mol"*CHESSLabConstants.lysine)
     @test CHESSCore.molar_amount(lys_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(lys_r,CHESSLabConstants.H2O) == 0u"mol" # anhydrous, unlike cysteine's monohydrate
     lys_sys = CHESSCore.acid_base_system(CHESSLabConstants.lysine)
@@ -492,7 +492,7 @@ end
 
     # tetracycline (HCl-salt case): Dissolution correctly dissociates into Cl- and the cation,
     # and molecular_weight is now derived (matching the stored HCl-salt mass), not the stale copy
-    r = CHESSCore.recipe(0.01u"mol"*CHESSLabConstants.tetracycline)
+    r = CHESSCore.composition(0.01u"mol"*CHESSLabConstants.tetracycline)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 0.01u"mol" atol=1e-6u"mol"
     @test CHESSCore.molecular_weight(CHESSLabConstants.tetracycline) ≈ 480.9u"g/mol" atol=0.02u"g/mol"
 

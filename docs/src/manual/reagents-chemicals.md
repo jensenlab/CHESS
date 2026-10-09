@@ -114,7 +114,7 @@ true
 
 `Dissolution` coefficients must be non-negative. A base's hydroxide is represented by the
 canonical [`OH⁻`](@ref) `Species`, not a negative [`H⁺`](@ref) count. This lets `pH` (see
-[Recipes & Solution Chemistry](recipes.md)) net acid and base contributions by explicit
+[Composition & Solution Chemistry](composition.md)) net acid and base contributions by explicit
 subtraction instead of signed stoichiometry.
 
 A weak acid or base only partially dissociates, so a fixed `Dissolution` cannot describe it.
