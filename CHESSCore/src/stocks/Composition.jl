@@ -109,6 +109,85 @@ function total_concentration(s::Stock,chem::Species)
     return molar_amount(composition(s),chem) / volume_estimate(s)
 end
 
+# Adds `amount` of `spc` to the per-element atom amounts in `counts`. Returns `:counted` when `spc` has
+# a formula, `:opaque` when it was declared opaque (it contributes nothing, deliberately), and
+# `:unknown` when it has no formula registered (it contributes nothing, but that is a gap).
+function _add_atoms!(counts::Dict{Symbol,Unitful.Amount},spc::Species,amount)
+    f = formula(spc)
+    f isa OpaqueFormula && return :opaque
+    ismissing(f) && return :unknown
+    for (element,n) in f
+        counts[element] = get(counts,element,0u"mol") + n*amount
+    end
+    return :counted
+end
+
+function _warn_incomplete_atoms(names)
+    n = length(names)
+    shown = join(("\"$nm\"" for nm in first(sort!(collect(names)),5)),", ")
+    more = n > 5 ? ", and $(n-5) more" : ""
+    @warn "atoms: $n $(n==1 ? "reagent has" : "reagents have") no registered formula (or an amount that cannot be computed), so the atom amounts are a lower bound: $shown$more. Register a formula for each, or declare a reagent `opaque` if its atomic content is intentionally not described."
+end
+
+"""
+    atoms(s::Stock) -> Dict{Symbol,Unitful.Amount}
+    atoms(s::Stock,element::Symbol) -> Unitful.Amount
+    atoms(c::Composition) -> Dict{Symbol,Unitful.Amount}
+    atoms(c::Composition,element::Symbol) -> Unitful.Amount
+
+Return the amount (in moles) of each element's atoms in a stock or [`Composition`](@ref), found by
+summing every species' amount times its atom count from its elemental formula. With an `element`
+symbol such as `:Fe`, return just that element's amount (`0u"mol"` if it is absent). Multiply by
+`Unitful.Na` to get a number of atoms.
+
+Only reagents contribute; organisms in a culture are not counted. A reagent contributes nothing, and
+the result is a lower bound, when it has no registered formula or when its amount cannot be computed
+(for example a liquid without a density). In that case `atoms` emits one warning naming the reagents.
+A reagent declared `opaque` contributes nothing without a warning.
+
+```julia
+julia> s = 18.015u"mL" * water + 0.1u"mol" * NaCl; # water defined as "H2O", NaCl as Na⁺ + Cl⁻
+
+julia> atoms(s,:H)
+2.0 mol
+
+julia> atoms(s,:Cl)
+0.1 mol
+```
+"""
+function atoms(s::Stock)
+    counts = Dict{Symbol,Unitful.Amount}()
+    incomplete = String[]
+    for (reagent,quantity) in Iterators.flatten((solids(s),liquids(s)))
+        species = collect(keys(dissolution(reagent).products))
+        all(is_opaque,species) && continue
+        moles = _reagent_moles(reagent,quantity)
+        if ismissing(moles)
+            push!(incomplete,name(reagent))
+            continue
+        end
+        results = [_add_atoms!(counts,spc,coeff*moles) for (spc,coeff) in dissolution(reagent).products]
+        :unknown in results && push!(incomplete,name(reagent))
+    end
+    isempty(incomplete) || _warn_incomplete_atoms(incomplete)
+    return counts
+end
+
+function atoms(c::Composition)
+    counts = Dict{Symbol,Unitful.Amount}()
+    incomplete = String[]
+    for (spc,amount) in c.amounts
+        _add_atoms!(counts,spc,amount) === :unknown && push!(incomplete,name(spc))
+    end
+    isempty(incomplete) || _warn_incomplete_atoms(incomplete)
+    return counts
+end
+
+function atoms(x::Union{Stock,Composition},element::Symbol)
+    element in _element_symbols || throw(ArgumentError("\"$element\" is not an element symbol"))
+    return get(atoms(x),element,0u"mol")
+end
+
 """
     net_hydrogen_ion_concentration(s::Stock)
 

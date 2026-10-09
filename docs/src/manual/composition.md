@@ -45,6 +45,37 @@ julia> molar_amount(r, spc"Na+")
 0.08555817487991287 mol
 ```
 
+## Atoms
+
+[`atoms`](@ref) gives the amount of each element in a stock, from the elemental formulas of the
+species in its composition. The reagents here are defined with a formula and with a dissolution
+(see [Reagents & Chemicals](reagents-chemicals.md)):
+
+```jldoctest composition
+julia> @reagent formulawater "water with a formula" Liquid "H2O" 1.0u"g/mL" missing
+water with a formula
+
+julia> @reagent formulasalt "salt with a formula" Solid (spc"Na+" + spc"Cl-") 2.16u"g/mL" missing
+salt with a formula
+
+julia> s = 18.015u"mL" * formulawater + 0.1u"mol" * formulasalt;
+
+julia> atoms(s, :H)
+2.0 mol
+
+julia> atoms(s, :Cl)
+0.1 mol
+
+julia> atoms(s, :Fe)
+0 mol
+```
+
+Multiplying an amount by `Unitful.Na` gives a number of atoms. Only reagents contribute, and a
+reagent contributes only if it has a registered formula. When a stock holds a reagent whose formula
+is not registered, or whose amount cannot be computed, `atoms` returns what it can count and warns
+that the result is a lower bound. A reagent declared `opaque` contributes nothing and does not
+warn.
+
 ## `total_concentration`
 
 The molar concentration of a `Species` across the whole stock:

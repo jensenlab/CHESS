@@ -197,3 +197,63 @@ end
     @test haskey(dissolutions,salt)
     @test set_dissolution!(salt,Dissolution(Dict(na=>2,so4=>1))) === nothing
 end
+
+@testset "atoms" begin
+    @reagent AtomWater "atom water" Liquid "H2O" 1.0u"g/mL" missing
+    @reagent AtomGlucose "atom glucose" Solid "C6H12O6" 1.2u"g/mL" missing
+    @species AtomFe³⁺ "Fe3+" 3 "Fe"
+    @species AtomCl⁻ "Cl-" -1 "Cl"
+    @reagent AtomIronChloride "atom iron chloride" Solid (AtomFe³⁺ + 3*AtomCl⁻) 2.8u"g/mL" missing
+    @reagent AtomHydrate "atom hydrate" Solid (Species("Fe2+",2,"Fe") + Species("SO4 2-",-2,"SO4") + 7*Species("H2O",0,"H2O")) 1.9u"g/mL" missing
+    @reagent AtomLegacy "atom legacy" Solid 100.0u"g/mol" 1.0u"g/mL" missing
+    @reagent AtomUnknown "atom unknown" Solid missing missing missing
+    @reagent AtomOpaque "atom opaque" Solid opaque 1.0u"g/mL" missing
+    @reagent AtomNoDensity "atom no density" Liquid "C2H6O" missing missing
+
+    # water: 1 mol of H2O is 2 mol H and 1 mol O
+    water_stock = (molecular_weight(AtomWater)/1.0u"g/mL")*1u"mol" * AtomWater
+    a = atoms(water_stock)
+    @test a[:H] ≈ 2u"mol" && a[:O] ≈ 1u"mol" && length(a) == 2
+    @test atoms(water_stock,:H) ≈ 2u"mol"
+    @test atoms(water_stock,:Fe) == 0u"mol" # an element that is absent
+    @test unit(atoms(water_stock,:H)) == u"mol"
+
+    # several reagents sum, and a dissolution counts each product's atoms times its coefficient
+    mixed = 0.5u"mol"*AtomGlucose + 0.1u"mol"*AtomIronChloride
+    a = atoms(mixed)
+    @test a[:C] ≈ 3u"mol" && a[:H] ≈ 6u"mol" && a[:O] ≈ 3u"mol"
+    @test a[:Fe] ≈ 0.1u"mol" && a[:Cl] ≈ 0.3u"mol"
+
+    # hydrate water is counted
+    hydrate = atoms(1u"mol"*AtomHydrate)
+    @test hydrate[:Fe] ≈ 1u"mol" && hydrate[:S] ≈ 1u"mol" && hydrate[:O] ≈ 11u"mol" && hydrate[:H] ≈ 14u"mol"
+
+    # a Composition gives the same counts as the Stock it came from
+    @test atoms(composition(mixed)) == atoms(mixed)
+    @test atoms(composition(mixed),:Fe) ≈ 0.1u"mol"
+
+    # the number of atoms
+    @test uconvert(Unitful.NoUnits,atoms(1u"mol"*AtomIronChloride,:Fe) * Unitful.Na) ≈ 6.02214076e23
+
+    # no warning when every reagent has a formula
+    @test_logs atoms(mixed)
+
+    # a reagent with no registered formula leaves a lower bound and warns once
+    with_legacy = mixed + 5u"g"*AtomLegacy
+    a2 = @test_logs (:warn,r"lower bound.*atom legacy") atoms(with_legacy)
+    @test a2[:C] ≈ 3u"mol" # unchanged: the legacy reagent contributes nothing
+    @test_logs (:warn,r"lower bound.*atom unknown") atoms(mixed + 5u"g"*AtomUnknown)
+    @test_logs (:warn,r"2 reagents") atoms(mixed + 5u"g"*AtomLegacy + 5u"g"*AtomUnknown)
+    # an amount that cannot be computed (a liquid without a density) is also a gap
+    @test_logs (:warn,r"atom no density") atoms(mixed + 5u"mL"*AtomNoDensity)
+    @test_logs (:warn,r"lower bound") atoms(with_legacy,:C)
+
+    # an opaque reagent contributes nothing and does not warn
+    @test_logs atoms(mixed + 5u"g"*AtomOpaque)
+    @test atoms(mixed + 5u"g"*AtomOpaque) == atoms(mixed)
+    @test_logs atoms(composition(mixed + 5u"g"*AtomOpaque))
+
+    # an unknown element symbol is an error
+    @test_throws ArgumentError atoms(mixed,:Xx)
+    @test_throws ArgumentError atoms(mixed,:fe)
+end
