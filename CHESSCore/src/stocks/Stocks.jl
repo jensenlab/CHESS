@@ -467,7 +467,7 @@ end
     @stock_str(kind)
 
 String macro to recall a `Stock` recipe registered with [`@stock`](@ref), by name -- mirrors
-[`@loc_str`](@ref)/[`@attr_str`](@ref)/[`@rgt_str`](@ref)/[`@chem_str`](@ref)/[`@org_str`](@ref), but
+[`@loc_str`](@ref)/[`@attr_str`](@ref)/[`@rgt_str`](@ref)/[`@spc_str`](@ref)/[`@org_str`](@ref), but
 looks up [`stock_recipes`](@ref) directly rather than scanning for any correctly-typed `const`
 binding: only recipes registered via [`@stock`](@ref) are reachable this way.
 

@@ -74,3 +74,61 @@ end
     @test_throws ArgumentError fm(Dict{Symbol,Int}())
     @test_throws ArgumentError fm(Dict(:Xx=>1))
 end
+
+@testset "Species with elemental formulas" begin
+    glucose_sp = Species("D-glucose",0,"C6H12O6")
+    @test molecular_weight(glucose_sp) ≈ 180.156u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.formula(glucose_sp) == Dict(:C=>6,:H=>12,:O=>6)
+    @test charge(glucose_sp) == 0
+    @test Species("D-glucose","C6H12O6") == glucose_sp # neutral shorthand
+
+    # a species with a stored molecular weight has no formula
+    legacy = Species("legacy",1,100.0u"g/mol")
+    @test molecular_weight(legacy) == 100.0u"g/mol"
+    @test ismissing(CHESSCore.formula(legacy))
+    @test ismissing(molecular_weight(Species("unknown",1,missing)))
+
+    # equality: name, charge, and formula (element order does not matter)
+    @test Species("x",0,"C6H12O6") == Species("x",0,"H12C6O6")
+    @test hash(Species("x",0,"C6H12O6")) == hash(Species("x",0,"H12C6O6"))
+    @test Species("x",0,"C6H12O6") != Species("x",0,"C6H12O5") # same name, different formula
+    @test Species("x",0,"C6H12O6") != Species("x",1,"C6H12O6")
+    @test Species("x",0,"C6H12O6") != Species("y",0,"C6H12O6")
+    @test Species("glucose",0,"C6H12O6") != Species("fructose",0,"C6H12O6") # isomers are separate species
+
+    # a species takes a formula or a stored weight, not both, and a formula must be non-empty
+    @test_throws ArgumentError Species("x",0,Dict(:C=>1),1.0u"g/mol")
+    @test_throws ArgumentError Species("x",0,Dict{Symbol,Int}(),missing)
+    @test_throws ArgumentError Species("x",0,"Xx")
+    @test_throws ArgumentError Species("x",0,"Na+")
+
+    # the canonical proton and hydroxide carry derived molecular weights
+    @test molecular_weight(H⁺) ≈ 1.008u"g/mol" atol=0.001u"g/mol"
+    @test molecular_weight(OH⁻) ≈ 17.007u"g/mol" atol=0.001u"g/mol"
+end
+
+@testset "@species" begin
+    @species TestFormulaNa⁺ "Na+" 1 "Na"
+    @species TestFormulaGlucose "D-glucose" 0 "C6H12O6"
+    @species TestLegacyIon "legacy ion" 1 123.0u"g/mol"
+    @test molecular_weight(TestFormulaNa⁺) ≈ 22.99u"g/mol" atol=0.01u"g/mol"
+    @test TestFormulaGlucose == Species("D-glucose",0,"C6H12O6")
+    @test molecular_weight(TestLegacyIon) == 123.0u"g/mol"
+end
+
+@testset "formula_string: canonical Hill order" begin
+    fs = CHESSCore.formula_string
+    @test fs(pf("C6H12O6")) == "C6H12O6"
+    @test fs(pf("H12C6O6")) == "C6H12O6"
+    @test fs(pf("NaCl")) == "ClNa" # no carbon: alphabetical
+    @test fs(pf("H2O")) == "H2O"
+    @test fs(pf("CH3COOH")) == "C2H4O2"
+    @test fs(pf("FeSO4·7H2O")) == "FeH14O11S"
+    @test fs(pf("C2H5Br")) == "C2H5Br"
+    @test fs(Dict(:C=>1,:Br=>1)) == "CBr" # no hydrogen: carbon then alphabetical
+    # round trip: parsing the string gives back the same counts
+    for f in ("C6H12O6","K4[Fe(CN)6]","Ca3(PO4)2","FeSO4·7H2O","H2O")
+        @test pf(fs(pf(f))) == pf(f)
+    end
+    @test_throws ArgumentError fs(Dict{Symbol,Int}())
+end

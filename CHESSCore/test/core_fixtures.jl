@@ -23,10 +23,10 @@ using CHESSCore, Unitful
 @location_kind TestWellKind Symbol[] nothing nothing 200u"µL" nothing nothing
 @attribute TestHumidity u"percent"
 @read TestpH nothing
-@chemical TestNa⁺ "TestNa+" 1 22.99u"g/mol"
-@chemical TestCa²⁺ "TestCa2+" 2 40.08u"g/mol"
-@chemical TestH2PO4⁻ "TestH2PO4-" -1 96.99u"g/mol"
-@chemical TestSO4²⁻ "TestSO4 2-" -2 96.06u"g/mol"
+@species TestNa⁺ "TestNa+" 1 22.99u"g/mol"
+@species TestCa²⁺ "TestCa2+" 2 40.08u"g/mol"
+@species TestH2PO4⁻ "TestH2PO4-" -1 96.99u"g/mol"
+@species TestSO4²⁻ "TestSO4 2-" -2 96.06u"g/mol"
 @stock test_stock_recipe 1u"mL" * water
 end
 

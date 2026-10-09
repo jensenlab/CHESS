@@ -1,10 +1,10 @@
 # Real ionic dissociation chemistry for the electrolyte salts (plus HCl/NaOH and the ammonium salts)
-# defined in solids.jl, expressed as Formula algebra over the cited ion Chemicals in ions.jl rather
+# defined in solids.jl, expressed as Formula algebra over the cited ion Species in ions.jl rather
 # than raw Dict literals -- e.g. `Na⁺+Cl⁻` instead of `Dict(Na⁺=>1,Cl⁻=>1)`. molecular_weight(::Reagent)
 # derives its result from a reagent's registered CompositionRule once one exists (see
 # CHESSCore/src/stocks/Chemicals.jl), overriding the reagent's own stored value -- these reagents are
 # therefore defined in solids.jl with `missing` molecular_weight, so the Formula below (built entirely
-# from PubChem-cited ion Chemicals) is the *only* source of truth for their molecular weight, with no
+# from PubChem-cited ion Species) is the *only* source of truth for their molecular weight, with no
 # separately-cached, independently-driftable compound-level number. Hydrates register their waters of
 # hydration as an explicit H2O product (they really are released into solution) to keep the derived
 # weight matching the correct hydrate value.
@@ -84,7 +84,7 @@ function _register_electrolyte_compositions!()
     set_composition!(cysteine,CompositionRule((CysteineCation+Cl⁻+H2O).composition))
 
     # Tetracycline family HCl salts -- their stored molecular_weight is the salt mass, not the free
-    # base (confirmed by exact arithmetic; see pKa_data.jl's comment above their Chemical
+    # base (confirmed by exact arithmetic; see pKa_data.jl's comment above their Species
     # definitions). Complete dissociation into the protonated tetracycline cation + Cl-, exactly like
     # the ammonium salts above; the cation's own further acid/base equilibrium is registered
     # separately via AcidBaseSystem in pKa_data.jl.

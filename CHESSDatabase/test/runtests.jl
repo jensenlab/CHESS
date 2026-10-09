@@ -28,13 +28,15 @@ include("test_reconstruct_contents_bootstrap.jl")
 
 include("test_reconstruct_encumbrances.jl")
 
+include("test_migrate_species.jl")
+
 include("test_reconstruct_contents_ancestor_closure.jl")
 
 # Fixtures used by testsets below that originally relied on core_runtests.jl's script-level bindings
-# (b = a Mixture stock; Cl⁻ = a test-local dissociation Chemical) -- now that CHESSCore and
+# (b = a Mixture stock; Cl⁻ = a test-local dissociation Species) -- now that CHESSCore and
 # CHESSDatabase are separate packages with independent test processes, these need their own copy here.
 b=10u"g"*rgt"paba" # mixture
-const Cl⁻=CHESSCore.Chemical("Cl-",-1,35.45u"g/mol")
+const Cl⁻=CHESSCore.Species("Cl-",-1,"Cl")
 
 @testset "upload() rejects uncommitted locations without a phantom ledger row" begin
     # upload's `ledger_id` default (append_ledger()) used to be evaluated before the commit check,
@@ -167,7 +169,7 @@ end
     @test_throws ErrorException vc_to_stock(vc_bad,units_bad;reagent_context=[CHESSCore,TestChemOrg])
 end
 
-@testset "Separate Chemical/Reagent DB registries" begin
+@testset "Separate Species/Reagent DB registries" begin
     # bug fix: Reagents is keyed by ComponentID now, not Name -- a Solid and a Liquid sharing a name
     # (distinct Reagent values per value-based equality) each get their own persisted row
     s1 = Solid("dbtest",137.14u"g/mol",1.35u"g/mL",978)
@@ -179,17 +181,19 @@ end
     @test rows[1,:MolecularWeight] == 137.14 && rows[1,:Density] == 1.35
     @test rows[2,:MolecularWeight] == 200.0 && rows[2,:Density] == 0.9
 
-    # composition round-trips through the new Chemicals/CompositionRules tables
+    # composition round-trips through the Species/CompositionRules tables
     hcl_db = Solid("hcl_dbtest",36.46u"g/mol",1.0u"g/mL",missing)
     set_composition!(hcl_db,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
     id_hcl = CHESSDatabase.upload_component(hcl_db)
     comp_rows = query_db("""
-        SELECT c.Name, c.Charge, c.MolecularWeight, r.Coefficient
-        FROM CompositionRules r INNER JOIN Chemicals c ON r.ChemicalID = c.ID
+        SELECT c.Name, c.Charge, c.Formula, c.MolecularWeight, r.Coefficient
+        FROM CompositionRules r INNER JOIN Species c ON r.SpeciesID = c.ID
         WHERE r.ReagentComponentID = $id_hcl
     """)
     @test nrow(comp_rows) == 2
-    fetched = Dict(CHESSCore.Chemical(row.Name,row.Charge,row.MolecularWeight*u"g/mol") => row.Coefficient for row in eachrow(comp_rows))
+    @test all(ismissing,comp_rows.MolecularWeight) # species with a formula store the formula, not a weight
+    @test sort(comp_rows.Formula) == ["Cl","H"]
+    fetched = Dict(CHESSCore.Species(row.Name,row.Charge,row.Formula) => row.Coefficient for row in eachrow(comp_rows))
     @test fetched == composition_rules[hcl_db].products
 
     # get_component restores the dissociation rule -- reconstructed reagent behaves identically
@@ -215,11 +219,23 @@ end
     @test org == org2
     @test hash(org) == hash(org2)
 
-    hplus_rt = CHESSCore.Chemical("H+_rt",1,1.008u"g/mol")
-    id_chem = CHESSDatabase.get_chemical_id(hplus_rt)
-    chem2 = CHESSDatabase.get_chemical(id_chem)
-    @test hplus_rt == chem2
-    @test hash(hplus_rt) == hash(chem2)
+    hplus_rt = CHESSCore.Species("H+_rt",1,"H")
+    id_spc = CHESSDatabase.get_species_id(hplus_rt)
+    spc2 = CHESSDatabase.get_species(id_spc)
+    @test hplus_rt == spc2
+    @test hash(hplus_rt) == hash(spc2)
+    @test CHESSDatabase.get_species_id(Species("H+_rt",1,"H")) == id_spc # natural-key dedup on the formula
+
+    # a species without a formula round-trips through its stored molecular weight
+    legacy_rt = CHESSCore.Species("legacy_rt",1,123.45u"g/mol")
+    legacy2 = CHESSDatabase.get_species(CHESSDatabase.get_species_id(legacy_rt))
+    @test legacy_rt == legacy2
+    @test ismissing(CHESSCore.formula(legacy2))
+    unknown_rt = CHESSCore.Species("unknown_rt",-1,missing)
+    @test CHESSDatabase.get_species(CHESSDatabase.get_species_id(unknown_rt)) == unknown_rt
+
+    # same name and charge but a different formula is a different species
+    @test CHESSDatabase.get_species_id(Species("H+_rt",1,"H2")) != id_spc
 
     # natural-key dedup: re-uploading the identical reagent/chemical/organism reuses the same row
     s_dedup = Solid("dedup_test",137.14u"g/mol",1.35u"g/mL",978)

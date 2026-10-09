@@ -14,7 +14,7 @@ DocTestSetup = :(using CHESS)
     below otherwise.
 
 A `Stock` is measured in `Reagent`s, the physical things that are weighed out. A
-[`Recipe`](@ref) expresses the same stock as molar quantities of `Chemical`s, accounting for
+[`Recipe`](@ref) expresses the same stock as molar quantities of `Species` values, accounting for
 dissociation. [`recipe(s::Stock)`](@ref) derives it, and the derivation is one-directional. The
 examples use the saline from [Stocks](stocks.md):
 
@@ -35,29 +35,29 @@ so it contributes its own identity, the default `composition`.
 
 ## Reading a `Recipe`
 
-[`mass`](@ref) and [`molar_amount`](@ref) read a `Recipe`'s quantity of a given `Chemical`:
+[`mass`](@ref) and [`molar_amount`](@ref) read a `Recipe`'s quantity of a given `Species`:
 
 ```jldoctest recipes
-julia> mass(r, chem"Na+")
-1.966962701545093 g
+julia> mass(r, spc"Na+")
+1.9669627005070887 g
 
-julia> molar_amount(r, chem"Na+")
-0.08555817485063207 mol
+julia> molar_amount(r, spc"Na+")
+0.08555817487991287 mol
 ```
 
 ## `total_concentration`
 
-The molar concentration of a `Chemical` across the whole stock:
+The molar concentration of a `Species` across the whole stock:
 
 ```jldoctest recipes
-julia> total_concentration(saline, chem"Na+")
-0.08555817485063207 mol mL⁻¹
+julia> total_concentration(saline, spc"Na+")
+0.08555817487991287 mol mL⁻¹
 ```
 
 ## `pH` and `net_hydrogen_ion_concentration`
 
 [`pH`](@ref) is derived from [`net_hydrogen_ion_concentration`](@ref), which nets the canonical
-[`H⁺`](@ref) and [`OH⁻`](@ref) `Chemical`s (see [Reagents & Chemicals](reagents-chemicals.md))
+[`H⁺`](@ref) and [`OH⁻`](@ref) `Species` values (see [Reagents & Chemicals](reagents-chemicals.md))
 against each other. `saline` is a neutral salt, so the result is neutral:
 
 ```jldoctest recipes

@@ -122,13 +122,13 @@ end
 @testset "register_chemical! author-time tool (cache hit, no network)" begin
     CHESSLabConstants._cache_chemical!("Na⁺","Na+",1,22.9897693,923)
     line = CHESSLabConstants.register_chemical!("Na⁺","Na+",1,923)
-    @test line == "@chemical Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+    @test line == "@species Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
 end
 
 @testset "Dissociation chemistry: derived molecular weights, hydrates, recipe/total_concentration" begin
     # copper_sulfate is the pentahydrate (fixed 2026-08-14 -- see solids.jl/electrolytes.jl), so its
     # derived weight includes 5 waters of hydration, not the anhydrous salt's 159.61
-    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 249.69u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 249.68u"g/mol" atol=0.01u"g/mol" # derived from atomic masses (was hand-entered 249.69)
 
     # hydrate: waters of hydration keep the derived weight at the hydrate value, not the anhydrous one
     @test CHESSCore.molecular_weight(CHESSLabConstants.calcium_chloride) ≈ 147.01u"g/mol" atol=0.01u"g/mol"
@@ -336,7 +336,7 @@ end
     sys = CHESSCore.acid_base_system(CHESSLabConstants.mops)
     @test sys isa AcidBaseSystem
     @test sys.pKa == [7.20]
-    @test sys.species[1] == CHESSCore.Chemical(name(CHESSLabConstants.mops),0,CHESSCore.molecular_weight(CHESSLabConstants.mops))
+    @test sys.species[1] == CHESSCore.Species(name(CHESSLabConstants.mops),0,CHESSCore.molecular_weight(CHESSLabConstants.mops))
 
     # MOPS is a Solid -- constructed by moles directly, like the other organic acid reagents
     stock = (0.1u"mol"*CHESSLabConstants.mops) + (1.0u"L"*CHESSLabConstants.water)

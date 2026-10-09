@@ -121,7 +121,7 @@ Labware
 
 !!! note
     [`@location_kind`](@ref) binds the constant in the calling module but does not export it. The
-    same holds for `@attribute`, `@read`, `@chemical`, and `@organism` (see
+    same holds for `@attribute`, `@read`, `@species`, and `@organism` (see
     [Registering Lab Constants](registering-lab-constants.md)), so a lab module can register
     hundreds of kinds without adding names to the namespace of code that loads it.
 

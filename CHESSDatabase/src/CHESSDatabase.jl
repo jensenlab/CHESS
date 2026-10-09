@@ -55,7 +55,7 @@ include("./update_operation.jl")
 include("./observations.jl")
 
 #database
-export create_db
+export create_db, migrate_species!
 #observations.jl
 export observe, upload_observation, observation_discrepancies, backfill_observations
 #ledger.jl

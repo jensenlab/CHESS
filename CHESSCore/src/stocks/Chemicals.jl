@@ -4,7 +4,7 @@
     abstract type Reagent end
 
 Represents a *physical form* — a substance you can weigh out and store (renamed from the old
-`Chemical`). `Reagent`s are used to identify the composition of various mixtures and substances in
+`Species`). `Reagent`s are used to identify the composition of various mixtures and substances in
 the lab, tracked in [`Stock`](@ref)'s `SolidDict`/`LiquidDict`.
 
 All `Reagent` subtypes have four fields utilized by CHESSCore:
@@ -13,7 +13,7 @@ All `Reagent` subtypes have four fields utilized by CHESSCore:
 3) `density`: the reagent's density at STP, if known, is used by CHESSCore to facilitate conversions between mass and volume quantities of the reagent. If `density` is unknown or undefined, it is assigned a value of `missing`
 4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) connects the reagent to registered substances in the pubchem database. the [`@reagent`](@ref) macro uses `pubchemid` to query the PubChem database for the reagent's properties automatically.
 
-See also: [`Chemical`](@ref) for the separate *chemical identity* axis (what a reagent behaves as once
+See also: [`Species`](@ref) for the separate *chemical identity* axis (what a reagent behaves as once
 dissolved), and [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Reagent` shares
 with [`Organism`](@ref).
 """
@@ -41,7 +41,7 @@ name(x::Reagent)=x.name
     molecular_weight(x::Reagent)
 
 The molecular weight of a reagent: derived from its registered [`composition`](@ref)
-(`composition_rules`) when one exists (the sum of each product [`Chemical`](@ref)'s molecular weight
+(`composition_rules`) when one exists (the sum of each product [`Species`](@ref)'s molecular weight
 times its coefficient), falling back to the reagent's stored value otherwise. Deriving from
 composition is safe because every registered [`CompositionRule`](@ref) is required to be
 non-negative, real stoichiometry (see its constructor).
@@ -108,7 +108,7 @@ end
 # object identity rather than value equality. SolidDict/LiquidDict/composition_rules use Reagent as
 # a Dict key and currently only work because callers happen to reuse the same canonical `const`
 # binding everywhere -- this makes that safe by construction (mirrors the equivalent fix already
-# applied to Chemical). Constrained to same-concrete-type pairs so a Solid and a Liquid with
+# applied to Species). Constrained to same-concrete-type pairs so a Solid and a Liquid with
 # identical fields are still correctly distinct.
 #
 # molecular_weight/density are hashed via a canonical unit (g/mol, g/mL), not the raw stored
@@ -126,32 +126,55 @@ Base.:(==)(a::T,b::T) where T<:Reagent = a.name==b.name && isequal(a.molecular_w
 Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.molecular_weight),hash(_hash_canon(a.density),hash(a.pubchemid,h)))))
 
 """
-    struct Chemical
+    struct Species
 
-Represents a *chemical identity* — what a [`Reagent`](@ref) behaves as once it's part of a reactive
-system (e.g. Na⁺, Cl⁻ from dissolved NaCl; or, trivially, glucose's own identity for a
-non-dissociating reagent). `Chemical`s are never added directly to a [`Stock`](@ref) — they exist
-purely as the output vocabulary of [`composition`](@ref) (per-`Reagent`) and [`Recipe`](@ref)
-(per-`Stock`), without changing how `Stock` stores its (undissociated) `Reagent` components.
+Represents a *species* — what a [`Reagent`](@ref) behaves as once it's part of a reactive system
+(e.g. Na⁺, Cl⁻ from dissolved NaCl; or, trivially, glucose's own identity for a non-dissociating
+reagent). `Species` values are never added directly to a [`Stock`](@ref) — they exist purely as the
+output vocabulary of [`composition`](@ref) (per-`Reagent`) and [`Recipe`](@ref) (per-`Stock`),
+without changing how `Stock` stores its (undissociated) `Reagent` components.
 
-`charge` defaults to `0` for neutral species. Unlike `Reagent`, `Chemical` has real value-based
-equality/hash (not Julia's identity-based default) — see the constructor/`==`/`hash` definitions
-below — because composition rules and the identity-default fallback (see [`composition`](@ref))
-routinely construct `Chemical` values on the fly, and those must compare equal to
-independently-constructed-but-identical values for `Dict` lookups (e.g. `Recipe`/`total_concentration`)
-to work correctly.
+A species carries a `name`, an integer `charge` (`0` for neutral species), and one of two
+descriptions of its mass:
+
+- an elemental formula string such as `"C6H12O6"` (see `CHESSCore.parse_formula`), from which
+  [`molecular_weight`](@ref) is derived using atomic masses; or
+- a stored molecular weight (or `missing`), for a species whose formula is not registered.
+
+```julia
+julia> Species("glucose",0,"C6H12O6")
+
+julia> Species("mystery ion",1,missing)
+```
+
+Unlike `Reagent`, `Species` has real value-based equality/hash (not Julia's identity-based default)
+because composition rules and the identity-default fallback (see [`composition`](@ref)) routinely
+construct `Species` values on the fly, and those must compare equal to independently-constructed-but-
+identical values for `Dict` lookups (e.g. `Recipe`/`total_concentration`) to work correctly. Two
+species are equal when their name, charge, and formula are equal (and, for species without a
+formula, their stored molecular weights).
 """
-struct Chemical
+struct Species
     name::String
     charge::Integer
-    molecular_weight::Union{Unitful.MolarMass,Missing}
+    formula::Union{Dict{Symbol,Int},Missing}
+    stored_molecular_weight::Union{Unitful.MolarMass,Missing}
+    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing},stored_molecular_weight::Union{Unitful.MolarMass,Missing})
+        !ismissing(formula) && !ismissing(stored_molecular_weight) && throw(ArgumentError(
+            "Species \"$name\" was given both a formula and a stored molecular weight; give one or the other"))
+        ismissing(formula) || isempty(formula) && throw(ArgumentError("Species \"$name\" has an empty formula"))
+        new(String(name),charge,formula,stored_molecular_weight)
+    end
 end
-Chemical(name::String,molecular_weight::Union{Unitful.MolarMass,Missing}) = Chemical(name,0,molecular_weight)
+Species(name::AbstractString,charge::Integer,formula::AbstractString) = Species(name,charge,parse_formula(formula),missing)
+Species(name::AbstractString,charge::Integer,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,charge,missing,molecular_weight)
+Species(name::AbstractString,formula::AbstractString) = Species(name,0,formula)
+Species(name::AbstractString,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,0,molecular_weight)
 
-Base.:(==)(a::Chemical,b::Chemical) = a.name==b.name && a.charge==b.charge && isequal(a.molecular_weight,b.molecular_weight)
-Base.hash(a::Chemical,h::UInt) = hash(a.name,hash(a.charge,hash(_hash_canon(a.molecular_weight),h)))
+Base.:(==)(a::Species,b::Species) = a.name==b.name && a.charge==b.charge && isequal(a.formula,b.formula) && isequal(a.stored_molecular_weight,b.stored_molecular_weight)
+Base.hash(a::Species,h::UInt) = hash(a.name,hash(a.charge,hash(a.formula,hash(_hash_canon(a.stored_molecular_weight),h))))
 
-function Base.show(io::IO,c::Chemical)
+function Base.show(io::IO,c::Species)
     try
         print(io,symbol(c))
     catch e
@@ -161,20 +184,27 @@ function Base.show(io::IO,c::Chemical)
 end
 
 """
-    name(x::Chemical)
-Access the `name` property of a [`Chemical`](@ref).
+    name(x::Species)
+Access the `name` property of a [`Species`](@ref).
 """
-name(x::Chemical)=x.name
+name(x::Species)=x.name
 """
-    molecular_weight(x::Chemical)
-Access the `molecular_weight` property of a [`Chemical`](@ref).
+    molecular_weight(x::Species)
+Return the molecular weight of a [`Species`](@ref): derived from its elemental formula using atomic
+masses when it has one, otherwise its stored molecular weight (`missing` if none).
 """
-molecular_weight(x::Chemical)=x.molecular_weight
+molecular_weight(x::Species) = ismissing(x.formula) ? x.stored_molecular_weight : formula_mass(x.formula)
 """
-    charge(x::Chemical)
-Access the `charge` property of a [`Chemical`](@ref).
+    formula(x::Species)
+Return the elemental formula of a [`Species`](@ref) as a dictionary from element symbol to atom
+count, or `missing` if no formula is registered.
 """
-charge(x::Chemical)=x.charge
+formula(x::Species)=x.formula
+"""
+    charge(x::Species)
+Access the `charge` property of a [`Species`](@ref).
+"""
+charge(x::Species)=x.charge
 
 """
     const H⁺
@@ -182,9 +212,9 @@ charge(x::Chemical)=x.charge
 The canonical hydrogen ion (proton), used by [`pH`](@ref)/[`total_concentration`](@ref). Any custom
 [`composition`](@ref) rule representing proton transfer (e.g. a strong base contributing a
 *negative* count, so it nets against acids in the same composition summation) should reuse this
-exact value rather than defining its own separate "H+" `Chemical`, so contributions net correctly.
+exact value rather than defining its own separate "H+" `Species`, so contributions net correctly.
 """
-const H⁺ = Chemical("H+",1,1.008u"g/mol")
+const H⁺ = Species("H+",1,"H")
 
 """
     const OH⁻
@@ -193,12 +223,12 @@ The canonical hydroxide ion, used by [`net_hydrogen_ion_concentration`](@ref)/[`
 should register their real dissociation formula using this value (e.g. `Na⁺ + OH⁻` for NaOH) rather
 than a negative [`H⁺`](@ref) count -- see [`CompositionRule`](@ref).
 """
-const OH⁻ = Chemical("OH-",-1,17.008u"g/mol")
+const OH⁻ = Species("OH-",-1,"OH")
 
 """
     struct CompositionRule
 
-Describes the stoichiometric products of a [`Reagent`](@ref) breaking down into [`Chemical`](@ref)s
+Describes the stoichiometric products of a [`Reagent`](@ref) breaking down into [`Species`](@ref)s
 — e.g. `CompositionRule(Dict(Na⁺=>1, Cl⁻=>1))` for NaCl, or `CompositionRule(Dict(glucose_chem=>1))`
 for a non-dissociating reagent (its own identity). Coefficients must be non-negative -- represent an
 acid/base's hydroxide contribution via [`OH⁻`](@ref), not a negative [`H⁺`](@ref) count (see
@@ -206,8 +236,8 @@ acid/base's hydroxide contribution via [`OH⁻`](@ref), not a negative [`H⁺`](
 registered products directly.
 """
 struct CompositionRule
-    products::Dict{Chemical,Int}
-    function CompositionRule(products::Dict{Chemical,Int})
+    products::Dict{Species,Int}
+    function CompositionRule(products::Dict{Species,Int})
         all(c->c>=0, values(products)) || throw(ArgumentError(
             "CompositionRule coefficients must be non-negative -- represent bases via OH⁻ (see `OH⁻`), not a negative H⁺ count"))
         new(products)
@@ -239,63 +269,68 @@ end
 """
     composition(x::Reagent)
 
-Return the [`CompositionRule`](@ref) describing how `x` breaks down into [`Chemical`](@ref)s when
+Return the [`CompositionRule`](@ref) describing how `x` breaks down into [`Species`](@ref)s when
 dissolved. Every `Reagent` has a composition — a non-electrolyte's default (for anything not
-registered via [`set_composition!`](@ref)) is simply its own identity `Chemical`
-(`CompositionRule(Dict(Chemical(name(x),0,molecular_weight(x))=>1))`), not "no composition."
+registered via [`set_composition!`](@ref)) is simply its own identity `Species`
+(`CompositionRule(Dict(Species(name(x),0,molecular_weight(x))=>1))`), not "no composition."
 """
 function composition(x::Reagent)
     haskey(composition_rules,x) && return composition_rules[x]
-    return CompositionRule(Dict(Chemical(name(x),0,molecular_weight(x))=>1))
+    return CompositionRule(Dict(Species(name(x),0,molecular_weight(x))=>1))
 end
 
 """
     struct Formula
 
-A stoichiometric formula built from [`Chemical`](@ref) values via the algebra below — e.g.
-`chem"Na+" + chem"Cl-"` or `chem"Mg2+" + 2*chem"Cl-"`. Used to define a [`Reagent`](@ref) from its
+A stoichiometric formula built from [`Species`](@ref) values via the algebra below — e.g.
+`spc"Na+" + spc"Cl-"` or `spc"Mg2+" + 2*spc"Cl-"`. Used to define a [`Reagent`](@ref) from its
 chemical composition via [`@reagent_formula`](@ref), which derives both the reagent's
 `molecular_weight` and its registered [`composition`](@ref) from the formula.
 """
 struct Formula
-    composition::Dict{Chemical,Int}
+    composition::Dict{Species,Int}
 end
 
-Base.:*(n::Integer,c::Chemical) = Formula(Dict(c=>n))
-Base.:*(c::Chemical,n::Integer) = n*c
+Base.:*(n::Integer,c::Species) = Formula(Dict(c=>n))
+Base.:*(c::Species,n::Integer) = n*c
 Base.:*(n::Integer,f::Formula) = Formula(Dict(k=>v*n for (k,v) in f.composition))
-Base.:+(a::Chemical,b::Chemical) = Formula(mergewith(+,Dict(a=>1),Dict(b=>1)))
-Base.:+(a::Formula,b::Chemical) = Formula(mergewith(+,a.composition,Dict(b=>1)))
-Base.:+(a::Chemical,b::Formula) = b+a
+Base.:+(a::Species,b::Species) = Formula(mergewith(+,Dict(a=>1),Dict(b=>1)))
+Base.:+(a::Formula,b::Species) = Formula(mergewith(+,a.composition,Dict(b=>1)))
+Base.:+(a::Species,b::Formula) = b+a
 Base.:+(a::Formula,b::Formula) = Formula(mergewith(+,a.composition,b.composition))
 
 
 """
-    @chemical labname name charge molecular_weight
+    @species labname name charge formula
 
-Define a new [`Chemical`](@ref) identity value (e.g. an ion like Na⁺, or a standalone chemical
-identity) and import it into the workspace under `labname`. `charge` is `0` for neutral species.
+Define a new [`Species`](@ref) value (e.g. an ion like Na⁺, or a standalone neutral species) and
+import it into the workspace under `labname`. `charge` is `0` for neutral species. `formula` is an
+elemental formula string such as `"C6H12O6"`; the molecular weight is derived from it. A molar
+mass (or `missing`) may be given instead of a formula for a species whose formula is not registered.
 
 Example:
 ```julia
-julia> @chemical Na⁺ "Na+" 1 22.99u"g/mol"
+julia> @species Na⁺ "Na+" 1 "Na"
 Na+
+
+julia> @species glucose_species "D-glucose" 0 "C6H12O6"
+D-glucose
 ```
 
-See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@chem_str`](@ref),
+See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@spc_str`](@ref),
 [`Formula`](@ref).
 """
-macro chemical(labsymb,name,charge,molecular_weight)
+macro species(labsymb,name,charge,formula)
     ls = Symbol(labsymb)
     docstr = """
             $labsymb
 
-        The chemical $name (charge $charge)
+        The species $name (charge $charge)
 
-        Molecular Weight: $molecular_weight
+        Formula: $formula
         """
     esc(quote
-        const global $ls = CHESSCore.Chemical($name,$charge,$molecular_weight)
+        const global $ls = CHESSCore.Species($name,$charge,$formula)
         @doc $docstr $ls
     end)
 end
@@ -307,7 +342,7 @@ end
 Define a new reagent (a physical `Solid`/`Liquid`/`Gas`) and import it into the workspace under
 `labname`. The `name` argument is the display name for the reagent, which can include a larger set
 of characters and formatting than the `labname`. Automatically registers the reagent's identity
-[`Chemical`](@ref) via [`set_composition!`](@ref) (discoverable in [`composition_rules`](@ref)),
+[`Species`](@ref) via [`set_composition!`](@ref) (discoverable in [`composition_rules`](@ref)),
 matching the default [`composition`](@ref) would compute anyway for a non-dissociating reagent.
 
 There are three valid type parameters for reagents:
@@ -365,33 +400,33 @@ end
 
 
 """
-    @chem_str(chemical)
+    @spc_str(chemical)
 
-String macro to easily recall [`Chemical`](@ref) identity values defined in lab modules that have
+String macro to easily recall [`Species`](@ref) identity values defined in lab modules that have
 been registered with [`CHESSCore.register_lab`](@ref)
 
-If the symbol is defined for a [`CHESSCore.Chemical`](@ref) in multiple modules, the symbol from the most
+If the symbol is defined for a [`CHESSCore.Species`](@ref) in multiple modules, the symbol from the most
 recently registred module will be used.
 
 Example:
 
 ```julia
-julia> chem"Na+"
+julia> spc"Na+"
 Na+
 ```
-The [`@chem_str`](@ref) macro is most useful for building [`CHESSCore.Formula`](@ref) values:
+The [`@spc_str`](@ref) macro is most useful for building [`CHESSCore.Formula`](@ref) values:
 
 ```julia
-julia> chem"Na+" + chem"Cl-"
+julia> spc"Na+" + spc"Cl-"
 ```
 
 See also: [`@rgt_str`](@ref) for looking up [`Reagent`](@ref)s instead.
 """
-macro chem_str(chemical)
+macro spc_str(chemical)
     # A bare Symbol lookup, not Meta.parse(chemical) -- charged chemical names routinely end in
     # `+`/`-` (Na+, Cl-), which Julia's parser treats as an incomplete binary expression rather than
     # part of an identifier. Symbol(str) has no such ambiguity for any string content. Compound
-    # expression parsing (e.g. for chemparse) is unaffected -- only this bare-lookup macro changes.
+    # expression parsing (e.g. for speciesparse) is unaffected -- only this bare-lookup macro changes.
     sym = Symbol(chemical)
     labmods = [CHESSCore]
     for m in CHESSCore.labmodules
@@ -401,15 +436,15 @@ macro chem_str(chemical)
             push!(labmods, m)
         end
     end
-    esc(lookup_named_value(labmods, sym, chemstr_check_bool))
+    esc(lookup_named_value(labmods, sym, spcstr_check_bool))
 end
 
 """
     @rgt_str(reagent)
 
 String macro to easily recall [`Reagent`](@ref)s defined in lab modules that have been registered
-with [`CHESSCore.register_lab`](@ref) — mirrors [`@chem_str`](@ref), targeting `Reagent` instead of
-`Chemical`.
+with [`CHESSCore.register_lab`](@ref) — mirrors [`@spc_str`](@ref), targeting `Reagent` instead of
+`Species`.
 
 Example:
 
@@ -421,7 +456,7 @@ julia> 1u"mL" * rgt"water"
 ```
 """
 macro rgt_str(reagent)
-    # Bare Symbol lookup -- see the comment in @chem_str for why this doesn't use Meta.parse.
+    # Bare Symbol lookup -- see the comment in @spc_str for why this doesn't use Meta.parse.
     sym = Symbol(reagent)
     labmods = [CHESSCore]
     for m in CHESSCore.labmodules
@@ -451,7 +486,7 @@ macro reagent_symbols(labsymb,name,type,molecular_weight,density,pubchemid)
 
         $(chemprops_expr(__module__,ln,cprops))
         const global $ls = $type($name,$molecular_weight,$density,$pubchemid)
-        CHESSCore.set_composition!($ls,CHESSCore.CompositionRule(Dict(CHESSCore.Chemical($name,0,$molecular_weight)=>1)))
+        CHESSCore.set_composition!($ls,CHESSCore.CompositionRule(Dict(CHESSCore.Species($name,0,$molecular_weight)=>1)))
         @doc $docstr $ls
     end)
 end
@@ -460,7 +495,7 @@ end
     @reagent_formula labname name type formula density pubchemid
 
 Define a new reagent whose [`composition`](@ref) is set from an explicit [`Formula`](@ref) (built from
-[`Chemical`](@ref) values via `+`/`*`), rather than a separately-specified molecular weight. No
+[`Species`](@ref) values via `+`/`*`), rather than a separately-specified molecular weight. No
 `molecular_weight` is stored directly -- [`molecular_weight`](@ref) derives it on demand from the
 registered composition, so there's only ever one number, not a baked-in copy that could drift from
 the formula. Use this when a reagent's real stoichiometry matters (e.g. an ionic solid); use
@@ -473,17 +508,17 @@ REPL), but **not** safe for reagents defined inside a precompiled package's top-
 precompilation isn't guaranteed to survive into a fresh session loading that package's precompiled
 cache (Julia's module-initialization guidance is that such state belongs in `__init__`, which runs on
 every load, not just once at compile time). A lab-constants package with real, non-default
-[`Chemical`](@ref) formulas to register (e.g. ionic salts) should instead register them explicitly
+[`Species`](@ref) formulas to register (e.g. ionic salts) should instead register them explicitly
 from its own `__init__()`, via [`set_composition!`](@ref) called on a [`Formula`](@ref)'s
 `.composition` -- see `CHESSLabConstants/src/chemicals/electrolytes.jl` for a worked example of this
 pattern.
 
 Example:
 ```julia
-julia> @reagent_formula NaCl "sodium chloride" Solid (chem"Na+"+chem"Cl-") missing missing
+julia> @reagent_formula NaCl "sodium chloride" Solid (spc"Na+"+spc"Cl-") missing missing
 NaCl
 
-julia> molecular_weight(NaCl) # derived: sum of each Chemical's molecular_weight × its coefficient
+julia> molecular_weight(NaCl) # derived: sum of each species' molecular_weight × its coefficient
 ```
 
 See also: [`@reagent`](@ref), [`Formula`](@ref), [`set_composition!`](@ref)
@@ -531,21 +566,21 @@ function reagentparse(str; reagent_context=CHESSCore)
 end
 
 """
-    chemparse(str; chem_context=CHESSCore)
+    speciesparse(str; species_context=CHESSCore)
 
-Non-macro equivalent of [`@chem_str`](@ref) — parses `str` as a [`Chemical`](@ref) expression, looked
-up against `chem_context` (a `Module` or list of `Module`s).
+Non-macro equivalent of [`@spc_str`](@ref) — parses `str` as a [`Species`](@ref) expression, looked
+up against `species_context` (a `Module` or list of `Module`s).
 """
-function chemparse(str; chem_context=CHESSCore)
+function speciesparse(str; species_context=CHESSCore)
     ex = Meta.parse(str)
-    eval(lookup_named_value(chem_context, ex, chemstr_check_bool))
+    eval(lookup_named_value(species_context, ex, spcstr_check_bool))
 end
 const allowed_funcs = [:*, :/, :^, :sqrt, :√, :+, :-, ://]
 
 """
     lookup_named_value(labmods, ex, check::Function)
 
-Shared lookup machinery behind [`@chem_str`](@ref), [`@rgt_str`](@ref), [`@org_str`](@ref), and
+Shared lookup machinery behind [`@spc_str`](@ref), [`@rgt_str`](@ref), [`@org_str`](@ref), and
 [`@loc_str`](@ref): resolve a bare symbol (or an arithmetic expression/tuple of symbols) against a
 list of modules, using `check(value)` to decide whether a candidate binding is of the desired kind.
 Falls back to searching all globally registered `labmodules` for a helpful "did you mean"
@@ -668,8 +703,8 @@ lookup_named_value(unitmod::Module, ex::Symbol, check::Function) = lookup_named_
 
 lookup_named_value(unitmods, literal::Number, check::Function) = literal
 
-chemstr_check_bool(::Chemical) =true
-chemstr_check_bool(::Any) =false
+spcstr_check_bool(::Species) =true
+spcstr_check_bool(::Any) =false
 
 rgtstr_check_bool(::Reagent) =true
 rgtstr_check_bool(::Any) =false
@@ -684,11 +719,11 @@ _is_generated_name(n::Symbol) = startswith(string(n),'#')
 
 Return the `Symbol` that `x` is bound to somewhere in `context` (a `Module` or list of `Module`s,
 default: CHESSCore plus every module registered via [`CHESSCore.register_lab`](@ref)) — the reverse of
-looking a value up via [`@chem_str`](@ref)/[`@rgt_str`](@ref)/[`@org_str`](@ref). This is the
+looking a value up via [`@spc_str`](@ref)/[`@rgt_str`](@ref)/[`@org_str`](@ref). This is the
 reliable way to get back the identifier you'd use to reference `x` in code; [`name`](@ref) is a
 separate, display-oriented string not guaranteed to correspond to any actual binding (e.g. `H⁺` is
 bound under `:H⁺`, but `name(H⁺) == "H+"`). Throws `ArgumentError` if no matching binding is found
-(common for ephemeral values, e.g. `Chemical`s built on the fly by [`composition`](@ref)'s default
+(common for ephemeral values, e.g. `Species` values built on the fly by [`composition`](@ref)'s default
 branch, which were never bound to a constant at all).
 """
 function symbol(x; context=vcat([CHESSCore],CHESSCore.labmodules))
@@ -708,24 +743,24 @@ end
 
 
 """
-    convert(desired_unit, current_unit, ingredient::Union{Reagent,Chemical})
+    convert(desired_unit, current_unit, ingredient::Union{Reagent,Species})
 
-[Unitful.uconvert](https://painterqubits.github.io/Unitful.jl/stable/conversion/#Unitful.uconvert) wrapper to convert a quantity from a molar quantity to a mass quantity and vice-versa, for either a [`Reagent`](@ref) or a [`Chemical`](@ref).
+[Unitful.uconvert](https://painterqubits.github.io/Unitful.jl/stable/conversion/#Unitful.uconvert) wrapper to convert a quantity from a molar quantity to a mass quantity and vice-versa, for either a [`Reagent`](@ref) or a [`Species`](@ref).
 
 `convert` accesses the stored `molecular_weight` to make the conversion using the [Unitful.uconvert](https://painterqubits.github.io/Unitful.jl/stable/conversion/#Unitful.uconvert) function.
 """
-function convert(y::Unitful.MassUnits,x::Unitful.Amount,ingredient::Union{Reagent,Chemical})
+function convert(y::Unitful.MassUnits,x::Unitful.Amount,ingredient::Union{Reagent,Species})
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x *molecular_weight(ingredient))
 end
 
-function convert(y::Unitful.AmountUnits,x::Unitful.Mass,ingredient::Union{Reagent,Chemical})
+function convert(y::Unitful.AmountUnits,x::Unitful.Mass,ingredient::Union{Reagent,Species})
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x / molecular_weight(ingredient))
 end
 
-function convert(y::Unitful.DensityUnits,x::Unitful.Molarity,ingredient::Union{Reagent,Chemical})
+function convert(y::Unitful.DensityUnits,x::Unitful.Molarity,ingredient::Union{Reagent,Species})
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x *molecular_weight(ingredient))
 end
 
-function convert(y::Unitful.MolarityUnits,x::Unitful.Density,ingredient::Union{Reagent,Chemical})
+function convert(y::Unitful.MolarityUnits,x::Unitful.Density,ingredient::Union{Reagent,Species})
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x /molecular_weight(ingredient))
 end

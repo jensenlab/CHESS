@@ -4,7 +4,7 @@
 """
     register_lab(lab_module::Module)
 
-Makes CHESSCore aware of lab objects defined in a new lab module and allows the string macros [`@chem_str`](@ref) and [`@org_str`](@ref) to work with the objects.
+Makes CHESSCore aware of lab objects defined in a new lab module and allows the string macros [`@spc_str`](@ref) and [`@org_str`](@ref) to work with the objects.
 When defining new lab objects, make sure to call `register_lab`.
 
 Example:

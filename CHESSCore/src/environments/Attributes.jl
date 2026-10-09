@@ -140,7 +140,7 @@ end
     @attribute name unit
 
 Define a new [`AttributeKind`](@ref) and register it under `name`, both as a `const` binding and in
-the [`attribute_kinds`](@ref) registry — mirrors [`@chemical`](@ref)/[`@location_kind`](@ref).
+the [`attribute_kinds`](@ref) registry — mirrors [`@species`](@ref)/[`@location_kind`](@ref).
 `name` is directly callable as a constructor, e.g. `Temperature(10u"°C")`.
 
 Example:
@@ -183,7 +183,7 @@ AttributeKind(Temperature)
 ```
 """
 macro attr_str(kind)
-    # Bare Symbol lookup, not Meta.parse -- see the comment in @chem_str (Chemicals.jl) for why.
+    # Bare Symbol lookup, not Meta.parse -- see the comment in @spc_str (Chemicals.jl) for why.
     sym = Symbol(kind)
     labmods = [CHESSCore]
     for m in CHESSCore.labmodules

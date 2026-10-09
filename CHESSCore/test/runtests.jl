@@ -235,7 +235,7 @@ end
                                                 # lab-module search context; WP96 here is a plain
                                                 # top-level binding (like the test script's chemicals),
                                                 # not inside a registered lab module, so loc"..." (which
-                                                # mirrors chem"..."'s lab-module search) wouldn't find it.
+                                                # mirrors spc"..."'s lab-module search) wouldn't find it.
     @test CHESSCore.concretetype(WP96) === Labware
     @test CHESSCore.concretetype(Well200) === Well
     @test CHESSCore.concretetype(Room) === CHESSCore.GenericLocation
@@ -473,9 +473,9 @@ end
 @reagent SodiumHydroxide "sodium hydroxide" Solid 40.0u"g/mol" 1.0u"g/mL" missing
 @reagent PotassiumChloride "potassium chloride" Solid 74.55u"g/mol" 1.0u"g/mL" missing
 
-const Cl⁻=CHESSCore.Chemical("Cl-",-1,35.45u"g/mol")
-const Na⁺=CHESSCore.Chemical("Na+",1,22.99u"g/mol")
-const K⁺=CHESSCore.Chemical("K+",1,39.10u"g/mol")
+const Cl⁻=CHESSCore.Species("Cl-",-1,35.45u"g/mol")
+const Na⁺=CHESSCore.Species("Na+",1,22.99u"g/mol")
+const K⁺=CHESSCore.Species("K+",1,39.10u"g/mol")
 
 set_composition!(HydrochloricAcid,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
 set_composition!(SodiumHydroxide,CompositionRule(Dict(Na⁺=>1,OH⁻=>1)))
@@ -517,10 +517,10 @@ set_composition!(LiquidHCl,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
 
     # user-reported bug (now via recipe/molar_amount instead of the removed composition(::Stock)):
     # a pure-water Solution used to yield an empty Dict even though water has a (default,
-    # non-dissociating) identity Chemical
+    # non-dissociating) identity Species
     water_stock = 100u"mL"*rgt"water"
     r = recipe(water_stock)
-    water_chem = CHESSCore.Chemical(name(rgt"water"),0,molecular_weight(rgt"water"))
+    water_chem = CHESSCore.Species(name(rgt"water"),0,molecular_weight(rgt"water"))
     expected_moles = uconvert(u"mol", 100u"mL"*density(rgt"water")/molecular_weight(rgt"water"))
     @test molar_amount(r,water_chem) ≈ expected_moles
 
@@ -530,18 +530,18 @@ set_composition!(LiquidHCl,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
     @test total_concentration(acid_stock,Cl⁻) > 0u"mol/L"
 
     # Mixture's recipe is unchanged -- the liquids loop is a no-op for it
-    paba_chem = CHESSCore.Chemical(name(rgt"paba"),0,molecular_weight(rgt"paba"))
+    paba_chem = CHESSCore.Species(name(rgt"paba"),0,molecular_weight(rgt"paba"))
     expected_paba_moles = uconvert(u"mol",quantity(b)/molecular_weight(rgt"paba"))
     @test molar_amount(recipe(b),paba_chem) ≈ expected_paba_moles
 
-    # Recipe is moles-native: a Chemical with unknown molecular_weight still has a well-defined molar
+    # Recipe is moles-native: a Species with unknown molecular_weight still has a well-defined molar
     # amount (mw-independent), even though mass() for it is missing (genuinely uncomputable) rather
     # than 0. Built directly via Recipe's own construction algebra -- going through a registered
     # Reagent composition isn't possible here, since molecular_weight(x::Reagent) now derives from
     # the sum of *all* its registered products (an earlier plan's fix): a reagent with an unknown-mw
     # product would itself get an unknown derived mw, which would block it from ever being converted
     # to moles in the first place, never reaching Recipe's accumulation at all.
-    unknown_mw_chem = CHESSCore.Chemical("mystery ion",1,missing)
+    unknown_mw_chem = CHESSCore.Species("mystery ion",1,missing)
     r = 0.001u"mol" * unknown_mw_chem
     @test molar_amount(r,unknown_mw_chem) == 0.001u"mol"
     @test ismissing(mass(r,unknown_mw_chem))
@@ -549,9 +549,9 @@ set_composition!(LiquidHCl,CompositionRule(Dict(H⁺=>1,Cl⁻=>1)))
 end
 
 @testset "AcidBaseSystem construction" begin
-    HA = CHESSCore.Chemical("test-HA",0,60.0u"g/mol")
-    Am = CHESSCore.Chemical("test-A-",-1,59.0u"g/mol")
-    Am2 = CHESSCore.Chemical("test-A2-",-2,58.0u"g/mol")
+    HA = CHESSCore.Species("test-HA",0,60.0u"g/mol")
+    Am = CHESSCore.Species("test-A-",-1,59.0u"g/mol")
+    Am2 = CHESSCore.Species("test-A2-",-2,58.0u"g/mol")
     @test AcidBaseSystem([HA,Am],[4.76]) isa AcidBaseSystem
     @test_throws ArgumentError AcidBaseSystem([HA,Am],[4.76,7.0]) # length(pKa) must be length(species)-1
     @test_throws ArgumentError AcidBaseSystem([HA,Am2],[4.76]) # charge must decrease by exactly 1 per step
@@ -604,8 +604,8 @@ end
 
 @reagent TestWeakAcid "test weak acid" Solid 60.0u"g/mol" missing missing
 @reagent TestWeakAcidNa "test sodium weak-acid salt" Solid missing missing missing
-const TestHA = CHESSCore.Chemical("TestHA",0,60.0u"g/mol")
-const TestAMinus = CHESSCore.Chemical("TestA-",-1,59.0u"g/mol")
+const TestHA = CHESSCore.Species("TestHA",0,60.0u"g/mol")
+const TestAMinus = CHESSCore.Species("TestA-",-1,59.0u"g/mol")
 set_composition!(TestWeakAcid,CompositionRule(Dict(TestHA=>1)))
 set_composition!(TestWeakAcidNa,CompositionRule(Dict(Na⁺=>1,TestAMinus=>1)))
 const test_weak_acid_system = AcidBaseSystem([TestHA,TestAMinus],[4.76])
@@ -633,10 +633,10 @@ end
 @reagent TestH3A "test triprotic acid" Solid 98.0u"g/mol" missing missing
 @reagent TestKH2A "test monobasic salt" Solid missing missing missing
 @reagent TestK2HA "test dibasic salt" Solid missing missing missing
-const TestH3A_chem = CHESSCore.Chemical("TestH3A",0,98.0u"g/mol")
-const TestH2AMinus = CHESSCore.Chemical("TestH2A-",-1,97.0u"g/mol")
-const TestHAMinus2 = CHESSCore.Chemical("TestHA2-",-2,96.0u"g/mol")
-const TestAMinus3 = CHESSCore.Chemical("TestA3-",-3,95.0u"g/mol")
+const TestH3A_chem = CHESSCore.Species("TestH3A",0,98.0u"g/mol")
+const TestH2AMinus = CHESSCore.Species("TestH2A-",-1,97.0u"g/mol")
+const TestHAMinus2 = CHESSCore.Species("TestHA2-",-2,96.0u"g/mol")
+const TestAMinus3 = CHESSCore.Species("TestA3-",-3,95.0u"g/mol")
 set_composition!(TestKH2A,CompositionRule(Dict(K⁺=>1,TestH2AMinus=>1)))
 set_composition!(TestK2HA,CompositionRule(Dict(K⁺=>2,TestHAMinus2=>1)))
 const test_triprotic_system = AcidBaseSystem([TestH3A_chem,TestH2AMinus,TestHAMinus2,TestAMinus3],[2.148,7.198,12.375])
@@ -660,19 +660,19 @@ end
 @testset "Acid/base equilibrium pH: edge cases" begin
     # dilute weak acid near neutral pH -- autoionization matters, a naive sqrt(Ka*C) approximation
     # would be wrong here; the full charge-balance solver must still produce a sane result
-    dilute_acid_chem = CHESSCore.Chemical("TestDiluteHA",0,60.0u"g/mol")
-    dilute_base_chem = CHESSCore.Chemical("TestDiluteA-",-1,59.0u"g/mol")
+    dilute_acid_chem = CHESSCore.Species("TestDiluteHA",0,60.0u"g/mol")
+    dilute_base_chem = CHESSCore.Species("TestDiluteA-",-1,59.0u"g/mol")
     dilute_sys = AcidBaseSystem([dilute_acid_chem,dilute_base_chem],[7.0])
     dilute_fam = AnalyticalSpecies(dilute_sys,1e-7u"mol/L")
-    p = pH([dilute_fam],Tuple{CHESSCore.Chemical,Unitful.Molarity}[];ionic_strength_correction=false)
+    p = pH([dilute_fam],Tuple{CHESSCore.Species,Unitful.Molarity}[];ionic_strength_correction=false)
     @test 6.5 < p < 7.0 # between neutral and pKa, not naively at pKa/2+3.5-ish extremes
 
     # high ionic strength (~1M): must not error, should warn-and-degrade at worst
-    conc_acid_chem = CHESSCore.Chemical("TestConcHA",0,60.0u"g/mol")
-    conc_base_chem = CHESSCore.Chemical("TestConcA-",-1,59.0u"g/mol")
+    conc_acid_chem = CHESSCore.Species("TestConcHA",0,60.0u"g/mol")
+    conc_base_chem = CHESSCore.Species("TestConcA-",-1,59.0u"g/mol")
     conc_sys = AcidBaseSystem([conc_acid_chem,conc_base_chem],[4.76])
     conc_fam = AnalyticalSpecies(conc_sys,1.0u"mol/L")
-    p2 = pH([conc_fam],Tuple{CHESSCore.Chemical,Unitful.Molarity}[];ionic_strength_correction=true)
+    p2 = pH([conc_fam],Tuple{CHESSCore.Species,Unitful.Molarity}[];ionic_strength_correction=true)
     @test isfinite(p2)
 end
 
@@ -746,9 +746,9 @@ end
 @testset "Truesdell-Jones ion parameters" begin
     # a test ion with registered Truesdell-Jones parameters (mirrors real Ca2+ wateq4f.dat values, for
     # a clean hand-check) vs an identical-charge one without (Davies fallback)
-    test_ion_tj = CHESSCore.Chemical("TestIonTJ",2,40.0u"g/mol")
+    test_ion_tj = CHESSCore.Species("TestIonTJ",2,40.0u"g/mol")
     set_ion_parameters!(test_ion_tj,5.0,0.165)
-    test_ion_davies = CHESSCore.Chemical("TestIonDavies",2,40.0u"g/mol")
+    test_ion_davies = CHESSCore.Species("TestIonDavies",2,40.0u"g/mol")
 
     I = 0.1
     A,B = 0.5085,0.3281
@@ -764,7 +764,7 @@ end
     @test !(CHESSCore._activity_coefficient(test_ion_tj,2,I) ≈ CHESSCore._activity_coefficient(test_ion_davies,2,I))
 
     # neutral species always resolve to γ=1.0 regardless of registration
-    neutral_ion = CHESSCore.Chemical("TestNeutral",0,10.0u"g/mol")
+    neutral_ion = CHESSCore.Species("TestNeutral",0,10.0u"g/mol")
     @test CHESSCore._activity_coefficient(neutral_ion,0,I) == 1.0
 
     # H⁺/OH⁻ have real CHESSCore-level registered parameters (wateq4f.dat)
@@ -782,7 +782,7 @@ end
     @test (Na⁺+2*Cl⁻).composition == Dict(Na⁺=>1,Cl⁻=>2)
 end
 
-const Mg²⁺=CHESSCore.Chemical("Mg2+",2,24.305u"g/mol")
+const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
 
 @reagent_formula MgCl2 "magnesium chloride" Solid (Mg²⁺+2*Cl⁻) missing missing
 
@@ -813,35 +813,35 @@ end
 
 module AsciiIonLab
 using CHESSCore, Unitful
-@chemical var"Na+" "Na+" 1 22.99u"g/mol"
-@chemical var"Cl-" "Cl-" -1 35.45u"g/mol"
+@species var"Na+" "Na+" 1 22.99u"g/mol"
+@species var"Cl-" "Cl-" -1 35.45u"g/mol"
 end
 CHESSCore.register_lab(AsciiIonLab)
 
-@testset "ASCII-parsable chem_str" begin
-    @test chem"Na+" === AsciiIonLab.var"Na+"
-    @test chem"Cl-" === AsciiIonLab.var"Cl-"
-    f = chem"Na+" + chem"Cl-"
-    @test f.composition == Dict(chem"Na+"=>1, chem"Cl-"=>1)
+@testset "ASCII-parsable spc_str" begin
+    @test spc"Na+" === AsciiIonLab.var"Na+"
+    @test spc"Cl-" === AsciiIonLab.var"Cl-"
+    f = spc"Na+" + spc"Cl-"
+    @test f.composition == Dict(spc"Na+"=>1, spc"Cl-"=>1)
     # the non-macro function form still supports compound expressions (unchanged, still Meta.parse-based)
     @test orgparse("(SMU_UA159)",org_context=[CHESSCore,TestChemOrg]) == org"SMU_UA159"
 end
 
-@testset "chem_str ASCII charge-symbol normalization" begin
+@testset "spc_str ASCII charge-symbol normalization" begin
     # single charge, magnitude 1 -- sign-only candidate resolves immediately
-    @test chem"TestNa+" === TestChemOrg.TestNa⁺
+    @test spc"TestNa+" === TestChemOrg.TestNa⁺
     # real charge magnitude (2) must be superscripted -- sign-only candidate ("TestCa⁺") doesn't
     # exist, so the second candidate ("TestCa²⁺") is the one that resolves
-    @test chem"TestCa2+" === TestChemOrg.TestCa²⁺
+    @test spc"TestCa2+" === TestChemOrg.TestCa²⁺
     # a formula digit ("4") immediately preceding the sign, charge magnitude 1 -- must NOT be
     # mistaken for a charge-magnitude digit (i.e. must resolve to TestH2PO4⁻, not TestH2PO⁴⁻)
-    @test chem"TestH2PO4-" === TestChemOrg.TestH2PO4⁻
+    @test spc"TestH2PO4-" === TestChemOrg.TestH2PO4⁻
     # a display-name-style spelling with an embedded space before the magnitude -- space is
     # stripped before candidates are generated
-    @test chem"TestSO4 2-" === TestChemOrg.TestSO4²⁻
+    @test spc"TestSO4 2-" === TestChemOrg.TestSO4²⁻
     # no matching candidate (and no direct match) still throws with the existing hint message
-    # (chem"..." expands at macro/parse time, so use the runtime chemparse form to catch this)
-    @test_throws ArgumentError chemparse("TestNotRegistered")
+    # (spc"..." expands at macro/parse time, so use the runtime speciesparse form to catch this)
+    @test_throws ArgumentError speciesparse("TestNotRegistered")
 end
 
 @testset "Reagent value-based equality" begin
@@ -860,7 +860,7 @@ end
     @test symbol(H⁺) == :H⁺
     @test symbol(H⁺) != Symbol(name(H⁺))
     @test symbol(rgt"water") == :water
-    @test symbol(chem"Na+") == Symbol("Na+")
+    @test symbol(spc"Na+") == Symbol("Na+")
     @test symbol(org"SMU_UA159") == :SMU_UA159
 
     # show now prints the recoverable symbol, not the display name
@@ -868,7 +868,7 @@ end
     @test sprint(show,H⁺) != name(H⁺)
 
     # ephemeral, never-bound values fall back to name(x) instead of erroring
-    transient = CHESSCore.Chemical("transient",0,missing)
+    transient = CHESSCore.Species("transient",0,missing)
     @test_throws ArgumentError symbol(transient)
     @test sprint(show,transient) == name(transient)
 end
@@ -1014,16 +1014,16 @@ end
     @test !isempty(sprint(show,a)) # plain, non-MIME Base.show(io::IO,s::Stock)
 end
 
-@testset "Chemical/Reagent parsing edge cases" begin
+@testset "Species/Reagent parsing edge cases" begin
     # single bare Module (not a Vector) -- lookup_named_value(unitmod::Module, ex::Symbol, check).
-    # Note: chemparse uses plain Meta.parse, unlike the @chem_str macro's special ASCII-name handling
-    # (see its docstring) -- so "Na+"/"Cl-" (valid chem_str names, invalid Julia syntax) can't be used
+    # Note: speciesparse uses plain Meta.parse, unlike the @spc_str macro's special ASCII-name handling
+    # (see its docstring) -- so "Na+"/"Cl-" (valid spc_str names, invalid Julia syntax) can't be used
     # here; H⁺/OH⁻ (unicode identifiers, valid plain Julia syntax) are the right fixtures instead.
-    @test chemparse("H⁺";chem_context=CHESSCore) === H⁺
+    @test speciesparse("H⁺";species_context=CHESSCore) === H⁺
 
     # a string-encoded compound expression -- exercises both the :call-head recursive branch and
     # the bare-Number-literal overload (the `2` itself routes through lookup_named_value too)
-    @test chemparse("2*H⁺";chem_context=CHESSCore).composition == (2*H⁺).composition
+    @test speciesparse("2*H⁺";species_context=CHESSCore).composition == (2*H⁺).composition
 
     # hint branch 1: symbol found in a globally-registered lab module, but not in the given context
     err1 = try
@@ -1048,15 +1048,15 @@ end
     # no-suggestion sub-branch: nothing close enough to match
     @test_throws ArgumentError reagentparse("zzzznotreal";reagent_context=[CHESSCore,TestChemOrg])
 
-    # Chemical's 2-arg convenience constructor (charge defaults to 0)
-    @test Chemical("standalone name",12.0u"g/mol") == Chemical("standalone name",0,12.0u"g/mol")
+    # Species's 2-arg convenience constructor (charge defaults to 0)
+    @test Species("standalone name",12.0u"g/mol") == Species("standalone name",0,12.0u"g/mol")
 
     @test charge(Cl⁻) == -1
 
     # composition(::Reagent)'s default-identity fallback -- rgt"water" has no registered composition
-    @test composition(rgt"water").products == Dict(CHESSCore.Chemical(name(rgt"water"),0,molecular_weight(rgt"water"))=>1)
+    @test composition(rgt"water").products == Dict(CHESSCore.Species(name(rgt"water"),0,molecular_weight(rgt"water"))=>1)
 
-    # commutative Chemical/Formula operator overloads -- Formula has no custom == (falls back to
+    # commutative Species/Formula operator overloads -- Formula has no custom == (falls back to
     # identity), so compare .composition Dicts directly, matching the existing "Formula algebra"
     # testset's style
     @test (Cl⁻*2).composition == (2*Cl⁻).composition
@@ -1133,7 +1133,7 @@ end
     @test name(org"SMU_UA159") == "Streptococcus mutans UA159"
 
     # ad hoc, unregistered Organism -- show falls back to name() via the ArgumentError-catch branch,
-    # mirroring the existing Reagent/Chemical show-fallback tests in "symbol(x) reverse lookup"
+    # mirroring the existing Reagent/Species show-fallback tests in "symbol(x) reverse lookup"
     transient_org = Organism("Genus","species","strain")
     @test_throws ArgumentError symbol(transient_org)
     @test sprint(show,transient_org) == name(transient_org)

@@ -197,7 +197,7 @@ julia> solids["Sodium Chloride"]["Amount"]
 ## Named stocks
 
 [`@stock`](@ref) registers a named stock, like [`@location_kind`](@ref), [`@reagent`](@ref),
-[`@chemical`](@ref), and [`@organism`](@ref). [`@stock_str`](@ref) recalls it. Only stocks
+[`@species`](@ref), and [`@organism`](@ref). [`@stock_str`](@ref) recalls it. Only stocks
 registered this way can be recalled, so an intermediate stock, such as a concentrated solution
 combined into a larger recipe, is never recalled by accident:
 

@@ -123,3 +123,20 @@ function formula_mass(counts::AbstractDict{Symbol,<:Integer})
     return total*u"g/mol"
 end
 formula_mass(str::AbstractString) = formula_mass(parse_formula(str))
+
+"""
+    formula_string(counts::AbstractDict{Symbol,<:Integer}) -> String
+
+Write element counts as a canonical formula string in Hill order: carbon first and hydrogen second
+when carbon is present, then the remaining elements alphabetically (all elements alphabetically when
+there is no carbon). A count of one is omitted. [`parse_formula`](@ref) reads the result back to the
+same counts, so equal formulas always give the same string.
+"""
+function formula_string(counts::AbstractDict{Symbol,<:Integer})
+    isempty(counts) && throw(ArgumentError("Cannot write an empty formula"))
+    syms = sort!(collect(keys(counts)),by=String)
+    if :C in syms
+        syms = vcat(:C, (:H in syms ? [:H] : Symbol[]), filter(s->s!==:C && s!==:H,syms))
+    end
+    return join((counts[s]==1 ? String(s) : "$(s)$(counts[s])") for s in syms)
+end

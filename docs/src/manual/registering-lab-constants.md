@@ -5,7 +5,7 @@ DocTestSetup = :(using CHESS)
 ```
 
 Seven macros register lab constants: [`@location_kind`](@ref), [`@attribute`](@ref),
-[`@read`](@ref), [`@chemical`](@ref), [`@reagent`](@ref), [`@organism`](@ref), and
+[`@read`](@ref), [`@species`](@ref), [`@reagent`](@ref), [`@organism`](@ref), and
 [`@stock`](@ref). Each defines a constant in the calling module and records it in a registry so
 that it can be found by name. The pattern follows
 [Unitful.jl](https://github.com/PainterQubits/Unitful.jl), which registers units and dimensions
@@ -50,7 +50,7 @@ julia> @location_kind Flask Symbol[] nothing nothing nothing nothing nothing
 ERROR: ArgumentError: LocationKind Flask already exists
 ```
 
-[`@organism`](@ref), [`@reagent`](@ref), and [`@chemical`](@ref) have no such check. Registering a
+[`@organism`](@ref), [`@reagent`](@ref), and [`@species`](@ref) have no such check. Registering a
 name again with these macros rebinds it to the new value without a warning.
 
 ## Namespaces
@@ -58,7 +58,7 @@ name again with these macros rebinds it to the new value without a warning.
 A lab module can register hundreds of constants, and loading it should not add all of them to the
 namespace of the loading code. None of the seven macros exports the names it defines. The constant
 exists in the module, and `names` lists it only when called with `all=true`. Each macro has a
-paired string macro that looks a name up safely: `@loc_str`, `@attr_str`, `@read_str`, `@chem_str`,
+paired string macro that looks a name up safely: `@loc_str`, `@attr_str`, `@read_str`, `@spc_str`,
 `@rgt_str`, `@org_str`, and `@stock_str`.
 
 ## How the string macros resolve a name
@@ -128,7 +128,7 @@ register_reagent!(CHESSCore.Solid, "boric_acid", "Boric Acid", 7628)
 # "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
 
 register_chemical!("Na⁺", "Na+", 1, 923)
-# "@chemical Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+# "@species Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
 
 register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "700610", notes = "wild type")
 # "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""

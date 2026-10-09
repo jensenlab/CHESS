@@ -91,13 +91,14 @@ function create_db(path)
         );
         """
 
-    create_Chemicals="""
-        CREATE TABLE Chemicals(
+    create_Species="""
+        CREATE TABLE Species(
             ID INTEGER PRIMARY KEY NOT NULL,
             Name TEXT,
             Charge INTEGER,
+            Formula TEXT,
             MolecularWeight REAL,
-            Unique(Name,Charge,MolecularWeight)
+            Unique(Name,Charge,Formula,MolecularWeight)
         );
         """
 
@@ -105,11 +106,11 @@ function create_db(path)
         CREATE TABLE CompositionRules(
             ID INTEGER PRIMARY KEY NOT NULL,
             ReagentComponentID INTEGER,
-            ChemicalID INTEGER,
+            SpeciesID INTEGER,
             Coefficient INTEGER,
             FOREIGN KEY(ReagentComponentID) REFERENCES Components(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
-            FOREIGN KEY(ChemicalID) REFERENCES Chemicals(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
-            Unique(ReagentComponentID,ChemicalID)
+            FOREIGN KEY(SpeciesID) REFERENCES Species(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+            Unique(ReagentComponentID,SpeciesID)
         );
         """
 
@@ -687,7 +688,7 @@ function create_db(path)
     DBInterface.execute(db,create_Locations)
     DBInterface.execute(db, create_Components)
     DBInterface.execute(db,create_Reagents)
-    DBInterface.execute(db,create_Chemicals)
+    DBInterface.execute(db,create_Species)
     DBInterface.execute(db,create_CompositionRules)
     DBInterface.execute(db,create_Organisms)
     DBInterface.execute(db,create_Attributes)
@@ -760,3 +761,32 @@ file="./src/database/test_create_db.db"
 rm(file)
 create_db(file)
 =#
+
+_table_exists(name::String) = nrow(query_db("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(name,)))>0
+
+function _warn_if_unmigrated()
+    if _table_exists("Chemicals") && !_table_exists("Species")
+        @warn "This database uses the old Chemicals table; run migrate_species!() to convert it to the Species table before using it."
+    end
+    return nothing
+end
+
+"""
+    migrate_species!()
+
+Convert the connected database from the old `Chemicals` table to the `Species` table: rename the
+table, add its nullable `Formula` column, and rename `CompositionRules.ChemicalID` to `SpeciesID`.
+Existing rows keep their stored molecular weights and have no formula. Returns `true` if the
+database was converted and `false` if there was nothing to do (already migrated, or a new database).
+Run it once per existing database; the changes are made in a single transaction.
+"""
+function migrate_species!()
+    _table_exists("Species") && return false
+    _table_exists("Chemicals") || return false
+    sql_transaction() do
+        execute_db("ALTER TABLE Chemicals RENAME TO Species")
+        execute_db("ALTER TABLE Species ADD COLUMN Formula TEXT")
+        execute_db("ALTER TABLE CompositionRules RENAME COLUMN ChemicalID TO SpeciesID")
+    end
+    return true
+end

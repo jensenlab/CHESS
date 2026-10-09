@@ -21,19 +21,19 @@ end
 """
     struct Recipe
 
-A `Stock`-level analog acting on [`Chemical`](@ref)s rather than [`Reagent`](@ref)s — describes real
+A `Stock`-level analog acting on [`Species`](@ref)s rather than [`Reagent`](@ref)s — describes real
 quantities of chemical identities ("5g of Na⁺") without committing to which physical `Reagent`
 supplies them. See [`recipe`](@ref) for the (one-directional) derivation from a `Stock`.
 
 Stores molar `amounts` natively (not mass) -- this is what dissociation math (`_reagent_moles`,
 `composition(::Reagent)`) naturally produces, and what [`total_concentration`](@ref)/[`pH`](@ref)
-need, with no dependency on any individual `Chemical`'s own `molecular_weight`. [`mass`](@ref) is
+need, with no dependency on any individual `Species`'s own `molecular_weight`. [`mass`](@ref) is
 therefore the *derived* accessor, returning `missing` when a chemical is present but its mass can't
 be computed (unknown `molecular_weight`) -- as opposed to `0u"g"` when the chemical isn't present at
 all.
 """
 struct Recipe
-    amounts::Dict{Chemical,Unitful.Amount}
+    amounts::Dict{Species,Unitful.Amount}
 end
 
 """
@@ -41,13 +41,13 @@ end
 
 Derive the [`Recipe`](@ref) (chemical-level composition, in real molar quantities) of `s`: for each
 `Reagent` in `s`, convert its tracked quantity to moles (via [`_reagent_moles`](@ref)) and distribute
-across its [`composition(::Reagent)`](@ref) rule's `Chemical`s, summing across every reagent present.
+across its [`composition(::Reagent)`](@ref) rule's `Species`s, summing across every reagent present.
 
 There is deliberately no `Stock`-from-`Recipe` conversion — going the other way is underdetermined (a
 target chemical profile doesn't uniquely determine which reagent(s) produce it).
 """
 function recipe(s::Stock)
-    out=Dict{Chemical,Unitful.Amount}()
+    out=Dict{Species,Unitful.Amount}()
     for (reagent,quantity) in Iterators.flatten((solids(s),liquids(s)))
         moles=_reagent_moles(reagent,quantity)
         ismissing(moles) && continue
@@ -58,17 +58,17 @@ function recipe(s::Stock)
     return Recipe(out)
 end
 
-Base.:*(quantity::Unitful.Amount,c::Chemical) = Recipe(Dict(c=>quantity))
-Base.:*(quantity::Unitful.Mass,c::Chemical) = Recipe(Dict(c=>convert(u"mol",quantity,c)))
+Base.:*(quantity::Unitful.Amount,c::Species) = Recipe(Dict(c=>quantity))
+Base.:*(quantity::Unitful.Mass,c::Species) = Recipe(Dict(c=>convert(u"mol",quantity,c)))
 
 """
-    mass(r::Recipe,c::Chemical)
+    mass(r::Recipe,c::Species)
 
 Return the mass of `c` tracked in `Recipe` `r`: `0u"g"` if `c` isn't present at all, `missing` if `c`
 is present but its `molecular_weight` is unknown (so a mass genuinely can't be computed), otherwise
 the mass derived from `r`'s stored molar amount.
 """
-function mass(r::Recipe,c::Chemical)
+function mass(r::Recipe,c::Species)
     haskey(r.amounts,c) || return 0u"g"
     mw = molecular_weight(c)
     ismissing(mw) && return missing
@@ -76,36 +76,36 @@ function mass(r::Recipe,c::Chemical)
 end
 
 """
-    molar_amount(r::Recipe,c::Chemical)
+    molar_amount(r::Recipe,c::Species)
 
 Return the molar amount of `c` tracked in `Recipe` `r` (`0u"mol"` if absent) -- `Recipe`'s native,
 directly-stored unit.
 """
-molar_amount(r::Recipe,c::Chemical) = get(r.amounts,c,0u"mol")
+molar_amount(r::Recipe,c::Species) = get(r.amounts,c,0u"mol")
 
 """
-    volume(r::Recipe,c::Chemical,density::Unitful.Density)
-    volume(r::Recipe,c::Chemical,source::Reagent)
+    volume(r::Recipe,c::Species,density::Unitful.Density)
+    volume(r::Recipe,c::Species,source::Reagent)
 
 Return the volume of `c` tracked in `Recipe` `r`, using an explicit `density` or a reference
-`Reagent` to source it from. `Chemical` deliberately has no density field of its own — density is a
+`Reagent` to source it from. `Species` deliberately has no density field of its own — density is a
 property of physical state, not chemical identity (e.g. ice vs. liquid water), so it stays on
 `Reagent`. `missing` if [`mass`](@ref) can't be computed (unknown `molecular_weight`).
 """
-volume(r::Recipe,c::Chemical,density::Unitful.Density) = uconvert(u"mL", mass(r,c)/density)
-volume(r::Recipe,c::Chemical,source::Reagent) = uconvert(u"mL", mass(r,c)/density(source))
+volume(r::Recipe,c::Species,density::Unitful.Density) = uconvert(u"mL", mass(r,c)/density)
+volume(r::Recipe,c::Species,source::Reagent) = uconvert(u"mL", mass(r,c)/density(source))
 
 Base.:+(a::Recipe,b::Recipe) = Recipe(mergewith(+,a.amounts,b.amounts))
 Base.:*(num::Real,r::Recipe) = Recipe(Dict(k=>v*num for (k,v) in r.amounts))
 Base.:*(r::Recipe,num::Real) = num*r
 
 """
-    total_concentration(s::Stock,chem::Chemical)
+    total_concentration(s::Stock,chem::Species)
 
 Return the molar concentration of `chem` in `s`, derived from [`recipe(::Stock)`](@ref) — e.g.
 the total potassium ion concentration in a stock containing dissolved KCl.
 """
-function total_concentration(s::Stock,chem::Chemical)
+function total_concentration(s::Stock,chem::Species)
     return molar_amount(recipe(s),chem) / volume_estimate(s)
 end
 

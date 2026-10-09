@@ -11,7 +11,7 @@ const Kw = 1.0e-14
 """
     struct AcidBaseSystem
 
-A linear "conjugate family" of [`Chemical`](@ref) protonation states, from fully-protonated to
+A linear "conjugate family" of [`Species`](@ref) protonation states, from fully-protonated to
 fully-deprotonated -- e.g. phosphoric acid's `[H3PO4, H2PO4⁻, HPO4²⁻, PO4³⁻]`, or a monoprotic acid's
 `[HA, A⁻]`. `pKa[i]` is the equilibrium constant (as a p-value) linking `species[i] ⇌ species[i+1] +
 H⁺`.
@@ -19,7 +19,7 @@ H⁺`.
 This same linear-chain shape represents zwitterions too (e.g. an amino acid's `[cation, zwitterion,
 anion]`) -- nothing about the type assumes the fully-protonated reference state is neutral; only that
 each successive state carries exactly one fewer positive charge, which the constructor verifies
-against each [`Chemical`](@ref)'s own registered `charge`.
+against each [`Species`](@ref)'s own registered `charge`.
 
 Registered against a [`Reagent`](@ref) via [`set_acid_base_system!`](@ref) -- independent of (and
 additional to) that reagent's [`CompositionRule`](@ref), which continues to answer the separate
@@ -27,9 +27,9 @@ question of complete-dissociation mass bookkeeping (`molecular_weight`/`recipe`)
 both, neither, or just one.
 """
 struct AcidBaseSystem
-    species::Vector{Chemical}
+    species::Vector{Species}
     pKa::Vector{Float64}
-    function AcidBaseSystem(species::Vector{Chemical},pKa::Vector{Float64})
+    function AcidBaseSystem(species::Vector{Species},pKa::Vector{Float64})
         length(species) >= 2 || throw(ArgumentError("AcidBaseSystem needs at least 2 species (1 equilibrium step)"))
         length(pKa) == length(species)-1 || throw(ArgumentError(
             "AcidBaseSystem needs exactly length(species)-1 pKa values, got $(length(pKa)) for $(length(species)) species"))
@@ -104,22 +104,22 @@ end
 """
     const ion_parameters
 
-Registry mapping a specific [`Chemical`](@ref) *value* to its Truesdell-Jones (extended Debye-Hückel)
+Registry mapping a specific [`Species`](@ref) *value* to its Truesdell-Jones (extended Debye-Hückel)
 ion-size parameter `å` (Ångströms) and empirical `b` parameter, as `(å,b)`. Prefer
 [`set_ion_parameters!`](@ref) over mutating this directly. Absence means "no citable per-species
 parameter" -- [`_activity_coefficient`](@ref) falls back to [`activity_coefficient`](@ref) (Davies) for
-any `Chemical` not registered here, exactly like [`acid_base_systems`](@ref)'s absence-means-inert
+any `Species` not registered here, exactly like [`acid_base_systems`](@ref)'s absence-means-inert
 convention.
 """
-const ion_parameters = Dict{Chemical,Tuple{Float64,Float64}}()
+const ion_parameters = Dict{Species,Tuple{Float64,Float64}}()
 
 """
-    set_ion_parameters!(chem::Chemical, a::Float64, b::Float64)
+    set_ion_parameters!(chem::Species, a::Float64, b::Float64)
 
 Register `chem`'s Truesdell-Jones ion-size parameter `a` (å, Ångströms) and empirical `b` parameter --
 see [`ion_parameters`](@ref), [`_activity_coefficient`](@ref).
 """
-function set_ion_parameters!(chem::Chemical,a::Float64,b::Float64)
+function set_ion_parameters!(chem::Species,a::Float64,b::Float64)
     ion_parameters[chem] = (a,b)
     return nothing
 end
@@ -133,17 +133,17 @@ set_ion_parameters!(H⁺,9.0,0.0)
 set_ion_parameters!(OH⁻,3.5,0.0)
 
 """
-    _activity_coefficient(chem::Chemical, z::Integer, I::Real)
+    _activity_coefficient(chem::Species, z::Integer, I::Real)
 
 Per-species activity coefficient at ionic strength `I` (dimensionless mol/L): Truesdell-Jones
 (`log10(γ) = -A z² √I/(1+B å √I) + b I`, standard extended-Debye-Hückel constants `A=0.5085`,
 `B=0.3281` at 25°C) using `chem`'s registered `(å,b)` from [`ion_parameters`](@ref) if present, else
 [`activity_coefficient`](@ref) (Davies) as the documented-less-reliable fallback for any species
-without a citable literature parameter (most custom organic `Chemical`s -- amino acid states,
+without a citable literature parameter (most custom organic `Species`s -- amino acid states,
 antibiotics, etc. -- fall back this way; only the well-characterized inorganic ions a lab module
 registers get the upgrade).
 """
-function _activity_coefficient(chem::Chemical,z::Integer,I::Real)
+function _activity_coefficient(chem::Species,z::Integer,I::Real)
     z==0 && return 1.0
     p = get(ion_parameters,chem,nothing)
     p === nothing && return activity_coefficient(z,I)
@@ -187,10 +187,10 @@ function _alpha_fractions(pKa::Vector{Float64},pH::Real)
 end
 
 """
-    _conditional_pKa(sys::AcidBaseSystem, gammas::Dict{Chemical,Float64})
+    _conditional_pKa(sys::AcidBaseSystem, gammas::Dict{Species,Float64})
 
 Convert `sys`'s thermodynamic (activity-basis) `pKa`s to concentration-basis "conditional" pKa's using
-the current per-species activity coefficients `gammas` (keyed by `Chemical` identity -- see
+the current per-species activity coefficients `gammas` (keyed by `Species` identity -- see
 [`_activity_coefficient`](@ref); real Truesdell-Jones values where registered, Davies fallback
 otherwise). The thermodynamic constant is `Kaⱼ = {H⁺}{speciesⱼ₊₁}/{speciesⱼ} =
 γ(H⁺)[H⁺]·γ(speciesⱼ₊₁)[speciesⱼ₊₁] / (γ(speciesⱼ)[speciesⱼ])`; solving for the concentration-basis
@@ -199,7 +199,7 @@ otherwise). The thermodynamic constant is `Kaⱼ = {H⁺}{speciesⱼ₊₁}/{spe
 magnitude) means two same-charge species with different registered ion-size parameters get correctly
 different shifts here, rather than being forced to share one value.
 """
-function _conditional_pKa(sys::AcidBaseSystem,gammas::Dict{Chemical,Float64})
+function _conditional_pKa(sys::AcidBaseSystem,gammas::Dict{Species,Float64})
     n = length(sys.pKa)
     out = Vector{Float64}(undef,n)
     gH = gammas[H⁺]
@@ -306,10 +306,10 @@ end
 Partition `s`'s [`recipe`](@ref) into the equilibrium solver's inputs: one [`AnalyticalSpecies`](@ref)
 per distinct [`AcidBaseSystem`](@ref) registered on any reagent actually present in `s` (deduplicated,
 since e.g. potassium and sodium phosphate salts share the same phosphate `AcidBaseSystem`), and a list
-of `(chemical, concentration)` pairs for every other charged [`Chemical`](@ref) in the recipe --
+of `(chemical, concentration)` pairs for every other charged [`Species`](@ref) in the recipe --
 excluding [`H⁺`](@ref)/[`OH⁻`](@ref) themselves (handled as the solver's own pH-dependent unknowns) and
 any chemical that's part of a family (handled via that family's speciation instead). Carrying the
-`Chemical` itself (not just its charge) lets the activity-correction machinery look up per-species
+`Species` itself (not just its charge) lets the activity-correction machinery look up per-species
 Truesdell-Jones parameters (see [`_activity_coefficient`](@ref)) rather than only a shared
 per-charge-magnitude value.
 """
@@ -322,13 +322,13 @@ function _analytical_species(s::Stock)
         sys === nothing || push!(systems,sys)
     end
     families = AnalyticalSpecies[]
-    family_chemicals = Set{Chemical}()
+    family_chemicals = Set{Species}()
     for sys in systems
         total = sum((molar_amount(r,chem) for chem in sys.species);init=0u"mol") / vol
         push!(families,AnalyticalSpecies(sys,total))
         union!(family_chemicals,sys.species)
     end
-    strong_ions = Tuple{Chemical,Unitful.Molarity}[]
+    strong_ions = Tuple{Species,Unitful.Molarity}[]
     for (chem,moles) in r.amounts
         (chem==H⁺ || chem==OH⁻) && continue
         chem in family_chemicals && continue
@@ -398,7 +398,7 @@ Ionic strength `I = 0.5·Σcᵢzᵢ²` at the given `pH`, over every charged spe
 parameters), every strong ion, and every family state (via `pKa_eff`, so this stays self-consistent
 with whatever pKa's were actually used to solve for `pH`).
 """
-function _ionic_strength(pH::Real,families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Chemical,Unitful.Molarity}},gammas::Dict{Chemical,Float64},pKa_eff::Dict{AcidBaseSystem,Vector{Float64}})
+function _ionic_strength(pH::Real,families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Species,Unitful.Molarity}},gammas::Dict{Species,Float64},pKa_eff::Dict{AcidBaseSystem,Vector{Float64}})
     Hp = exp10(-pH)
     Kw_eff = Kw/(gammas[H⁺]*gammas[OH⁻])
     OHm = Kw_eff/Hp
@@ -431,7 +431,7 @@ actual concentration is negligible, and checking chain membership alone would fa
 A no-op when everything materially present is monovalent, neutral, or already using real
 Truesdell-Jones parameters.
 """
-function _check_davies_reliability(pH::Real,I::Float64,families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Chemical,Unitful.Molarity}},pKa_eff::Dict{AcidBaseSystem,Vector{Float64}})
+function _check_davies_reliability(pH::Real,I::Float64,families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Species,Unitful.Molarity}},pKa_eff::Dict{AcidBaseSystem,Vector{Float64}})
     I <= 0 && return nothing
     max_z = 0
     for (chem,c) in strong_ions
@@ -458,12 +458,12 @@ end
 """
     _relevant_chemicals(families, strong_ions)
 
-Every distinct [`Chemical`](@ref) whose activity coefficient the solver needs each iteration: `H⁺`,
+Every distinct [`Species`](@ref) whose activity coefficient the solver needs each iteration: `H⁺`,
 `OH⁻`, every species across every family's chain (including neutral ones, which always resolve to
 `γ=1.0` -- see [`_activity_coefficient`](@ref)), and every strong-ion chemical.
 """
-function _relevant_chemicals(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Chemical,Unitful.Molarity}})
-    chems = Set{Chemical}((H⁺,OH⁻))
+function _relevant_chemicals(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Species,Unitful.Molarity}})
+    chems = Set{Species}((H⁺,OH⁻))
     for fam in families
         union!(chems,fam.system.species)
     end
@@ -485,10 +485,10 @@ stabilizes or a small iteration cap is hit (in which case a warning is emitted a
 so far is returned, rather than erroring). Returns `(pH, pKa_eff)` -- the second so callers needing
 per-species fractions (`speciation`) can report ones consistent with the pH actually solved for.
 """
-function _solve_ph(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Chemical,Unitful.Molarity}};ionic_strength_correction::Bool=true)
+function _solve_ph(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{Tuple{Species,Unitful.Molarity}};ionic_strength_correction::Bool=true)
     strong_net = sum((ustrip(u"mol/L",charge(chem)*c) for (chem,c) in strong_ions);init=0.0)
     chems = _relevant_chemicals(families,strong_ions)
-    gammas = Dict{Chemical,Float64}(chem=>1.0 for chem in chems)
+    gammas = Dict{Species,Float64}(chem=>1.0 for chem in chems)
     pH_est = 7.0
     pKa_eff = Dict{AcidBaseSystem,Vector{Float64}}(fam.system=>fam.system.pKa for fam in families)
     maxiter = ionic_strength_correction ? 10 : 1
@@ -519,14 +519,14 @@ end
 The general, low-level entry point behind [`pH(::Stock)`](@ref): root-finds the solution pH of an
 arbitrary mixture of acid/base `families` (each an [`AnalyticalSpecies`](@ref) or
 [`OpenSystemSpecies`](@ref)) plus `strong_ions` (a list of `(chemical, concentration)` pairs for
-fully-dissociated strong electrolytes -- carrying the [`Chemical`](@ref) itself, not just its charge,
+fully-dissociated strong electrolytes -- carrying the [`Species`](@ref) itself, not just its charge,
 so per-species activity parameters can be looked up; see [`_activity_coefficient`](@ref)). Set
 `ionic_strength_correction=false` to get the ideal/infinite-dilution pH instead (no activity
 correction).
 """
-function pH(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{<:Tuple{Chemical,<:Unitful.Molarity}};ionic_strength_correction::Bool=true)
+function pH(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{<:Tuple{Species,<:Unitful.Molarity}};ionic_strength_correction::Bool=true)
     isempty(families) && return _pH_strong_electrolyte_only(sum((charge(chem)*c for (chem,c) in strong_ions);init=0.0u"mol/L"))
-    p,_ = _solve_ph(families,convert(Vector{Tuple{Chemical,Unitful.Molarity}},strong_ions);ionic_strength_correction)
+    p,_ = _solve_ph(families,convert(Vector{Tuple{Species,Unitful.Molarity}},strong_ions);ionic_strength_correction)
     return p
 end
 

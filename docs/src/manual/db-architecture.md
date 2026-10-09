@@ -33,9 +33,14 @@ Each table below is listed as `Name(column, column, ...)`.
 ## Components and chemistry
 
 `Components(ID, Type)`, `Reagents(ComponentID, Name, Type, MolecularWeight, Density, CID)`,
-`Chemicals(ID, Name, Charge, MolecularWeight)`, `CompositionRules(ID, ReagentComponentID,
-ChemicalID, Coefficient)`, and `Organisms(ID, ComponentID, Genus, Species, Strain)` persist the
-`Reagent`, `Chemical`, `Organism`, and `CompositionRule` types of `CHESSCore`.
+`Species(ID, Name, Charge, Formula, MolecularWeight)`, `CompositionRules(ID, ReagentComponentID,
+SpeciesID, Coefficient)`, and `Organisms(ID, ComponentID, Genus, Species, Strain)` persist the
+`Reagent`, `Species`, `Organism`, and `CompositionRule` types of `CHESSCore`. A species with an
+elemental formula stores the formula as a Hill-order string and no molecular weight, since the weight
+derives from the formula. A species without a formula stores its molecular weight.
+
+A database created before the `Chemicals` table was renamed `Species` is converted by
+[`migrate_species!`](@ref).
 
 ## Environment
 

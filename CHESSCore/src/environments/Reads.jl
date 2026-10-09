@@ -229,7 +229,7 @@ ReadKind(Absorbance)
 ```
 """
 macro read_str(kind)
-    # Bare Symbol lookup, not Meta.parse -- see the comment in @chem_str (Chemicals.jl) for why.
+    # Bare Symbol lookup, not Meta.parse -- see the comment in @spc_str (Chemicals.jl) for why.
     sym = Symbol(kind)
     labmods = [CHESSCore]
     for m in CHESSCore.labmodules

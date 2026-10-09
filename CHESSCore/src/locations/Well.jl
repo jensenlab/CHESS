@@ -146,7 +146,7 @@ end
 """
     drain!(x::Well)
 
-Remove all [`Chemical`](@ref) components from the [`Stock`](@ref) object contained in the well.
+Remove all [`Species`](@ref) components from the [`Stock`](@ref) object contained in the well.
 
 * `drain!` leaves behind any [`Organism`](@ref)s *
 

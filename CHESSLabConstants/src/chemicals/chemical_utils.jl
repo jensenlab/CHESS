@@ -4,9 +4,9 @@
 
 Path to the SQLite cache of PubChem-derived properties, keyed by `LabID`: `Reagents`
 (`Name`/`Type`/`MolecularWeight`/`Density`/`CID`, backing [`register_reagent!`](@ref)) and `Chemicals`
-(`Name`/`Charge`/`MolecularWeight`/`CID`, backing [`register_chemical!`](@ref)) -- named to match
-[`CHESSCore.Reagent`](@ref)/[`CHESSCore.Chemical`](@ref) exactly, not the other way around. Used only
-by those two author-time tools -- package load never touches this file or the network.
+(`Name`/`Charge`/`MolecularWeight`/`CID`, backing [`register_chemical!`](@ref), which produces
+[`CHESSCore.Species`](@ref) definitions). Used only by those two author-time tools -- package load
+never touches this file or the network.
 """
 const chemical_cache_path = joinpath(@__DIR__,"..","lab_constants_cache.db")
 
@@ -116,23 +116,23 @@ function _cache_chemical!(lab_id::AbstractString,name::AbstractString,charge::In
     return nothing
 end
 
-_chemical_line(lab_id,name,charge,mw) = "@chemical $lab_id \"$name\" $charge $(mw)u\"g/mol\""
+_chemical_line(lab_id,name,charge,mw) = "@species $lab_id \"$name\" $charge $(mw)u\"g/mol\""
 
 """
     register_chemical!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
 
-Author-time tool, mirroring [`register_reagent!`](@ref) for [`CHESSCore.Chemical`](@ref) identities
+Author-time tool, mirroring [`register_reagent!`](@ref) for [`CHESSCore.Species`](@ref) identities
 (ions) instead of [`CHESSCore.Reagent`](@ref)s: looks up `lab_id`'s molecular weight in the local cache
 ([`chemical_cache_path`](@ref)); on a cache miss, fetches it from PubChem via [`get_mw_density`](@ref)
-(density is fetched but discarded -- `Chemical` has no density field) and caches the result. Returns a
-ready-to-paste `@chemical` line -- `Chemical` itself has no `pubchemid` field, so this is authoring
+(density is fetched but discarded -- `Species` has no density field) and caches the result. Returns a
+ready-to-paste `@species` line -- `Species` itself has no `pubchemid` field, so this is authoring
 convenience only, not permanent provenance. Paste the returned line into
 `chemicals/dissociation.jl` and commit.
 
 Example:
 ```julia-repl
 julia> register_chemical!("Na⁺","Na+",1,923)
-"@chemical Na⁺ \\"Na+\\" 1 22.9897693u\\"g/mol\\""
+"@species Na⁺ \\"Na+\\" 1 22.9897693u\\"g/mol\\""
 ```
 """
 function register_chemical!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)

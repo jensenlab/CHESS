@@ -97,16 +97,16 @@ export is_quantitative, is_qualitative
 export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
 export StockComponent # common dispatch/gathering ancestor for Reagent and Organism
 export Reagent,Solid,Liquid,Gas # physical-form types
-export Chemical,H⁺,OH⁻,Formula # chemical-identity types
+export Species,H⁺,OH⁻,Formula # chemical-identity types
 export charge, CompositionRule, composition, set_composition!, composition_rules
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types
 export is_capable, actuatable_attributes, performable_operations, readable_types
-export @chemical, @reagent, @reagent_formula, @organism , @attribute, @chem_str, @rgt_str, @org_str, @attr_str # macros for constants
+export @species, @reagent, @reagent_formula, @organism , @attribute, @spc_str, @rgt_str, @org_str, @attr_str # macros for constants
 export set_occupancy_cost!, occupancy_rules, kind, is_committed, build_location, plate_namer, childtype
 # chemicals/reagents
-export molecular_weight, density, pubchemid , chemparse, reagentparse, symbol
+export molecular_weight, density, pubchemid , speciesparse, reagentparse, symbol
 # Organisms
 export genus, species, strain , orgparse
 # Stocks
