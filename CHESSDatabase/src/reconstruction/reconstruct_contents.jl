@@ -22,39 +22,44 @@ function _reconstruction_transfer(donor,recipient,quantity,configuration::String
 end
 
 """
-    get_chemical(id::Integer)
+    get_species(id::Integer)
 
-Reconstruct a bare [`Chemical`](@ref) from the `Chemicals` table by `ID` -- the direct, standalone
-counterpart of `get_component` for `Reagent`/`Organism`. `Chemical` reconstruction otherwise
-only happens inline inside [`restore_composition!`](@ref) as part of rebuilding a `Reagent`'s
-`CompositionRule`; this gives it the same testable, direct path.
+Reconstruct a bare [`Species`](@ref) from the `Species` table by `ID` -- the direct, standalone
+counterpart of `get_component` for `Reagent`/`Organism`. `Species` reconstruction otherwise
+only happens inline inside [`restore_dissolution!`](@ref) as part of rebuilding a `Reagent`'s
+`Dissolution`; this gives it the same testable, direct path.
 """
-function get_chemical(id::Integer)
-    row = query_db("SELECT Name, Charge, MolecularWeight FROM Chemicals WHERE ID = ?",(id,))
-    nrow(row)==0 && error("chemical $id does not exist in the database")
+function get_species(id::Integer)
+    row = query_db("SELECT Name, Charge, Formula, MolecularWeight FROM Species WHERE ID = ?",(id,))
+    nrow(row)==0 && error("species $id does not exist in the database")
     row = row[1,:]
+    if isequal(row["Formula"],"opaque")
+        ismissing(row["MolecularWeight"]) && return Species(row["Name"],row["Charge"],CHESSCore.opaque)
+        return Species(row["Name"],row["Charge"],CHESSCore.opaque(row["MolecularWeight"]*u"g/mol"))
+    end
+    ismissing(row["Formula"]) || return Species(row["Name"],row["Charge"],row["Formula"])
     mw = ismissing(row["MolecularWeight"]) ? missing : row["MolecularWeight"]*u"g/mol"
-    return Chemical(row["Name"],row["Charge"],mw)
+    return Species(row["Name"],row["Charge"],mw)
 end
 
 """
-    restore_composition!(reagent::Reagent, component_id::Integer)
+    restore_dissolution!(reagent::Reagent, component_id::Integer)
 
-Restore `reagent`'s dissociation rule from the `CompositionRules`/`Chemicals` tables (see
-`upload_composition`, `src/database/uploads.jl`), registering it via [`set_composition!`](@ref) so a
+Restore `reagent`'s dissociation rule from the `Dissolutions`/`Species` tables (see
+`upload_dissolution`, `src/database/uploads.jl`), registering it via [`set_dissolution!`](@ref) so a
 reagent reconstructed from the database behaves identically to one defined by its original lab module
 in the current session -- no longer dependent on that module being loaded. No-op if nothing was
 persisted for `component_id` (e.g. locations uploaded before this table existed).
 """
-function restore_composition!(reagent::Reagent,component_id::Integer)
+function restore_dissolution!(reagent::Reagent,component_id::Integer)
     rows = query_db("""
-        SELECT r.ChemicalID, r.Coefficient
-        FROM CompositionRules r
+        SELECT r.SpeciesID, r.Coefficient
+        FROM Dissolutions r
         WHERE r.ReagentComponentID = ?
     """,(component_id,))
     nrow(rows)==0 && return nothing
-    products = Dict(get_chemical(row.ChemicalID) => row.Coefficient for row in eachrow(rows))
-    set_composition!(reagent,CompositionRule(products))
+    products = Dict(get_species(row.SpeciesID) => row.Coefficient for row in eachrow(rows))
+    set_dissolution!(reagent,Dissolution(products))
     return nothing
 end
 
@@ -70,7 +75,7 @@ function get_component(id::Integer)
         c = query_db("SELECT Name, Type,MolecularWeight,Density,CID FROM Reagents WHERE ComponentID = ?",(id,))[1,:]
         typ=eval(Symbol(c["Type"]))
         reagent = typ(c["Name"],c["MolecularWeight"]*u"g/mol",c["Density"]*u"g/mL",c["CID"])
-        restore_composition!(reagent,id)
+        restore_dissolution!(reagent,id)
         return reagent
 
     elseif comp_type =="Organism"

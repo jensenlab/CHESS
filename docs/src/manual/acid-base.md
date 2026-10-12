@@ -5,7 +5,7 @@ DocTestSetup = :(using CHESS)
 ```
 
 !!! note
-    The `pH` in [Recipes & Solution Chemistry](recipes.md) is a direct estimate from net `H⁺`/`OH⁻`
+    The `pH` in [Composition & Solution Chemistry](composition.md) is a direct estimate from net `H⁺`/`OH⁻`
     concentration. It is correct for strong electrolytes (salts, strong acids and bases) but not
     for weak acids, weak bases, or buffers, which partially dissociate and shift with pH. This page
     describes the equilibrium model for those: [`AcidBaseSystem`](@ref), [`speciation`](@ref), and
@@ -15,13 +15,13 @@ DocTestSetup = :(using CHESS)
 
 ## Conjugate acid/base families
 
-An [`AcidBaseSystem`](@ref) represents a chain of [`Chemical`](@ref) protonation states, from
+An [`AcidBaseSystem`](@ref) represents a chain of [`Species`](@ref) protonation states, from
 fully-protonated to fully-deprotonated, linked by a `pKa` per step. Phosphoric acid is a
 three-step example:
 
 ```jldoctest acid_base
 julia> acid_base_system(rgt"potassium_phosphate_mono")
-AcidBaseSystem(Chemical[H3PO4, H2PO4⁻, HPO4²⁻, PO4³⁻], [2.148, 7.198, 12.375])
+AcidBaseSystem(Species[H3PO4, H2PO4⁻, HPO4²⁻, PO4³⁻], [2.148, 7.198, 12.375])
 ```
 
 Each step's `pKa[i]` links `species[i] ⇌ species[i+1] + H⁺`, and the constructor checks that the
@@ -31,16 +31,16 @@ positive charge instead of being neutral:
 
 ```jldoctest acid_base
 julia> acid_base_system(rgt"aspartic_acid")
-AcidBaseSystem(Chemical[AspartateCation, L-aspartic acid, AspartateAnion, AspartateDianion], [1.99, 3.9, 9.9])
+AcidBaseSystem(Species[AspartateCation, L-aspartic acid, AspartateAnion, AspartateDianion], [1.99, 3.9, 9.9])
 ```
 
 ## Registering one
 
 [`set_acid_base_system!`](@ref) registers a system for a [`Reagent`](@ref), and
 [`acid_base_system`](@ref) looks it up. The systems are held in [`acid_base_systems`](@ref), keyed
-by the reagent, like the composition rules. The lookup returns `nothing` for a reagent with no
+by the reagent, like the dissolutions. The lookup returns `nothing` for a reagent with no
 registered weak acid or base, which is the default. This registry is independent of a reagent's
-[`CompositionRule`](@ref) (see [Reagents & Chemicals](reagents-chemicals.md)). A `Reagent` can have
+[`Dissolution`](@ref) (see [Reagents & Species](reagents-species.md)). A `Reagent` can have
 either, both, or neither, because they answer different questions: complete-dissociation mass
 bookkeeping and pH-dependent equilibrium speciation.
 
@@ -48,16 +48,16 @@ bookkeeping and pH-dependent equilibrium speciation.
 julia> @reagent my_weak_acid "my weak acid" Solid 100.0u"g/mol" missing missing
 my weak acid
 
-julia> @chemical MyWeakAcid "my weak acid" 0 100.0u"g/mol"
+julia> @species MyWeakAcid "my weak acid" 0 100.0u"g/mol"
 MyWeakAcid
 
-julia> @chemical MyConjugateBase "my conjugate base" -1 99.0u"g/mol"
+julia> @species MyConjugateBase "my conjugate base" -1 99.0u"g/mol"
 MyConjugateBase
 
 julia> set_acid_base_system!(my_weak_acid, AcidBaseSystem([MyWeakAcid,MyConjugateBase],[5.0]))
 
 julia> acid_base_system(my_weak_acid)
-AcidBaseSystem(Chemical[my weak acid, my conjugate base], [5.0])
+AcidBaseSystem(Species[my weak acid, my conjugate base], [5.0])
 ```
 
 ## `pH` with weak acid/base families
@@ -79,7 +79,7 @@ julia> pH(vinegar)
 
 `acetic_acid`'s registered [`AcidBaseSystem`](@ref) (`[Acetic Acid, OAc⁻]`, `pKa=4.76`) only
 partially dissociates, so `vinegar` is far less acidic than `acid` at a similar loading. The
-strong-electrolyte formula in [Recipes & Solution Chemistry](recipes.md) cannot capture this.
+strong-electrolyte formula in [Composition & Solution Chemistry](composition.md) cannot capture this.
 
 ## Speciation
 
@@ -94,7 +94,7 @@ julia> buffer = 5.725u"mL" * rgt"acetic_acid" + 0.1u"mol" * rgt"sodium_acetate_a
 
 julia> speciation(buffer)
 1-element Vector{SpeciationResult}:
- SpeciationResult(AcidBaseSystem(Chemical[Acetic Acid, OAc⁻], [4.76]), [0.4998782904645701, 0.5001217095354299], Union{Quantity{T, 𝐍 𝐋⁻³, U}, Level{L, S, Quantity{T, 𝐍 𝐋⁻³, U}} where {L, S}} where {T, U}[0.09940924549192721 mol L⁻¹, 0.0994576534877016 mol L⁻¹])
+ SpeciationResult(AcidBaseSystem(Species[Acetic Acid, OAc⁻], [4.76]), [0.4998782904645701, 0.5001217095354299], Union{Quantity{T, 𝐍 𝐋⁻³, U}, Level{L, S, Quantity{T, 𝐍 𝐋⁻³, U}} where {L, S}} where {T, U}[0.09940924549192721 mol L⁻¹, 0.0994576534877016 mol L⁻¹])
 ```
 
 At a 1:1 acid to conjugate base ratio, `speciation` reports an even split. This matches the
@@ -125,7 +125,7 @@ julia> pH(buffer)
 
 The equilibrium solver takes its inputs as families. An [`AnalyticalSpecies`](@ref) is an
 [`AcidBaseSystem`](@ref) together with its total concentration in a stock. Every family that comes
-from the recipe of a stock is of this kind. An [`OpenSystemSpecies`](@ref) is a family held at a
+from the composition of a stock is of this kind. An [`OpenSystemSpecies`](@ref) is a family held at a
 fixed concentration of its first species. It models a species in equilibrium with an external
 reservoir, such as dissolved atmospheric carbon dioxide, whose concentration is set by the partial
 pressure and not by how much of the conjugate base forms. Its total concentration grows with pH.

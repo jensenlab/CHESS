@@ -163,55 +163,68 @@ function upload_component(reagent::Reagent)
     id=query_db("SELECT Max(ID) FROM Components")[1,1]
     execute_db("INSERT INTO Reagents(ComponentID,Name,Type,MolecularWeight,Density,CID) Values(?,?,?,?,?,?)",
         (id,name(reagent),string(typeof(reagent)),mw,d,pc))
-    upload_composition(id,reagent)
+    upload_dissolution(id,reagent)
     return id
 end
 
 """
-    get_chemical_id(chem::Chemical)
+    get_species_id(spc::Species)
 
-Return the `Chemicals.ID` for `chem`, uploading it first (via [`upload_chemical`](@ref)) if no row
-with a matching natural key (name/charge/molecular weight) already exists.
+Return the `Species.ID` for `spc`, uploading it first (via [`upload_species`](@ref)) if no row with a
+matching natural key (name/charge/formula/stored molecular weight) already exists.
 """
-function get_chemical_id(chem::Chemical)
-    mw = ismissing(molecular_weight(chem)) ? missing : ustrip(uconvert(u"g/mol",molecular_weight(chem)))
-    conds,params = sql_where(
-        "Name"=>name(chem),
-        "Charge"=>charge(chem),
-        "MolecularWeight"=>mw,
-    )
-    id=query_db("SELECT ID FROM Chemicals WHERE $conds",params)
+function get_species_id(spc::Species)
+    conds,params = sql_where(_species_key(spc)...)
+    id=query_db("SELECT ID FROM Species WHERE $conds",params)
     nrow(id)==1 && return id[1,1]
-    return upload_chemical(chem)
+    return upload_species(spc)
+end
+
+# The natural key of a species row. A species with a formula stores the formula (as a canonical
+# Hill-order string) and no molecular weight, since its weight derives from the formula. An opaque
+# species stores the text "opaque" as its formula, and its average molecular weight if it has one. A
+# species without a formula stores its molecular weight.
+function _species_key(spc::Species)
+    f = CHESSCore.formula(spc)
+    if f isa CHESSCore.OpaqueFormula
+        mw = molecular_weight(spc)
+        mw = ismissing(mw) ? missing : ustrip(uconvert(u"g/mol",mw))
+        return ["Name"=>name(spc),"Charge"=>charge(spc),"Formula"=>"opaque","MolecularWeight"=>mw]
+    end
+    ismissing(f) || return ["Name"=>name(spc),"Charge"=>charge(spc),"Formula"=>CHESSCore.formula_string(f),"MolecularWeight"=>missing]
+    mw = molecular_weight(spc)
+    mw = ismissing(mw) ? missing : ustrip(uconvert(u"g/mol",mw))
+    return ["Name"=>name(spc),"Charge"=>charge(spc),"Formula"=>missing,"MolecularWeight"=>mw]
 end
 
 """
-    upload_chemical(chem::Chemical)
+    upload_species(spc::Species)
 
-Insert `chem` into the `Chemicals` registry (the DB counterpart of [`Chemical`](@ref) dissociation
-identities -- distinct from [`Reagents`](@ref)/`Components`, since a `Chemical` never participates in
-a `Stock` directly). Returns its `Chemicals.ID`.
+Insert `spc` into the `Species` registry (the DB counterpart of [`Species`](@ref) dissociation
+identities -- distinct from [`Reagents`](@ref)/`Components`, since a `Species` never participates in
+a `Stock` directly). Returns its `Species.ID`.
 """
-function upload_chemical(chem::Chemical)
-    mw = ismissing(molecular_weight(chem)) ? missing : ustrip(uconvert(u"g/mol",molecular_weight(chem)))
-    execute_db("INSERT OR IGNORE INTO Chemicals(Name,Charge,MolecularWeight) Values(?,?,?)",(name(chem),charge(chem),mw))
-    return get_chemical_id(chem)
+function upload_species(spc::Species)
+    key = Dict(_species_key(spc))
+    execute_db("INSERT OR IGNORE INTO Species(Name,Charge,Formula,MolecularWeight) Values(?,?,?,?)",
+        (key["Name"],key["Charge"],key["Formula"],key["MolecularWeight"]))
+    return get_species_id(spc)
 end
 
 """
-    upload_composition(reagent_component_id::Integer, reagent::Reagent)
+    upload_dissolution(reagent_component_id::Integer, reagent::Reagent)
 
-Persist `reagent`'s currently-resolved [`composition`](@ref) (`composition(reagent).products`) as
-`CompositionRules` rows -- the DB counterpart of the in-memory `composition_rules` registry. Called
+Persist `reagent`'s currently-resolved [`dissolution`](@ref) (`dissolution(reagent).products`) as
+`Dissolutions` rows -- the DB counterpart of the in-memory `dissolutions` registry. Called
 whenever a `Reagent` component is uploaded, so a reagent reconstructed from the database (see
 `get_component`, `reconstruct_contents.jl`) can restore its dissociation rule without depending on the
 defining lab module being loaded in that session.
 """
-function upload_composition(reagent_component_id::Integer,reagent::Reagent)
-    for (chem,coeff) in composition(reagent).products
-        chem_id=get_chemical_id(chem)
-        execute_db("INSERT OR IGNORE INTO CompositionRules(ReagentComponentID,ChemicalID,Coefficient) Values(?,?,?)",
-            (reagent_component_id,chem_id,coeff))
+function upload_dissolution(reagent_component_id::Integer,reagent::Reagent)
+    for (spc,coeff) in dissolution(reagent).products
+        spc_id=get_species_id(spc)
+        execute_db("INSERT OR IGNORE INTO Dissolutions(ReagentComponentID,SpeciesID,Coefficient) Values(?,?,?)",
+            (reagent_component_id,spc_id,coeff))
     end
     return nothing
 end

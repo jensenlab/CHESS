@@ -90,7 +90,7 @@ ArgumentError: LocationKind Room already exists
 ```
 
 CHESS already includes many common names, such as `Room` and `WP96`. Use the registered
-constant, or pick a new name. `@reagent`, `@chemical`, and `@organism` do not check, and silently
+constant, or pick a new name. `@reagent`, `@species`, and `@organism` do not check, and silently
 replace an existing registration. See [Registering Lab Constants](registering-lab-constants.md).
 
 ## Databases

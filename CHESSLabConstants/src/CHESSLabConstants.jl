@@ -25,12 +25,12 @@ include("./standard_stocks/thy.jl")
 include("./standard_stocks/cdm.jl")
 include("./standard_stocks/align_base_media.jl")
 
-export get_mw_density, register_reagent!, register_organism!, register_chemical!
+export get_mw_density, get_molecular_formula, register_reagent!, register_organism!, register_species!
 
 function __init__()
     CHESSCore.register_lab(CHESSLabConstants)
     _register_occupancy_rules!()
-    _register_electrolyte_compositions!()
+    _register_electrolyte_dissolutions!()
     _register_acid_base_systems!()
     _register_ion_parameters!()
 end

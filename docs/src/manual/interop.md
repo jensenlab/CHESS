@@ -119,10 +119,10 @@ real one. CHESS logs a warning ("reagent ... not registered") and does not throw
 ## Names and objects
 
 Reagents, chemicals, and organisms appear in tables and in dictionaries by name.
-[`reagentparse`](@ref), [`chemparse`](@ref), and [`orgparse`](@ref) are the functions behind the
-string macros `rgt"..."`, `chem"..."`, and `org"..."`. They take the module or modules to search as a
-keyword, which allows the context to be chosen at run time. The string macro `chem"Na+"` accepts ASCII
-charge symbols, and `chemparse` needs the registered name, `Na⁺`. [`string_to_component`](@ref) converts a
+[`reagentparse`](@ref), [`speciesparse`](@ref), and [`orgparse`](@ref) are the functions behind the
+string macros `rgt"..."`, `spc"..."`, and `org"..."`. They take the module or modules to search as a
+keyword, which allows the context to be chosen at run time. The string macro `spc"Na+"` accepts ASCII
+charge symbols, and `speciesparse` needs the registered name, `Na⁺`. [`string_to_component`](@ref) converts a
 name to a reagent of a given type or to an organism. It shows a warning and returns a reagent with
 only a name when the name is not registered. [`component_to_string`](@ref) is the inverse. It returns
 the registered name when it finds the component in the context and the display name otherwise:
@@ -131,7 +131,7 @@ the registered name when it finds the component in the context and the display n
 julia> reagentparse("water"; reagent_context=ctx)
 water
 
-julia> chemparse("Na⁺"; chem_context=ctx)
+julia> speciesparse("Na⁺"; species_context=ctx)
 Na⁺
 
 julia> orgparse("SMU_UA159"; org_context=ctx)

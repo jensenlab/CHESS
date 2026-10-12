@@ -4,11 +4,11 @@
 
 Assemble every registered constant across `context` (a `Module` or list of `Module`s, default:
 `CHESSCore` plus every module registered via [`register_lab`](@ref)) into one `NamedTuple`, keyed by
-category: `reagents`, `chemicals`, `organisms`, `locations`, `attributes`, `reads`, `stocks`.
+category: `reagents`, `species`, `organisms`, `locations`, `attributes`, `reads`, `stocks`.
 
 `organisms`/`locations`/`attributes`/`reads` are read directly from CHESSCore's central registries
 (`orgprops`/[`location_kinds`](@ref)/[`attribute_kinds`](@ref)/[`read_kinds`](@ref)), which
-already hold everything needed. `reagents`/`chemicals` have no such registry, and `stocks`'
+already hold everything needed. `reagents`/`species` have no such registry, and `stocks`'
 registry ([`stock_recipes`](@ref)) only reflects `Stock`s explicitly registered via
 [`@stock`](@ref) -- so like [`symbol`](@ref)'s own reverse lookup, all three are instead found here
 by scanning `names(m; all=true)` of each module in `context` and filtering by type. This
@@ -22,7 +22,7 @@ function registry_summary(context=vcat([CHESSCore],CHESSCore.labmodules))
     mods = context isa Module ? [context] : context
 
     reagents = NamedTuple[]
-    chemicals = NamedTuple[]
+    species = NamedTuple[]
     stocks = NamedTuple[]
     for m in mods
         for n in names(m; all=true)
@@ -31,8 +31,8 @@ function registry_summary(context=vcat([CHESSCore],CHESSCore.labmodules))
             v = getfield(m,n)
             if v isa Reagent
                 push!(reagents,(module_=m,name=n,type=typeof(v),molecular_weight=molecular_weight(v),density=density(v),pubchemid=pubchemid(v)))
-            elseif v isa Chemical
-                push!(chemicals,(module_=m,name=n,charge=charge(v),molecular_weight=molecular_weight(v)))
+            elseif v isa Species
+                push!(species,(module_=m,name=n,charge=charge(v),molecular_weight=molecular_weight(v)))
             elseif v isa Stock
                 push!(stocks,(module_=m,name=n,type=typeof(v)))
             end
@@ -44,5 +44,5 @@ function registry_summary(context=vcat([CHESSCore],CHESSCore.labmodules))
     attributes = [(name=k,unit=v.unit) for (k,v) in CHESSCore.attribute_kinds]
     reads = [(name=k,unit=v.unit,allowed_values=v.allowed_values) for (k,v) in CHESSCore.read_kinds]
 
-    return (reagents=reagents,chemicals=chemicals,organisms=organisms,locations=locations,attributes=attributes,reads=reads,stocks=stocks)
+    return (reagents=reagents,species=species,organisms=organisms,locations=locations,attributes=attributes,reads=reads,stocks=stocks)
 end

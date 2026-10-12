@@ -155,7 +155,7 @@ locstr_check_bool(::Any) = false
     @loc_str(kind)
 
 String macro to recall a [`LocationKind`](@ref) registered with [`@location_kind`](@ref) by name,
-mirroring [`@chem_str`](@ref)/[`@org_str`](@ref) (and sharing their lookup machinery).
+mirroring [`@spc_str`](@ref)/[`@org_str`](@ref) (and sharing their lookup machinery).
 
 `loc"WP96"` is a **pure lookup** — it never allocates a new physical instance or touches the
 database. Actual instantiation stays an explicit call, e.g. `generate_location(loc"WP96", "Plate 1")`.
@@ -167,7 +167,7 @@ LocationKind(WP96)
 ```
 """
 macro loc_str(kind)
-    # Bare Symbol lookup, not Meta.parse -- see the comment in @chem_str (Chemicals.jl) for why.
+    # Bare Symbol lookup, not Meta.parse -- see the comment in @spc_str (Chemicals.jl) for why.
     sym = Symbol(kind)
     labmods = [CHESSCore]
     for m in CHESSCore.labmodules

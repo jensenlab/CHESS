@@ -35,10 +35,10 @@ makedocs(
             "Movement & Occupancy" => "manual/movement.md",
             "Environmental Attributes & Inheritance" => "manual/attributes.md",
             "Stocks & Chemistry" => [
-                "Reagents & Chemicals" => "manual/reagents-chemicals.md",
+                "Reagents & Species" => "manual/reagents-species.md",
                 "Stocks" => "manual/stocks.md",
                 "Organisms & Cultures" => "manual/organisms-cultures.md",
-                "Recipes & Solution Chemistry" => "manual/recipes.md",
+                "Composition & Solution Chemistry" => "manual/composition.md",
                 "Acid/Base Chemistry" => "manual/acid-base.md",
                 "Wells: Depositing & Transferring Material" => "manual/wells.md",
             ],

@@ -30,12 +30,12 @@ julia> name(BSU_168)
 ```
 
 `name(x)` joins all three fields. `show(x)` prints the binding name (`BSU_168`), as it does for
-[`Reagent`](@ref) and [`Chemical`](@ref).
+[`Reagent`](@ref) and [`Species`](@ref).
 
 ## Recalling with `@org_str`
 
 [`@org_str`](@ref) looks up organisms registered by CHESS or a lab module, like
-[`@loc_str`](@ref), [`@attr_str`](@ref), [`@rgt_str`](@ref), and [`@chem_str`](@ref):
+[`@loc_str`](@ref), [`@attr_str`](@ref), [`@rgt_str`](@ref), and [`@spc_str`](@ref):
 
 ```jldoctest organisms
 julia> org"SMU_UA159"

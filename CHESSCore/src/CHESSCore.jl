@@ -9,6 +9,7 @@ using
     Dates, # Read's own recorded time
     Printf, # fixed-precision number formatting for stock displays
     StringDistances # used for computing chemical and organism hints
+import PeriodicTable # atomic masses for elemental formulas; used qualified so its `elements` and `Element` names stay out of this module
 import Base: +,-,*,/,convert, show ,sort , promote_rule,round , in, ==,empty!, hash, isapprox # all overloaded by this package
 import AbstractTrees: children,parent,nodevalue
 
@@ -61,12 +62,13 @@ include("./environments/Environment.jl")
 include("./operations/capability.jl")
 include("./locations/Labware.jl")
 include("./stocks/StockComponent.jl")
+include("./stocks/ElementalFormula.jl")
 include("./stocks/Chemicals.jl")
 include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")
 include("./stocks/StockDisplay.jl")
 include("./stocks/AcidBase.jl")
-include("./stocks/Recipe.jl")
+include("./stocks/Composition.jl")
 include("./locations/Well.jl")
 include("./locations/LocationDisplay.jl")
 include("./locations/build_location.jl")
@@ -95,22 +97,22 @@ export is_quantitative, is_qualitative
 export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
 export StockComponent # common dispatch/gathering ancestor for Reagent and Organism
 export Reagent,Solid,Liquid,Gas # physical-form types
-export Chemical,H⁺,OH⁻,Formula # chemical-identity types
-export charge, CompositionRule, composition, set_composition!, composition_rules
+export Species,H⁺,OH⁻ # chemical-identity types
+export charge, Dissolution, dissolution, set_dissolution!, dissolutions
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types
 export is_capable, actuatable_attributes, performable_operations, readable_types
-export @chemical, @reagent, @reagent_formula, @organism , @attribute, @chem_str, @rgt_str, @org_str, @attr_str # macros for constants
+export @species, @reagent, @organism , @attribute, @spc_str, @rgt_str, @org_str, @attr_str # macros for constants
 export set_occupancy_cost!, occupancy_rules, kind, is_committed, build_location, plate_namer, childtype
 # chemicals/reagents
-export molecular_weight, density, pubchemid , chemparse, reagentparse, symbol
+export molecular_weight, density, pubchemid , speciesparse, reagentparse, symbol
 # Organisms
 export genus, species, strain , orgparse
 # Stocks
 export solids, liquids, reagents, organisms, volume_estimate, quantity, reagent_display
-export total_concentration, pH, net_hydrogen_ion_concentration
-export Recipe, recipe, mass, molar_amount, volume
+export total_concentration, pH, net_hydrogen_ion_concentration, atoms
+export Composition, composition, mass, molar_amount, volume
 # acid/base equilibrium
 export AcidBaseSystem, set_acid_base_system!, acid_base_system, acid_base_systems
 export AnalyticalSpecies, OpenSystemSpecies, AbstractAnalyticalSpecies, SpeciationResult, speciation, activity_coefficient, Kw, adjust_pH

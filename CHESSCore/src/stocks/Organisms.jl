@@ -91,7 +91,7 @@ counterpart of [`@rgt_str`](@ref).
 See also: [`orgparse`](@ref) for the non-macro form.
 """
 macro org_str(organism)
-    # Bare Symbol lookup, not Meta.parse -- see the comment in @chem_str (Chemicals.jl) for why.
+    # Bare Symbol lookup, not Meta.parse -- see the comment in @spc_str (Chemicals.jl) for why.
     sym = Symbol(organism)
     labmods = [CHESSCore]
     for m in CHESSCore.labmodules

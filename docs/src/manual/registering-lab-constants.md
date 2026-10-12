@@ -5,7 +5,7 @@ DocTestSetup = :(using CHESS)
 ```
 
 Seven macros register lab constants: [`@location_kind`](@ref), [`@attribute`](@ref),
-[`@read`](@ref), [`@chemical`](@ref), [`@reagent`](@ref), [`@organism`](@ref), and
+[`@read`](@ref), [`@species`](@ref), [`@reagent`](@ref), [`@organism`](@ref), and
 [`@stock`](@ref). Each defines a constant in the calling module and records it in a registry so
 that it can be found by name. The pattern follows
 [Unitful.jl](https://github.com/PainterQubits/Unitful.jl), which registers units and dimensions
@@ -50,7 +50,7 @@ julia> @location_kind Flask Symbol[] nothing nothing nothing nothing nothing
 ERROR: ArgumentError: LocationKind Flask already exists
 ```
 
-[`@organism`](@ref), [`@reagent`](@ref), and [`@chemical`](@ref) have no such check. Registering a
+[`@organism`](@ref), [`@reagent`](@ref), and [`@species`](@ref) have no such check. Registering a
 name again with these macros rebinds it to the new value without a warning.
 
 ## Namespaces
@@ -58,7 +58,7 @@ name again with these macros rebinds it to the new value without a warning.
 A lab module can register hundreds of constants, and loading it should not add all of them to the
 namespace of the loading code. None of the seven macros exports the names it defines. The constant
 exists in the module, and `names` lists it only when called with `all=true`. Each macro has a
-paired string macro that looks a name up safely: `@loc_str`, `@attr_str`, `@read_str`, `@chem_str`,
+paired string macro that looks a name up safely: `@loc_str`, `@attr_str`, `@read_str`, `@spc_str`,
 `@rgt_str`, `@org_str`, and `@stock_str`.
 
 ## How the string macros resolve a name
@@ -69,7 +69,7 @@ All string macros use the same lookup:
    `CHESSCore.labmodules`, keeping only modules that the calling module has itself loaded.
    Registering a lab module globally is not enough on its own.
 2. If nothing matches, try charge-symbol candidates, in which ASCII `+` and `-` are converted to
-   Unicode superscripts (see [Reagents & Chemicals](reagents-chemicals.md)).
+   Unicode superscripts (see [Reagents & Species](reagents-species.md)).
 3. If the name exists in a globally registered lab module that is not visible to the caller, an
    error names the module that must be loaded:
 
@@ -102,41 +102,51 @@ julia> registry_summary([CHESSCore, MyLab]).reagents
 
 With no arguments, `registry_summary()` covers every lab module registered globally. Unlike the
 string macros, it is not limited to modules visible to the caller. The `organisms`, `locations`,
-`attributes`, and `reads` entries come from the central registries. The `reagents`, `chemicals`,
+`attributes`, and `reads` entries come from the central registries. The `reagents`, `species`,
 and `stocks` entries are found by scanning each module's names and filtering by type, because
-reagents and chemicals have no central registry and `stock_recipes` holds only stocks registered
+reagents and species have no central registry and `stock_recipes` holds only stocks registered
 with `@stock`.
 
 ## Generating registration lines
 
 `CHESSLabConstants` has four functions that help write the registrations of a lab module. They are
 used while the module is being written and are not needed to use registered constants.
-[`register_reagent!`](@ref), [`register_chemical!`](@ref), and [`register_organism!`](@ref) each
+[`register_reagent!`](@ref), [`register_species!`](@ref), and [`register_organism!`](@ref) each
 return a line of code that registers the constant, ready to paste into the source of the module.
 They do not register anything and do not write to any source file.
 
-For a reagent or a chemical, the function looks up the molecular weight and density in a local
-cache. If the cache has no entry, it fetches them from PubChem with [`get_mw_density`](@ref) and
-stores them in the cache. The lookup needs a PubChem ID and a network connection. A chemical has no
-density, so the fetched density is discarded. For an organism, the function does not look anything
-up. It records the genus, species, strain, and optional ATCC ID and notes in the cache.
+For a reagent or a species, the function looks up the elemental formula, molecular weight, and
+density in a local cache. If the cache has no entry, it fetches them from PubChem with
+[`get_molecular_formula`](@ref) and [`get_mw_density`](@ref) and stores them in the cache. The lookup
+needs a PubChem ID and a network connection. The returned line gives the formula in place of a
+molecular weight, so the weight is derived from atomic masses (see [Reagents & Species](reagents-species.md)).
+A species has no density, so the fetched density is discarded. PubChem writes the charge of an ion as a
+suffix of its formula, and `register_species!` removes it after checking that it agrees with the
+charge given. When PubChem's formula cannot be used, because its charge disagrees or it cannot be read
+as an elemental formula, the function warns and the line keeps the stored molecular weight. For an
+organism, the function does not look anything up. It records the genus, species, strain, and optional
+ATCC ID and notes in the cache.
 
 ```julia
 using CHESSLabConstants
 
 register_reagent!(CHESSCore.Solid, "boric_acid", "Boric Acid", 7628)
-# "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
+# "@reagent boric_acid \"Boric Acid\" Solid \"BH3O3\" 1.435u\"g/mL\" 7628"
 
-register_chemical!("Na⁺", "Na+", 1, 923)
-# "@chemical Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+register_species!("Na⁺", "Na+", 1, 923)
+# "@species Na⁺ \"Na+\" 1 \"Na\""
 
 register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "700610", notes = "wild type")
 # "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""
 ```
 
-A compound with no PubChem entry, such as a rich-media broth, is registered without a PubChem ID,
-and its molecular weight and density are recorded as `missing`. [`get_mw_density`](@ref) takes a
-PubChem ID and returns the molecular weight in g/mol and the density in g/mL.
+PubChem describes the compound of the ID it is given, so the ID must be that of the form actually
+weighed out. A hydrate needs the hydrate's PubChem ID. A salt that dissolves into ions needs a
+`Dissolution` in place of the single formula the function returns. A compound with no PubChem entry,
+such as a rich-media broth, is registered without a PubChem ID. The line then has `missing`
+chemistry, or `opaque` when `register_reagent!` is called with `opaque=true` for an undefined mixture.
+[`get_molecular_formula`](@ref) takes a PubChem ID and returns the formula as PubChem writes it, and
+[`get_mw_density`](@ref) returns the molecular weight in g/mol and the density in g/mL.
 
 [Database Architecture](db-architecture.md) describes how CHESSDatabase stores the locations and
 stocks built from registered constants.

@@ -91,25 +91,26 @@ function create_db(path)
         );
         """
 
-    create_Chemicals="""
-        CREATE TABLE Chemicals(
+    create_Species="""
+        CREATE TABLE Species(
             ID INTEGER PRIMARY KEY NOT NULL,
             Name TEXT,
             Charge INTEGER,
+            Formula TEXT,
             MolecularWeight REAL,
-            Unique(Name,Charge,MolecularWeight)
+            Unique(Name,Charge,Formula,MolecularWeight)
         );
         """
 
-    create_CompositionRules="""
-        CREATE TABLE CompositionRules(
+    create_Dissolutions="""
+        CREATE TABLE Dissolutions(
             ID INTEGER PRIMARY KEY NOT NULL,
             ReagentComponentID INTEGER,
-            ChemicalID INTEGER,
+            SpeciesID INTEGER,
             Coefficient INTEGER,
             FOREIGN KEY(ReagentComponentID) REFERENCES Components(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
-            FOREIGN KEY(ChemicalID) REFERENCES Chemicals(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
-            Unique(ReagentComponentID,ChemicalID)
+            FOREIGN KEY(SpeciesID) REFERENCES Species(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
+            Unique(ReagentComponentID,SpeciesID)
         );
         """
 
@@ -687,8 +688,8 @@ function create_db(path)
     DBInterface.execute(db,create_Locations)
     DBInterface.execute(db, create_Components)
     DBInterface.execute(db,create_Reagents)
-    DBInterface.execute(db,create_Chemicals)
-    DBInterface.execute(db,create_CompositionRules)
+    DBInterface.execute(db,create_Species)
+    DBInterface.execute(db,create_Dissolutions)
     DBInterface.execute(db,create_Organisms)
     DBInterface.execute(db,create_Attributes)
     DBInterface.execute(db,create_EnvironmentAttributes)
@@ -760,3 +761,44 @@ file="./src/database/test_create_db.db"
 rm(file)
 create_db(file)
 =#
+
+_table_exists(name::String) = nrow(query_db("SELECT name FROM sqlite_master WHERE type='table' AND name=?",(name,)))>0
+_column_exists(table::String,col::String) = col in query_db("SELECT name FROM pragma_table_info('$table')").name
+
+_needs_chemistry_migration() = (_table_exists("Chemicals") && !_table_exists("Species")) ||
+                               (_table_exists("CompositionRules") && !_table_exists("Dissolutions"))
+
+function _warn_if_unmigrated()
+    if _needs_chemistry_migration()
+        @warn "This database uses the old Chemicals/CompositionRules tables; run migrate_chemistry!() to convert them to Species/Dissolutions before using it."
+    end
+    return nothing
+end
+
+"""
+    migrate_chemistry!()
+
+Convert the connected database from the old `Chemicals` and `CompositionRules` tables to the
+`Species` and `Dissolutions` tables: rename `Chemicals` to `Species` and add its nullable `Formula`
+column, rename `CompositionRules` to `Dissolutions`, and rename the `ChemicalID` column of
+`Dissolutions` to `SpeciesID`. Existing rows keep their stored molecular weights and have no formula.
+Returns `true` if the database was converted and `false` if there was nothing to do (already
+migrated, or a new database). Run it once per existing database; the changes are made in a single
+transaction.
+"""
+function migrate_chemistry!()
+    _needs_chemistry_migration() || return false
+    sql_transaction() do
+        if _table_exists("Chemicals") && !_table_exists("Species")
+            execute_db("ALTER TABLE Chemicals RENAME TO Species")
+        end
+        _column_exists("Species","Formula") || execute_db("ALTER TABLE Species ADD COLUMN Formula TEXT")
+        if _table_exists("CompositionRules") && !_table_exists("Dissolutions")
+            execute_db("ALTER TABLE CompositionRules RENAME TO Dissolutions")
+        end
+        if _table_exists("Dissolutions") && _column_exists("Dissolutions","ChemicalID")
+            execute_db("ALTER TABLE Dissolutions RENAME COLUMN ChemicalID TO SpeciesID")
+        end
+    end
+    return true
+end

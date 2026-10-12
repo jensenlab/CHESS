@@ -10,8 +10,9 @@ directly from [`registry_summary`](@ref), so they stay in sync with what's actua
 ```@docs
 register_reagent!
 register_organism!
-register_chemical!
+register_species!
 get_mw_density
+get_molecular_formula
 CHESSLabConstants.chemical_cache_path
 ```
 

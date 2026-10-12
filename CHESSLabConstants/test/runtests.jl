@@ -101,7 +101,7 @@ end
     summary = CHESSCore.registry_summary()
 
     @test any(r -> r.name === :water && r.module_ === CHESSLabConstants, summary.reagents)
-    @test any(c -> c.name === Symbol("Na⁺") && c.module_ === CHESSLabConstants, summary.chemicals)
+    @test any(c -> c.name === Symbol("Na⁺") && c.module_ === CHESSLabConstants, summary.species)
     @test any(s -> s.name === :thy_350mL && s.module_ === CHESSLabConstants, summary.stocks)
     @test any(o -> o.name === :SMU_UA159 && o.genus == "Streptococcus", summary.organisms)
     @test any(l -> l.name === :WP96, summary.locations)
@@ -110,44 +110,93 @@ end
 end
 
 @testset "register_reagent!/register_organism! author-time tools (cache hits, no network)" begin
-    CHESSLabConstants._cache_reagent!("boric_acid","Boric Acid",CHESSCore.Solid,61.84,1.435,7628)
+    # a cached formula is used in place of the molecular weight (rows from an earlier run are cleared
+    # first, so the test does not depend on the state of the local cache)
+    CHESSLabConstants.DBInterface.execute(CHESSLabConstants._reagent_cache_db(),"DELETE FROM Reagents WHERE LabID IN ('boric_acid','unknown_broth')")
+    CHESSLabConstants._cache_reagent!("boric_acid","Boric Acid",CHESSCore.Solid,61.84,1.435,7628,"BH3O3")
     line = CHESSLabConstants.register_reagent!(CHESSCore.Solid,"boric_acid","Boric Acid",7628)
-    @test line == "@reagent boric_acid \"Boric Acid\" Solid 61.84u\"g/mol\" 1.435u\"g/mL\" 7628"
+    @test line == "@reagent boric_acid \"Boric Acid\" Solid \"BH3O3\" 1.435u\"g/mL\" 7628"
+
+    # no PubChem ID: unknown chemistry, or opaque on request
+    @test CHESSLabConstants.register_reagent!(CHESSCore.Solid,"unknown_broth","Unknown Broth") ==
+        "@reagent unknown_broth \"Unknown Broth\" Solid missing missing missing"
+    @test CHESSLabConstants.register_reagent!(CHESSCore.Solid,"unknown_broth","Unknown Broth";opaque=true) ==
+        "@reagent unknown_broth \"Unknown Broth\" Solid opaque missing missing"
 
     CHESSLabConstants._cache_organism!("SMU_UA159","Streptococcus","mutans","UA159",missing,"")
     orgline = CHESSLabConstants.register_organism!("SMU_UA159","Streptococcus","mutans","UA159")
     @test orgline == "@organism SMU_UA159 \"Streptococcus\" \"mutans\" \"UA159\""
 end
 
-@testset "register_chemical! author-time tool (cache hit, no network)" begin
-    CHESSLabConstants._cache_chemical!("Na⁺","Na+",1,22.9897693,923)
-    line = CHESSLabConstants.register_chemical!("Na⁺","Na+",1,923)
-    @test line == "@chemical Na⁺ \"Na+\" 1 22.9897693u\"g/mol\""
+@testset "register_species! author-time tool (cache hit, no network)" begin
+    CHESSLabConstants.DBInterface.execute(CHESSLabConstants._species_cache_db(),"DELETE FROM Species WHERE LabID = 'Na⁺'")
+    CHESSLabConstants._cache_species!("Na⁺","Na+",1,22.9897693,923,"Na")
+    line = CHESSLabConstants.register_species!("Na⁺","Na+",1,923)
+    @test line == "@species Na⁺ \"Na+\" 1 \"Na\""
+    # a cache written when the table was called Chemicals keeps its rows
+    db = CHESSLabConstants._species_cache_db()
+    CHESSLabConstants.DBInterface.execute(db,"ALTER TABLE Species RENAME TO Chemicals")
+    @test CHESSLabConstants.register_species!("Na⁺","Na+",1,923) == line
+    tables = CHESSLabConstants.DBInterface.execute(CHESSLabConstants._species_cache_db(),"SELECT name FROM sqlite_master WHERE type='table'") |> CHESSLabConstants.DataFrame
+    @test "Species" in tables.name && !("Chemicals" in tables.name)
+
+    # the formula in the line is the one CHESS defines for Na⁺
+    @test endswith(line,"\""*CHESSCore.formula_string(CHESSCore.formula(CHESSLabConstants.Na⁺))*"\"")
+end
+
+@testset "PubChem formulas for the authoring tools" begin
+    split = CHESSLabConstants._split_pubchem_charge
+    @test split("C6H12O6") == ("C6H12O6",0)
+    @test split("Na+") == ("Na",1)
+    @test split("Cl-") == ("Cl",-1)
+    @test split("O4S-2") == ("O4S",-2)
+    @test split("Fe+3") == ("Fe",3)
+    @test split("C6H5O7-3") == ("C6H5O7",-3)
+
+    usable = CHESSLabConstants._usable_formula
+    @test usable("C6H12O6",0) == "C6H12O6"
+    @test usable("O4S-2",-2) == "O4S"
+    @test usable("H2O",0) == "H2O"
+    @test usable("C6H5O7-3",-3) == "C6H5O7"
+    @test ismissing(usable(missing,0))
+    # a charge that disagrees, or a formula that cannot be read, is not used, with a warning
+    @test_logs (:warn,r"charge") @test ismissing(usable("C5H14NO+",0))
+    @test_logs (:warn,r"charge") @test ismissing(usable("Na+",2))
+    @test_logs (:warn,r"cannot be read") @test ismissing(usable("(C2H4)n",0))
+
+    # the line builders fall back to the stored molecular weight when there is no formula
+    @test CHESSLabConstants._reagent_line("x","X",CHESSCore.Solid,100.0,1.0,5) == "@reagent x \"X\" Solid 100.0u\"g/mol\" 1.0u\"g/mL\" 5"
+    @test CHESSLabConstants._species_line("Y","Y",1,12.5) == "@species Y \"Y\" 1 12.5u\"g/mol\""
+
+    # a stored weight that disagrees with the formula's mass is reported
+    @test_logs (:warn,r"disagrees") CHESSLabConstants._check_formula_mass("x","H2O",30.0)
+    @test_logs CHESSLabConstants._check_formula_mass("x","H2O",18.015)
+    @test_logs CHESSLabConstants._check_formula_mass("x","H2O",missing)
 end
 
 @testset "Dissociation chemistry: derived molecular weights, hydrates, recipe/total_concentration" begin
     # copper_sulfate is the pentahydrate (fixed 2026-08-14 -- see solids.jl/electrolytes.jl), so its
     # derived weight includes 5 waters of hydration, not the anhydrous salt's 159.61
-    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 249.69u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 249.68u"g/mol" atol=0.01u"g/mol" # derived from atomic masses (was hand-entered 249.69)
 
     # hydrate: waters of hydration keep the derived weight at the hydrate value, not the anhydrous one
     @test CHESSCore.molecular_weight(CHESSLabConstants.calcium_chloride) ≈ 147.01u"g/mol" atol=0.01u"g/mol"
 
     # pre-existing data bug in the ported PubChem cache (NaCl stored as 214.25u"g/mol", matching the
-    # wrong CID it was linked to -- since fixed in solids.jl) is masked by composition-derivation,
+    # wrong CID it was linked to -- since fixed in solids.jl) is masked by dissolution-derivation,
     # which takes precedence over the stored field regardless
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_chloride) ≈ 58.44u"g/mol" atol=0.01u"g/mol"
 
-    # recipe()/total_concentration() see the real ionic composition
+    # composition()/total_concentration() see the real ionic composition
     stock = 1u"mol" * CHESSLabConstants.calcium_chloride
-    r = CHESSCore.recipe(stock)
+    r = CHESSCore.composition(stock)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Ca²⁺) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 2u"mol" atol=1e-6u"mol"
 
     # potassium chloride: simple 1:1 strong electrolyte, no acid/base equilibrium
     @test CHESSCore.molecular_weight(CHESSLabConstants.potassium_chloride) ≈ 74.555u"g/mol" atol=0.01u"g/mol"
     kcl_stock = 1u"mol" * CHESSLabConstants.potassium_chloride
-    kcl_r = CHESSCore.recipe(kcl_stock)
+    kcl_r = CHESSCore.composition(kcl_stock)
     @test CHESSCore.molar_amount(kcl_r,CHESSLabConstants.K⁺) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(kcl_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.acid_base_system(CHESSLabConstants.potassium_chloride) === nothing
@@ -156,7 +205,7 @@ end
 @testset "Acid/base equilibrium: cysteine and lysine are HCl salts, not free zwitterions" begin
     # cysteine: L-Cysteine hydrochloride monohydrate (Thermo Fisher BP376, PubChem CID 23462)
     @test CHESSCore.molecular_weight(CHESSLabConstants.cysteine) ≈ 175.63u"g/mol" atol=0.01u"g/mol"
-    cys_r = CHESSCore.recipe(1u"mol"*CHESSLabConstants.cysteine)
+    cys_r = CHESSCore.composition(1u"mol"*CHESSLabConstants.cysteine)
     @test CHESSCore.molar_amount(cys_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(cys_r,CHESSLabConstants.H2O) ≈ 1u"mol" atol=1e-6u"mol"
     cys_sys = CHESSCore.acid_base_system(CHESSLabConstants.cysteine)
@@ -164,7 +213,7 @@ end
 
     # lysine: L-Lysine monohydrochloride (Sigma/Thermo L5626, PubChem CID 69568), anhydrous
     @test CHESSCore.molecular_weight(CHESSLabConstants.lysine) ≈ 182.65u"g/mol" atol=0.01u"g/mol"
-    lys_r = CHESSCore.recipe(1u"mol"*CHESSLabConstants.lysine)
+    lys_r = CHESSCore.composition(1u"mol"*CHESSLabConstants.lysine)
     @test CHESSCore.molar_amount(lys_r,CHESSLabConstants.Cl⁻) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(lys_r,CHESSLabConstants.H2O) == 0u"mol" # anhydrous, unlike cysteine's monohydrate
     lys_sys = CHESSCore.acid_base_system(CHESSLabConstants.lysine)
@@ -238,16 +287,20 @@ end
     @test CHESSCore.pH(acetate_stock;ionic_strength_correction=false) > 7.0 # a weak base, genuinely basic
 end
 
-@testset "Acid/base equilibrium: lactic_acid is the 85% w/w solution (Sigma W261114), not pure acid" begin
-    # molecular_weight is purity-adjusted (90.08/0.85) so mass/MW yields moles of *real* lactic acid
-    # per gram of the 85% product actually weighed out -- regression test for a real reported pH
+@testset "Acid/base equilibrium: lactic_acid is the 88% w/w solution (Sigma W261106), not pure acid" begin
+    # molecular_weight is purity-adjusted (90.078/0.88) so mass/MW yields moles of *real* lactic acid
+    # per gram of the 88% product actually weighed out -- regression test for a real reported pH
     # discrepancy (carbon_sources_20x stock, predicted 4.94 vs measured 10.38)
-    @test CHESSCore.molecular_weight(CHESSLabConstants.lactic_acid) ≈ 105.976u"g/mol" atol=0.001u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.lactic_acid) ≈ 102.36u"g/mol" atol=0.01u"g/mol"
+    @test CHESSLabConstants.lactic_acid isa CHESSCore.Liquid
+    @test CHESSCore.is_opaque(only(keys(CHESSCore.dissolution(CHESSLabConstants.lactic_acid).products)))
 
-    stock = (10u"g"*CHESSLabConstants.lactic_acid) + (1.0u"L"*CHESSLabConstants.water)
+    # 10 g of the product, dosed by volume through its density
+    lactic_volume = 10u"g"/CHESSCore.density(CHESSLabConstants.lactic_acid)
+    stock = (lactic_volume*CHESSLabConstants.lactic_acid) + (1.0u"L"*CHESSLabConstants.water)
     families,_ = CHESSCore._analytical_species(stock)
     @test length(families) == 1
-    expected_moles = 10u"g"/105.976u"g/mol" # not 10u"g"/90.08u"g/mol" (the pure-acid assumption)
+    expected_moles = 10u"g"/(CHESSCore.formula_mass("C3H6O3")/0.88) # not 10u"g"/90.08u"g/mol" (the pure-acid assumption)
     @test uconvert(u"mol",families[1].total_concentration*CHESSCore.volume_estimate(stock)) ≈ expected_moles atol=1e-6u"mol"
 end
 
@@ -336,7 +389,7 @@ end
     sys = CHESSCore.acid_base_system(CHESSLabConstants.mops)
     @test sys isa AcidBaseSystem
     @test sys.pKa == [7.20]
-    @test sys.species[1] == CHESSCore.Chemical(name(CHESSLabConstants.mops),0,CHESSCore.molecular_weight(CHESSLabConstants.mops))
+    @test sys.species[1] == only(keys(CHESSCore.dissolution(CHESSLabConstants.mops).products)) # the reagent's own identity species
 
     # MOPS is a Solid -- constructed by moles directly, like the other organic acid reagents
     stock = (0.1u"mol"*CHESSLabConstants.mops) + (1.0u"L"*CHESSLabConstants.water)
@@ -453,8 +506,8 @@ end
     @test CHESSCore.pH(his_stock;ionic_strength_correction=false) ≈ 7.68 atol=0.01
 
     # pyruvate is real sodium pyruvate (confirmed against Reagent_StockList.xlsx, Sigma P5280) --
-    # its CompositionRule dissociates into Na+ and the correctly-charged anion, not a bare ion
-    pyr_products = CHESSCore.composition(CHESSLabConstants.sodium_pyruvate).products
+    # its Dissolution dissociates into Na+ and the correctly-charged anion, not a bare ion
+    pyr_products = CHESSCore.dissolution(CHESSLabConstants.sodium_pyruvate).products
     @test pyr_products[CHESSLabConstants.PyruvateAnion] == 1
     @test pyr_products[CHESSLabConstants.Na⁺] == 1
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_pyruvate) ≈ 110.04u"g/mol" atol=0.01u"g/mol"
@@ -472,27 +525,28 @@ end
     @test 7.0 < pH(pyr_stock;ionic_strength_correction=false) < 8.0
 
     # butyrate is real sodium butyrate (confirmed: Sigma 303410)
-    but_products = CHESSCore.composition(CHESSLabConstants.sodium_butyrate).products
+    but_products = CHESSCore.dissolution(CHESSLabConstants.sodium_butyrate).products
     @test but_products[CHESSLabConstants.ButyrateAnion] == 1
     @test but_products[CHESSLabConstants.Na⁺] == 1
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_butyrate) ≈ 110.09u"g/mol" atol=0.01u"g/mol"
 
     # tartrate is real sodium tartrate dihydrate (confirmed against Reagent_StockList.xlsx, catalog
     # AAA1618730) -- 2 Na+ and 2 waters of hydration, not a bare dianion
-    tart_products = CHESSCore.composition(CHESSLabConstants.tartrate).products
+    tart_products = CHESSCore.dissolution(CHESSLabConstants.tartrate).products
     @test tart_products[CHESSLabConstants.TartrateDianion] == 1
     @test tart_products[CHESSLabConstants.Na⁺] == 2
     @test tart_products[CHESSLabConstants.H2O] == 2
     @test CHESSCore.molecular_weight(CHESSLabConstants.tartrate) ≈ 230.08u"g/mol" atol=0.01u"g/mol"
 
     # ascorbate is the plain free acid (both Reagent_StockList.xlsx catalog lines are "L-ASCORBIC
-    # ACID") -- no CompositionRule needed, identity is neutral like citric_acid/lactic_acid
-    @test !haskey(CHESSCore.composition_rules,CHESSLabConstants.ascorbate)
+    # ACID") -- no Dissolution needed, identity is neutral like citric_acid/lactic_acid
+    asc_products = CHESSCore.dissolution(CHESSLabConstants.ascorbate).products
+    @test length(asc_products) == 1 && only(values(asc_products)) == 1 && CHESSCore.charge(only(keys(asc_products))) == 0
     @test CHESSCore.molecular_weight(CHESSLabConstants.ascorbate) ≈ 176.12u"g/mol" atol=0.01u"g/mol"
 
-    # tetracycline (HCl-salt case): CompositionRule correctly dissociates into Cl- and the cation,
+    # tetracycline (HCl-salt case): Dissolution correctly dissociates into Cl- and the cation,
     # and molecular_weight is now derived (matching the stored HCl-salt mass), not the stale copy
-    r = CHESSCore.recipe(0.01u"mol"*CHESSLabConstants.tetracycline)
+    r = CHESSCore.composition(0.01u"mol"*CHESSLabConstants.tetracycline)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 0.01u"mol" atol=1e-6u"mol"
     @test CHESSCore.molecular_weight(CHESSLabConstants.tetracycline) ≈ 480.9u"g/mol" atol=0.02u"g/mol"
 
@@ -503,4 +557,60 @@ end
     # guanidine: a very strong base (pKa=13.6, near the solver's upper bracket) still solves cleanly
     guan_stock = (0.01u"mol"*CHESSLabConstants.guanidine) + (1.0u"L"*CHESSLabConstants.water)
     @test CHESSCore.pH(guan_stock;ionic_strength_correction=false) > 10.0
+end
+
+@testset "Reagent chemistry: every reagent has a formula or is declared opaque" begin
+    lacking = Symbol[]
+    for sym in sort!(collect(keys(CHESSCore.chemprops)))
+        isdefined(CHESSLabConstants,sym) || continue
+        reagent = getfield(CHESSLabConstants,sym)
+        reagent isa CHESSCore.Reagent || continue
+        species = keys(CHESSCore.dissolution(reagent).products)
+        any(s->ismissing(CHESSCore.formula(s)),species) && push!(lacking,sym)
+    end
+    # the methyl glucoside hemihydrate keeps its stored weight: a half water has no integer formula
+    @test lacking == [:beta_methyl_d_glucoside]
+end
+
+@testset "atoms: formula-defined lab reagents" begin
+    # a formula reagent
+    glucose_atoms = CHESSCore.atoms(0.5u"mol"*CHESSLabConstants.glucose)
+    @test glucose_atoms[:C] ≈ 3u"mol" && glucose_atoms[:H] ≈ 6u"mol" && glucose_atoms[:O] ≈ 3u"mol"
+
+    # a salt: its ions' atoms
+    nacl_atoms = CHESSCore.atoms(0.1u"mol"*CHESSLabConstants.sodium_chloride)
+    @test nacl_atoms[:Na] ≈ 0.1u"mol" && nacl_atoms[:Cl] ≈ 0.1u"mol"
+
+    # a hydrate: waters of hydration are counted, and the weight agrees with PubChem's C6H9Na3O9
+    citrate = CHESSLabConstants.sodium_citrate_dihydrate
+    @test CHESSCore.molecular_weight(citrate) ≈ 294.098u"g/mol" atol=0.01u"g/mol"
+    citrate_atoms = CHESSCore.atoms(1u"mol"*citrate)
+    @test citrate_atoms[:C] ≈ 6u"mol" && citrate_atoms[:Na] ≈ 3u"mol" && citrate_atoms[:O] ≈ 9u"mol" && citrate_atoms[:H] ≈ 9u"mol"
+
+    # choline is supplied as the chloride
+    choline_atoms = CHESSCore.atoms(1u"mol"*CHESSLabConstants.choline_chloride)
+    @test choline_atoms[:Cl] ≈ 1u"mol" && choline_atoms[:N] ≈ 1u"mol" && choline_atoms[:C] ≈ 5u"mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.choline_chloride) ≈ 139.62u"g/mol" atol=0.01u"g/mol"
+
+    # opaque reagents contribute no atoms and do not warn; lactic acid and bleomycin keep their weights
+    @test_logs CHESSCore.atoms(10u"g"*CHESSLabConstants.yeast_extract)
+    @test isempty(CHESSCore.atoms(10u"g"*CHESSLabConstants.yeast_extract))
+    @test CHESSCore.molecular_weight(CHESSLabConstants.bleomycin) == 1415.6u"g/mol"
+    @test_logs CHESSCore.atoms(5u"mL"*CHESSLabConstants.lactic_acid + 1u"g"*CHESSLabConstants.bleomycin)
+
+    # a stock mixing formula reagents, opaque reagents, and water has no gap to warn about
+    media = 10u"g"*CHESSLabConstants.glucose + 5u"g"*CHESSLabConstants.yeast_extract + 1u"L"*CHESSLabConstants.water
+    @test_logs CHESSCore.atoms(media)
+
+    # only the hemihydrate leaves a gap
+    @test_logs (:warn,r"Methyl-beta-D-glucopyranoside Hemihydrate") CHESSCore.atoms(1u"g"*CHESSLabConstants.beta_methyl_d_glucoside)
+end
+
+@testset "Species formulas: acid/base chain endpoints" begin
+    # chain species are formula-defined, so their weights track the neutral identity's formula
+    sys = CHESSCore.acid_base_system(CHESSLabConstants.citric_acid)
+    masses = [ustrip(u"g/mol",CHESSCore.molecular_weight(s)) for s in sys.species]
+    @test all(diff(masses) .< 0) # each deprotonation lowers the mass
+    @test all(isapprox.(abs.(diff(masses)),1.008;atol=0.001)) # by exactly one proton
+    @test CHESSCore.formula(CHESSLabConstants.Citrate³⁻) == Dict(:C=>6,:H=>5,:O=>7)
 end
