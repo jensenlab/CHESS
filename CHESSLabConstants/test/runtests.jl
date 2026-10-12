@@ -568,8 +568,7 @@ end
         species = keys(CHESSCore.dissolution(reagent).products)
         any(s->ismissing(CHESSCore.formula(s)),species) && push!(lacking,sym)
     end
-    # the methyl glucoside hemihydrate keeps its stored weight: a half water has no integer formula
-    @test lacking == [:beta_methyl_d_glucoside]
+    @test isempty(lacking)
 end
 
 @testset "atoms: formula-defined lab reagents" begin
@@ -602,8 +601,11 @@ end
     media = 10u"g"*CHESSLabConstants.glucose + 5u"g"*CHESSLabConstants.yeast_extract + 1u"L"*CHESSLabConstants.water
     @test_logs CHESSCore.atoms(media)
 
-    # only the hemihydrate leaves a gap
-    @test_logs (:warn,r"Methyl-beta-D-glucopyranoside Hemihydrate") CHESSCore.atoms(1u"g"*CHESSLabConstants.beta_methyl_d_glucoside)
+    # a hemihydrate counts its half water: C7H14O6 + 1/2 H2O
+    hemi = CHESSLabConstants.beta_methyl_d_glucoside
+    @test CHESSCore.molecular_weight(hemi) ≈ 203.19u"g/mol" atol=0.01u"g/mol"
+    hemi_atoms = @test_logs CHESSCore.atoms(2u"mol"*hemi)
+    @test hemi_atoms[:C] ≈ 14u"mol" && hemi_atoms[:H] ≈ 30u"mol" && hemi_atoms[:O] ≈ 13u"mol"
 end
 
 @testset "Species formulas: acid/base chain endpoints" begin

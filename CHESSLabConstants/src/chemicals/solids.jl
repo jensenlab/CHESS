@@ -41,10 +41,11 @@
 @reagent beef_extract "Beef Extract" Solid opaque missing missing
 @reagent beef_heart "Beef Heart" Solid opaque missing missing
 @reagent benzamadine "benzamidine" Solid "C7H8N2" missing 2332
-@reagent beta_methyl_d_glucoside "Methyl-beta-D-glucopyranoside Hemihydrate" Solid 203.19u"g/mol" missing 445238
-# ^ Thermo/Acros AC270920250 is the hemihydrate, not anhydrous (194.18 + 18.015/2 = 203.19, hand-
-# computed here). PubChem's own "hemihydrate"-titled CID (75487602, MW 212.20) is internally
-# inconsistent -- its formula is actually a full monohydrate's, not a hemihydrate's -- confirmed
+@species MethylBetaDGlucoside "Methyl-beta-D-glucopyranoside" 0 "C7H14O6" # PubChem CID 445238
+@reagent beta_methyl_d_glucoside "Methyl-beta-D-glucopyranoside Hemihydrate" Solid (MethylBetaDGlucoside + 0.5*H2O) missing 445238
+# ^ Thermo/Acros AC270920250 is the hemihydrate, not anhydrous: one mole of the glucoside with half a mole
+# of water (194.18 + 18.015/2 = 203.19). PubChem's own "hemihydrate"-titled CID (75487602, MW 212.20) is
+# internally inconsistent -- its formula is actually a full monohydrate's, not a hemihydrate's -- confirmed
 # against the clean 2:1 compound:water co-crystal entry (CID 2724704, MW 406.38 = 2x194.18+18.02).
 # pubchemid kept as the anhydrous parent (445238), the correct compound identity, since no
 # PubChem CID accurately represents the hemihydrate on its own.
