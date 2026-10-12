@@ -81,6 +81,22 @@ julia> round(u"g/mol", molecular_weight(Li⁺); digits=3)
 
 [`@spc_str`](@ref) recalls a registered species by name. The ASCII form `spc"Na+"` finds `Na⁺`.
 
+A species can record the PubChem ID of its compound, as an optional last argument of
+[`@species`](@ref). The ID is descriptive metadata, available from [`pubchemid`](@ref). It is not part of
+the species' identity, so a species is equal to one with the same name, charge, and formula whatever IDs
+they carry:
+
+```jldoctest reagents
+julia> @species Rb⁺ "Rb+" 1 "Rb" 105153
+Rb⁺
+
+julia> pubchemid(Rb⁺)
+105153
+
+julia> Rb⁺ == Species("Rb+", 1, "Rb")
+true
+```
+
 A species is identified by its name. Two species are equal when their name, charge, and formula are
 equal, whatever order the elements were written in. Registering the same name and charge with a
 different formula therefore gives a different species and never a silent merge. Isomers are separate

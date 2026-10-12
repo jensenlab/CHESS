@@ -834,6 +834,37 @@ end
     @test_throws ArgumentError by_mass(CHESSCore.Species("test unweighed",0,missing)=>1, solvent=>1)
 end
 
+@testset "Species PubChem ID" begin
+    glucose = CHESSCore.Species("pc glucose",0,"C6H12O6";pubchemid=5793)
+    @test pubchemid(glucose) == 5793
+    @test ismissing(pubchemid(CHESSCore.Species("pc glucose",0,"C6H12O6")))
+
+    # every constructor form takes the keyword
+    @test pubchemid(CHESSCore.Species("pc water",0,"H2O";pubchemid=962)) == 962
+    @test pubchemid(CHESSCore.Species("pc water neutral","H2O";pubchemid=962)) == 962
+    @test pubchemid(CHESSCore.Species("pc stored",1,22.99u"g/mol";pubchemid=923)) == 923
+    @test pubchemid(CHESSCore.Species("pc stored neutral",22.99u"g/mol";pubchemid=923)) == 923
+    @test pubchemid(CHESSCore.Species("pc unknown",1,missing;pubchemid=5)) == 5
+    @test pubchemid(CHESSCore.Species("pc opaque",0,CHESSCore.opaque;pubchemid=9)) == 9
+
+    # the ID is metadata: it does not take part in equality or hash
+    @test glucose == CHESSCore.Species("pc glucose",0,"C6H12O6")
+    @test hash(glucose) == hash(CHESSCore.Species("pc glucose",0,"C6H12O6"))
+    @test glucose == CHESSCore.Species("pc glucose",0,"C6H12O6";pubchemid=1)
+
+    @test_throws ArgumentError CHESSCore.Species("pc bad",0,"H2O";pubchemid=0)
+    @test_throws ArgumentError CHESSCore.Species("pc bad",0,"H2O";pubchemid=-3)
+
+    # @species takes the ID as an optional fifth argument
+    @species PcSodium "pc Na+" 1 "Na" 923
+    @species PcNoId "pc no id" 0 "H2O"
+    @test pubchemid(PcSodium) == 923
+    @test ismissing(pubchemid(PcNoId))
+
+    summary = CHESSCore.registry_summary(Main)
+    @test any(c -> c.name === :PcSodium && c.pubchemid == 923, summary.species)
+end
+
 const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
 
 @reagent MgCl2 "magnesium chloride" Solid (Mg²⁺+2*Cl⁻) missing missing

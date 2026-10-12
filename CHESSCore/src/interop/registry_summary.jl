@@ -32,7 +32,7 @@ function registry_summary(context=vcat([CHESSCore],CHESSCore.labmodules))
             if v isa Reagent
                 push!(reagents,(module_=m,name=n,type=typeof(v),molecular_weight=molecular_weight(v),density=density(v),pubchemid=pubchemid(v)))
             elseif v isa Species
-                push!(species,(module_=m,name=n,charge=charge(v),molecular_weight=molecular_weight(v)))
+                push!(species,(module_=m,name=n,charge=charge(v),molecular_weight=molecular_weight(v),pubchemid=pubchemid(v)))
             elseif v isa Stock
                 push!(stocks,(module_=m,name=n,type=typeof(v)))
             end

@@ -148,6 +148,10 @@ julia> Species("glucose",0,"C6H12O6")
 julia> Species("mystery ion",1,missing)
 ```
 
+A species may also carry the integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of its compound, as the
+`pubchemid` keyword (`Species("glucose",0,"C6H12O6";pubchemid=5793)`). The ID is descriptive metadata. It
+does not take part in equality or hash, which identify a species by its name, charge, and formula.
+
 Unlike `Reagent`, `Species` has real value-based equality/hash (not Julia's identity-based default)
 because dissolutions and the identity-default fallback (see [`dissolution`](@ref)) routinely
 construct `Species` values on the fly, and those must compare equal to independently-constructed-but-
@@ -160,18 +164,21 @@ struct Species
     charge::Integer
     formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula}
     stored_molecular_weight::Union{Unitful.MolarMass,Missing}
-    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula},stored_molecular_weight::Union{Unitful.MolarMass,Missing})
+    pubchemid::Union{Integer,Missing}
+    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula},stored_molecular_weight::Union{Unitful.MolarMass,Missing},pubchemid::Union{Integer,Missing}=missing)
+        !ismissing(pubchemid) && pubchemid <= 0 && throw(ArgumentError(
+            "Species \"$name\" was given PubChem ID $pubchemid; a PubChem ID is a positive integer"))
         !ismissing(formula) && !ismissing(stored_molecular_weight) && throw(ArgumentError(
             "Species \"$name\" was given both a formula and a stored molecular weight; give one or the other"))
         formula isa Dict && isempty(formula) && throw(ArgumentError("Species \"$name\" has an empty formula"))
-        new(String(name),charge,formula,stored_molecular_weight)
+        new(String(name),charge,formula,stored_molecular_weight,pubchemid)
     end
 end
-Species(name::AbstractString,charge::Integer,formula::AbstractString) = Species(name,charge,parse_formula(formula),missing)
-Species(name::AbstractString,charge::Integer,formula::OpaqueFormula) = Species(name,charge,formula,missing)
-Species(name::AbstractString,charge::Integer,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,charge,missing,molecular_weight)
-Species(name::AbstractString,formula::AbstractString) = Species(name,0,formula)
-Species(name::AbstractString,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,0,molecular_weight)
+Species(name::AbstractString,charge::Integer,formula::AbstractString;pubchemid=missing) = Species(name,charge,parse_formula(formula),missing,pubchemid)
+Species(name::AbstractString,charge::Integer,formula::OpaqueFormula;pubchemid=missing) = Species(name,charge,formula,missing,pubchemid)
+Species(name::AbstractString,charge::Integer,molecular_weight::Union{Unitful.MolarMass,Missing};pubchemid=missing) = Species(name,charge,missing,molecular_weight,pubchemid)
+Species(name::AbstractString,formula::AbstractString;pubchemid=missing) = Species(name,0,formula;pubchemid)
+Species(name::AbstractString,molecular_weight::Union{Unitful.MolarMass,Missing};pubchemid=missing) = Species(name,0,molecular_weight;pubchemid)
 
 Base.:(==)(a::Species,b::Species) = a.name==b.name && a.charge==b.charge && isequal(a.formula,b.formula) && isequal(a.stored_molecular_weight,b.stored_molecular_weight)
 Base.hash(a::Species,h::UInt) = hash(a.name,hash(a.charge,hash(a.formula,hash(_hash_canon(a.stored_molecular_weight),h))))
@@ -198,6 +205,12 @@ has the average molecular weight given to `opaque`, or `missing` if none was giv
 """
 molecular_weight(x::Species) = x.formula isa Dict ? formula_mass(x.formula) :
     x.formula isa OpaqueFormula ? x.formula.molecular_weight : x.stored_molecular_weight
+"""
+    pubchemid(x::Species)
+Return the integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of a [`Species`](@ref)'s compound, or
+`missing` if none was given. The ID is metadata and is not part of the species' identity.
+"""
+pubchemid(x::Species)=x.pubchemid
 """
     formula(x::Species)
 Return the elemental formula of a [`Species`](@ref) as a dictionary from element symbol to atom
@@ -360,18 +373,19 @@ end
 
 
 """
-    @species labname name charge formula
+    @species labname name charge formula [pubchemid]
 
 Define a new [`Species`](@ref) value (e.g. an ion like Na⁺, or a standalone neutral species) and
 import it into the workspace under `labname`. `charge` is `0` for neutral species. `formula` is an
 elemental formula string such as `"C6H12O6"`; the molecular weight is derived from it. A molar
 mass (or `missing`) may be given instead of a formula for a species whose formula is not registered
 yet, and `opaque` (or `opaque(mass)` with an average molar mass) for a species whose atomic content
-is intentionally not described.
+is intentionally not described. The optional `pubchemid` is the integer PubChem ID of the species'
+compound, recorded as metadata.
 
 Example:
 ```julia
-julia> @species Na⁺ "Na+" 1 "Na"
+julia> @species Na⁺ "Na+" 1 "Na" 923
 Na+
 
 julia> @species glucose_species "D-glucose" 0 "C6H12O6"
@@ -381,7 +395,7 @@ D-glucose
 See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@spc_str`](@ref),
 [`Dissolution`](@ref).
 """
-macro species(labsymb,name,charge,formula)
+macro species(labsymb,name,charge,formula,pubchemid=:(missing))
     ls = Symbol(labsymb)
     formula = _opaque_marker(formula)
     docstr = """
@@ -389,10 +403,11 @@ macro species(labsymb,name,charge,formula)
 
         The species $name (charge $charge)
 
-        Formula: $formula
+        Formula: $formula\
+        PubChem ID: $pubchemid
         """
     esc(quote
-        const global $ls = CHESSCore.Species($name,$charge,$formula)
+        const global $ls = CHESSCore.Species($name,$charge,$formula;pubchemid=$pubchemid)
         @doc $docstr $ls
     end)
 end
