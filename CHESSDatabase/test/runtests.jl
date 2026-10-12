@@ -200,6 +200,16 @@ end
     reconstructed = CHESSDatabase.get_component(id_hcl)
     @test molecular_weight(reconstructed) == molecular_weight(hcl_db)
     @test dissolution(reconstructed).products == dissolution(hcl_db).products
+
+    # a fractional coefficient (half a water of hydration) survives the round trip
+    hemi_water = CHESSCore.Species("hemi_dbtest water",0,"H2O")
+    hemi_db = Solid("hemi_dbtest",missing,missing,missing)
+    set_dissolution!(hemi_db,Dissolution(Dict(H⁺=>1,Cl⁻=>1,hemi_water=>0.5)))
+    id_hemi = CHESSDatabase.upload_component(hemi_db)
+    reconstructed_hemi = CHESSDatabase.get_component(id_hemi)
+    @test dissolution(reconstructed_hemi).products[hemi_water] == 0.5
+    @test dissolution(reconstructed_hemi).products == dissolution(hemi_db).products
+    @test molecular_weight(reconstructed_hemi) == molecular_weight(hemi_db)
 end
 
 @testset "DB round-trip equivalence, natural-key dedup, SQL escaping, hash precision" begin

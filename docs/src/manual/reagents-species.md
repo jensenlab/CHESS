@@ -55,7 +55,8 @@ ERROR: ArgumentError: Invalid formula "Na+" at position 3: charge is not part of
 Isotopes are not supported. Every formula describes the natural isotopic mixture, and the notation
 `[13C]` and the symbols `D` and `T` are reserved for a later extension, so they raise an error
 instead of being read as something else. A formula also cannot describe a fractional amount, such
-as the half water of a hemihydrate.
+as the half water of a hemihydrate. A [`Dissolution`](@ref) can (see
+[Fractional amounts](#Fractional-amounts)).
 
 ## Species
 
@@ -190,17 +191,17 @@ reagent's own identity as a single species, which means no dissociation:
 
 ```jldoctest reagents
 julia> dissolution(rgt"water")
-Dissolution(Dict{Species, Int64}(water => 1))
+Dissolution(Dict{Species, Float64}(water => 1.0))
 ```
 
-`+` and `*` on species build a `Dissolution`. Adding species lists them, and multiplying by a whole
-number sets a coefficient, as for the two chlorides that balance Ca²⁺:
+`+` and `*` on species build a `Dissolution`. Adding species lists them, and multiplying by a number
+sets a coefficient, as for the two chlorides that balance Ca²⁺:
 
 ```jldoctest reagents
 julia> salt = spc"Ca2+" + 2*spc"Cl-";
 
 julia> salt.products[spc"Cl-"], salt.products[spc"Ca2+"]
-(2, 1)
+(2.0, 1.0)
 ```
 
 A dissolution in the chemistry argument of [`@reagent`](@ref) registers the reagent and its
@@ -214,6 +215,44 @@ lithium chloride
 julia> round(u"g/mol", molecular_weight(LiCl); digits=2)
 42.39 g mol⁻¹
 ```
+
+### Fractional amounts
+
+Coefficients are amounts per mole of reagent and do not have to be whole numbers. A hemihydrate is one
+mole of the compound with half a mole of water:
+
+```jldoctest reagents
+julia> @species Glucoside "my glucoside" 0 "C7H14O6"
+Glucoside
+
+julia> @reagent hemihydrate "my hemihydrate" Solid (Glucoside + 0.5*spc"H2O") missing missing
+my hemihydrate
+
+julia> round(u"g/mol", molecular_weight(hemihydrate); digits=2)
+203.19 g mol⁻¹
+```
+
+A product sold as a solution is described the same way, with its solvent as a species. [`by_mass`](@ref)
+takes the mass fractions that the label gives and converts them to moles per mole of the first species,
+which is the species that a molar amount of the reagent counts. An 88% w/w solution of an acid has the
+molar mass of the whole product per mole of acid:
+
+```jldoctest reagents
+julia> @species MyAcid "my acid" 0 "C3H6O3"
+MyAcid
+
+julia> @reagent solution "my 88% acid" Liquid by_mass(MyAcid => 0.88, spc"H2O" => 0.12) 1.2u"g/mL" missing
+my 88% acid
+
+julia> round(u"g/mol", molecular_weight(solution); digits=1)
+102.4 g mol⁻¹
+
+julia> round(dissolution(solution).products[spc"H2O"]; digits=3)
+0.682
+```
+
+Only the composition is modeled. A solid sold at a purity grade, such as 99%, is registered as the
+pure species.
 
 [`set_dissolution!`](@ref) registers the dissolution of a reagent that is already defined. The
 dissolutions are held in [`dissolutions`](@ref), keyed by the reagent itself and not by its type,

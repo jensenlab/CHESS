@@ -240,23 +240,27 @@ const OH⁻ = Species("OH-",-1,"OH")
 
 Describes the stoichiometric products of a [`Reagent`](@ref) breaking down into [`Species`](@ref)s
 — e.g. `Dissolution(Dict(Na⁺=>1, Cl⁻=>1))` for NaCl, or `Dissolution(Dict(glucose_chem=>1))`
-for a non-dissociating reagent (its own identity). Coefficients must be non-negative -- represent an
+for a non-dissociating reagent (its own identity). Coefficients are amounts per mole of reagent and need
+not be whole numbers: a hemihydrate is `Dissolution(Dict(compound=>1, H2O=>0.5))`, and a product sold as a
+solution carries its solvent (see [`by_mass`](@ref)). Coefficients must be non-negative -- represent an
 acid/base's hydroxide contribution via [`OH⁻`](@ref), not a negative [`H⁺`](@ref) count (see
 [`net_hydrogen_ion_concentration`](@ref)) -- since [`molecular_weight`](@ref) sums a reagent's
 registered products directly.
 
 `+` and `*` build a `Dissolution` from [`Species`](@ref) values: `spc"Na+" + spc"Cl-"`, or
-`spc"Mg2+" + 2*spc"Cl-"`. A reagent is defined from one by [`@reagent`](@ref) or registered
+`spc"Mg2+" + 2*spc"Cl-"`, or `spc"H2O"*0.5` for half a water. A reagent is defined from one by [`@reagent`](@ref) or registered
 with [`set_dissolution!`](@ref).
 """
 struct Dissolution
-    products::Dict{Species,Int}
-    function Dissolution(products::Dict{Species,Int})
-        all(c->c>=0, values(products)) || throw(ArgumentError(
+    products::Dict{Species,Float64}
+    function Dissolution(products::Dict{Species,Float64})
+        all(c->isfinite(c) && c>=0, values(products)) || throw(ArgumentError(
             "Dissolution coefficients must be non-negative -- represent bases via OH⁻ (see `OH⁻`), not a negative H⁺ count"))
         new(products)
     end
 end
+
+Dissolution(products::AbstractDict{Species,<:Real}) = Dissolution(Dict{Species,Float64}(products))
 
 Base.:(==)(a::Dissolution,b::Dissolution) = a.products == b.products
 Base.hash(a::Dissolution,h::UInt) = hash(a.products,hash(:Dissolution,h))
@@ -281,8 +285,8 @@ coefficients, must sum to zero; otherwise an `ArgumentError` is thrown.
 """
 function set_dissolution!(r::Reagent,rule::Dissolution)
     net = sum(coeff*charge(spc) for (spc,coeff) in rule.products)
-    net == 0 || throw(ArgumentError(
-        "The dissolution of \"$(name(r))\" has a net charge of $net; a reagent is neutral, so the charges of its products must sum to zero"))
+    abs(net) < 1e-9 || throw(ArgumentError(
+        "The dissolution of \"$(name(r))\" has a net charge of $(isinteger(net) ? Int(net) : round(net;digits=6)); a reagent is neutral, so the charges of its products must sum to zero"))
     dissolutions[r]=rule
     return nothing
 end
@@ -324,14 +328,35 @@ function dissolution(x::Reagent)
     return Dissolution(Dict(Species(name(x),0,molecular_weight(x))=>1))
 end
 
-Base.:*(n::Integer,c::Species) = Dissolution(Dict(c=>n))
-Base.:*(c::Species,n::Integer) = n*c
-Base.:*(n::Integer,d::Dissolution) = Dissolution(Dict(k=>v*n for (k,v) in d.products))
-Base.:*(d::Dissolution,n::Integer) = n*d
-Base.:+(a::Species,b::Species) = Dissolution(mergewith(+,Dict(a=>1),Dict(b=>1)))
-Base.:+(a::Dissolution,b::Species) = Dissolution(mergewith(+,a.products,Dict(b=>1)))
+Base.:*(n::Real,c::Species) = Dissolution(Dict(c=>n))
+Base.:*(c::Species,n::Real) = n*c
+Base.:*(n::Real,d::Dissolution) = Dissolution(Dict(k=>v*n for (k,v) in d.products))
+Base.:*(d::Dissolution,n::Real) = n*d
+Base.:+(a::Species,b::Species) = Dissolution(mergewith(+,Dict(a=>1.0),Dict(b=>1.0)))
+Base.:+(a::Dissolution,b::Species) = Dissolution(mergewith(+,a.products,Dict(b=>1.0)))
 Base.:+(a::Species,b::Dissolution) = b+a
 Base.:+(a::Dissolution,b::Dissolution) = Dissolution(mergewith(+,a.products,b.products))
+
+"""
+    by_mass(parts::Pair{<:Species,<:Real}...)
+
+Build a [`Dissolution`](@ref) from the mass fractions of a product's species, as a label gives them:
+`by_mass(lactic_acid_species => 0.88, H2O => 0.12)` for an 88% w/w lactic acid solution. The fractions
+need only be proportional; they are converted to moles per mole of the **first** species, so the first
+species is the one a reagent's molar amount counts. The reagent's [`molecular_weight`](@ref) is then
+the mass of product per mole of that species. Every species needs a known molecular weight.
+"""
+function by_mass(parts::Pair{Species,<:Real}...)
+    isempty(parts) && throw(ArgumentError("by_mass needs at least one species"))
+    moles = map(parts) do (spc,fraction)
+        fraction >= 0 || throw(ArgumentError("mass fractions must be non-negative"))
+        mw = molecular_weight(spc)
+        ismissing(mw) && throw(ArgumentError("the molecular weight of $(name(spc)) is unknown, so its mass fraction cannot be converted to moles"))
+        fraction/ustrip(u"g/mol",mw)
+    end
+    moles[1] > 0 || throw(ArgumentError("the first species of by_mass needs a positive mass fraction"))
+    return Dissolution(Dict{Species,Float64}(spc=>m/moles[1] for ((spc,_),m) in zip(parts,moles)))
+end
 
 
 """

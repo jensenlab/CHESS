@@ -98,7 +98,7 @@ export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
 export StockComponent # common dispatch/gathering ancestor for Reagent and Organism
 export Reagent,Solid,Liquid,Gas # physical-form types
 export Species,H⁺,OH⁻ # chemical-identity types
-export charge, Dissolution, dissolution, set_dissolution!, dissolutions
+export charge, Dissolution, dissolution, set_dissolution!, dissolutions, by_mass
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types

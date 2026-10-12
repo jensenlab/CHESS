@@ -782,6 +782,58 @@ end
     @test (Na⁺+2*Cl⁻).products == Dict(Na⁺=>1,Cl⁻=>2)
 end
 
+@testset "Dissolution with fractional coefficients" begin
+    water_spc = CHESSCore.Species("test water",0,18.015u"g/mol")
+    sugar_spc = CHESSCore.Species("test sugar",0,194.18u"g/mol")
+
+    # a hemihydrate is the compound plus half a water, per mole of compound
+    hemi = sugar_spc + 0.5*water_spc
+    @test hemi.products == Dict(sugar_spc=>1,water_spc=>0.5)
+    @test (water_spc*0.5).products == Dict(water_spc=>0.5)
+    @test (1//2*water_spc).products == Dict(water_spc=>0.5)
+    @test (3*(sugar_spc + 0.5*water_spc)).products == Dict(sugar_spc=>3,water_spc=>1.5)
+    @test Dissolution(Dict(sugar_spc=>1,water_spc=>1//2)) == hemi
+    @test hash(Dissolution(Dict(sugar_spc=>1,water_spc=>1//2))) == hash(hemi)
+
+    @reagent TestHemihydrate "test hemihydrate" Solid hemi missing missing
+    @test molecular_weight(TestHemihydrate) ≈ (194.18+0.5*18.015)u"g/mol"
+    r = composition(2u"mol"*TestHemihydrate)
+    @test molar_amount(r,sugar_spc) ≈ 2u"mol"
+    @test molar_amount(r,water_spc) ≈ 1u"mol"
+
+    @test_throws ArgumentError Dissolution(Dict(water_spc=>-0.5))
+    @test_throws ArgumentError Dissolution(Dict(water_spc=>NaN))
+
+    # charge balance still holds with a fractional coefficient
+    ion = CHESSCore.Species("test half ion",1,"K")
+    anion = CHESSCore.Species("test half anion",-2,"SO4")
+    @test_throws ArgumentError set_dissolution!(TestHemihydrate,ion + anion)
+    @test isnothing(set_dissolution!(TestHemihydrate,2*ion + anion + 0.5*water_spc))
+end
+
+@testset "by_mass" begin
+    acid = CHESSCore.Species("test lactic acid",0,90.078u"g/mol")
+    solvent = CHESSCore.Species("test solvent water",0,18.015u"g/mol")
+    d = by_mass(acid=>0.88, solvent=>0.12)
+    @test d.products[acid] == 1
+    @test d.products[solvent] ≈ (0.12/18.015)/(0.88/90.078)
+    @test by_mass(acid=>88, solvent=>12).products[solvent] ≈ d.products[solvent] # only the proportions matter
+
+    # the reagent's molecular weight is the product mass per mole of the first species
+    @reagent TestAssayAcid "test 88% acid" Liquid d 1.2u"g/mL" missing
+    @test molecular_weight(TestAssayAcid) ≈ 90.078u"g/mol"/0.88
+    # 10 mL at 1.2 g/mL is 12 g of product, 88% of it acid and 12% of it solvent
+    r = composition(10u"mL"*TestAssayAcid)
+    @test mass(r,acid) ≈ 12u"g"*0.88
+    @test mass(r,solvent) ≈ 12u"g"*0.12
+
+    @test by_mass(acid=>1) == Dissolution(Dict(acid=>1))
+    @test_throws ArgumentError by_mass()
+    @test_throws ArgumentError by_mass(acid=>0, solvent=>1)
+    @test_throws ArgumentError by_mass(acid=>-1, solvent=>1)
+    @test_throws ArgumentError by_mass(CHESSCore.Species("test unweighed",0,missing)=>1, solvent=>1)
+end
+
 const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
 
 @reagent MgCl2 "magnesium chloride" Solid (Mg²⁺+2*Cl⁻) missing missing
