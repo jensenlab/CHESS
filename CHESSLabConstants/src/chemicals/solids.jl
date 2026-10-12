@@ -12,6 +12,10 @@
 @reagent agar "agar" Solid "C14H24O9" missing 71571511
 @reagent agmatine "Agmatine" Solid "C5H14N4" missing 199
 @reagent alanine "DL-alanine" Solid "C3H7NO2" missing 602
+@reagent alpha_amylase "alpha-Amylase from porcine pancreas (Type VI-B)" Solid opaque missing missing
+# ^ Sigma A3176, sold by enzyme activity (1 MU pack), not by mass. An enzyme preparation, so registered
+# opaque with no molar mass, for identity/inventory purposes only, same as the other undefined biological
+# materials here.
 @reagent alpha_cyclodextrin "Alpha-Cyclodextrin" Solid "C36H60O30" missing 444913
 @reagent alpha_ketoglutaric_acid "Alpha Ketoglutaric Acid (2-Oxoglutaric Acid)" Solid "C5H6O5" missing 51
 @reagent amitrole "amitrole (3-amino-1,2,4-triazole)" Solid "C2H4N4" 1.138u"g/mL" 1639
@@ -192,6 +196,10 @@
 @reagent minocycline "minocycline hydrochloride" Solid 493.9u"g/mol" missing 54685925
 @reagent mrs_broth "MRS broth" Solid opaque missing missing
 @reagent mops "MOPS" Solid "C7H15NO4S" missing 70807
+@reagent mucin_type_ii "Mucin from porcine stomach (Type II)" Solid opaque missing missing
+# ^ Sigma M2378, partially purified porcine gastric mucin; a different catalog item from
+# hydrolyzed_mucin (M1778). Heterogeneous glycoprotein with no PubChem CID/fixed MW; registered for
+# identity/inventory purposes only, same as hydrolyzed_mucin.
 @reagent myo_inositol "myo-inositol" Solid "C6H12O6" missing 892
 @reagent n_acetylgalactosamine "N-Acetyl-D-Galactosamine" Solid "C8H15NO6" missing 35717
 @reagent n_acetylneuraminate "N-Acetylneuraminic Acid" Solid "C11H19NO9" missing 439197
@@ -302,6 +310,11 @@
 @reagent tryptose "Tryptose" Solid opaque missing missing
 @reagent tyrosine "L-tyrosine" Solid "C9H11NO3" missing 6057
 @reagent uracil "uracil" Solid "C4H4N2O2" missing 1174
+@reagent urea "Urea" Solid "CH4N2O" 1.34u"g/mL" 1176
+# ^ Sigma U5128 (ACS reagent), anhydrous neutral urea. Density is PubChem's. No AcidBaseSystem: urea is
+# a very weak base, conjugate acid pKa 0.10 at 21 °C (Perrin, Dissociation Constants of Organic Bases
+# in Aqueous Solution, IUPAC Chem. Data Ser., 1965, via PubChem CID 1176), so it is not protonated in
+# the working pH range.
 @reagent uridine "uridine" Solid "C9H12N2O6" missing 6029
 @reagent valine "L-valine" Solid "C5H11NO2" 1.23u"g/mL" 6287
 @reagent vancomycin "vancomycin" Solid "C66H75Cl2N9O24" missing 14969
