@@ -242,7 +242,7 @@ The canonical hydrogen ion (proton), used by [`pH`](@ref)/[`total_concentration`
 *negative* count, so it nets against acids in the same sum) should reuse this
 exact value rather than defining its own separate "H+" `Species`, so contributions net correctly.
 """
-const H⁺ = Species("H+",1,"H")
+const H⁺ = Species("H+",1,"H";pubchemid=1038)
 
 """
     const OH⁻
@@ -251,7 +251,7 @@ The canonical hydroxide ion, used by [`net_hydrogen_ion_concentration`](@ref)/[`
 should register their real dissolution using this value (e.g. `Na⁺ + OH⁻` for NaOH) rather
 than a negative [`H⁺`](@ref) count -- see [`Dissolution`](@ref).
 """
-const OH⁻ = Species("OH-",-1,"OH")
+const OH⁻ = Species("OH-",-1,"OH";pubchemid=961)
 
 """
     struct Dissolution

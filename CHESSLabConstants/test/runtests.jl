@@ -560,6 +560,20 @@ end
     @test CHESSCore.pH(guan_stock;ionic_strength_correction=false) > 10.0
 end
 
+@testset "Ion species carry PubChem IDs" begin
+    # every species declared in ions.jl has an ID
+    labels = [m.captures[1] for m in match.(r"^@species (\S+) ",readlines(joinpath(pkgdir(CHESSLabConstants),"src","chemicals","ions.jl"))) if m !== nothing]
+    @test length(labels) == 31
+    @test all(l -> !ismissing(CHESSCore.pubchemid(getfield(CHESSLabConstants,Symbol(l)))),labels)
+    @test CHESSCore.pubchemid(CHESSLabConstants.Na⁺) == 923
+    @test CHESSCore.pubchemid(CHESSLabConstants.SO4²⁻) == 1117
+    @test CHESSCore.pubchemid(CHESSLabConstants.H2O) == 962
+    @test CHESSCore.pubchemid(CHESSCore.H⁺) == 1038
+    @test CHESSCore.pubchemid(CHESSCore.OH⁻) == 961
+    # a reagent made of one such species reports its ID
+    @test CHESSCore.pubchemid(CHESSLabConstants.water) == 962
+end
+
 @testset "Reagent chemistry: every reagent has a formula or is declared opaque" begin
     lacking = Symbol[]
     for sym in sort!(collect(keys(CHESSCore.chemprops)))
