@@ -64,7 +64,7 @@ const MEDIA_COMPONENT_MEASUREMENTS = [
      measured_pH=8.22,ph_kwargs=(water_correction=true,),notes="media component panel"),
     (label="sodium_chloride 10g/500mL",stock=10u"g"*rgt"sodium_chloride"+500u"mL"*rgt"water",
      measured_pH=5.93,ph_kwargs=(water_correction=true,),notes="media component panel"),
-    # sodium_phosphate_mono 11.5g/500mL -- no measured pH yet, add when available
+    # sodium_phosphate_mono_anhydrous 11.5g/500mL -- no measured pH yet, add when available
     (label="potassium_phosphate_mono 40g/500mL",stock=40u"g"*rgt"potassium_phosphate_mono"+500u"ml"*rgt"water",
      measured_pH=4.24,ph_kwargs=(water_correction=true,),notes="media component panel"),
     (label="magnesium_sulfate 0.49g/500mL",stock=0.49u"g"*rgt"magnesium_sulfate"+500u"ml"*rgt"water",
@@ -118,7 +118,7 @@ const nps_20x =
 
 const phosphates_20x =
     11.6u"g"*rgt"potassium_phosphate_di" + 10u"g"*rgt"sodium_phosphate_di" +
-    2.85u"g"*rgt"sodium_phosphate_mono" + 1u"l"*rgt"water"
+    2.85u"g"*rgt"sodium_phosphate_mono_anhydrous" + 1u"l"*rgt"water"
 
 const salts_20x =
     1510u"mg"*rgt"calcium_chloride" + 100u"mg"*rgt"edta" + 2u"g"*rgt"magnesium_sulfate" +

@@ -1,7 +1,7 @@
  const phosphates_25x_1L = 
     5u"g" * potassium_phosphate_di + 
     25u"g" *potassium_phosphate_mono + 
-    79u"g" * sodium_phosphate_mono + 
+    79u"g" * sodium_phosphate_mono_anhydrous + 
     346.8u"g" *sodium_phosphate_di + 
     1u"L" * water 
 

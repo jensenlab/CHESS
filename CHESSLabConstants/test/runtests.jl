@@ -240,6 +240,12 @@ end
                 (0.1u"mol"*CHESSLabConstants.sodium_phosphate_di) +
                 (1.0u"L"*CHESSLabConstants.water)
     @test CHESSCore.pH(na_buffer;ionic_strength_correction=false) ≈ 7.198 atol=1e-3
+    # the anhydrous salt is a separate reagent on the same phosphate chain
+    @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_phosphate_mono_anhydrous) ≈ 119.98u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_phosphate_mono) ≈ 137.99u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono_anhydrous) == CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono)
+    @test only(CHESSCore.reagent_products(CHESSLabConstants.sodium_phosphate_mono_anhydrous)).catalog_number == "S0751"
+    @test only(CHESSCore.reagent_products(CHESSLabConstants.sodium_phosphate_mono)).catalog_number == "BP330"
     @test CHESSCore.acid_base_system(CHESSLabConstants.potassium_phosphate_mono) == CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono)
 
     # sodium carbonate/bicarbonate share the carbonic acid system

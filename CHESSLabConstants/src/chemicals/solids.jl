@@ -424,6 +424,12 @@
 @reagent_product sodium_phosphate_di_anhydrous "Sigma-Aldrich" catalog_number="S9763" product_name="Sodium phosphate dibasic" grade="ACS reagent"
 @reagent_product sodium_phosphate_di_anhydrous "Fisher Scientific" catalog_number="S375-212" product_name="Sodium Phosphate Dibasic Anhydrous (USP), Fisher Chemical™"
 @reagent sodium_phosphate_mono "sodium phosphate monobasic monohydrate" Solid (Na⁺+H2PO4⁻+H2O) missing missing  # monohydrate
+@reagent_product sodium_phosphate_mono "Fisher Scientific" catalog_number="BP330" product_name="Sodium phosphate monobasic monohydrate, Fisher BioReagents" notes="Supplied by the lab; not in the stocklist. Pack size not recorded."
+@reagent sodium_phosphate_mono_anhydrous "sodium phosphate monobasic anhydrous" Solid (Na⁺+H2PO4⁻) missing missing  # anhydrous
+# ^ Sigma S0751 (NaH2PO4, 119.98 g/mol on Sigma's listing; the ordering sheet notes it as anhydrous). The lab
+# also has the monohydrate above. Sigma's listing does not state the hydrate and the material can carry some
+# water, so the lot's certificate of analysis is the final word.
+@reagent_product sodium_phosphate_mono_anhydrous "Sigma-Aldrich" catalog_number="S0751" product_name="SODIUM PHOSPHATE MONOBASIC, REAGENTPLUS" grade="≥99.0%"
 @reagent sodium_selenite "Sodium Selenite" Solid (2*Na⁺+SeO3²⁻) 3.1u"g/mL" missing
 # ^ checked 2026-08-14 against the lab stocklist (Reagent_StockList.xlsx): Sigma 71950-100G "ANHYDROUS".
 @reagent_product sodium_selenite "Sigma-Aldrich" catalog_number="71950" product_name="Sodium selenite, anhydrous" grade="≥90.0%"

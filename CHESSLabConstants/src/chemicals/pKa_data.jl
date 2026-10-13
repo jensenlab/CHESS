@@ -259,6 +259,7 @@ function _register_acid_base_systems!()
     set_acid_base_system!(potassium_phosphate_mono,phosphoric_acid_system)
     set_acid_base_system!(potassium_phosphate_di,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_mono,phosphoric_acid_system)
+    set_acid_base_system!(sodium_phosphate_mono_anhydrous,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_di,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_di_anhydrous,phosphoric_acid_system)
 
