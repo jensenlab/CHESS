@@ -8,8 +8,9 @@
 @reagent ethanol "ethanol" Liquid "C2H6O" 0.79u"g/mL" 702
 @reagent ethanolamine "Ethanolamine" Liquid "C2H7NO" 1.016u"g/mL" 700
 @reagent fusayama_meyer_saliva "Fusayama/Meyer Artificial Saliva" Liquid opaque missing missing
-# ^ Sigma SAE0148 (200 mL), a ready-made multi-component solution. Its composition was not confirmed, so
+# ^ A ready-made multi-component solution. Its composition was not confirmed, so
 # it is registered opaque, for identity/inventory purposes only, same as sheep_blood.
+@reagent_product fusayama_meyer_saliva "Sigma-Aldrich" catalog_number="SAE0148" product_name="Fusayama/Meyer artificial saliva"
 @reagent glycerol "glycerol" Liquid "C3H8O3" 1.261u"g/mL" 753
 @reagent hydrogen_peroxide "hydrogen peroxide" Liquid "H2O2" 1.11u"g/mL" 784
 @reagent lactic_acid "Lactic Acid (88% w/w solution)" Liquid opaque(CHESSCore.formula_mass("C3H6O3")/0.88) 1.2u"g/mL" 612
@@ -22,5 +23,6 @@
 # purity-adjusted mass, so it no longer differs from Lactate⁻ by exactly one proton's mass --
 # cosmetically inconsistent, but doesn't affect the pH solve (moles/charges, not absolute masses, drive
 # that). Revisit if CHESSCore ever gains a first-class "purity/assay" concept on Reagent.
+@reagent_product lactic_acid "Sigma-Aldrich" catalog_number="W261106" product_name="Lactic acid, 88%, FCC" grade="FCC"
 @reagent sheep_blood "Defibrinated Sheep Blood" Liquid opaque missing missing
 @reagent water "water" Liquid "H2O" 1.0u"g/mL" 962

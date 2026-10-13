@@ -575,6 +575,28 @@ end
     @test CHESSCore.pubchemid(CHESSLabConstants.water) == 962
 end
 
+@testset "Reagent products" begin
+    L = CHESSLabConstants
+    @test CHESSCore.reagent_products(L.urea) == [ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent")]
+    @test only(CHESSCore.reagent_products(L.lactic_acid)).catalog_number == "W261106"
+    @test only(CHESSCore.reagent_products(L.fusayama_meyer_saliva)).catalog_number == "SAE0148"
+    @test only(CHESSCore.reagent_products(L.beta_methyl_d_glucoside)).supplier == "Fisher Scientific"
+
+    # every product names its supplier and catalog number, and no catalog number carries a pack size
+    with_products = [r for r in CHESSCore.registry_summary([L]).reagents if !isempty(r.products)]
+    @test length(with_products) >= 26
+    for r in with_products, product in r.products
+        @test !isempty(product.supplier)
+        @test !ismissing(product.catalog_number)
+        @test !occursin(r"-\d+(G|KG|MG|ML|MU)$",product.catalog_number)
+    end
+    # the module keeps its own copy, which register_lab merges
+    @test haskey(CHESSCore._reagent_products(L),L.urea)
+
+    # a reagent with no registered product has none
+    @test isempty(CHESSCore.reagent_products(L.water))
+end
+
 @testset "Species PubChem IDs from the acid/base data" begin
     pid = CHESSCore.pubchemid
     @test pid(CHESSLabConstants.Lactate⁻) == 91435 # the ion, not the neutral acid (107689)
