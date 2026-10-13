@@ -1,6 +1,7 @@
 using CHESSCore, CHESSLabConstants, Test, Unitful
 
 include("empirical_measurements.jl")
+include("test_pubchem_audit.jl")
 
 @testset "CHESSLabConstants loads and registers as a lab module" begin
     @test isdefined(CHESSLabConstants, :get_mw_density)

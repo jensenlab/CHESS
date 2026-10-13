@@ -13,6 +13,8 @@ register_organism!
 register_species!
 get_mw_density
 get_molecular_formula
+audit_pubchem
+fetch_pubchem_records
 CHESSLabConstants.chemical_cache_path
 ```
 

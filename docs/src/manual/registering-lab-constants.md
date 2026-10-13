@@ -149,5 +149,34 @@ chemistry, or `opaque` when `register_reagent!` is called with `opaque=true` for
 [`get_molecular_formula`](@ref) takes a PubChem ID and returns the formula as PubChem writes it, and
 [`get_mw_density`](@ref) returns the molecular weight in g/mol and the density in g/mL.
 
+## Checking PubChem IDs
+
+A species keeps the PubChem ID of its compound, and a wrong ID is easy to write: an ID that is off by a
+digit, or one that names a derivative of the compound, still returns a plausible record.
+[`audit_pubchem`](@ref) compares every registered species with the record at its ID and returns the
+differences as a table. It reports an ID that PubChem does not have, a charge or isotope labelling that
+differs, a formula or molar mass that differs, and a PubChem title that shares no word with the species'
+name. Species that share an ID are reported too, and species with no ID are listed when asked for.
+
+```julia
+using CHESSLabConstants
+
+findings = audit_pubchem()
+```
+
+The audit fetches each distinct ID once, in batches with a pause between requests. When PubChem answers
+that there are too many requests, the audit stops instead of retrying, because repeated requests extend the
+block. [`fetch_pubchem_records`](@ref) fills a dictionary as it goes, so passing the same dictionary to
+the next call continues where the first stopped and fetches nothing it already holds:
+
+```julia
+records = Dict{Int,Union{CHESSLabConstants.PubChemRecord,Nothing}}()
+findings = audit_pubchem(; records)   # may stop early with a PubChemThrottled error
+findings = audit_pubchem(; records)   # later: fetches only what is missing
+```
+
+A formula check cannot find an ID that was copied together with its formula from the wrong compound. Read
+the `pubchem_title` column for any species that was added by a lookup.
+
 [Database Architecture](db-architecture.md) describes how CHESSDatabase stores the locations and
 stocks built from registered constants.
