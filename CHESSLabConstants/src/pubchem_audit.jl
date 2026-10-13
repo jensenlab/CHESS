@@ -117,15 +117,23 @@ end
 
 _alnum(s::AbstractString) = lowercase(replace(s,r"[^A-Za-z0-9]"=>""))
 
-# True when the species' name and the PubChem title plausibly name the same thing: some word of five or more
-# letters in one is contained in the other. A name with no such word, such as "Na+", is not judged.
+# Words that describe a species' charge state, not the compound.
+const _CHARGE_WORDS = ("anion","cation","dication","trication","dianion","trianion","tetraanion","monoanion","zwitterion")
+
+# True when the species' name and the PubChem title plausibly name the same compound: the first five letters
+# of some word of five or more letters in one appear in the other, so "alanine" matches "alaninate". Words
+# that contain a digit (as in "H3PO4") or only describe a charge state are not compared, and a name with no
+# word left to compare is not judged.
 function _title_plausible(name::AbstractString,title::AbstractString)
-    words(s) = [lowercase(w) for w in split(s,r"[^A-Za-z0-9]+") if length(w) >= 5]
+    function words(s)
+        found = [lowercase(w) for w in split(s,r"[^A-Za-z0-9]+") if length(w) >= 5 && !occursin(r"[0-9]",w)]
+        return [w for w in found if !(w in _CHARGE_WORDS)]
+    end
     name_words = words(name)
     isempty(name_words) && return true
     title_alnum = _alnum(title)
     name_alnum = _alnum(name)
-    return any(w->occursin(w,title_alnum),name_words) || any(w->occursin(w,name_alnum),words(title))
+    return any(w->occursin(first(w,5),title_alnum),name_words) || any(w->occursin(first(w,5),name_alnum),words(title))
 end
 
 # The findings for one species and its PubChem record (`nothing` if PubChem has none): tuples of
@@ -194,8 +202,9 @@ Each row is a finding for one species, with columns `label`, `name`, `charge`, `
 - `:error`: the ID cannot be right for the species: PubChem has no such compound, or its charge or
   isotope labelling differs, or the species' formula (or, for a species without one, its molar mass)
   differs from PubChem's.
-- `:review`: possibly wrong and worth a look, such as a PubChem title that shares no word with the
-  species' name, or a formula PubChem writes in a form that cannot be read.
+- `:review`: possibly wrong and worth a look, such as a PubChem title that has no word starting with the
+  same five letters as a word of the species' name, or a formula PubChem writes in a form that cannot be
+  read.
 - `:info`: shown only with `include_info=true`: a species with no PubChem ID, or two species of the same
   chemistry that share an ID.
 

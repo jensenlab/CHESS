@@ -155,8 +155,8 @@ A species keeps the PubChem ID of its compound, and a wrong ID is easy to write:
 digit, or one that names a derivative of the compound, still returns a plausible record.
 [`audit_pubchem`](@ref) compares every registered species with the record at its ID and returns the
 differences as a table. It reports an ID that PubChem does not have, a charge or isotope labelling that
-differs, a formula or molar mass that differs, and a PubChem title that shares no word with the species'
-name. Species that share an ID are reported too, and species with no ID are listed when asked for.
+differs, a formula or molar mass that differs, and a PubChem title with no word that starts with the same
+five letters as a word of the species' name. Species that share an ID are reported too, and species with no ID are listed when asked for.
 
 ```julia
 using CHESSLabConstants

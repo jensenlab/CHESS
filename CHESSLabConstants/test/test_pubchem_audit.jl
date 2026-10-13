@@ -56,7 +56,18 @@ end
     @test plausible("L-aspartic acid","Aspartic acid")
     @test plausible("Alpha Ketoglutaric Acid (2-Oxoglutaric Acid)","2-Oxoglutaric Acid")
     @test plausible("Na+","Sodium Ion") # no word to judge
+    # a name and a title that differ only in how the ion is named still match
+    @test plausible("Alanine(anion)","Alaninate")
+    @test plausible("Arginine(cation)","Argininium(1+)")
+    @test plausible("Citruline(anion)","Citrullinate")
+    @test plausible("Cysteine(anion)","L-cysteinate(1-)")
+    # words that only describe the charge, and formula-like names, are not compared
+    @test plausible("EDTA(tetraanion)","Ethylenediaminetetraacetate")
+    @test plausible("PABA(cation)","(4-Carboxyphenyl)azanium")
+    @test plausible("H3PO4","Phosphoric Acid")
+    @test plausible("Cr2O7 2-","Dichromate ion")
     @test !plausible("neomycin","Butyl Lactate")
+    @test !plausible("beta-NADPH (triphosphopyridine nucleotide)","Nadp")
     @test !plausible("Adonitol (Ribitol)","(2S,4R)-Pentane-1,2,3,4,5-Pentol")
 end
 
