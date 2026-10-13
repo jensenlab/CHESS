@@ -64,6 +64,7 @@ include("./locations/Labware.jl")
 include("./stocks/StockComponent.jl")
 include("./stocks/ElementalFormula.jl")
 include("./stocks/Chemicals.jl")
+include("./stocks/ReagentProducts.jl")
 include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")
 include("./stocks/StockDisplay.jl")
@@ -98,6 +99,7 @@ export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
 export StockComponent # common dispatch/gathering ancestor for Reagent and Organism
 export Reagent,Solid,Liquid,Gas # physical-form types
 export Species,H⁺,OH⁻ # chemical-identity types
+export ReagentProduct, reagent_products, add_reagent_product!, @reagent_product # where a reagent is obtained
 export charge, Dissolution, dissolution, set_dissolution!, dissolutions, by_mass
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types

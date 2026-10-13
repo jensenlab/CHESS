@@ -97,7 +97,7 @@ category. It is the fastest way to see what a lab module such as `CHESSLabConsta
 ```jldoctest registering
 julia> registry_summary([CHESSCore, MyLab]).reagents
 1-element Vector{NamedTuple}:
- (module_ = MyLab, name = :ethanol, type = Liquid, molecular_weight = 46.07 g mol⁻¹, density = 0.789 g mL⁻¹, pubchemid = 702)
+ (module_ = MyLab, name = :ethanol, type = Liquid, molecular_weight = 46.07 g mol⁻¹, density = 0.789 g mL⁻¹, pubchemid = 702, products = ReagentProduct[])
 ```
 
 With no arguments, `registry_summary()` covers every lab module registered globally. Unlike the

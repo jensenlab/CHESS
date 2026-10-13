@@ -28,6 +28,9 @@ function register_lab(lab_module::Module)
     if lab_module !== CHESSCore
         merge!(CHESSCore.chemprops,_chemprops(lab_module))
         merge!(CHESSCore.dissolutions,_dissolutions(lab_module))
+        for (reagent,products) in _reagent_products(lab_module), product in products
+            add_reagent_product!(reagent,product)
+        end
         merge!(CHESSCore.orgprops,_orgprops(lab_module))
         merge!(CHESSCore.location_kinds,_locationkinds(lab_module))
         merge!(CHESSCore.attribute_kinds,_attributekinds(lab_module))

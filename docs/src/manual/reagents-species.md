@@ -175,6 +175,39 @@ missing
 
 An invalid formula string is rejected when the reagent is defined.
 
+## Products
+
+A reagent is a material identified by its composition. A [`ReagentProduct`](@ref) records one way the lab
+obtains it: the supplier, the catalog number, the vendor's product name, the manufacturer number, the grade
+as the vendor states it, and notes. A reagent has no product, one, or several. Two vendors' urea are two
+products of one reagent, and the in-house water supply is a product with no catalog number. A product holds
+only what stays true across purchases. Price, quantity, received date, lot, and shelf location describe a
+purchase or a bottle and are not recorded. A stated purity is information only: the reagent is the pure
+composition, and nothing reads the grade.
+
+[`@reagent_product`](@ref) registers a product of a reagent, and [`reagent_products`](@ref) returns the
+products registered for it:
+
+```jldoctest reagents
+julia> @reagent carbamide "carbamide" Solid "CH4N2O" 1.34u"g/mL" missing
+carbamide
+
+julia> @reagent_product carbamide "Sigma-Aldrich" catalog_number="U5128" product_name="Urea ACS reagent" grade="ACS reagent"
+
+julia> @reagent_product carbamide "in-house"
+
+julia> reagent_products(carbamide)
+2-element Vector{ReagentProduct}:
+ Sigma-Aldrich U5128
+ in-house
+
+julia> reagent_products(carbamide)[1].grade
+"ACS reagent"
+```
+
+A product that is already registered for the reagent is not added twice. Products are kept with the module
+that registers them, as dissolutions are, so a lab module's products are available once it is registered.
+
 ## Opaque reagents
 
 Some materials have no formula: an undefined mixture such as yeast extract, a polymer of varying

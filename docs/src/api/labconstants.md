@@ -27,9 +27,9 @@ Unitful = CHESSCore.Unitful
 summary = CHESSCore.registry_summary([CHESSLabConstants])
 fmtq(x) = (ismissing(x) || isnothing(x)) ? "--" : (x isa Unitful.Quantity ? "$(round(Unitful.ustrip(x),digits=2)) $(Unitful.unit(x))" : string(x))
 
-rows = ["| Name | Type | Molecular Weight | Density | PubChem ID |", "|---|---|---|---|---|"]
+rows = ["| Name | Type | Molecular Weight | Density | PubChem ID | Products |", "|---|---|---|---|---|---|"]
 for r in sort(collect(summary.reagents); by=x->string(x.name))
-    push!(rows, "| `$(r.name)` | $(r.type) | $(fmtq(r.molecular_weight)) | $(fmtq(r.density)) | $(fmtq(r.pubchemid)) |")
+    push!(rows, "| `$(r.name)` | $(r.type) | $(fmtq(r.molecular_weight)) | $(fmtq(r.density)) | $(fmtq(r.pubchemid)) | $(isempty(r.products) ? "--" : join(string.(r.products), ", ")) |")
 end
 Markdown.parse(join(rows, "\n"))
 ```

@@ -834,6 +834,70 @@ end
     @test_throws ArgumentError by_mass(CHESSCore.Species("test unweighed",0,missing)=>1, solvent=>1)
 end
 
+module ProductLab
+using CHESSCore, Unitful
+@reagent widget "widget" Solid "C2H6O" missing missing
+@reagent_product widget "Acme Chemical" catalog_number="W-100" product_name="Widget, reagent grade" grade="reagent grade"
+@reagent_product widget "Beta Supply" catalog_number="B9" manufacturer_number="M-77" notes="second source"
+@reagent bare "bare" Solid "CH4" missing missing
+end
+
+@testset "ReagentProduct" begin
+    p = ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent")
+    @test p.supplier == "Sigma-Aldrich" && p.catalog_number == "U5128" && p.grade == "ACS reagent"
+    @test ismissing(p.manufacturer_number) && ismissing(p.notes)
+    @test sprint(show,p) == "Sigma-Aldrich U5128"
+    @test sprint(show,ReagentProduct("in-house";product_name="deionized water")) == "in-house"
+
+    # value equality, with missing fields comparing equal
+    @test p == ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent")
+    @test hash(p) == hash(ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent"))
+    @test p != ReagentProduct("Sigma-Aldrich";catalog_number="U5129",product_name="Urea ACS reagent",grade="ACS reagent")
+    @test ReagentProduct("a") == ReagentProduct("a")
+    @test ReagentProduct(SubString("Acme Co",1,4);catalog_number=SubString("X123",1,2)).catalog_number == "X1"
+
+    @test_throws ArgumentError ReagentProduct("")
+    @test_throws ArgumentError ReagentProduct("   ")
+
+    # adding and reading
+    reagent = Solid("product test reagent",missing,missing)
+    @test isempty(reagent_products(reagent))
+    add_reagent_product!(reagent,p)
+    add_reagent_product!(reagent,ReagentProduct("Fisher";catalog_number="A1"))
+    add_reagent_product!(reagent,p) # already registered
+    @test reagent_products(reagent) == [p,ReagentProduct("Fisher";catalog_number="A1")]
+    push!(reagent_products(reagent),ReagentProduct("Elsewhere")) # a copy: the registry is unchanged
+    @test length(reagent_products(reagent)) == 2
+    # a product belongs to the reagent it was added to
+    @test isempty(reagent_products(Solid("another reagent",missing,missing)))
+end
+
+@testset "@reagent_product" begin
+    # the macro registers the product in CHESSCore and keeps it with the calling module
+    products = reagent_products(ProductLab.widget)
+    @test length(products) == 2
+    @test products[1] == ReagentProduct("Acme Chemical";catalog_number="W-100",product_name="Widget, reagent grade",grade="reagent grade")
+    @test products[2] == ReagentProduct("Beta Supply";catalog_number="B9",manufacturer_number="M-77",notes="second source")
+    @test isempty(reagent_products(ProductLab.bare))
+    @test length(CHESSCore._reagent_products(ProductLab)[ProductLab.widget]) == 2
+
+    # register_lab restores a module's products from the module's own copy
+    delete!(CHESSCore.product_registry,ProductLab.widget)
+    @test isempty(reagent_products(ProductLab.widget))
+    CHESSCore.register_lab(ProductLab)
+    @test reagent_products(ProductLab.widget) == products
+
+    # the registry summary lists them
+    summary = CHESSCore.registry_summary(ProductLab)
+    @test only(r.products for r in summary.reagents if r.name === :widget) == products
+    @test isempty(only(r.products for r in summary.reagents if r.name === :bare))
+
+    # options are written name=value, and only the known options are accepted
+    expansion_error(ex) = try macroexpand(@__MODULE__,ex); nothing catch e e isa LoadError ? e.error : e end
+    @test expansion_error(:(@reagent_product widget "Acme" 5)) isa ArgumentError
+    @test_throws MethodError ReagentProduct("Acme";price=3)
+end
+
 @testset "Species PubChem ID" begin
     glucose = CHESSCore.Species("pc glucose",0,"C6H12O6";pubchemid=5793)
     @test pubchemid(glucose) == 5793
