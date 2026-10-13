@@ -13,9 +13,9 @@
 # the same precompilation-safety reason (acid_base_systems is a global Dict owned by CHESSCore).
 
 # New Species endpoints not already defined in ions.jl (H2PO4⁻/HPO4²⁻/HCO3⁻/CO3²⁻ already exist there)
-@species H3PO4 "H3PO4" 0 "H3PO4" # PubChem CID 1004
-@species PO4³⁻ "PO4 3-" -3 "PO4" # PubChem CID 1061
-@species H2CO3 "H2CO3" 0 "H2CO3" # PubChem CID 767
+@species H3PO4 "H3PO4" 0 "H3PO4" 1004
+@species PO4³⁻ "PO4 3-" -3 "PO4" 1061
+@species H2CO3 "H2CO3" 0 "H2CO3" 767
 
 # Organic acid conjugate-base endpoints. Each acid's fully-protonated (neutral, as-weighed) reference
 # state is the reagent's own identity species -- the single product of its registered Dissolution --
@@ -23,20 +23,20 @@
 # makes: `composition()` already reports their moles under exactly the Species that appears in their
 # AcidBaseSystem below (see `_identity`). Each conjugate base is defined by its formula, the acid's
 # formula with the protons removed.
-@species Citrate³⁻ "Citrate3-" -3 "C6H5O7"
+@species Citrate³⁻ "Citrate3-" -3 "C6H5O7" 31348
 @species HCitrate²⁻ "HCitrate2-" -2 "C6H6O7"
 @species H2Citrate⁻ "H2Citrate-" -1 "C6H7O7"
-@species Lactate⁻ "Lactate-" -1 "C3H5O3" # PubChem CID 107689 (distinct from the "Lactic Acid" reagent's own PubChem entry)
-@species Oxalate²⁻ "Oxalate2-" -2 "C2O4" # PubChem CID 971 shares parent; ion CID 71081
-@species HOxalate⁻ "HOxalate-" -1 "C2HO4"
-@species Formate⁻ "Formate-" -1 "CHO2" # PubChem CID 283
-@species Malate²⁻ "Malate2-" -2 "C4H4O5" # PubChem CID 222656
+@species Lactate⁻ "Lactate-" -1 "C3H5O3" 91435
+@species Oxalate²⁻ "Oxalate2-" -2 "C2O4" 71081
+@species HOxalate⁻ "HOxalate-" -1 "C2HO4" 3716971
+@species Formate⁻ "Formate-" -1 "CHO2" 283
+@species Malate²⁻ "Malate2-" -2 "C4H4O5" 160434 # the DL-malate record, as the species has no stereochemistry
 @species HMalate⁻ "HMalate-" -1 "C4H5O5"
-@species Tetrahydroxyborate⁻ "B(OH)4-" -1 "B(OH)4" # B(OH)3 + H2O - H+
-@species Propionate⁻ "Propionate-" -1 "C3H5O2" # PubChem CID 104745
-@species Shikimate⁻ "Shikimate-" -1 "C7H9O5"
+@species Tetrahydroxyborate⁻ "B(OH)4-" -1 "B(OH)4" 177595 # B(OH)3 + H2O - H+
+@species Propionate⁻ "Propionate-" -1 "C3H5O2" 104745
+@species Shikimate⁻ "Shikimate-" -1 "C7H9O5" 7057976
 @species HAlphaKetoglutarate⁻ "HAlphaKetoglutarate-" -1 "C5H5O5"
-@species AlphaKetoglutarate²⁻ "AlphaKetoglutarate2-" -2 "C5H4O5" # PubChem CID 51 shares parent; ion CID 51056
+@species AlphaKetoglutarate²⁻ "AlphaKetoglutarate2-" -2 "C5H4O5" 164533
 
 # Zwitterion endpoints (amino acids: aspartic_acid, glutamic_acid; and PABA, a weakly basic aromatic
 # amine + carboxylic acid). The reagent's own stored/derived molecular_weight is the *neutral* form in
@@ -45,82 +45,82 @@
 # fully-protonated *cation* carries a real net charge here), so again no Dissolution registration
 # is needed.
 @species AspartateCation "Aspartate(cation)" 1 "C4H8NO4" # L-aspartic acid + H+
-@species AspartateAnion "Aspartate(anion)" -1 "C4H6NO4" # L-aspartic acid - H+
+@species AspartateAnion "Aspartate(anion)" -1 "C4H6NO4" 4124657 # L-aspartic acid - H+
 @species AspartateDianion "Aspartate(dianion)" -2 "C4H5NO4"
 @species GlutamateCation "Glutamate(cation)" 1 "C5H10NO4" # L-glutamic acid + H+
 @species GlutamateAnion "Glutamate(anion)" -1 "C5H8NO4" # L-glutamic acid - H+
-@species GlutamateDianion "Glutamate(dianion)" -2 "C5H7NO4"
-@species PABACation "PABA(cation)" 1 "C7H8NO2" # 4-aminobenzoic acid + H+ (protonated anilinium)
-@species PABAAnion "PABA(anion)" -1 "C7H6NO2" # 4-aminobenzoic acid - H+ (deprotonated COOH)
+@species GlutamateDianion "Glutamate(dianion)" -2 "C5H7NO4" 5128032
+@species PABACation "PABA(cation)" 1 "C7H8NO2" 4465519 # 4-aminobenzoic acid + H+ (protonated anilinium)
+@species PABAAnion "PABA(anion)" -1 "C7H6NO2" 4876 # 4-aminobenzoic acid - H+ (deprotonated COOH)
 
 # MOPS (a Good's buffer) is weighed out as its zwitterion (protonated morpholinium + sulfonate, net
 # charge 0 -- the reagent's own default identity, same trick as above). Its sulfonic acid group is a
 # strong acid (pKa ≈ -1) and is always fully deprotonated in any realistic aqueous solution, so it's
 # not modeled as an equilibrium step at all (same reasoning as HCl/NaOH staying Dissolution-only) --
 # only the morpholinium's own deprotonation (pKa ≈ 7.20, 25°C) is registered.
-@species MOPS⁻ "MOPS-" -1 "C7H14NO4S" # PubChem CID 70807 shares parent; deprotonated morpholine
+@species MOPS⁻ "MOPS-" -1 "C7H14NO4S" 3830057 # deprotonated morpholine
 
 # Tier-1 audit pass: amino acid endpoints. Each reagent's identity Species is the neutral zwitterion
 # -- the endpoints are its formula with one proton added or removed per unit of charge, chained
 # outward. See the cluster comments in _register_acid_base_systems! below for each chain's
 # shape/pKa citations.
-@species AlanineCation "Alanine(cation)" 1 "C3H8NO2"
-@species AlanineAnion "Alanine(anion)" -1 "C3H6NO2"
-@species ValineCation "Valine(cation)" 1 "C5H12NO2"
-@species ValineAnion "Valine(anion)" -1 "C5H10NO2"
-@species LeucineCation "Leucine(cation)" 1 "C6H14NO2"
-@species LeucineAnion "Leucine(anion)" -1 "C6H12NO2"
+@species AlanineCation "Alanine(cation)" 1 "C3H8NO2" 5237251
+@species AlanineAnion "Alanine(anion)" -1 "C3H6NO2" 5460975
+@species ValineCation "Valine(cation)" 1 "C5H12NO2" 5249995
+@species ValineAnion "Valine(anion)" -1 "C5H10NO2" 5460778
+@species LeucineCation "Leucine(cation)" 1 "C6H14NO2" 5460894
+@species LeucineAnion "Leucine(anion)" -1 "C6H12NO2" 5460895
 @species IsoleucineCation "Isoleucine(cation)" 1 "C6H14NO2"
 @species IsoleucineAnion "Isoleucine(anion)" -1 "C6H12NO2"
-@species GlycineCation "Glycine(cation)" 1 "C2H6NO2"
-@species GlycineAnion "Glycine(anion)" -1 "C2H4NO2"
-@species ProlineCation "Proline(cation)" 1 "C5H10NO2"
-@species ProlineAnion "Proline(anion)" -1 "C5H8NO2"
-@species SerineCation "Serine(cation)" 1 "C3H8NO3"
-@species SerineAnion "Serine(anion)" -1 "C3H6NO3"
+@species GlycineCation "Glycine(cation)" 1 "C2H6NO2" 445457
+@species GlycineAnion "Glycine(anion)" -1 "C2H4NO2" 26066
+@species ProlineCation "Proline(cation)" 1 "C5H10NO2" 5231966
+@species ProlineAnion "Proline(anion)" -1 "C5H8NO2" 5460770
+@species SerineCation "Serine(cation)" 1 "C3H8NO3" 3401347
+@species SerineAnion "Serine(anion)" -1 "C3H6NO3" 5460785
 @species ThreonineCation "Threonine(cation)" 1 "C4H10NO3"
 @species ThreonineAnion "Threonine(anion)" -1 "C4H8NO3"
-@species MethionineCation "Methionine(cation)" 1 "C5H12NO2S"
-@species MethionineAnion "Methionine(anion)" -1 "C5H10NO2S"
-@species PhenylalanineCation "Phenylalanine(cation)" 1 "C9H12NO2"
-@species PhenylalanineAnion "Phenylalanine(anion)" -1 "C9H10NO2"
-@species TryptophanCation "Tryptophan(cation)" 1 "C11H13N2O2"
-@species TryptophanAnion "Tryptophan(anion)" -1 "C11H11N2O2"
-@species AsparagineCation "Asparagine(cation)" 1 "C4H9N2O3"
-@species AsparagineAnion "Asparagine(anion)" -1 "C4H7N2O3"
-@species GlutamineCation "Glutamine(cation)" 1 "C5H11N2O3"
-@species GlutamineAnion "Glutamine(anion)" -1 "C5H9N2O3"
+@species MethionineCation "Methionine(cation)" 1 "C5H12NO2S" 5249997
+@species MethionineAnion "Methionine(anion)" -1 "C5H10NO2S" 5460884
+@species PhenylalanineCation "Phenylalanine(cation)" 1 "C9H12NO2" 5460949
+@species PhenylalanineAnion "Phenylalanine(anion)" -1 "C9H10NO2" 5460950
+@species TryptophanCation "Tryptophan(cation)" 1 "C11H13N2O2" 5460842
+@species TryptophanAnion "Tryptophan(anion)" -1 "C11H11N2O2" 3090777
+@species AsparagineCation "Asparagine(cation)" 1 "C4H9N2O3" 5460874
+@species AsparagineAnion "Asparagine(anion)" -1 "C4H7N2O3" 5460875
+@species GlutamineCation "Glutamine(cation)" 1 "C5H11N2O3" 5460862
+@species GlutamineAnion "Glutamine(anion)" -1 "C5H9N2O3" 5460863
 @species CitrulineCation "Citruline(cation)" 1 "C6H14N3O3"
-@species CitrulineAnion "Citruline(anion)" -1 "C6H12N3O3"
+@species CitrulineAnion "Citruline(anion)" -1 "C6H12N3O3" 20849076
 
 @species HistidineDication "Histidine(dication)" 2 "C6H11N3O2" # imidazole side chain is basic, like lysine/arginine/ornithine's -- see the registration below
 @species HistidineCation "Histidine(cation)" 1 "C6H10N3O2"
-@species HistidineAnion "Histidine(anion)" -1 "C6H8N3O2"
-@species CysteineCation "Cysteine(cation)" 1 "C3H8NO2S"
+@species HistidineAnion "Histidine(anion)" -1 "C6H8N3O2" 5460934
+@species CysteineCation "Cysteine(cation)" 1 "C3H8NO2S" 5460961
 @species CysteineZwitterion "Cysteine(zwitterion)" 0 "C3H7NO2S" # the reagent itself is now the HCl monohydrate salt (see electrolytes.jl), not this state -- kept explicit for the chain
-@species CysteineAnion "Cysteine(anion)" -1 "C3H6NO2S"
+@species CysteineAnion "Cysteine(anion)" -1 "C3H6NO2S" 5460974 # PubChem has only the stereo-specific record: L-cysteinate(1-)
 @species CysteineDianion "Cysteine(dianion)" -2 "C3H5NO2S"
-@species TyrosineCation "Tyrosine(cation)" 1 "C9H12NO3"
-@species TyrosineAnion "Tyrosine(anion)" -1 "C9H10NO3"
+@species TyrosineCation "Tyrosine(cation)" 1 "C9H12NO3" 5460804
+@species TyrosineAnion "Tyrosine(anion)" -1 "C9H10NO3" 5460822 # PubChem has only the stereo-specific record: L-tyrosinate(1-)
 @species TyrosineDianion "Tyrosine(dianion)" -2 "C9H9NO3"
 
 @species LysineDication "Lysine(dication)" 2 "C6H16N2O2"
-@species LysineCation "Lysine(cation)" 1 "C6H15N2O2"
+@species LysineCation "Lysine(cation)" 1 "C6H15N2O2" 5242389
 @species LysineZwitterion "Lysine(zwitterion)" 0 "C6H14N2O2" # the reagent itself is now the HCl salt (see electrolytes.jl), not this state -- kept explicit for the chain
-@species LysineAnion "Lysine(anion)" -1 "C6H13N2O2"
+@species LysineAnion "Lysine(anion)" -1 "C6H13N2O2" 5460920
 @species ArginineDication "Arginine(dication)" 2 "C6H16N4O2"
-@species ArginineCation "Arginine(cation)" 1 "C6H15N4O2"
-@species ArginineAnion "Arginine(anion)" -1 "C6H13N4O2"
+@species ArginineCation "Arginine(cation)" 1 "C6H15N4O2" 5231987
+@species ArginineAnion "Arginine(anion)" -1 "C6H13N4O2" 5460857
 @species OrnithineDication "Ornithine(dication)" 2 "C5H14N2O2"
-@species OrnithineCation "Ornithine(cation)" 1 "C5H13N2O2"
-@species OrnithineAnion "Ornithine(anion)" -1 "C5H11N2O2"
+@species OrnithineCation "Ornithine(cation)" 1 "C5H13N2O2" 3350920
+@species OrnithineAnion "Ornithine(anion)" -1 "C5H11N2O2" 5460253
 
 # cystine (cysteine's disulfide dimer, symmetric, no thiol) -- approximate macroscopic pKa's, see
 # comment at its registration below.
 @species CystineDication "Cystine(dication)" 2 "C6H14N2O4S2"
 @species CystineCation "Cystine(cation)" 1 "C6H13N2O4S2"
 @species CystineAnion "Cystine(anion)" -1 "C6H11N2O4S2"
-@species CystineDianion "Cystine(dianion)" -2 "C6H10N2O4S2"
+@species CystineDianion "Cystine(dianion)" -2 "C6H10N2O4S2" 56927735 # PubChem has only the stereo-specific record: L-cystine anion
 
 # Tier-1: common acids. pyruvate/butyrate/tartrate turned out to be real sodium salts (confirmed
 # against the lab's actual stocklist, Reagent_StockList.xlsx -- see electrolytes.jl), so their
@@ -134,18 +134,18 @@
 @species EDTAAnion "EDTA(anion)" -1 "C10H15N2O8"
 @species EDTADianion "EDTA(dianion)" -2 "C10H14N2O8"
 @species EDTATrianion "EDTA(trianion)" -3 "C10H13N2O8"
-@species EDTATetraanion "EDTA(tetraanion)" -4 "C10H12N2O8"
-@species AscorbateAnion "Ascorbate(anion)" -1 "C6H7O6"
+@species EDTATetraanion "EDTA(tetraanion)" -4 "C10H12N2O8" 164551
+@species AscorbateAnion "Ascorbate(anion)" -1 "C6H7O6" 54679076
 @species AscorbateDianion "Ascorbate(dianion)" -2 "C6H6O6"
-@species PyruvicAcid "Pyruvic acid" 0 "C3H4O3" # neutral acid
-@species PyruvateAnion "Pyruvate(anion)" -1 "C3H3O3" # == pyruvate's stored MW, now correctly charged
-@species ButyricAcid "Butyric acid" 0 "C4H8O2" # neutral acid
-@species ButyrateAnion "Butyrate(anion)" -1 "C4H7O2" # == butyrate's stored MW, now correctly charged
+@species PyruvicAcid "Pyruvic acid" 0 "C3H4O3" 1060 # neutral acid
+@species PyruvateAnion "Pyruvate(anion)" -1 "C3H3O3" 107735 # == pyruvate's stored MW, now correctly charged
+@species ButyricAcid "Butyric acid" 0 "C4H8O2" 264 # neutral acid
+@species ButyrateAnion "Butyrate(anion)" -1 "C4H7O2" 104775 # == butyrate's stored MW, now correctly charged
 @species TartaricAcid "Tartaric acid" 0 "C4H6O6" # neutral diacid
 @species TartrateMonoanion "Tartrate(monoanion)" -1 "C4H5O6"
-@species TartrateDianion "Tartrate(dianion)" -2 "C4H4O6" # == tartrate's stored MW, now correctly charged
-@species BiotinAnion "Biotin(anion)" -1 "C10H15N2O3S"
-@species LipoateAnion "Lipoate(anion)" -1 "C8H13O2S2"
+@species TartrateDianion "Tartrate(dianion)" -2 "C4H4O6" 119400 # == tartrate's stored MW, now correctly charged
+@species BiotinAnion "Biotin(anion)" -1 "C10H15N2O3S" 6560210
+@species LipoateAnion "Lipoate(anion)" -1 "C8H13O2S2" 1549144 # PubChem has only the stereo-specific record: (R)-Lipoate
 
 # Tier-1: antibiotics. Sulfonamides/fluoroquinolones/most penicillins reuse the identity trick
 # (neutral zwitterion or free acid, matches stored MW) exactly like the amino acids/organic acids
@@ -167,12 +167,12 @@
 @species OfloxacinAnion "Ofloxacin(anion)" -1 "C18H19FN3O4"
 @species PenicillinGAnion "PenicillinG(anion)" -1 "C16H17N2O4S"
 @species AmpicillinCation "Ampicillin(cation)" 1 "C16H20N3O4S"
-@species AmpicillinAnion "Ampicillin(anion)" -1 "C16H18N3O4S"
+@species AmpicillinAnion "Ampicillin(anion)" -1 "C16H18N3O4S" 640430
 @species AmoxicillinCation "Amoxicillin(cation)" 1 "C16H20N3O5S"
-@species AmoxicillinAnion "Amoxicillin(anion)" -1 "C16H18N3O5S"
+@species AmoxicillinAnion "Amoxicillin(anion)" -1 "C16H18N3O5S" 25137942
 @species AmoxicillinDianion "Amoxicillin(dianion)" -2 "C16H17N3O5S"
 @species CarbenicillinAnion "Carbenicillin(anion)" -1 "C17H17N2O6S"
-@species OxacillinAnion "Oxacillin(anion)" -1 "C19H18N3O5S"
+@species OxacillinAnion "Oxacillin(anion)" -1 "C19H18N3O5S" 6426740
 
 # Tetracycline family (free-base MW anchors, not the reagents' own stored HCl-salt MW): tetracycline
 # and doxycycline share the same molecular formula (444.43 g/mol free base); chlortetracycline is
@@ -180,28 +180,28 @@
 # 457.48. Each gets its own 4-state cation/zwitterion/anion/dianion chain.
 @species TetracyclineCation "Tetracycline(cation)" 1 "C22H25N2O8"
 @species TetracyclineZwitterion "Tetracycline(zwitterion)" 0 "C22H24N2O8"
-@species TetracyclineAnion "Tetracycline(anion)" -1 "C22H23N2O8"
+@species TetracyclineAnion "Tetracycline(anion)" -1 "C22H23N2O8" 139031622
 @species TetracyclineDianion "Tetracycline(dianion)" -2 "C22H22N2O8"
 @species DoxycyclineCation "Doxycycline(cation)" 1 "C22H25N2O8"
 @species DoxycyclineZwitterion "Doxycycline(zwitterion)" 0 "C22H24N2O8"
 @species DoxycyclineAnion "Doxycycline(anion)" -1 "C22H23N2O8"
 @species DoxycyclineDianion "Doxycycline(dianion)" -2 "C22H22N2O8"
 @species ChlortetracyclineCation "Chlortetracycline(cation)" 1 "C22H24ClN2O8"
-@species ChlortetracyclineZwitterion "Chlortetracycline(zwitterion)" 0 "C22H23ClN2O8"
+@species ChlortetracyclineZwitterion "Chlortetracycline(zwitterion)" 0 "C22H23ClN2O8" 54675777
 @species ChlortetracyclineAnion "Chlortetracycline(anion)" -1 "C22H22ClN2O8"
 @species ChlortetracyclineDianion "Chlortetracycline(dianion)" -2 "C22H21ClN2O8"
 @species MinocyclineCation "Minocycline(cation)" 1 "C23H28N3O7"
-@species MinocyclineZwitterion "Minocycline(zwitterion)" 0 "C23H27N3O7"
-@species MinocyclineAnion "Minocycline(anion)" -1 "C23H26N3O7"
+@species MinocyclineZwitterion "Minocycline(zwitterion)" 0 "C23H27N3O7" 54675783
+@species MinocyclineAnion "Minocycline(anion)" -1 "C23H26N3O7" 139031619
 @species MinocyclineDianion "Minocycline(dianion)" -2 "C23H25N3O7"
 
-@species CycloserineCation "Cycloserine(cation)" 1 "C3H7N2O2"
+@species CycloserineCation "Cycloserine(cation)" 1 "C3H7N2O2" 7045654 # PubChem has only the stereo-specific record: D-cycloserine(1+)
 @species CycloserineAnion "Cycloserine(anion)" -1 "C3H5N2O2"
-@species ErythromycinCation "Erythromycin(cation)" 1 "C37H68NO13"
+@species ErythromycinCation "Erythromycin(cation)" 1 "C37H68NO13" 44629456 # the erythromycin A record
 @species LincomycinCation "Lincomycin(cation)" 1 "C18H35N2O6S"
 
 # Tier-1: miscellaneous simple bases.
-@species PromethazineCation "Promethazine(cation)" 1 "C17H21N2S"
+@species PromethazineCation "Promethazine(cation)" 1 "C17H21N2S" 24848341
 @species CarnitineCation "Carnitine(cation)" 1 "C7H16NO3" # the quaternary N is permanently +1; only the carboxyl equilibrates
 @species TaurineAnion "Taurine(anion)" -1 "C2H6NO3S" # sulfonate stays fully deprotonated, MOPS-style; only the amine equilibrates
 @species AgmatineDication "Agmatine(dication)" 2 "C5H16N4"
@@ -223,19 +223,19 @@
 # Succinic acid: sodium_succinate_hexahydrate's own Dissolution already dissociates to the fully
 # deprotonated dianion (C4H4O4²⁻, already in ions.jl), same situation as pyruvate/butyrate/tartrate --
 # these two new endpoints are the more-protonated states above it in the chain.
-@species SuccinicAcid "Succinic acid" 0 "C4H6O4" # matches real succinic acid's MW (118.09) -- consistency check
-@species SuccinateMonoanion "Succinate(monoanion)" -1 "C4H5O4"
+@species SuccinicAcid "Succinic acid" 0 "C4H6O4" 1110 # matches real succinic acid's MW (118.09) -- consistency check
+@species SuccinateMonoanion "Succinate(monoanion)" -1 "C4H5O4" 3693574
 
 # Ammonium: NH4⁺ (already in ions.jl, shared by ammonium_chloride/ammonium_nitrate/ammonium_sulfate)
 # is one of the most well-established weak acids in aqueous chemistry (conjugate acid of ammonia).
-@species NH3 "NH3" 0 "NH3" # PubChem CID 222
+@species NH3 "NH3" 0 "NH3" 222
 
 # butyric_acid/succinic_acid/l_malic_acid/d_malic_acid are new free-acid reagents added alongside
 # the existing sodium_butyrate/sodium_succinate_hexahydrate/malic_acid salts -- same conjugate
 # chemistry, so they reuse the ButyricAcid/SuccinicAcid/HMalate-/Malate2- Species already defined
 # above rather than duplicating them. Only ethanolamine/putrescine/hypoxanthine below are genuinely
 # new conjugate endpoints.
-@species EthanolamineCation "Ethanolamine(cation)" 1 "C2H8NO"
+@species EthanolamineCation "Ethanolamine(cation)" 1 "C2H8NO" 444693
 @species PutrescineDication "Putrescine(dication)" 2 "C4H14N2"
 @species PutrescineCation "Putrescine(cation)" 1 "C4H13N2"
 @species HypoxanthineAnion "Hypoxanthine(anion)" -1 "C5H3N4O"

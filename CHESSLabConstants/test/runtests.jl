@@ -574,6 +574,27 @@ end
     @test CHESSCore.pubchemid(CHESSLabConstants.water) == 962
 end
 
+@testset "Species PubChem IDs from the acid/base data" begin
+    pid = CHESSCore.pubchemid
+    @test pid(CHESSLabConstants.Lactate⁻) == 91435 # the ion, not the neutral acid (107689)
+    @test pid(CHESSLabConstants.Oxalate²⁻) == 71081
+    @test pid(CHESSLabConstants.H3PO4) == 1004
+    @test pid(CHESSLabConstants.AlanineCation) == 5237251
+    @test pid(CHESSLabConstants.TetracyclineAnion) == 139031622
+    # a species with no PubChem record of its own stays unset
+    @test ismissing(pid(CHESSLabConstants.AspartateCation))
+
+    # no two named species share an ID
+    ids = Int[]
+    for n in names(CHESSLabConstants;all=true)
+        isdefined(CHESSLabConstants,n) || continue
+        v = getfield(CHESSLabConstants,n)
+        v isa CHESSCore.Species && !ismissing(pid(v)) && push!(ids,pid(v))
+    end
+    @test length(ids) > 100
+    @test allunique(ids)
+end
+
 @testset "Reagent chemistry: every reagent has a formula or is declared opaque" begin
     lacking = Symbol[]
     for sym in sort!(collect(keys(CHESSCore.chemprops)))
