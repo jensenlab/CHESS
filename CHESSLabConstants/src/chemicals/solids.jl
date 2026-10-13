@@ -39,7 +39,13 @@
 @reagent ascorbate "L-Ascorbic Acid" Solid "C6H8O6" missing 54670067
 @reagent asparagine "L-asparagine" Solid "C4H8N2O3" 1.543u"g/mL" 6267
 @reagent aspartic_acid "L-aspartic acid" Solid "C4H7NO4" 1.6603u"g/mL" 5960
-@reagent b_nadph "β-NADPH (triphosphopyridine nucleotide)" Solid "C21H28N7O17P3" missing 5885
+@reagent b_nadp "β-NADP (β-nicotinamide adenine dinucleotide phosphate)" Solid "C21H28N7O17P3" missing 5885
+# ^ corrected 2026-10-13: this was registered as b_nadph, NADPH, but it is NADP, the oxidized form. The
+# lab's received list gives the vendor product "B-NICOTINAMIDE ADENINE DINUCLEOTIDE PHOS" (cut off by the
+# order system) with formula C21H28N7O17P3, and CID 5885 is NADP. The ordering sheet planned catalog
+# COMH042346F4, noted "tetra sodium hydrate"; the order and the received list show N5755. The lab calls it
+# CoenzymeII (b-nadph).
+@reagent_product b_nadp "Sigma-Aldrich" catalog_number="N5755" product_name="β-Nicotinamide adenine dinucleotide phosphate" notes="Manufactured by CombiBlocks. The product name is cut off in the order record."
 @reagent beef_extract "Beef Extract" Solid opaque missing missing
 @reagent beef_heart "Beef Heart" Solid opaque missing missing
 @reagent benzamadine "benzamidine" Solid "C7H8N2" missing 2332

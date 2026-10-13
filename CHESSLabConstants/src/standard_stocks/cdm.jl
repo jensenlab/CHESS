@@ -40,7 +40,7 @@
     10u"mg" * biotin + 
     40u"mg" * folic_acid + 
     50u"mg" * niacinamide + 
-    125u"mg" * b_nadph + 
+    125u"mg" * b_nadp + 
     100u"mg" * pantothenate + 
     50u"mg" * pyridoxal + 
     50u"mg" * pyridoxamine + 
