@@ -9,6 +9,9 @@
 @reagent adenine "adenine" Solid "C5H5N5" missing 190
 @reagent adenosine "adenosine" Solid "C10H13N5O4" missing 60961
 @reagent adonitol "Adonitol (Ribitol)" Solid "C5H12O5" missing 6912
+# ^ CID 6912 is also xylitol's. PubChem keeps one record for both meso pentitols: the CAS numbers of ribitol
+# (488-81-3) and xylitol (87-99-0) both resolve to it, and it leaves the middle carbon's stereochemistry
+# undefined. PubChem has no separate record for either, so the two species share the ID and differ by name.
 @reagent agar "agar" Solid "C14H24O9" missing 71571511
 @reagent agmatine "Agmatine" Solid "C5H14N4" missing 199
 @reagent alanine "DL-alanine" Solid "C3H7NO2" missing 602
@@ -60,7 +63,15 @@
 @reagent_product beta_methyl_d_glucoside "Fisher Scientific" catalog_number="AC270920250" product_name="Methyl-beta-D-glucopyranoside hemihydrate" notes="Thermo Scientific (Acros Organics)"
 @reagent bhi "Brain Heart Infusion Broth" Solid opaque missing missing
 @reagent biotin "biotin" Solid "C10H16N2O3S" missing 171548
-@reagent bleomycin "bleomycin" Solid opaque(1415.6u"g/mol") missing 5360373
+@species BleomycinA2⁺ "Bleomycin A2(cation)" 1 "C55H84N17O21S3" 5460769
+@reagent bleomycin "bleomycin sulfate" Solid (BleomycinA2⁺ + HSO4⁻) missing missing
+# ^ modeled on Sigma BP971, the British Pharmacopoeia reference standard for bleomycin sulfate (CAS 9041-93-4).
+# The product is a mixture of bleomycin A2 and B2. It is modeled as the A2 salt, the A2 cation plus hydrogen
+# sulfate, C55H85N17O25S4 at 1512.6 g/mol, which is the formula and molar mass that vendors give for
+# bleomycin sulfate; BP971 itself states neither. The B2 component is not modeled. This was opaque at 1415.6
+# g/mol, the cation's mass without its counter-ion, with CID 5360373, which has the same formula as A2's
+# record but a general name. No AcidBaseSystem: the pH of a bleomycin sulfate solution is not modeled.
+@reagent_product bleomycin "Sigma-Aldrich" catalog_number="BP971" product_name="Bleomycin sulfate, British Pharmacopoeia reference standard" grade="British Pharmacopoeia reference standard" notes="100 mg lyophilized powder. From the ordering sheet, whose 25 g size does not match the 100 mg unit."
 @reagent boric_acid "Boric Acid" Solid "BH3O3" 1.435u"g/mL" 7628
 @reagent sodium_butyrate "Sodium Butyrate" Solid 110.09u"g/mol" missing missing
 @reagent_product sodium_butyrate "Sigma-Aldrich" catalog_number="303410" product_name="Butyric acid, sodium salt" grade="98%"
@@ -360,8 +371,7 @@
 @reagent xanthosine "xanthosine" Solid "C10H12N4O6" missing 64959
 @reagent xylitol "Xylitol" Solid "C5H12O5" missing 6912
 # ^ fixed 2026-10-12: was CID 581285 ("xylitol, 1-O-octanoyl-", C13H26O6), a different compound --
-# corrected to xylitol. CID 6912 is PubChem's pentitol entry without stereochemistry, which adonitol
-# (ribitol) shares; the two are isomers and differ only by name here.
+# corrected to xylitol. CID 6912 is shared with adonitol (ribitol); see the note under adonitol.
 @reagent xylose "D-xylose" Solid "C5H10O5" 1.525u"g/mL" 135191
 @reagent yeast_extract "yeast_extract" Solid opaque missing missing
 @reagent zinc_chloride "Zinc (II) Chloride" Solid (Zn²⁺+2*Cl⁻) 2.91u"g/mL" missing

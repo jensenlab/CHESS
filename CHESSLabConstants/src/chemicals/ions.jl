@@ -27,6 +27,7 @@
 @species Cl⁻ "Cl-" -1 "Cl" 312
 @species NO3⁻ "NO3-" -1 "NO3" 943
 @species SO4²⁻ "SO4 2-" -2 "SO4" 1117
+@species HSO4⁻ "HSO4-" -1 "HSO4" 61778
 @species CO3²⁻ "CO3 2-" -2 "CO3" 19660
 @species HCO3⁻ "HCO3-" -1 "HCO3" 769
 @species Cr2O7²⁻ "Cr2O7 2-" -2 "Cr2O7" 24503

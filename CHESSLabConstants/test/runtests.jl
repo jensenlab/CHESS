@@ -564,7 +564,7 @@ end
 @testset "Ion species carry PubChem IDs" begin
     # every species declared in ions.jl has an ID
     labels = [m.captures[1] for m in match.(r"^@species (\S+) ",readlines(joinpath(pkgdir(CHESSLabConstants),"src","chemicals","ions.jl"))) if m !== nothing]
-    @test length(labels) == 31
+    @test length(labels) == 32
     @test all(l -> !ismissing(CHESSCore.pubchemid(getfield(CHESSLabConstants,Symbol(l)))),labels)
     @test CHESSCore.pubchemid(CHESSLabConstants.Na⁺) == 923
     @test CHESSCore.pubchemid(CHESSLabConstants.SO4²⁻) == 1117
@@ -650,11 +650,21 @@ end
     @test choline_atoms[:Cl] ≈ 1u"mol" && choline_atoms[:N] ≈ 1u"mol" && choline_atoms[:C] ≈ 5u"mol"
     @test CHESSCore.molecular_weight(CHESSLabConstants.choline_chloride) ≈ 139.62u"g/mol" atol=0.01u"g/mol"
 
-    # opaque reagents contribute no atoms and do not warn; lactic acid and bleomycin keep their weights
+    # opaque reagents contribute no atoms and do not warn; lactic acid keeps its weight
     @test_logs CHESSCore.atoms(10u"g"*CHESSLabConstants.yeast_extract)
     @test isempty(CHESSCore.atoms(10u"g"*CHESSLabConstants.yeast_extract))
-    @test CHESSCore.molecular_weight(CHESSLabConstants.bleomycin) == 1415.6u"g/mol"
-    @test_logs CHESSCore.atoms(5u"mL"*CHESSLabConstants.lactic_acid + 1u"g"*CHESSLabConstants.bleomycin)
+    @test_logs CHESSCore.atoms(5u"mL"*CHESSLabConstants.lactic_acid)
+
+    # bleomycin sulfate (Sigma BP971): the A2 cation with hydrogen sulfate, C55H85N17O25S4 at 1512.6 g/mol
+    bleo = CHESSLabConstants.bleomycin
+    @test CHESSCore.molecular_weight(bleo) ≈ 1512.62u"g/mol" atol=0.1u"g/mol"
+    bleo_atoms = @test_logs CHESSCore.atoms(1u"mol"*bleo)
+    @test bleo_atoms[:C] ≈ 55u"mol" && bleo_atoms[:H] ≈ 85u"mol" && bleo_atoms[:N] ≈ 17u"mol" &&
+        bleo_atoms[:O] ≈ 25u"mol" && bleo_atoms[:S] ≈ 4u"mol"
+    @test CHESSCore.pubchemid(CHESSLabConstants.BleomycinA2⁺) == 5460769
+    @test CHESSCore.pubchemid(CHESSLabConstants.HSO4⁻) == 61778
+    @test ismissing(CHESSCore.pubchemid(bleo)) # two species: the IDs belong to them
+    @test only(CHESSCore.reagent_products(bleo)).catalog_number == "BP971"
 
     # a stock mixing formula reagents, opaque reagents, and water has no gap to warn about
     media = 10u"g"*CHESSLabConstants.glucose + 5u"g"*CHESSLabConstants.yeast_extract + 1u"L"*CHESSLabConstants.water
