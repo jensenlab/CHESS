@@ -141,8 +141,9 @@ register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "7
 ```
 
 PubChem describes the compound of the ID it is given, so the ID must be that of the form actually
-weighed out. A hydrate needs the hydrate's PubChem ID. A salt that dissolves into ions needs a
-`Dissolution` in place of the single formula the function returns. A compound with no PubChem entry,
+weighed out when the reagent is a single compound. A hydrate or a salt that dissolves into ions needs a
+`Dissolution` in place of the single formula the function returns, and each species in it carries its
+own PubChem ID. A compound with no PubChem entry,
 such as a rich-media broth, is registered without a PubChem ID. The line then has `missing`
 chemistry, or `opaque` when `register_reagent!` is called with `opaque=true` for an undefined mixture.
 [`get_molecular_formula`](@ref) takes a PubChem ID and returns the formula as PubChem writes it, and

@@ -23,6 +23,7 @@ end
         @test CHESSDatabase.migrate_chemistry!() === true
         @test CHESSDatabase.migrate_chemistry!() === false # already migrated
         @test "Formula" in query_db("SELECT name FROM pragma_table_info('Species')").name
+        @test "CID" in query_db("SELECT name FROM pragma_table_info('Species')").name
         tables = query_db("SELECT name FROM sqlite_master WHERE type='table'").name
         @test !("Chemicals" in tables) && !("CompositionRules" in tables)
         rows = query_db("SELECT s.Name, s.MolecularWeight, s.Formula, r.Coefficient FROM Dissolutions r INNER JOIN Species s ON r.SpeciesID = s.ID")
@@ -43,5 +44,31 @@ end
         CHESSDatabase._current_db[] = previous
         rm(old_path,force=true)
         rm(half_path,force=true)
+    end
+end
+
+@testset "migrate_chemistry! adds Species.CID from single-species reagents" begin
+    previous = CHESSDatabase._current_db[]
+    path = tempname()*".db"
+    try
+        db = SQLite.DB(path)
+        DBInterface.execute(db,"CREATE TABLE Species(ID INTEGER PRIMARY KEY NOT NULL, Name TEXT, Charge INTEGER, Formula TEXT, MolecularWeight REAL)")
+        DBInterface.execute(db,"CREATE TABLE Reagents(ComponentID INTEGER PRIMARY KEY NOT NULL, Name TEXT, Type TEXT, MolecularWeight REAL, Density REAL, CID INTEGER)")
+        DBInterface.execute(db,"CREATE TABLE Dissolutions(ID INTEGER PRIMARY KEY NOT NULL, ReagentComponentID INTEGER, SpeciesID INTEGER, Coefficient INTEGER)")
+        DBInterface.execute(db,"INSERT INTO Species(Name,Charge,Formula) VALUES('urea',0,'CH4N2O'),('Na+',1,'Na'),('Cl-',-1,'Cl')")
+        DBInterface.execute(db,"INSERT INTO Reagents(ComponentID,Name,Type,CID) VALUES(1,'urea','Solid',1176),(2,'sodium chloride','Solid',5234)")
+        DBInterface.execute(db,"INSERT INTO Dissolutions(ReagentComponentID,SpeciesID,Coefficient) VALUES(1,1,1),(2,2,1),(2,3,1)")
+        close(db)
+
+        @test_logs (:warn,r"migrate_chemistry!") connect_SQLite(path)
+        @test CHESSDatabase.migrate_chemistry!() === true
+        @test CHESSDatabase.migrate_chemistry!() === false
+        cids = query_db("SELECT Name, CID FROM Species ORDER BY ID")
+        @test cids.CID[1] == 1176 # the one species of urea takes urea's ID
+        @test ismissing(cids.CID[2]) && ismissing(cids.CID[3]) # a two-species reagent's ID belongs to neither
+        @test_logs connect_SQLite(path)
+    finally
+        CHESSDatabase._current_db[] = previous
+        rm(path,force=true)
     end
 end

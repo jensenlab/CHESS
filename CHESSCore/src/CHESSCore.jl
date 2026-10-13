@@ -31,7 +31,7 @@ function _chemprops(m::Module)
     if isdefined(m,chemprops_name)
         getproperty(m,chemprops_name)
     else
-        Core.eval(m,:(const $chemprops_name = Dict{Symbol,Tuple{Union{Unitful.MolarMass,Missing},Union{Unitful.Density,Missing},Union{Integer,Missing}}}()))
+        Core.eval(m,:(const $chemprops_name = Dict{Symbol,Tuple{Union{Unitful.MolarMass,Missing},Union{Unitful.Density,Missing}}}()))
     end
 end
 

@@ -929,11 +929,11 @@ end
 end
 
 @testset "Reagent value-based equality" begin
-    s1 = Solid("paba",137.14u"g/mol",1.35u"g/mL",978)
-    s2 = Solid("paba",137.14u"g/mol",1.35u"g/mL",978)
+    s1 = Solid("paba",137.14u"g/mol",1.35u"g/mL")
+    s2 = Solid("paba",137.14u"g/mol",1.35u"g/mL")
     @test s1 == s2
     @test hash(s1) == hash(s2)
-    l1 = Liquid("paba",137.14u"g/mol",1.35u"g/mL",978)
+    l1 = Liquid("paba",137.14u"g/mol",1.35u"g/mL")
     @test s1 != l1 # same fields, different concrete type -- must stay distinct
     d = Dict(s1=>5u"g")
     @test d[s2] == 5u"g" # Dict lookup succeeds with a separately-constructed-but-equal key

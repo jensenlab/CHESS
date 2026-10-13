@@ -2,8 +2,8 @@
 # author-time cache (JLConstants_database.db) via register_reagent! -- see chemical_utils.jl. To add
 # a new compound, call register_reagent!, paste the returned line in below (alphabetically), commit.
 
-@reagent HCl "Hydrochloric Acid" Solid (CHESSCore.H⁺+Cl⁻) 1.05u"g/mL" 313
-@reagent NaOH "Sodium Hydroxide" Solid (Na⁺+CHESSCore.OH⁻) 1.5u"g/mL" 14798
+@reagent HCl "Hydrochloric Acid" Solid (CHESSCore.H⁺+Cl⁻) 1.05u"g/mL" missing
+@reagent NaOH "Sodium Hydroxide" Solid (Na⁺+CHESSCore.OH⁻) 1.5u"g/mL" missing
 @reagent acetamide "Acetamide" Solid "C2H5NO" 1.159u"g/mL" 178
 @reagent acid_red_1 "Acid Red 1" Solid "C18H13N3Na2O8S2" missing 19522
 @reagent adenine "adenine" Solid "C5H5N5" missing 190
@@ -19,9 +19,9 @@
 @reagent alpha_cyclodextrin "Alpha-Cyclodextrin" Solid "C36H60O30" missing 444913
 @reagent alpha_ketoglutaric_acid "Alpha Ketoglutaric Acid (2-Oxoglutaric Acid)" Solid "C5H6O5" missing 51
 @reagent amitrole "amitrole (3-amino-1,2,4-triazole)" Solid "C2H4N4" 1.138u"g/mL" 1639
-@reagent ammonium_chloride "Ammonium_chloride" Solid (NH4⁺+Cl⁻) 1.53u"g/mL" 25517
-@reagent ammonium_nitrate "Ammonium Nitrate" Solid (NH4⁺+NO3⁻) 1.72u"g/mL" 22985
-@reagent ammonium_sulfate "Ammonium Sulfate" Solid (2*NH4⁺+SO4²⁻) 1.78u"g/mL" 6097028
+@reagent ammonium_chloride "Ammonium_chloride" Solid (NH4⁺+Cl⁻) 1.53u"g/mL" missing
+@reagent ammonium_nitrate "Ammonium Nitrate" Solid (NH4⁺+NO3⁻) 1.72u"g/mL" missing
+@reagent ammonium_sulfate "Ammonium Sulfate" Solid (2*NH4⁺+SO4²⁻) 1.78u"g/mL" missing
 @reagent amoxicillin "amoxicillin" Solid "C16H19N3O5S" missing 33613
 @reagent ampicillin "ampicillin" Solid "C16H19N3O4S" missing 6249
 @reagent arabinan "Arabinan" Solid opaque missing missing
@@ -41,20 +41,20 @@
 @reagent beef_extract "Beef Extract" Solid opaque missing missing
 @reagent beef_heart "Beef Heart" Solid opaque missing missing
 @reagent benzamadine "benzamidine" Solid "C7H8N2" missing 2332
-@species MethylBetaDGlucoside "Methyl-beta-D-glucopyranoside" 0 "C7H14O6" # PubChem CID 445238
-@reagent beta_methyl_d_glucoside "Methyl-beta-D-glucopyranoside Hemihydrate" Solid (MethylBetaDGlucoside + 0.5*H2O) missing 445238
+@species MethylBetaDGlucoside "Methyl-beta-D-glucopyranoside" 0 "C7H14O6" 445238
+@reagent beta_methyl_d_glucoside "Methyl-beta-D-glucopyranoside Hemihydrate" Solid (MethylBetaDGlucoside + 0.5*H2O) missing missing
 # ^ Thermo/Acros AC270920250 is the hemihydrate, not anhydrous: one mole of the glucoside with half a mole
 # of water (194.18 + 18.015/2 = 203.19). PubChem's own "hemihydrate"-titled CID (75487602, MW 212.20) is
 # internally inconsistent -- its formula is actually a full monohydrate's, not a hemihydrate's -- confirmed
 # against the clean 2:1 compound:water co-crystal entry (CID 2724704, MW 406.38 = 2x194.18+18.02).
-# pubchemid kept as the anhydrous parent (445238), the correct compound identity, since no
-# PubChem CID accurately represents the hemihydrate on its own.
+# The glucoside species carries the anhydrous parent's CID (445238); no PubChem CID accurately represents
+# the hemihydrate on its own, and the reagent has none.
 @reagent bhi "Brain Heart Infusion Broth" Solid opaque missing missing
 @reagent biotin "biotin" Solid "C10H16N2O3S" missing 171548
 @reagent bleomycin "bleomycin" Solid opaque(1415.6u"g/mol") missing 5360373
 @reagent boric_acid "Boric Acid" Solid "BH3O3" 1.435u"g/mL" 7628
-@reagent sodium_butyrate "Sodium Butyrate" Solid 110.09u"g/mol" missing 5222465
-@reagent calcium_chloride "calcium chloride dihydrate" Solid (Ca²⁺+2*Cl⁻+2*H2O) 1.85u"g/mL" 6093260  # dihydrate
+@reagent sodium_butyrate "Sodium Butyrate" Solid 110.09u"g/mol" missing missing
+@reagent calcium_chloride "calcium chloride dihydrate" Solid (Ca²⁺+2*Cl⁻+2*H2O) 1.85u"g/mL" missing  # dihydrate
 @reagent calcium_l_threonate "Calcium L-threonate" Solid "C8H14CaO10" missing 13388558
 @reagent carbenicillin "carbenicillin" Solid "C17H18N2O6S" missing 20824
 @reagent carnitine "D,L-Carnitine" Solid "C7H15NO3" missing 288
@@ -66,33 +66,33 @@
 # no Dissolution/AcidBaseSystem (same non-discrete-material treatment as arabinan/
 # hydrolyzed_mucin below).
 @reagent chloramphenicol "chloramphenicol" Solid "C11H12Cl2N2O5" missing 5959
-@reagent chlortetracycline "chlortetracycline" Solid 515.3u"g/mol" missing 54682468
-@reagent choline_chloride "Choline Chloride" Solid (Choline⁺ + Cl⁻) missing 6209
+@reagent chlortetracycline "chlortetracycline" Solid 515.3u"g/mol" missing missing
+@reagent choline_chloride "Choline Chloride" Solid (Choline⁺ + Cl⁻) missing missing
 # ^ Sigma C7527 choline chloride (139.62 g/mol). The choline cation is `Choline⁺` (ions.jl, CID 305).
 @reagent ciprofloxacin "ciprofloxacin" Solid "C17H18FN3O3" missing 2764
 @reagent citric_acid "Citric Acid" Solid "C6H8O7" 1.54u"g/mL" 311
 @reagent citruline "L-citruline" Solid "C6H13N3O3" missing 9750
-@reagent cobalt_chloride "Cobalt (II) Chloride Hexahydrate" Solid (Co²⁺+2*Cl⁻+6*H2O) 1.924u"g/mL" 24643  # hexahydrate
+@reagent cobalt_chloride "Cobalt (II) Chloride Hexahydrate" Solid (Co²⁺+2*Cl⁻+6*H2O) 1.924u"g/mL" missing  # hexahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 3032536, real anhydrous density ~3.35 g/mL) but
 # the stored density (1.924) actually matches the hexahydrate's -- corrected to the hexahydrate CID
 # (24643); molecular_weight derives from the Dissolution (electrolytes.jl), now including 6 H2O.
-@reagent cobalt_nitrate "Cobalt (II) Nitrate Hexahydrate" Solid (Co²⁺+2*NO3⁻+6*H2O) 1.88u"g/mL" 24821  # hexahydrate
+@reagent cobalt_nitrate "Cobalt (II) Nitrate Hexahydrate" Solid (Co²⁺+2*NO3⁻+6*H2O) 1.88u"g/mL" missing  # hexahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 25000, density 1.54 -- neither the anhydrous
 # nor hexahydrate reference density) -- corrected to hexahydrate (CID 24821, density 1.88) per the
 # lab's own purchase record (Sigma 230375-100G, "COBALT(II) NITRATE HEXAHYDRATE, 98%").
 # molecular_weight derives from the Dissolution (electrolytes.jl), now including 6 H2O.
 @reagent colistin "colistin" Solid "C52H98N16O13" missing 5311054
-@reagent copper_chloride "Copper (II) Chloride Dihydrate" Solid (Cu²⁺+2*Cl⁻+2*H2O) 2.54u"g/mL" 61482  # dihydrate
+@reagent copper_chloride "Copper (II) Chloride Dihydrate" Solid (Cu²⁺+2*Cl⁻+2*H2O) 2.54u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24014, real anhydrous density ~3.4 g/mL) but the
 # stored density (2.54) actually matches the dihydrate's -- corrected to the dihydrate CID (61482);
 # molecular_weight derives from the Dissolution (electrolytes.jl), now including 2 H2O.
-@reagent copper_sulfate "Copper (II) Sulfate Pentahydrate" Solid (Cu²⁺+SO4²⁻+5*H2O) 2.29u"g/mL" 24463  # pentahydrate
+@reagent copper_sulfate "Copper (II) Sulfate Pentahydrate" Solid (Cu²⁺+SO4²⁻+5*H2O) 2.29u"g/mL" missing  # pentahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24462, real anhydrous density ~3.6 g/mL) but the
 # stored density (2.29) actually matches the pentahydrate's -- corrected to the pentahydrate CID
 # (24463); molecular_weight derives from the Dissolution (electrolytes.jl), now including 5 H2O.
 @reagent cyclohexamide "cycloheximide" Solid "C15H23NO4" missing 6197
 @reagent cycloserine "cycloserine" Solid "C3H6N2O2" missing 6234
-@reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing 23462
+@reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing missing
 @reagent cystine "L-cystine" Solid "C6H12N2O4S2" missing 67678
 @reagent cytosine "cytosine" Solid "C4H5N3O" missing 597
 @reagent d_alanine "D-Alanine" Solid "C3H7NO2" missing 71080
@@ -121,7 +121,7 @@
 @reagent d_tagatose "D-Tagatose" Solid "C6H12O6" missing 439312
 @reagent dextrin "dextrin from corn" Solid "C18H32O16" missing 62698
 @reagent dihydroxyacetone "Dihydroxyacetone" Solid "C3H6O3" missing 670
-@reagent doxycycline "doxycycline" Solid 480.9u"g/mol" missing 54685920
+@reagent doxycycline "doxycycline" Solid 480.9u"g/mol" missing missing
 @reagent dulcitol "Dulcitol (Galactitol)" Solid "C6H14O6" missing 11850
 @reagent ectoine "Ectoine" Solid "C6H10N2O2" missing 126041
 @reagent edta "EDTA" Solid "C10H16N2O8" 0.86u"g/mL" 6049
@@ -163,11 +163,11 @@
 # CID/fixed MW; registered for identity/inventory purposes only, same as arabinan above.
 @reagent hypoxanthine "Hypoxanthine" Solid "C5H4N4O" missing 135398638
 @reagent inosine "inosine" Solid "C10H12N4O5" missing 135398641
-@reagent iron_chloride "Iron Chloride (Ferric Chloride)" Solid (Fe³⁺+3*Cl⁻) 2.8u"g/mL" 24380
+@reagent iron_chloride "Iron Chloride (Ferric Chloride)" Solid (Fe³⁺+3*Cl⁻) 2.8u"g/mL" missing
 # ^ checked 2026-08-14: not in the lab stocklist, but its stored density matches the anhydrous reference value
 # cleanly, unlike the hydrates fixed in this file -- confirmed anhydrous.
-@reagent iron_nitrate "iron (III) nitrate nonahydrate" Solid (Fe³⁺+3*NO3⁻+9*H2O) 1.68u"g/mL" 16211566  # nonahydrate
-@reagent iron_sulfate "iron (II) sulfate heptahydrate" Solid (Fe²⁺+SO4²⁻+7*H2O) 1.895u"g/mL" 62662  # heptahydrate
+@reagent iron_nitrate "iron (III) nitrate nonahydrate" Solid (Fe³⁺+3*NO3⁻+9*H2O) 1.68u"g/mL" missing  # nonahydrate
+@reagent iron_sulfate "iron (II) sulfate heptahydrate" Solid (Fe²⁺+SO4²⁻+7*H2O) 1.895u"g/mL" missing  # heptahydrate
 @reagent isoleucine "L-isoleucine" Solid "C6H13NO2" missing 6306
 @reagent kanamycin "kanamycin" Solid "C18H36N4O11" missing 6032
 @reagent l_alanine "L-Alanine" Solid "C3H7NO2" 1.432u"g/mL" 5950
@@ -182,13 +182,13 @@
 @reagent leucine "L-leucine" Solid "C6H13NO2" 1.293u"g/mL" 6106
 @reagent lincomycin "lincomycin" Solid "C18H34N2O6S" missing 3000540
 @reagent lipoic_acid "lipoic_acid" Solid "C8H14O2S2" missing 6112
-@reagent lysine "L-Lysine monohydrochloride" Solid missing missing 69568
-@reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid (Mg²⁺+SO4²⁻+7*H2O) 1.68u"g/mL" 24843  # heptahydrate
+@reagent lysine "L-Lysine monohydrochloride" Solid missing missing missing
+@reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid (Mg²⁺+SO4²⁻+7*H2O) 1.68u"g/mL" missing  # heptahydrate
 @reagent malic_acid "Malic Acid" Solid "C4H6O5" 1.601u"g/mL" 525
 @reagent maltodextrin "maltodextrin" Solid opaque missing missing
 @reagent maltose "Maltose" Solid "C12H22O11" missing 439186
-@reagent manganese_chloride "Manganese (II) Chloride Tetrahydrate" Solid (Mn²⁺+2*Cl⁻+4*H2O) 2.01u"g/mL" 643989  # tetrahydrate
-@reagent manganese_sulfate "manganese sulfate monohydrate" Solid (Mn²⁺+SO4²⁻+H2O) 2.95u"g/mL" 177577  # monohydrate
+@reagent manganese_chloride "Manganese (II) Chloride Tetrahydrate" Solid (Mn²⁺+2*Cl⁻+4*H2O) 2.01u"g/mL" missing  # tetrahydrate
+@reagent manganese_sulfate "manganese sulfate monohydrate" Solid (Mn²⁺+SO4²⁻+H2O) 2.95u"g/mL" missing  # monohydrate
 @reagent mannitol "D-mannitol" Solid "C6H14O6" 1.489u"g/mL" 6251
 @reagent mannose "D-mannose" Solid "C6H12O6" missing 18950
 @reagent marine_broth "Marine Broth" Solid opaque missing missing
@@ -196,7 +196,7 @@
 @reagent methionine "L-methionine" Solid "C5H11NO2S" 1.178u"g/mL" 6137
 @reagent middlebrook_7h9_broth "Middlebrook 7H9 Broth Base" Solid opaque missing missing
 @reagent miltefosine "miltefosine" Solid "C21H46NO4P" missing 3599
-@reagent minocycline "minocycline hydrochloride" Solid 493.9u"g/mol" missing 54685925
+@reagent minocycline "minocycline hydrochloride" Solid 493.9u"g/mol" missing missing
 @reagent mrs_broth "MRS broth" Solid opaque missing missing
 @reagent mops "MOPS" Solid "C7H15NO4S" missing 70807
 @reagent mucin_type_ii "Mucin from porcine stomach (Type II)" Solid opaque missing missing
@@ -211,7 +211,7 @@
 # density (0.98) -- corrected to neomycin (CID 8378). The formula is the free base. The salt form of the
 # product bought was not checked, so a sulfate would need a Dissolution.
 @reagent niacinamide "niacinamide (nicotinamide)" Solid "C6H6N2O" 1.4u"g/mL" 936
-@reagent nickel_chloride "Nickel (II) Chloride" Solid (Ni²⁺+2*Cl⁻) 3.55u"g/mL" 24385
+@reagent nickel_chloride "Nickel (II) Chloride" Solid (Ni²⁺+2*Cl⁻) 3.55u"g/mL" missing
 # ^ checked 2026-08-14 against the lab stocklist (Reagent_StockList.xlsx): Sigma N6136-100G "anhydrous".
 @reagent nutrient_broth "Nutrient Broth" Solid opaque missing missing
 @reagent ofloxacin "ofloxacin" Solid "C18H20FN3O4" missing 4583
@@ -226,21 +226,21 @@
 @reagent peptone "Peptone" Solid opaque missing missing
 @reagent phenylalanine "L-phenylalanine" Solid "C9H11NO2" missing 6140
 @reagent polymyxin_b "polymyxin_b" Solid "C56H100N16O17S" missing 5702105
-@reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate Dodecahydrate" Solid (K⁺+Al³⁺+2*SO4²⁻+12*H2O) 1.725u"g/mL" 62667  # dodecahydrate
+@reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate Dodecahydrate" Solid (K⁺+Al³⁺+2*SO4²⁻+12*H2O) 1.725u"g/mL" missing  # dodecahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24856), but the stored density (1.725) is
 # PubChem's own dodecahydrate-labeled value, and potassium alum is essentially never sold anhydrous
 # -- corrected to the dodecahydrate CID (62667); molecular_weight derives from the Dissolution
 # (electrolytes.jl), now including 12 H2O.
-@reagent potassium_chloride "Potassium Chloride" Solid (K⁺+Cl⁻) 1.984u"g/mL" 4873
-@reagent potassium_phosphate_di "potassium phosphate dibasic" Solid (2*K⁺+HPO4²⁻) missing 24450
-@reagent potassium_phosphate_mono "potassium phosphate monobasic" Solid (K⁺+H2PO4⁻) 2.34u"g/mL" 516951
+@reagent potassium_chloride "Potassium Chloride" Solid (K⁺+Cl⁻) 1.984u"g/mL" missing
+@reagent potassium_phosphate_di "potassium phosphate dibasic" Solid (2*K⁺+HPO4²⁻) missing missing
+@reagent potassium_phosphate_mono "potassium phosphate monobasic" Solid (K⁺+H2PO4⁻) 2.34u"g/mL" missing
 @reagent proline "L-proline" Solid "C5H9NO2" 1.064u"g/mL" 145742
 @reagent promethazine "promethazine" Solid "C17H20N2S" missing 4927
 @reagent propionic_acid "Propionic Acid" Solid "C3H6O2" 0.995u"g/mL" 1032
 @reagent putrescine "Putrescine" Solid "C4H12N2" 0.877u"g/mL" 1045
 @reagent pyridoxal "pyridoxal hydrochloride" Solid "C8H10ClNO3" missing 6171
 @reagent pyridoxamine "pyridoxamine dihydrochloride" Solid "C8H14Cl2N2O2" missing 10664
-@reagent sodium_pyruvate "Sodium Pyruvate" Solid 110.04u"g/mol" missing 23662274
+@reagent sodium_pyruvate "Sodium Pyruvate" Solid 110.04u"g/mol" missing missing
 @reagent raffinose "Raffinose" Solid "C18H32O16" missing 439242
 @reagent resazurin "Resazurin" Solid "C12H7NO4" missing 11077
 @reagent riboflavin "riboflavin (vitamin B2)" Solid "C17H20N4O6" missing 493570
@@ -249,43 +249,43 @@
 @reagent salicin "Salicin" Solid "C13H18O7" missing 439503
 @reagent serine "L-serine" Solid "C3H7NO3" 1.6u"g/mL" 5951
 @reagent shikimic_acid "Shikimic Acid" Solid "C7H10O5" missing 8742
-@reagent silver_nitrate "silver_nitrate" Solid (Ag⁺+NO3⁻) 4.35u"g/mL" 24470
-@reagent sodium_acetate_anhydrous "sodium acetate" Solid (Na⁺+OAc⁻) 1.528u"g/mL" 517045
+@reagent silver_nitrate "silver_nitrate" Solid (Ag⁺+NO3⁻) 4.35u"g/mL" missing
+@reagent sodium_acetate_anhydrous "sodium acetate" Solid (Na⁺+OAc⁻) 1.528u"g/mL" missing
 # ^ note 2026-08-14: a purchase logged as "acetate" (catalog "S28625-500 G") was originally assumed
 # to be this anhydrous salt, but S28625 isn't a real Sigma catalog number -- checked against the
 # lab's actual stocklist (Reagent_StockList.xlsx), which lists the same item (same price, same
 # size) under catalog S8625-500G with formula CH3COONa.3H2O, i.e. sodium_acetate_trihydrate below.
 # Digit-transposition typo in the original purchase log, not a registry error -- no code change
 # needed since both reagents already existed; flagged so future stock-building uses the right one.
-@reagent sodium_acetate_trihydrate "sodium acetate trihydrate" Solid (Na⁺+OAc⁻+3*H2O) 1.528u"g/mL" 23665404
-@reagent sodium_bicarbonate "sodium bicarbonate" Solid (Na⁺+HCO3⁻) 2.159u"g/mL" 516892
-@reagent sodium_carbonate "Sodium Carbonate" Solid (2*Na⁺+CO3²⁻) 2.54u"g/mL" 10340
-@reagent sodium_chloride "Sodium Chloride" Solid (Na⁺+Cl⁻) missing 5234
+@reagent sodium_acetate_trihydrate "sodium acetate trihydrate" Solid (Na⁺+OAc⁻+3*H2O) 1.528u"g/mL" missing
+@reagent sodium_bicarbonate "sodium bicarbonate" Solid (Na⁺+HCO3⁻) 2.159u"g/mL" missing
+@reagent sodium_carbonate "Sodium Carbonate" Solid (2*Na⁺+CO3²⁻) 2.54u"g/mL" missing
+@reagent sodium_chloride "Sodium Chloride" Solid (Na⁺+Cl⁻) missing missing
 # ^ fixed 2026-08-14: stored CID was 5324 (Sulfaguanidine), a transposed-digit typo -- corrected to
 # 5234 (Sodium Chloride). MW/density were already `missing`, so this doesn't change any derived
 # value, only the CID metadata.
-@reagent sodium_citrate_dihydrate "Sodium Citrate Dihydrate" Solid missing missing 71474
+@reagent sodium_citrate_dihydrate "Sodium Citrate Dihydrate" Solid missing missing missing
 # ^ Fisherbrand S279-500. Vendor listing says "citrate buffer solution" but the product is actually
 # the raw salt, Sodium Citrate Dihydrate (trisodium citrate dihydrate, CAS 6132-04-3) -- not a
 # premixed buffer. molecular_weight is `missing` and derived instead from its Dissolution
 # (electrolytes.jl: 3*Na+ + Citrate3- + 2*H2O), matching sodium_acetate_trihydrate's convention.
-@reagent sodium_dichromate "Sodium Dichromate Dihydrate" Solid (2*Na⁺+Cr2O7²⁻+2*H2O) 2.35u"g/mL" 108005  # dihydrate
+@reagent sodium_dichromate "Sodium Dichromate Dihydrate" Solid (2*Na⁺+Cr2O7²⁻+2*H2O) 2.35u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 25408) -- corrected to dihydrate (CID 108005)
 # per the lab's own purchase record (Sigma 398063-100G, whose catalog listing is "Sodium dichromate
 # dihydrate"). Density (2.35) was already the dihydrate's value, unchanged. molecular_weight derives
 # from the Dissolution (electrolytes.jl), now including 2 H2O.
-@reagent sodium_molybdate "Sodium Molybdate Dihydrate" Solid (2*Na⁺+MoO4²⁻+2*H2O) 3.5u"g/mL" 16211258  # dihydrate
+@reagent sodium_molybdate "Sodium Molybdate Dihydrate" Solid (2*Na⁺+MoO4²⁻+2*H2O) 3.5u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 61424, density 3.78) -- corrected to dihydrate
 # (CID 16211258, density 3.5) per the lab's own purchase record (catalog 243655-100G, "Sodium
 # molybdate dihydrate"). molecular_weight derives from the Dissolution (electrolytes.jl), now
 # including 2 H2O.
-@reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid (2*Na⁺+HPO4²⁻+7*H2O) missing 6096963  # heptahydrate
-@reagent sodium_phosphate_di_anhydrous "sodium phosphate dibasic anhydrous" Solid (2*Na⁺+HPO4²⁻) missing 24203  # anhydrous (e.g. Sigma S9763)
-@reagent sodium_phosphate_mono "sodium phosphate monobasic monohydrate" Solid (Na⁺+H2PO4⁻+H2O) missing 516949  # monohydrate
-@reagent sodium_selenite "Sodium Selenite" Solid (2*Na⁺+SeO3²⁻) 3.1u"g/mL" 24934
+@reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid (2*Na⁺+HPO4²⁻+7*H2O) missing missing  # heptahydrate
+@reagent sodium_phosphate_di_anhydrous "sodium phosphate dibasic anhydrous" Solid (2*Na⁺+HPO4²⁻) missing missing  # anhydrous (e.g. Sigma S9763)
+@reagent sodium_phosphate_mono "sodium phosphate monobasic monohydrate" Solid (Na⁺+H2PO4⁻+H2O) missing missing  # monohydrate
+@reagent sodium_selenite "Sodium Selenite" Solid (2*Na⁺+SeO3²⁻) 3.1u"g/mL" missing
 # ^ checked 2026-08-14 against the lab stocklist (Reagent_StockList.xlsx): Sigma 71950-100G "ANHYDROUS".
-@reagent sodium_succinate_hexahydrate "Sodium Succinate Hexahydrate" Solid (2*Na⁺+C4H4O4²⁻+6*H2O) missing 3083938
-@reagent sodium_tungstate "Sodium Tungstate Dihydrate" Solid (2*Na⁺+WO4²⁻+2*H2O) 3.25u"g/mL" 150191  # dihydrate
+@reagent sodium_succinate_hexahydrate "Sodium Succinate Hexahydrate" Solid (2*Na⁺+C4H4O4²⁻+6*H2O) missing missing
+@reagent sodium_tungstate "Sodium Tungstate Dihydrate" Solid (2*Na⁺+WO4²⁻+2*H2O) 3.25u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 26052, density 4.179) -- corrected to dihydrate
 # (CID 150191, density 3.25) per the lab's own purchase record (Sigma 223336-100G, "SODIUM TUNGSTATE
 # DIHYDRATE, ACS REAGENT"). molecular_weight derives from the Dissolution (electrolytes.jl), now
@@ -300,15 +300,15 @@
 @reagent sulfadiazine "sulfadiazine" Solid "C10H10N4O2S" missing 5215
 @reagent sulfamethazine "sulfamethazine" Solid "C12H14N4O2S" 1.4655u"g/mL" 5327
 @reagent sulfathiazole "sulfathiazole" Solid "C9H9N3O2S2" missing 5340
-@reagent tartrate "sodium tartrate dihydrate" Solid missing missing 12598458
+@reagent tartrate "sodium tartrate dihydrate" Solid missing missing missing
 @reagent taurine "Taurine" Solid "C2H7NO3S" missing 1123
-@reagent tetracycline "tetracycline_hydrochloride" Solid 480.9u"g/mol" missing 54704426
+@reagent tetracycline "tetracycline_hydrochloride" Solid 480.9u"g/mol" missing missing
 @reagent thb "Todd-Hewitt Broth" Solid opaque missing missing
 @reagent thiamine "thiamine hydrochloride" Solid "C12H18Cl2N4OS" missing 6202
 @reagent thiourea "Thiourea" Solid "CH4N2S" 1.405u"g/mL" 2723790
 @reagent threonine "L-threonine" Solid "C4H9NO3" missing 6288
 @reagent thymine "thymine" Solid "C5H6N2O2" missing 1135
-@reagent tin_fluoride "Tin (II) Fluoride" Solid (Sn²⁺+2*F⁻) 2.79u"g/mL" 24550
+@reagent tin_fluoride "Tin (II) Fluoride" Solid (Sn²⁺+2*F⁻) 2.79u"g/mL" missing
 @reagent tobramycin "tobramycin" Solid "C18H37N5O9" missing 36294
 @reagent trehalose "D-(+)-trehalose dihydrate" Solid "C12H26O13" missing 181978
 @reagent triclosan "triclosan" Solid "C12H7Cl3O2" missing 5564
@@ -336,10 +336,10 @@
 # (ribitol) shares; the two are isomers and differ only by name here.
 @reagent xylose "D-xylose" Solid "C5H10O5" 1.525u"g/mL" 135191
 @reagent yeast_extract "yeast_extract" Solid opaque missing missing
-@reagent zinc_chloride "Zinc (II) Chloride" Solid (Zn²⁺+2*Cl⁻) 2.91u"g/mL" 5727
+@reagent zinc_chloride "Zinc (II) Chloride" Solid (Zn²⁺+2*Cl⁻) 2.91u"g/mL" missing
 # ^ checked 2026-08-14 against the lab stocklist (Sigma Z0152-100G, plain "ZINC CHLORIDE CELL CULTURE", no
 # hydrate noted): confirmed anhydrous, unlike zinc_sulfate below.
-@reagent zinc_sulfate "Zinc Sulfate Heptahydrate" Solid (Zn²⁺+SO4²⁻+7*H2O) 1.97u"g/mL" 62640  # heptahydrate
+@reagent zinc_sulfate "Zinc Sulfate Heptahydrate" Solid (Zn²⁺+SO4²⁻+7*H2O) 1.97u"g/mL" missing  # heptahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24424, real anhydrous density ~3.8 g/mL) -- the
 # stored density (1.96) actually matched the heptahydrate's, and the lab's own purchase record
 # (Reagent_StockList.xlsx: Sigma Z0251-100G, "ZINC SULFATE HEPTAHYDRATE") confirms it. Corrected to

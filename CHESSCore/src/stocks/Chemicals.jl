@@ -7,11 +7,13 @@ Represents a physical material: a substance you can weigh out or pipette and sto
 identify the materials in the lab's mixtures and solutions, tracked in [`Stock`](@ref)'s
 `SolidDict`/`LiquidDict`.
 
-All `Reagent` subtypes have four fields utilized by CHESSCore:
+All `Reagent` subtypes have three fields utilized by CHESSCore:
 1) `name`: the name by which the reagent will be referred to
 2) `molecular_weight`: the reagent's stored molecular weight. For a reagent defined by a formula or a [`Dissolution`](@ref), this is the weight derived from it when the reagent was defined, and [`molecular_weight`](@ref) re-derives it from the registered [`dissolution`](@ref) whenever one exists. If the weight is unknown, `missing`.
 3) `density`: the reagent's density at STP, if known, is used by CHESSCore to facilitate conversions between mass and volume quantities of the reagent. If `density` is unknown or undefined, it is assigned a value of `missing`
-4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov), which identifies the reagent's compound in the PubChem database.
+
+A reagent has no PubChem ID of its own: PubChem identifies compounds, so the ID belongs to the [`Species`](@ref)
+a reagent is made of (see [`pubchemid`](@ref)).
 
 See also: [`Species`](@ref) for what a reagent breaks into once dissolved, [`@reagent`](@ref) for defining
 one, and [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Reagent` shares
@@ -61,9 +63,15 @@ density(x::Reagent)=x.density
 """
     pubchemid(x::Reagent)
 
-access the pubchemid property of a reagent
+The [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of a reagent that is made of a single
+[`Species`](@ref): the ID of that species. `missing` for a reagent that breaks into several species,
+or whose species has no ID. The ID is kept on the species, not the reagent.
 """
-pubchemid(x::Reagent)=x.pubchemid
+function pubchemid(x::Reagent)
+    species = collect(keys(dissolution(x).products))
+    length(species) == 1 || return missing
+    return pubchemid(only(species))
+end
 
 
 
@@ -77,7 +85,6 @@ struct Solid <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
     density::Union{Unitful.Density,Missing}
-    pubchemid::Union{Integer,Missing}
 end
 """
     struct Liquid <: Reagent
@@ -88,7 +95,6 @@ struct Liquid <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
     density::Union{Unitful.Density,Missing}
-    pubchemid::Union{Integer,Missing}
 end
 
 """
@@ -101,7 +107,6 @@ struct Gas <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
     density::Union{Unitful.Density,Missing}
-    pubchemid::Union{Integer,Missing}
 end
 
 # Reagent has a name::String field, so it isn't isbits and Julia's default ==/hash fall back to
@@ -122,8 +127,8 @@ _hash_canon(x::Missing) = x
 _hash_canon(x::Unitful.MolarMass) = uconvert(u"g/mol",x)
 _hash_canon(x::Unitful.Density) = uconvert(u"g/mL",x)
 
-Base.:(==)(a::T,b::T) where T<:Reagent = a.name==b.name && isequal(a.molecular_weight,b.molecular_weight) && isequal(a.density,b.density) && isequal(a.pubchemid,b.pubchemid)
-Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.molecular_weight),hash(_hash_canon(a.density),hash(a.pubchemid,h)))))
+Base.:(==)(a::T,b::T) where T<:Reagent = a.name==b.name && isequal(a.molecular_weight,b.molecular_weight) && isequal(a.density,b.density)
+Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.molecular_weight),hash(_hash_canon(a.density),h))))
 
 """
     struct Species
@@ -433,6 +438,11 @@ The `chemistry` argument says what the reagent is made of, and is one of:
 - `opaque`, for an undefined mixture such as yeast extract whose atomic content is intentionally not
   described, or `opaque(1415.6u"g/mol")` for one with a known average molar mass.
 
+The `pubchemid` argument is the [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of the species the
+reagent is made of, or `missing`. It applies when the chemistry is a formula, a molar mass, `missing`, or
+`opaque`, which make one species. A reagent defined by a [`Dissolution`](@ref) takes `missing` here and
+gets its IDs from the species it breaks into, so passing an ID with a dissolution is an error.
+
 The reagent's [`dissolution`](@ref) is registered with [`set_dissolution!`](@ref) (discoverable in
 [`dissolutions`](@ref)), and is kept with the defining module so it survives precompilation.
 
@@ -463,7 +473,7 @@ Reagents can also be defined manually with type constructors.
 
 Example:
 ```julia
-julia> water=Liquid("water",18.015u"g/mol",1.00u"g/mL",962)
+julia> water=Liquid("water",18.015u"g/mol",1.00u"g/mL")
 water
 ```
 
@@ -564,35 +574,41 @@ macro reagent_symbols(labsymb,name,type,chemistry,density,pubchemid)
     docstr= """
             $labsymb
 
-        The $type reagent $name with [`PubChem ID`](https://pubchem.ncbi.nlm.nih.gov) $pubchemid
+        The $type reagent $name
 
         Chemistry: $chemistry\\
-        Density: $density
+        Density: $density\\
+        PubChem ID: $pubchemid
 
         See also: [`$type`](@ref)
         """
-    cprops = :(__rgt_mw,$density,$pubchemid)
+    cprops = :(__rgt_mw,$density)
     esc(quote
-        local __rgt_chemistry = $CHESSCore._reagent_chemistry($name,$chemistry)
+        local __rgt_chemistry = $CHESSCore._reagent_chemistry($name,$chemistry,$pubchemid)
         local __rgt_mw = __rgt_chemistry[1]
         $(chemprops_expr(__module__,ln,cprops))
-        const global $ls = $type($name,__rgt_mw,$density,$pubchemid)
+        const global $ls = $type($name,__rgt_mw,$density)
         $(dissolutions_expr(__module__,ls,:(__rgt_chemistry[2])))
         @doc $docstr $ls
     end)
 end
 
 # What a `@reagent` chemistry argument means: returns the reagent's molecular weight (stored on the
-# `Reagent`) and its `Dissolution`.
+# `Reagent`) and its `Dissolution`. `pubchemid` is the PubChem ID of the species that a formula, molar
+# mass, `missing`, or `opaque` chemistry makes; a `Dissolution` brings its own species and takes none.
 _identity_dissolution(spc::Species) = Dissolution(Dict(spc=>1))
 _dissolution_mass(d::Dissolution) = sum(coeff*molecular_weight(spc) for (spc,coeff) in d.products)
-function _reagent_chemistry(name::AbstractString,formula::AbstractString)
-    d = _identity_dissolution(Species(name,0,formula))
+function _reagent_chemistry(name::AbstractString,formula::AbstractString,pubchemid)
+    d = _identity_dissolution(Species(name,0,formula;pubchemid))
     return (_dissolution_mass(d),d)
 end
-_reagent_chemistry(name::AbstractString,d::Dissolution) = (_dissolution_mass(d),d)
-_reagent_chemistry(name::AbstractString,mw::Union{Unitful.MolarMass,Missing}) = (mw,_identity_dissolution(Species(name,0,mw)))
-_reagent_chemistry(name::AbstractString,o::OpaqueFormula) = (o.molecular_weight,_identity_dissolution(Species(name,0,o)))
+function _reagent_chemistry(name::AbstractString,d::Dissolution,pubchemid)
+    ismissing(pubchemid) || throw(ArgumentError(
+        "Reagent \"$name\" is defined by a Dissolution, so it takes `missing` as its PubChem ID; give the PubChem IDs to the species it breaks into"))
+    return (_dissolution_mass(d),d)
+end
+_reagent_chemistry(name::AbstractString,mw::Union{Unitful.MolarMass,Missing},pubchemid) = (mw,_identity_dissolution(Species(name,0,mw;pubchemid)))
+_reagent_chemistry(name::AbstractString,o::OpaqueFormula,pubchemid) = (o.molecular_weight,_identity_dissolution(Species(name,0,o;pubchemid)))
 
 
 

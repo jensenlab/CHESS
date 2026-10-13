@@ -117,9 +117,11 @@ species has no stored weight that could disagree with it.
 ## Reagent types
 
 `Reagent` is an abstract type with three concrete subtypes, `Solid`, `Liquid`, and `Gas`, which
-share four fields: `name`, `molecular_weight`, `density`, and `pubchemid`. A solid is dosed by mass
-or amount and a liquid by volume. CHESS already includes a starter set of reagents, which
-[`@rgt_str`](@ref) recalls by name:
+share three fields: `name`, `molecular_weight`, and `density`. A solid is dosed by mass or amount and a
+liquid by volume. A reagent has no PubChem ID of its own, because PubChem identifies compounds. The
+ID belongs to the species a reagent is made of, and [`pubchemid`](@ref) of a reagent made of one species
+returns that species' ID. CHESS already includes a starter set of reagents, which [`@rgt_str`](@ref)
+recalls by name:
 
 ```jldoctest reagents
 julia> rgt"water"
@@ -138,7 +140,8 @@ julia> pubchemid(rgt"water")
 ## Defining a reagent
 
 [`@reagent`](@ref) registers a new reagent from a label, a name, a type, a description of its
-chemistry, a density, and a PubChem ID. The chemistry argument says what the reagent is made of. An
+chemistry, a density, and the PubChem ID of the species it is made of. The chemistry argument says
+what the reagent is made of. An
 elemental formula string registers the reagent as a single neutral species with that formula, and
 the molecular weight is derived from the formula:
 

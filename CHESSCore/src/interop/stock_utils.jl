@@ -61,10 +61,10 @@ function string_to_component(str::AbstractString,unit::Unitful.Units;reagent_con
     elseif unit isa Unitful.DensityUnits || unit isa Unitful.MassUnits || unit isa Unitful.AmountUnits || unit isa Unitful.MolarityUnits
         # a solid mass concentration in vc format or a mass in q format
         @warn("reagent $str not registered. parsing $str assuming it is a chemical. No chemical properties known.")
-        return Solid(str,missing,missing,missing)
+        return Solid(str,missing,missing)
     elseif unit isa Unitful.DimensionlessUnits || unit isa Unitful.VolumeUnits # a %v/v concentration in vc format or a volume in q format
         @warn("reagent $str not registered. parsing $str assuming it is a chemical. No chemical properties known.")
-        return Liquid(str,missing,missing,missing)
+        return Liquid(str,missing,missing)
     end
 
 end
@@ -101,7 +101,7 @@ emits a warning and falls back to splitting `str` into `"genus species strain"` 
 
 # Returns
 - A `Reagent` object. If `reagentparse` succeeds, the parsed/registered object is
-  returned; otherwise, a new `chem_type(str, missing, missing, missing)` is returned.
+  returned; otherwise, a new `chem_type(str, missing, missing)` is returned.
 - An `Organism` object. If `orgparse` succeeds, the parsed/registered object is returned;
   otherwise, `str` is split into `Organism(genus, species, strain)`.
 
@@ -120,7 +120,7 @@ function string_to_component(str::AbstractString,chem_type::Type{<:Reagent};reag
     catch
     end
     @warn("reagent $str not registered. parsing $str assuming it is a chemical. No chemical properties known.")
-    return chem_type(str,missing,missing,missing)
+    return chem_type(str,missing,missing)
 end
 
 function string_to_component(str::AbstractString, ::Type{Organism}; org_context=CHESSCore, kwargs...)

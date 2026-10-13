@@ -33,11 +33,14 @@ Each table below is listed as `Name(column, column, ...)`.
 ## Components and chemistry
 
 `Components(ID, Type)`, `Reagents(ComponentID, Name, Type, MolecularWeight, Density, CID)`,
-`Species(ID, Name, Charge, Formula, MolecularWeight)`, `Dissolutions(ID, ReagentComponentID,
+`Species(ID, Name, Charge, Formula, MolecularWeight, CID)`, `Dissolutions(ID, ReagentComponentID,
 SpeciesID, Coefficient)`, and `Organisms(ID, ComponentID, Genus, Species, Strain)` persist the
 `Reagent`, `Species`, `Organism`, and `Dissolution` types of `CHESSCore`. A species with an
 elemental formula stores the formula as a Hill-order string and no molecular weight, since the weight
-derives from the formula. A species without a formula stores its molecular weight.
+derives from the formula. A species without a formula stores its molecular weight. A species' PubChem ID
+is stored in `Species.CID`. It is descriptive and not part of the species' natural key. The
+`Reagents.CID` column belongs to databases written before PubChem IDs moved to species. It is no longer
+read, and [`migrate_chemistry!`](@ref) copies it onto the species of a reagent made of one species.
 
 A database created before the `Chemicals` and `CompositionRules` tables were renamed `Species` and
 `Dissolutions` is converted by

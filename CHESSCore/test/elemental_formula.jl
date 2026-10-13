@@ -142,16 +142,28 @@ end
     @test CHESSCore.dissolutions[TestGlucose] == d
     @test TestGlucose.molecular_weight ≈ molecular_weight(TestGlucose) # stored weight is the derived one
     @test pubchemid(TestGlucose) == 5793
+    # the ID is kept on the reagent's species, not on the reagent
+    @test pubchemid(only(keys(d.products))) == 5793
+    @test !hasfield(typeof(TestGlucose),:pubchemid)
 
     # a dissolution expression
     @species TestFe³⁺ "Fe3+" 3 "Fe"
     @species TestCl⁻ "Cl-" -1 "Cl"
-    @reagent TestIronChloride "iron chloride" Solid (TestFe³⁺ + 3*TestCl⁻) 2.8u"g/mL" 24380
+    @reagent TestIronChloride "iron chloride" Solid (TestFe³⁺ + 3*TestCl⁻) 2.8u"g/mL" missing
     @test molecular_weight(TestIronChloride) ≈ 162.2u"g/mol" atol=0.1u"g/mol"
     @test CHESSCore.dissolution(TestIronChloride).products == Dict(TestFe³⁺=>1,TestCl⁻=>3)
+    # a reagent made of several species has no single ID
+    @test ismissing(pubchemid(TestIronChloride))
+    # a dissolution takes its IDs from its species, so a reagent-level ID is an error
+    @test_throws ArgumentError @eval @reagent TestIronChlorideId "iron chloride with an ID" Solid (TestFe³⁺ + 3*TestCl⁻) 2.8u"g/mL" 24380
+    # a dissolution of one species has that species' ID
+    @species TestPcSpecies "pc one species" 0 "H2O" 962
+    @reagent TestSingleDissolution "single dissolution" Liquid (1*TestPcSpecies) 1.0u"g/mL" missing
+    @test pubchemid(TestSingleDissolution) == 962
 
     # the legacy forms: a stored molecular weight, and missing
-    @reagent TestLegacyReagent "legacy reagent" Solid 100.0u"g/mol" 1.0u"g/mL" missing
+    @reagent TestLegacyReagent "legacy reagent" Solid 100.0u"g/mol" 1.0u"g/mL" 4242
+    @test pubchemid(TestLegacyReagent) == 4242
     @test molecular_weight(TestLegacyReagent) == 100.0u"g/mol"
     @test ismissing(CHESSCore.formula(only(keys(CHESSCore.dissolution(TestLegacyReagent).products))))
     @reagent TestUnknownReagent "unknown reagent" Solid missing missing missing
@@ -160,6 +172,9 @@ end
 
     # opaque: no molecular weight, a species flagged as intentionally undescribed
     @reagent TestYeastExtract "yeast extract" Solid opaque 1.0u"g/mL" missing
+    @reagent TestOpaqueId "opaque with an ID" Solid opaque(100.0u"g/mol") missing 777
+    @test pubchemid(TestOpaqueId) == 777
+    @test ismissing(pubchemid(TestYeastExtract))
     @test ismissing(molecular_weight(TestYeastExtract))
     spc_opaque = only(keys(CHESSCore.dissolution(TestYeastExtract).products))
     @test CHESSCore.is_opaque(spc_opaque)
@@ -189,7 +204,7 @@ end
     na = Species("Na+",1,"Na")
     cl = Species("Cl-",-1,"Cl")
     so4 = Species("SO4 2-",-2,"SO4")
-    salt = Solid("charge_check_salt",missing,missing,missing)
+    salt = Solid("charge_check_salt",missing,missing)
     @test_throws ArgumentError set_dissolution!(salt,Dissolution(Dict(na=>1)))
     @test_throws ArgumentError set_dissolution!(salt,Dissolution(Dict(na=>1,cl=>2)))
     @test !haskey(dissolutions,salt)

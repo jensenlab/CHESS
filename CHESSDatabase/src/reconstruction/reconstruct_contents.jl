@@ -30,16 +30,16 @@ only happens inline inside [`restore_dissolution!`](@ref) as part of rebuilding 
 `Dissolution`; this gives it the same testable, direct path.
 """
 function get_species(id::Integer)
-    row = query_db("SELECT Name, Charge, Formula, MolecularWeight FROM Species WHERE ID = ?",(id,))
+    row = query_db("SELECT Name, Charge, Formula, MolecularWeight, CID FROM Species WHERE ID = ?",(id,))
     nrow(row)==0 && error("species $id does not exist in the database")
     row = row[1,:]
     if isequal(row["Formula"],"opaque")
-        ismissing(row["MolecularWeight"]) && return Species(row["Name"],row["Charge"],CHESSCore.opaque)
-        return Species(row["Name"],row["Charge"],CHESSCore.opaque(row["MolecularWeight"]*u"g/mol"))
+        ismissing(row["MolecularWeight"]) && return Species(row["Name"],row["Charge"],CHESSCore.opaque;pubchemid=row["CID"])
+        return Species(row["Name"],row["Charge"],CHESSCore.opaque(row["MolecularWeight"]*u"g/mol");pubchemid=row["CID"])
     end
-    ismissing(row["Formula"]) || return Species(row["Name"],row["Charge"],row["Formula"])
+    ismissing(row["Formula"]) || return Species(row["Name"],row["Charge"],row["Formula"];pubchemid=row["CID"])
     mw = ismissing(row["MolecularWeight"]) ? missing : row["MolecularWeight"]*u"g/mol"
-    return Species(row["Name"],row["Charge"],mw)
+    return Species(row["Name"],row["Charge"],mw;pubchemid=row["CID"])
 end
 
 """
@@ -72,9 +72,9 @@ function get_component(id::Integer)
     end
 
     if comp_type == "Reagent"
-        c = query_db("SELECT Name, Type,MolecularWeight,Density,CID FROM Reagents WHERE ComponentID = ?",(id,))[1,:]
+        c = query_db("SELECT Name, Type,MolecularWeight,Density FROM Reagents WHERE ComponentID = ?",(id,))[1,:]
         typ=eval(Symbol(c["Type"]))
-        reagent = typ(c["Name"],c["MolecularWeight"]*u"g/mol",c["Density"]*u"g/mL",c["CID"])
+        reagent = typ(c["Name"],c["MolecularWeight"]*u"g/mol",c["Density"]*u"g/mL")
         restore_dissolution!(reagent,id)
         return reagent
 
