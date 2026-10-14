@@ -250,6 +250,27 @@ function *(quantity::Unitful.Volume,chemical::Liquid)
 end
 
 """
+    *(quantity::Unitful.Mass,chemical::Liquid)
+
+Overload the `*` operator to construct a Solution from a mass of a liquid. A stock holds a liquid as a volume,
+so the mass is converted with the liquid's density, and an `ArgumentError` is thrown if the density is unknown.
+"""
+function *(quantity::Unitful.Mass,chemical::Liquid)
+    return Stock(OrganismDict(),SolidDict(),LiquidDict(chemical=>convert(prefquantunits(chemical),quantity,chemical)))
+end
+
+"""
+    *(quantity::Unitful.Amount,chemical::Liquid)
+
+Overload the `*` operator to construct a Solution from a molar quantity of a liquid, using the liquid's molecular
+weight and then its density. An error is thrown if either is unknown.
+"""
+function *(quantity::Unitful.Amount,chemical::Liquid)
+    mass = convert(u"g",quantity,chemical)
+    return Stock(OrganismDict(),SolidDict(),LiquidDict(chemical=>convert(prefquantunits(chemical),mass,chemical)))
+end
+
+"""
     *(quantity::Biomass,organism::Organism)
 
 Overload the `*` operator to construct a Culture from a [`Biomass`](@ref) quantity of an

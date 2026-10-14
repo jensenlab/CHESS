@@ -118,7 +118,8 @@ species has no stored weight that could disagree with it.
 
 `Reagent` is an abstract type with three concrete subtypes, `Solid`, `Liquid`, and `Gas`, which
 share three fields: `name`, `molecular_weight`, and `density`. A solid is dosed by mass or amount and a
-liquid by volume. A reagent has no PubChem ID of its own, because PubChem identifies compounds. The
+liquid by volume. A liquid can also be dosed by mass or amount: either is converted to a volume with the
+liquid's density, and an unknown density is an error. A reagent has no PubChem ID of its own, because PubChem identifies compounds. The
 ID belongs to the species a reagent is made of, and [`pubchemid`](@ref) of a reagent made of one species
 returns that species' ID. CHESS already includes a starter set of reagents, which [`@rgt_str`](@ref)
 recalls by name:

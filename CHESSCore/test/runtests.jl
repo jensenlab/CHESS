@@ -834,6 +834,41 @@ end
     @test_throws ArgumentError by_mass(CHESSCore.Species("test unweighed",0,missing)=>1, solvent=>1)
 end
 
+@testset "Liquids dosed by mass or amount" begin
+    lq = Liquid("mass-dosed liquid",100.0u"g/mol",0.8u"g/mL")
+
+    # a mass converts to a volume through the density
+    @test CHESSCore.liquids(0.8u"g"*lq)[lq] ≈ 1.0u"mL"
+    @test CHESSCore.liquids(250u"mg"*lq)[lq] ≈ 0.3125u"mL"
+    @test CHESSCore.liquids(0.0008u"kg"*lq)[lq] ≈ 1.0u"mL"
+    @test CHESSCore.liquids(2u"mL"*lq)[lq] ≈ 2.0u"mL" # a volume is unchanged
+
+    # a molar amount goes through the molecular weight and then the density
+    @test CHESSCore.liquids(0.01u"mol"*lq)[lq] ≈ 1.25u"mL"
+
+    # it composes with other quantities like any stock
+    diluent = Liquid("test diluent",18.015u"g/mol",1.0u"g/mL")
+    mixed = 0.8u"g"*lq + 1u"L"*diluent
+    @test CHESSCore.liquids(mixed)[lq] ≈ 1.0u"mL"
+    lq_species = only(keys(dissolution(lq).products))
+    @test molar_amount(composition(0.8u"g"*lq),lq_species) ≈ 0.008u"mol"
+    @test molar_amount(composition(0.8u"g"*lq),lq_species) ≈ molar_amount(composition(1.0u"mL"*lq),lq_species)
+
+    # a solid is unchanged
+    sd = Solid("mass-dosed solid",100.0u"g/mol",1.0u"g/mL")
+    @test CHESSCore.solids(1u"g"*sd)[sd] ≈ 1u"g"
+
+    # an unknown density, or weight, is a clear error
+    no_density = Liquid("liquid with no density",100.0u"g/mol",missing)
+    no_weight = Liquid("liquid with no weight",missing,0.8u"g/mL")
+    @test_throws ArgumentError 1u"g"*no_density
+    @test_throws ArgumentError 1u"mol"*no_density
+    @test occursin("density is unknown",sprint(showerror,try 1u"g"*no_density catch e e end))
+    @test CHESSCore.liquids(1u"g"*no_weight)[no_weight] ≈ 1.25u"mL" # a mass needs no molecular weight
+    @test_throws ErrorException 1u"mol"*no_weight
+    @test CHESSCore.liquids(1u"mL"*no_density)[no_density] ≈ 1u"mL" # a volume needs neither
+end
+
 module ProductLab
 using CHESSCore, Unitful
 @reagent widget "widget" Solid "C2H6O" missing missing

@@ -835,6 +835,18 @@ function convert(y::Unitful.AmountUnits,x::Unitful.Mass,ingredient::Union{Reagen
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x / molecular_weight(ingredient))
 end
 
+"""
+    convert(desired_unit, mass::Unitful.Mass, liquid::Liquid)
+
+Convert a mass of a [`Liquid`](@ref) to a volume with the liquid's density, so a liquid sold or weighed by mass
+can be dosed. Throws an `ArgumentError` if the density is unknown.
+"""
+function convert(y::Unitful.VolumeUnits,x::Unitful.Mass,ingredient::Liquid)
+    ismissing(density(ingredient)) && throw(ArgumentError(
+        "$(ingredient)'s density is unknown, so a mass of it cannot be converted to a volume"))
+    return uconvert(y,x / density(ingredient))
+end
+
 function convert(y::Unitful.DensityUnits,x::Unitful.Molarity,ingredient::Union{Reagent,Species})
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x *molecular_weight(ingredient))
 end
