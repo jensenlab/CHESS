@@ -177,12 +177,12 @@ end
 end
 
 @testset "Dissociation chemistry: derived molecular weights, hydrates, recipe/total_concentration" begin
-    # copper_sulfate is the pentahydrate (fixed 2026-08-14 -- see solids.jl/electrolytes.jl), so its
+    # copper_sulfate_pentahydrate is the pentahydrate (fixed 2026-08-14 -- see solids.jl/electrolytes.jl), so its
     # derived weight includes 5 waters of hydration, not the anhydrous salt's 159.61
-    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate) ≈ 249.68u"g/mol" atol=0.01u"g/mol" # derived from atomic masses (was hand-entered 249.69)
+    @test CHESSCore.molecular_weight(CHESSLabConstants.copper_sulfate_pentahydrate) ≈ 249.68u"g/mol" atol=0.01u"g/mol" # derived from atomic masses (was hand-entered 249.69)
 
     # hydrate: waters of hydration keep the derived weight at the hydrate value, not the anhydrous one
-    @test CHESSCore.molecular_weight(CHESSLabConstants.calcium_chloride) ≈ 147.01u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.molecular_weight(CHESSLabConstants.calcium_chloride_dihydrate) ≈ 147.01u"g/mol" atol=0.01u"g/mol"
 
     # pre-existing data bug in the ported PubChem cache (NaCl stored as 214.25u"g/mol", matching the
     # wrong CID it was linked to -- since fixed in solids.jl) is masked by dissolution-derivation,
@@ -190,7 +190,7 @@ end
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_chloride) ≈ 58.44u"g/mol" atol=0.01u"g/mol"
 
     # composition()/total_concentration() see the real ionic composition
-    stock = 1u"mol" * CHESSLabConstants.calcium_chloride
+    stock = 1u"mol" * CHESSLabConstants.calcium_chloride_dihydrate
     r = CHESSCore.composition(stock)
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Ca²⁺) ≈ 1u"mol" atol=1e-6u"mol"
     @test CHESSCore.molar_amount(r,CHESSLabConstants.Cl⁻) ≈ 2u"mol" atol=1e-6u"mol"
@@ -236,17 +236,17 @@ end
 
     # sodium phosphate salts share the *same* AcidBaseSystem as the potassium salts (deduplication
     # across reagents that differ only in counter-ion)
-    na_buffer = (0.1u"mol"*CHESSLabConstants.sodium_phosphate_mono) +
-                (0.1u"mol"*CHESSLabConstants.sodium_phosphate_di) +
+    na_buffer = (0.1u"mol"*CHESSLabConstants.sodium_phosphate_mono_monohydrate) +
+                (0.1u"mol"*CHESSLabConstants.sodium_phosphate_di_heptahydrate) +
                 (1.0u"L"*CHESSLabConstants.water)
     @test CHESSCore.pH(na_buffer;ionic_strength_correction=false) ≈ 7.198 atol=1e-3
     # the anhydrous salt is a separate reagent on the same phosphate chain
     @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_phosphate_mono_anhydrous) ≈ 119.98u"g/mol" atol=0.01u"g/mol"
-    @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_phosphate_mono) ≈ 137.99u"g/mol" atol=0.01u"g/mol"
-    @test CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono_anhydrous) == CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono)
+    @test CHESSCore.molecular_weight(CHESSLabConstants.sodium_phosphate_mono_monohydrate) ≈ 137.99u"g/mol" atol=0.01u"g/mol"
+    @test CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono_anhydrous) == CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono_monohydrate)
     @test only(CHESSCore.reagent_products(CHESSLabConstants.sodium_phosphate_mono_anhydrous)).catalog_number == "S0751"
-    @test only(CHESSCore.reagent_products(CHESSLabConstants.sodium_phosphate_mono)).catalog_number == "BP330"
-    @test CHESSCore.acid_base_system(CHESSLabConstants.potassium_phosphate_mono) == CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono)
+    @test only(CHESSCore.reagent_products(CHESSLabConstants.sodium_phosphate_mono_monohydrate)).catalog_number == "BP330"
+    @test CHESSCore.acid_base_system(CHESSLabConstants.potassium_phosphate_mono) == CHESSCore.acid_base_system(CHESSLabConstants.sodium_phosphate_mono_monohydrate)
 
     # sodium carbonate/bicarbonate share the carbonic acid system
     carb_buffer = (0.05u"mol"*CHESSLabConstants.sodium_bicarbonate) +
@@ -313,19 +313,19 @@ end
 end
 
 @testset "Acid/base equilibrium: iron/succinate/ammonium audit" begin
-    # iron_chloride: Fe3+ hydrolysis, shared with iron_nitrate (same Fe3+ chemistry)
+    # iron_chloride: Fe3+ hydrolysis, shared with iron_nitrate_nonahydrate (same Fe3+ chemistry)
     fe_sys = CHESSCore.acid_base_system(CHESSLabConstants.iron_chloride)
     @test fe_sys isa AcidBaseSystem
     @test fe_sys.pKa == [2.2]
-    @test fe_sys == CHESSCore.acid_base_system(CHESSLabConstants.iron_nitrate)
+    @test fe_sys == CHESSCore.acid_base_system(CHESSLabConstants.iron_nitrate_nonahydrate)
     fe_stock = (0.01u"mol"*CHESSLabConstants.iron_chloride) + (1.0u"L"*CHESSLabConstants.water)
     @test CHESSCore.pH(fe_stock;ionic_strength_correction=false) < 3.0 # markedly acidic, matches known FeCl3 behavior
 
-    # iron_sulfate: Fe2+ hydrolysis, much weaker than Fe3+'s (lower charge density)
-    fe2_sys = CHESSCore.acid_base_system(CHESSLabConstants.iron_sulfate)
+    # iron_sulfate_heptahydrate: Fe2+ hydrolysis, much weaker than Fe3+'s (lower charge density)
+    fe2_sys = CHESSCore.acid_base_system(CHESSLabConstants.iron_sulfate_heptahydrate)
     @test fe2_sys isa AcidBaseSystem
     @test fe2_sys.pKa == [9.5]
-    fe2_stock = (0.01u"mol"*CHESSLabConstants.iron_sulfate) + (1.0u"L"*CHESSLabConstants.water)
+    fe2_stock = (0.01u"mol"*CHESSLabConstants.iron_sulfate_heptahydrate) + (1.0u"L"*CHESSLabConstants.water)
     fe2_pH = CHESSCore.pH(fe2_stock;ionic_strength_correction=false)
     @test 4.0 < fe2_pH < 7.0 # mildly acidic, not markedly so
     @test fe2_pH > CHESSCore.pH(fe_stock;ionic_strength_correction=false) # less acidic than the Fe3+ salt at the same concentration
@@ -609,7 +609,7 @@ end
     @test CHESSCore.reagent_products(L.urea) == [ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent")]
     @test only(CHESSCore.reagent_products(L.lactic_acid)).catalog_number == "W261106"
     @test only(CHESSCore.reagent_products(L.fusayama_meyer_saliva)).catalog_number == "SAE0148"
-    @test only(CHESSCore.reagent_products(L.beta_methyl_d_glucoside)).supplier == "Fisher Scientific"
+    @test only(CHESSCore.reagent_products(L.beta_methyl_d_glucoside_hemihydrate)).supplier == "Fisher Scientific"
 
     # every product names its supplier and catalog number, and no catalog number carries a pack size
     with_products = [r for r in CHESSCore.registry_summary([L]).reagents if !isempty(r.products)]
@@ -700,7 +700,7 @@ end
     @test_logs CHESSCore.atoms(media)
 
     # a hemihydrate counts its half water: C7H14O6 + 1/2 H2O
-    hemi = CHESSLabConstants.beta_methyl_d_glucoside
+    hemi = CHESSLabConstants.beta_methyl_d_glucoside_hemihydrate
     @test CHESSCore.molecular_weight(hemi) ≈ 203.19u"g/mol" atol=0.01u"g/mol"
     hemi_atoms = @test_logs CHESSCore.atoms(2u"mol"*hemi)
     @test hemi_atoms[:C] ≈ 14u"mol" && hemi_atoms[:H] ≈ 30u"mol" && hemi_atoms[:O] ≈ 13u"mol"

@@ -216,10 +216,10 @@
 @species GuanidineCation "Guanidine(cation)" 1 "CH6N3"
 
 # Metal-cation hydrolysis, and other salts audited on request. Fe³⁺ (registered on iron_chloride and
-# iron_nitrate) is a classic hydrolyzing Lewis-acidic metal cation -- this is why FeCl3 solutions are
+# iron_nitrate_nonahydrate) is a classic hydrolyzing Lewis-acidic metal cation -- this is why FeCl3 solutions are
 # well known to run distinctly acidic in practice. Only the first hydrolysis step is modeled (real
 # solutions precipitate Fe(OH)3 rather than continuing as a clean aqueous equilibrium past that);
-# same documented-simplification spirit as boric acid's apparent pKa. Fe²⁺ (iron_sulfate) hydrolyzes
+# same documented-simplification spirit as boric acid's apparent pKa. Fe²⁺ (iron_sulfate_heptahydrate) hydrolyzes
 # far more weakly (pKa≈9.5, standard reference value e.g. Baes & Mesmer) since its lower charge
 # density polarizes coordinated water much less than Fe³⁺'s -- registered too, for completeness.
 @species FeOH²⁺ "FeOH2+" 2 "FeOH" # Fe3+ + H2O - H+
@@ -266,9 +266,9 @@ function _register_acid_base_systems!()
     phosphoric_acid_system = AcidBaseSystem([H3PO4,H2PO4⁻,HPO4²⁻,PO4³⁻],[2.148,7.198,12.375])
     set_acid_base_system!(potassium_phosphate_mono,phosphoric_acid_system)
     set_acid_base_system!(potassium_phosphate_di,phosphoric_acid_system)
-    set_acid_base_system!(sodium_phosphate_mono,phosphoric_acid_system)
+    set_acid_base_system!(sodium_phosphate_mono_monohydrate,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_mono_anhydrous,phosphoric_acid_system)
-    set_acid_base_system!(sodium_phosphate_di,phosphoric_acid_system)
+    set_acid_base_system!(sodium_phosphate_di_heptahydrate,phosphoric_acid_system)
     set_acid_base_system!(sodium_phosphate_di_anhydrous,phosphoric_acid_system)
 
     # Carbonic acid family: H2CO3 ⇌ HCO3⁻ ⇌ CO3²⁻ -- pKa1/pKa2 = 6.352/10.329 (CRC Handbook, 25°C).
@@ -507,9 +507,9 @@ function _register_acid_base_systems!()
     # Fe3+ hydrolysis, first step only (see the Species definitions' comment above):
     iron_hydrolysis_system = AcidBaseSystem([Fe³⁺,FeOH²⁺],[2.2])
     set_acid_base_system!(iron_chloride,iron_hydrolysis_system)
-    set_acid_base_system!(iron_nitrate,iron_hydrolysis_system)
+    set_acid_base_system!(iron_nitrate_nonahydrate,iron_hydrolysis_system)
     # Fe2+ hydrolysis (much weaker than Fe3+'s, see the Species definitions' comment above):
-    set_acid_base_system!(iron_sulfate,AcidBaseSystem([Fe²⁺,FeOH⁺],[9.5]))
+    set_acid_base_system!(iron_sulfate_heptahydrate,AcidBaseSystem([Fe²⁺,FeOH⁺],[9.5]))
     # succinic acid: sodium_succinate_hexahydrate's identity is already the dianion (see above):
     set_acid_base_system!(sodium_succinate_hexahydrate,AcidBaseSystem(
         [SuccinicAcid,SuccinateMonoanion,C4H4O4²⁻],[4.21,5.64]))

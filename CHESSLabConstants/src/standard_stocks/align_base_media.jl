@@ -77,11 +77,11 @@ m9_glucose =
 100u"mL" * water 
 
 m9_magnesium_sulfate = 
-1.204u"g" * magnesium_sulfate + 
+1.204u"g" * magnesium_sulfate_anhydrous + 
 10u"mL" * water 
 
 m9_calcium_chloride = 
-1.110u"g" * calcium_chloride + 
+1.110u"g" * calcium_chloride_dihydrate + 
 10u"mL" * water 
 
 m9_thiamine = 

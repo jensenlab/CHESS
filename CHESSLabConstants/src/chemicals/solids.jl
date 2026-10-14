@@ -72,14 +72,14 @@
 @reagent beef_heart "Beef Heart" Solid opaque missing missing
 @reagent benzamadine "benzamidine" Solid "C7H8N2" missing 2332
 @species MethylBetaDGlucoside "Methyl-beta-D-glucopyranoside" 0 "C7H14O6" 445238
-@reagent beta_methyl_d_glucoside "Methyl-beta-D-glucopyranoside Hemihydrate" Solid (MethylBetaDGlucoside + 0.5*H2O) missing missing
+@reagent beta_methyl_d_glucoside_hemihydrate "Methyl-beta-D-glucopyranoside Hemihydrate" Solid (MethylBetaDGlucoside + 0.5*H2O) missing missing
 # ^ Thermo/Acros AC270920250 is the hemihydrate, not anhydrous: one mole of the glucoside with half a mole
 # of water (194.18 + 18.015/2 = 203.19). PubChem's own "hemihydrate"-titled CID (75487602, MW 212.20) is
 # internally inconsistent -- its formula is actually a full monohydrate's, not a hemihydrate's -- confirmed
 # against the clean 2:1 compound:water co-crystal entry (CID 2724704, MW 406.38 = 2x194.18+18.02).
 # The glucoside species carries the anhydrous parent's CID (445238); no PubChem CID accurately represents
 # the hemihydrate on its own, and the reagent has none.
-@reagent_product beta_methyl_d_glucoside "Fisher Scientific" catalog_number="AC270920250" product_name="Methyl-beta-D-glucopyranoside hemihydrate" notes="Thermo Scientific (Acros Organics)"
+@reagent_product beta_methyl_d_glucoside_hemihydrate "Fisher Scientific" catalog_number="AC270920250" product_name="Methyl-beta-D-glucopyranoside hemihydrate" notes="Thermo Scientific (Acros Organics)"
 @reagent bhi "Brain Heart Infusion Broth" Solid opaque missing missing
 @reagent_product bhi "Fisher Scientific" catalog_number="DF0037-17-8" product_name="BD Difco™ Bacto™ Brain Heart Infusion Broth" manufacturer_number="BD 237200"
 @reagent biotin "biotin" Solid "C10H16N2O3S" missing 171548
@@ -97,9 +97,9 @@
 @reagent_product boric_acid "Sigma-Aldrich" catalog_number="B0252" product_name="BORIC ACID, REAGENTPLUS TM, 99.5%"
 @reagent sodium_butyrate "Sodium Butyrate" Solid 110.09u"g/mol" missing missing
 @reagent_product sodium_butyrate "Sigma-Aldrich" catalog_number="303410" product_name="Butyric acid, sodium salt" grade="98%"
-@reagent calcium_chloride "calcium chloride dihydrate" Solid (Ca²⁺+2*Cl⁻+2*H2O) 1.85u"g/mL" missing  # dihydrate
-@reagent_product calcium_chloride "Fisher Scientific" catalog_number="BP510-250" product_name="Calcium Chloride Dihydrate (White Crystals to Powder), Fisher BioReagents™"
-@reagent_product calcium_chloride "Sigma-Aldrich" catalog_number="C3306" product_name="CALCIUM CHLORIDE DIHYDRATE"
+@reagent calcium_chloride_dihydrate "calcium chloride dihydrate" Solid (Ca²⁺+2*Cl⁻+2*H2O) 1.85u"g/mL" missing  # dihydrate
+@reagent_product calcium_chloride_dihydrate "Fisher Scientific" catalog_number="BP510-250" product_name="Calcium Chloride Dihydrate (White Crystals to Powder), Fisher BioReagents™"
+@reagent_product calcium_chloride_dihydrate "Sigma-Aldrich" catalog_number="C3306" product_name="CALCIUM CHLORIDE DIHYDRATE"
 @reagent calcium_l_threonate "Calcium L-threonate" Solid "C8H14CaO10" missing 13388558
 @reagent carbenicillin "carbenicillin" Solid "C17H18N2O6S" missing 20824
 @reagent carnitine_hydrochloride "DL-carnitine hydrochloride" Solid missing missing missing
@@ -125,28 +125,28 @@
 @reagent_product citric_acid "Sigma-Aldrich" catalog_number="27109" product_name="CITRIC ACID ANHYDROUS"
 @reagent citruline "L-citruline" Solid "C6H13N3O3" missing 9750
 @reagent_product citruline "Sigma-Aldrich" catalog_number="C7629" product_name="L-CITRULLINE"
-@reagent cobalt_chloride "Cobalt (II) Chloride Hexahydrate" Solid (Co²⁺+2*Cl⁻+6*H2O) 1.924u"g/mL" missing  # hexahydrate
+@reagent cobalt_chloride_hexahydrate "Cobalt (II) Chloride Hexahydrate" Solid (Co²⁺+2*Cl⁻+6*H2O) 1.924u"g/mL" missing  # hexahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 3032536, real anhydrous density ~3.35 g/mL) but
 # the stored density (1.924) actually matches the hexahydrate's -- corrected to the hexahydrate CID
 # (24643); molecular_weight derives from the Dissolution (electrolytes.jl), now including 6 H2O.
-@reagent_product cobalt_chloride "Sigma-Aldrich" catalog_number="202185" product_name="COBALT(II) CHLORIDE HEXAHYDRATE, REAGEN" notes="Product name is cut off in the stocklist"
-@reagent cobalt_nitrate "Cobalt (II) Nitrate Hexahydrate" Solid (Co²⁺+2*NO3⁻+6*H2O) 1.88u"g/mL" missing  # hexahydrate
+@reagent_product cobalt_chloride_hexahydrate "Sigma-Aldrich" catalog_number="202185" product_name="COBALT(II) CHLORIDE HEXAHYDRATE, REAGEN" notes="Product name is cut off in the stocklist"
+@reagent cobalt_nitrate_hexahydrate "Cobalt (II) Nitrate Hexahydrate" Solid (Co²⁺+2*NO3⁻+6*H2O) 1.88u"g/mL" missing  # hexahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 25000, density 1.54 -- neither the anhydrous
 # nor hexahydrate reference density) -- corrected to hexahydrate (CID 24821, density 1.88) per the
 # lab's own purchase record (Sigma 230375-100G, "COBALT(II) NITRATE HEXAHYDRATE, 98%").
 # molecular_weight derives from the Dissolution (electrolytes.jl), now including 6 H2O.
-@reagent_product cobalt_nitrate "Sigma-Aldrich" catalog_number="230375" product_name="Cobalt(II) nitrate hexahydrate" grade="98%"
+@reagent_product cobalt_nitrate_hexahydrate "Sigma-Aldrich" catalog_number="230375" product_name="Cobalt(II) nitrate hexahydrate" grade="98%"
 @reagent colistin "colistin" Solid "C52H98N16O13" missing 5311054
-@reagent copper_chloride "Copper (II) Chloride Dihydrate" Solid (Cu²⁺+2*Cl⁻+2*H2O) 2.54u"g/mL" missing  # dihydrate
+@reagent copper_chloride_dihydrate "Copper (II) Chloride Dihydrate" Solid (Cu²⁺+2*Cl⁻+2*H2O) 2.54u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24014, real anhydrous density ~3.4 g/mL) but the
 # stored density (2.54) actually matches the dihydrate's -- corrected to the dihydrate CID (61482);
 # molecular_weight derives from the Dissolution (electrolytes.jl), now including 2 H2O.
-@reagent_product copper_chloride "Sigma-Aldrich" catalog_number="221783" product_name="COPPER(II) CHLORIDE DIHYDRATE, REAGENT" notes="Product name is cut off in the stocklist"
-@reagent copper_sulfate "Copper (II) Sulfate Pentahydrate" Solid (Cu²⁺+SO4²⁻+5*H2O) 2.29u"g/mL" missing  # pentahydrate
+@reagent_product copper_chloride_dihydrate "Sigma-Aldrich" catalog_number="221783" product_name="COPPER(II) CHLORIDE DIHYDRATE, REAGENT" notes="Product name is cut off in the stocklist"
+@reagent copper_sulfate_pentahydrate "Copper (II) Sulfate Pentahydrate" Solid (Cu²⁺+SO4²⁻+5*H2O) 2.29u"g/mL" missing  # pentahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24462, real anhydrous density ~3.6 g/mL) but the
 # stored density (2.29) actually matches the pentahydrate's -- corrected to the pentahydrate CID
 # (24463); molecular_weight derives from the Dissolution (electrolytes.jl), now including 5 H2O.
-@reagent_product copper_sulfate "Sigma-Aldrich" catalog_number="C7631" product_name="COPPER(II) SULFATE PENTAHYDRATE, REAGENT" notes="Product name is cut off in the stocklist"
+@reagent_product copper_sulfate_pentahydrate "Sigma-Aldrich" catalog_number="C7631" product_name="COPPER(II) SULFATE PENTAHYDRATE, REAGENT" notes="Product name is cut off in the stocklist"
 @reagent cyclohexamide "cycloheximide" Solid "C15H23NO4" missing 6197
 @reagent cycloserine "cycloserine" Solid "C3H6N2O2" missing 6234
 @reagent cysteine "L-Cysteine hydrochloride monohydrate" Solid missing missing missing
@@ -253,10 +253,10 @@
 @reagent iron_chloride "Iron Chloride (Ferric Chloride)" Solid (Fe³⁺+3*Cl⁻) 2.8u"g/mL" missing
 # ^ checked 2026-08-14: not in the lab stocklist, but its stored density matches the anhydrous reference value
 # cleanly, unlike the hydrates fixed in this file -- confirmed anhydrous.
-@reagent iron_nitrate "iron (III) nitrate nonahydrate" Solid (Fe³⁺+3*NO3⁻+9*H2O) 1.68u"g/mL" missing  # nonahydrate
-@reagent_product iron_nitrate "Sigma-Aldrich" catalog_number="F8508" product_name="FERRIC NITRATE NONAHYDRATE CELL CULTURE" notes="Product name is cut off in the stocklist"
-@reagent iron_sulfate "iron (II) sulfate heptahydrate" Solid (Fe²⁺+SO4²⁻+7*H2O) 1.895u"g/mL" missing  # heptahydrate
-@reagent_product iron_sulfate "Sigma-Aldrich" catalog_number="F7002" product_name="IRON(II) SULFATE HEPTAHYDRATE, REAGENTP" notes="Product name is cut off in the stocklist"
+@reagent iron_nitrate_nonahydrate "iron (III) nitrate nonahydrate" Solid (Fe³⁺+3*NO3⁻+9*H2O) 1.68u"g/mL" missing  # nonahydrate
+@reagent_product iron_nitrate_nonahydrate "Sigma-Aldrich" catalog_number="F8508" product_name="FERRIC NITRATE NONAHYDRATE CELL CULTURE" notes="Product name is cut off in the stocklist"
+@reagent iron_sulfate_heptahydrate "iron (II) sulfate heptahydrate" Solid (Fe²⁺+SO4²⁻+7*H2O) 1.895u"g/mL" missing  # heptahydrate
+@reagent_product iron_sulfate_heptahydrate "Sigma-Aldrich" catalog_number="F7002" product_name="IRON(II) SULFATE HEPTAHYDRATE, REAGENTP" notes="Product name is cut off in the stocklist"
 @reagent isoleucine "L-isoleucine" Solid "C6H13NO2" missing 6306
 @reagent_product isoleucine "Sigma-Aldrich" catalog_number="I2752" product_name="L-ISOLEUCINE, REAGENT GRADE, >=98% (HPLC" notes="Product name is cut off in the stocklist"
 @reagent kanamycin "kanamycin" Solid "C18H36N4O11" missing 6032
@@ -283,8 +283,8 @@
 @reagent_product lipoic_acid "Sigma-Aldrich" catalog_number="62320" product_name="DL-ALPHA-LIPOIC ACID"
 @reagent lysine "L-Lysine monohydrochloride" Solid missing missing missing
 @reagent_product lysine "Sigma-Aldrich" catalog_number="L5626" product_name="L-Lysine monohydrochloride" grade=">98%"
-@reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid (Mg²⁺+SO4²⁻+7*H2O) 1.68u"g/mL" missing  # heptahydrate
-@reagent_product magnesium_sulfate "Sigma-Aldrich" catalog_number="M1880" product_name="MAGNESIUM SULFATE HEPTAHYDRATE, REAGENTP" notes="Product name is cut off in the stocklist"
+@reagent magnesium_sulfate_heptahydrate "magnesium sulfate heptahydrate" Solid (Mg²⁺+SO4²⁻+7*H2O) 1.68u"g/mL" missing  # heptahydrate
+@reagent_product magnesium_sulfate_heptahydrate "Sigma-Aldrich" catalog_number="M1880" product_name="MAGNESIUM SULFATE HEPTAHYDRATE, REAGENTP" notes="Product name is cut off in the stocklist"
 @reagent magnesium_sulfate_anhydrous "magnesium sulfate anhydrous" Solid (Mg²⁺+SO4²⁻) missing missing
 @reagent_product magnesium_sulfate_anhydrous "Fisher Scientific" catalog_number="AA3333736" product_name="Magnesium sulfate, anhydrous, 99.5% min" manufacturer_number="Thermo 03333736"
 @reagent malic_acid "Malic Acid" Solid "C4H6O5" 1.601u"g/mL" 525
@@ -292,10 +292,10 @@
 @reagent maltodextrin "maltodextrin" Solid opaque missing missing
 @reagent_product maltodextrin "Sigma-Aldrich" catalog_number="419672" product_name="MALTODEXTRIN, DEXTROSE EQUIVALENT 4.0-7" notes="Product name is cut off in the stocklist"
 @reagent maltose "Maltose" Solid "C12H22O11" missing 439186
-@reagent manganese_chloride "Manganese (II) Chloride Tetrahydrate" Solid (Mn²⁺+2*Cl⁻+4*H2O) 2.01u"g/mL" missing  # tetrahydrate
-@reagent_product manganese_chloride "Sigma-Aldrich" catalog_number="M3634" product_name="MANGANESE(II) CHLORIDE TETRAHYDRATE"
-@reagent manganese_sulfate "manganese sulfate monohydrate" Solid (Mn²⁺+SO4²⁻+H2O) 2.95u"g/mL" missing  # monohydrate
-@reagent_product manganese_sulfate "Sigma-Aldrich" catalog_number="M7634" product_name="MANGANESE(II) SULFATE MONOHYDRATE, REAG" notes="Product name is cut off in the stocklist"
+@reagent manganese_chloride_tetrahydrate "Manganese (II) Chloride Tetrahydrate" Solid (Mn²⁺+2*Cl⁻+4*H2O) 2.01u"g/mL" missing  # tetrahydrate
+@reagent_product manganese_chloride_tetrahydrate "Sigma-Aldrich" catalog_number="M3634" product_name="MANGANESE(II) CHLORIDE TETRAHYDRATE"
+@reagent manganese_sulfate_monohydrate "manganese sulfate monohydrate" Solid (Mn²⁺+SO4²⁻+H2O) 2.95u"g/mL" missing  # monohydrate
+@reagent_product manganese_sulfate_monohydrate "Sigma-Aldrich" catalog_number="M7634" product_name="MANGANESE(II) SULFATE MONOHYDRATE, REAG" notes="Product name is cut off in the stocklist"
 @reagent mannitol "D-mannitol" Solid "C6H14O6" 1.489u"g/mL" 6251
 @reagent_product mannitol "Sigma-Aldrich" catalog_number="M4125" product_name="D-MANNITOL"
 @reagent mannose "D-mannose" Solid "C6H12O6" missing 18950
@@ -354,12 +354,12 @@
 @reagent phenylalanine "L-phenylalanine" Solid "C9H11NO2" missing 6140
 @reagent_product phenylalanine "Sigma-Aldrich" catalog_number="P2126" product_name="L-PHENYLALANINE"
 @reagent polymyxin_b "polymyxin_b" Solid "C56H100N16O17S" missing 5702105
-@reagent potassium_aluminum_sulfate "Potassium Aluminum Sulfate Dodecahydrate" Solid (K⁺+Al³⁺+2*SO4²⁻+12*H2O) 1.725u"g/mL" missing  # dodecahydrate
+@reagent potassium_aluminum_sulfate_dodecahydrate "Potassium Aluminum Sulfate Dodecahydrate" Solid (K⁺+Al³⁺+2*SO4²⁻+12*H2O) 1.725u"g/mL" missing  # dodecahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24856), but the stored density (1.725) is
 # PubChem's own dodecahydrate-labeled value, and potassium alum is essentially never sold anhydrous
 # -- corrected to the dodecahydrate CID (62667); molecular_weight derives from the Dissolution
 # (electrolytes.jl), now including 12 H2O.
-@reagent_product potassium_aluminum_sulfate "Sigma-Aldrich" catalog_number="237086" product_name="ALUMINUM POTASSIUM SULFATE DODECAHYDRATE" notes="Product name is cut off in the stocklist"
+@reagent_product potassium_aluminum_sulfate_dodecahydrate "Sigma-Aldrich" catalog_number="237086" product_name="ALUMINUM POTASSIUM SULFATE DODECAHYDRATE" notes="Product name is cut off in the stocklist"
 @reagent potassium_chloride "Potassium Chloride" Solid (K⁺+Cl⁻) 1.984u"g/mL" missing
 @reagent potassium_phosphate_di "potassium phosphate dibasic" Solid (2*K⁺+HPO4²⁻) missing missing
 @reagent_product potassium_phosphate_di "Sigma-Aldrich" catalog_number="P3786" product_name="POTASSIUM PHOSPHATE DIBASIC, ACS REAGENT" notes="Product name is cut off in the stocklist"
@@ -425,27 +425,27 @@
 # premixed buffer. molecular_weight is `missing` and derived instead from its Dissolution
 # (electrolytes.jl: 3*Na+ + Citrate3- + 2*H2O), matching sodium_acetate_trihydrate's convention.
 @reagent_product sodium_citrate_dihydrate "Fisher Scientific" catalog_number="S279-500" product_name="Sodium citrate dihydrate" notes="Listed by the vendor as a citrate buffer solution; the product is the salt"
-@reagent sodium_dichromate "Sodium Dichromate Dihydrate" Solid (2*Na⁺+Cr2O7²⁻+2*H2O) 2.35u"g/mL" missing  # dihydrate
+@reagent sodium_dichromate_dihydrate "Sodium Dichromate Dihydrate" Solid (2*Na⁺+Cr2O7²⁻+2*H2O) 2.35u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 25408) -- corrected to dihydrate (CID 108005)
 # per the lab's own purchase record (Sigma 398063-100G, whose catalog listing is "Sodium dichromate
 # dihydrate"). Density (2.35) was already the dihydrate's value, unchanged. molecular_weight derives
 # from the Dissolution (electrolytes.jl), now including 2 H2O.
-@reagent_product sodium_dichromate "Sigma-Aldrich" catalog_number="398063" product_name="Sodium dichromate dihydrate"
+@reagent_product sodium_dichromate_dihydrate "Sigma-Aldrich" catalog_number="398063" product_name="Sodium dichromate dihydrate"
 @reagent sodium_formate "sodium formate" Solid missing missing missing
 # ^ was formic_acid until 2026-10-13: the lab bought sodium formate, not the acid. Its dissolution is in electrolytes.jl.
 @reagent_product sodium_formate "Sigma-Aldrich" catalog_number="247596" product_name="SODIUM FORMATE, 99+%, A.C.S. REAGENT"
-@reagent sodium_molybdate "Sodium Molybdate Dihydrate" Solid (2*Na⁺+MoO4²⁻+2*H2O) 3.5u"g/mL" missing  # dihydrate
+@reagent sodium_molybdate_dihydrate "Sodium Molybdate Dihydrate" Solid (2*Na⁺+MoO4²⁻+2*H2O) 3.5u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 61424, density 3.78) -- corrected to dihydrate
 # (CID 16211258, density 3.5) per the lab's own purchase record (catalog 243655-100G, "Sodium
 # molybdate dihydrate"). molecular_weight derives from the Dissolution (electrolytes.jl), now
 # including 2 H2O.
-@reagent_product sodium_molybdate "Sigma-Aldrich" catalog_number="243655" product_name="Sodium molybdate dihydrate" grade="98+%"
-@reagent sodium_phosphate_di "sodium phosphate dibasic heptahydrate" Solid (2*Na⁺+HPO4²⁻+7*H2O) missing missing  # heptahydrate
+@reagent_product sodium_molybdate_dihydrate "Sigma-Aldrich" catalog_number="243655" product_name="Sodium molybdate dihydrate" grade="98+%"
+@reagent sodium_phosphate_di_heptahydrate "sodium phosphate dibasic heptahydrate" Solid (2*Na⁺+HPO4²⁻+7*H2O) missing missing  # heptahydrate
 @reagent sodium_phosphate_di_anhydrous "sodium phosphate dibasic anhydrous" Solid (2*Na⁺+HPO4²⁻) missing missing  # anhydrous (e.g. Sigma S9763)
 @reagent_product sodium_phosphate_di_anhydrous "Sigma-Aldrich" catalog_number="S9763" product_name="Sodium phosphate dibasic" grade="ACS reagent"
 @reagent_product sodium_phosphate_di_anhydrous "Fisher Scientific" catalog_number="S375-212" product_name="Sodium Phosphate Dibasic Anhydrous (USP), Fisher Chemical™"
-@reagent sodium_phosphate_mono "sodium phosphate monobasic monohydrate" Solid (Na⁺+H2PO4⁻+H2O) missing missing  # monohydrate
-@reagent_product sodium_phosphate_mono "Fisher Scientific" catalog_number="BP330" product_name="Sodium phosphate monobasic monohydrate, Fisher BioReagents" notes="Supplied by the lab; not in the stocklist. Pack size not recorded."
+@reagent sodium_phosphate_mono_monohydrate "sodium phosphate monobasic monohydrate" Solid (Na⁺+H2PO4⁻+H2O) missing missing  # monohydrate
+@reagent_product sodium_phosphate_mono_monohydrate "Fisher Scientific" catalog_number="BP330" product_name="Sodium phosphate monobasic monohydrate, Fisher BioReagents" notes="Supplied by the lab; not in the stocklist. Pack size not recorded."
 @reagent sodium_phosphate_mono_anhydrous "sodium phosphate monobasic anhydrous" Solid (Na⁺+H2PO4⁻) missing missing  # anhydrous
 # ^ Sigma S0751 (NaH2PO4, 119.98 g/mol on Sigma's listing; the ordering sheet notes it as anhydrous). The lab
 # also has the monohydrate above. Sigma's listing does not state the hydrate and the material can carry some
@@ -455,12 +455,12 @@
 # ^ checked 2026-08-14 against the lab stocklist (Reagent_StockList.xlsx): Sigma 71950-100G "ANHYDROUS".
 @reagent_product sodium_selenite "Sigma-Aldrich" catalog_number="71950" product_name="Sodium selenite, anhydrous" grade="≥90.0%"
 @reagent sodium_succinate_hexahydrate "Sodium Succinate Hexahydrate" Solid (2*Na⁺+C4H4O4²⁻+6*H2O) missing missing
-@reagent sodium_tungstate "Sodium Tungstate Dihydrate" Solid (2*Na⁺+WO4²⁻+2*H2O) 3.25u"g/mL" missing  # dihydrate
+@reagent sodium_tungstate_dihydrate "Sodium Tungstate Dihydrate" Solid (2*Na⁺+WO4²⁻+2*H2O) 3.25u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 26052, density 4.179) -- corrected to dihydrate
 # (CID 150191, density 3.25) per the lab's own purchase record (Sigma 223336-100G, "SODIUM TUNGSTATE
 # DIHYDRATE, ACS REAGENT"). molecular_weight derives from the Dissolution (electrolytes.jl), now
 # including 2 H2O.
-@reagent_product sodium_tungstate "Sigma-Aldrich" catalog_number="223336" product_name="Sodium tungstate dihydrate" grade="ACS reagent"
+@reagent_product sodium_tungstate_dihydrate "Sigma-Aldrich" catalog_number="223336" product_name="Sodium tungstate dihydrate" grade="ACS reagent"
 @reagent soluble_starch "Soluble Starch" Solid opaque missing missing
 @reagent_product soluble_starch "Fisher Scientific" catalog_number="DF0178-17-7" product_name="BD BBL™/Difco™ Media Additives/Ingredients/Reagents: Soluble Starch" manufacturer_number="BD 217820"
 @reagent sorbitol "D-sorbitol" Solid "C6H14O6" 1.49u"g/mL" 5780
@@ -533,12 +533,12 @@
 @reagent_product yeast_extract "Fisher Scientific" catalog_number="BP9727-2" product_name="Fisher BioReagents™ Yeast Extract (Granulated)"
 @reagent zinc_chloride "Zinc (II) Chloride" Solid (Zn²⁺+2*Cl⁻) 2.91u"g/mL" missing
 # ^ checked 2026-08-14 against the lab stocklist (Sigma Z0152-100G, plain "ZINC CHLORIDE CELL CULTURE", no
-# hydrate noted): confirmed anhydrous, unlike zinc_sulfate below.
+# hydrate noted): confirmed anhydrous, unlike zinc_sulfate_heptahydrate below.
 @reagent_product zinc_chloride "Sigma-Aldrich" catalog_number="Z0152" product_name="Zinc chloride, cell culture"
-@reagent zinc_sulfate "Zinc Sulfate Heptahydrate" Solid (Zn²⁺+SO4²⁻+7*H2O) 1.97u"g/mL" missing  # heptahydrate
+@reagent zinc_sulfate_heptahydrate "Zinc Sulfate Heptahydrate" Solid (Zn²⁺+SO4²⁻+7*H2O) 1.97u"g/mL" missing  # heptahydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 24424, real anhydrous density ~3.8 g/mL) -- the
 # stored density (1.96) actually matched the heptahydrate's, and the lab's own purchase record
 # (Reagent_StockList.xlsx: Sigma Z0251-100G, "ZINC SULFATE HEPTAHYDRATE") confirms it. Corrected to
 # the heptahydrate CID (62640); molecular_weight derives from the Dissolution (electrolytes.jl),
 # now including 7 H2O.
-@reagent_product zinc_sulfate "Sigma-Aldrich" catalog_number="Z0251" product_name="Zinc sulfate heptahydrate, cell culture"
+@reagent_product zinc_sulfate_heptahydrate "Sigma-Aldrich" catalog_number="Z0251" product_name="Zinc sulfate heptahydrate, cell culture"

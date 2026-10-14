@@ -2,15 +2,15 @@
     5u"g" * potassium_phosphate_di + 
     25u"g" *potassium_phosphate_mono + 
     79u"g" * sodium_phosphate_mono_anhydrous + 
-    346.8u"g" *sodium_phosphate_di + 
+    346.8u"g" *sodium_phosphate_di_heptahydrate + 
     1u"L" * water 
 
  const magnesium_500x_250mL=
-    87.5u"g" * magnesium_sulfate+
+    87.5u"g" * magnesium_sulfate_heptahydrate+
     250u"mL"* water
 
  const manganese_1000x_250mL = 
-    1.25u"g" *manganese_sulfate+
+    1.25u"g" *manganese_sulfate_monohydrate+
     250u"mL" * water
 
  const sodium_acetate_50x_500mL = 
@@ -22,13 +22,13 @@
     1u"L" * water
 
  const calcium_chloride_1000x_50mL = 
-    338u"mg" *calcium_chloride+
+    338u"mg" *calcium_chloride_dihydrate+
     50u"mL"* water
 
 
  const iron_1000x_50mL=
-    50u"mg" * iron_nitrate+
-    250u"mg" * iron_sulfate+
+    50u"mg" * iron_nitrate_nonahydrate+
+    250u"mg" * iron_sulfate_heptahydrate+
     50u"mL" * water
 
  const cysteine_500x_50mL = 
