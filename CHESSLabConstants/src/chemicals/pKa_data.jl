@@ -241,6 +241,9 @@
 # above rather than duplicating them. Only ethanolamine/putrescine/hypoxanthine below are genuinely
 # new conjugate endpoints.
 @species EthanolamineCation "Ethanolamine(cation)" 1 "C2H8NO" 444693
+@species SpermidineTrication "Spermidine(trication)" 3 "C7H22N3" 6992097 # all three amines protonated
+@species SpermidineDication "Spermidine(dication)" 2 "C7H21N3"
+@species SpermidineCation "Spermidine(cation)" 1 "C7H20N3"
 @species PutrescineDication "Putrescine(dication)" 2 "C4H14N2"
 @species PutrescineCation "Putrescine(cation)" 1 "C4H13N2"
 @species HypoxanthineAnion "Hypoxanthine(anion)" -1 "C5H3N4O"
@@ -434,6 +437,14 @@ function _register_acid_base_systems!()
     set_acid_base_system!(d_malic_acid,AcidBaseSystem([_identity(d_malic_acid),HMalate⁻,Malate²⁻],[3.40,5.20]))
     # ethanolamine: conjugate acid pKa 9.50 (CRC Handbook), same [cation,identity] shape as ammonium.
     set_acid_base_system!(ethanolamine,AcidBaseSystem([EthanolamineCation,_identity(ethanolamine)],[9.50]))
+    # spermidine, a triamine: macroscopic pKa 8.25 / 9.71 / 10.90, from Kimberly & Goldstein (1981) as tabulated in
+    # Table 1 of Rieck, Derst & Veh, PLOS ONE 2024 (PMC11271873), which found them in good agreement with its own
+    # titrations of spermidine trihydrochloride. That table does not state the temperature or ionic strength.
+    # The IUPAC pKa dataset's entry for this structure was not used: it is filed under the name of an isomer
+    # (N,N-bis(3-aminopropyl)methylamine), flagged uncertain, and has a pKa near 6.5 that fits that isomer's
+    # measurements, not a polyamine this basic.
+    set_acid_base_system!(spermidine,AcidBaseSystem(
+        [SpermidineTrication,SpermidineDication,SpermidineCation,_identity(spermidine)],[8.25,9.71,10.90]))
     # putrescine (1,4-butanediamine): two amines, pKa1=9.35/pKa2=10.80 (CRC Handbook), same
     # low-then-high chain shape as agmatine above.
     set_acid_base_system!(putrescine,AcidBaseSystem(

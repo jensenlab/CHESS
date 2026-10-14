@@ -28,4 +28,9 @@
 @reagent_product lactic_acid "Sigma-Aldrich" catalog_number="W261106" product_name="Lactic acid, 88%, FCC" grade="FCC"
 @reagent sheep_blood "Defibrinated Sheep Blood" Liquid opaque missing missing
 @reagent_product sheep_blood "Fisher Scientific" catalog_number="R54012" product_name="Thermo Scientific™ Defibrinated Sheep Blood" manufacturer_number="Thermo R54012"
+@reagent spermidine "Spermidine" Liquid "C7H19N3" 0.925u"g/mL" 1102
+# ^ a liquid as supplied: the lab's stocklist labels it "(liquid)", PubChem gives a melting point below 25 C,
+# and Sigma describes S0266 as a neat liquid. It is sold by mass (25 g), but a reagent's type is its phase as
+# supplied, so it is dosed with the density, Sigma's literature value of 0.925 g/mL at 25 C, as 0.4 g is 0.432 mL.
+@reagent_product spermidine "Sigma-Aldrich" catalog_number="S0266" product_name="SPERMIDINE, BIOREAGENT, FOR MOLECULAR B" notes="Product name is cut off in the stocklist"
 @reagent water "water" Liquid "H2O" 1.0u"g/mL" 962

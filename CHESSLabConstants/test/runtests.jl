@@ -567,6 +567,29 @@ end
     @test CHESSCore.pH(guan_stock;ionic_strength_correction=false) > 10.0
 end
 
+@testset "Acid/base equilibrium: spermidine" begin
+    L = CHESSLabConstants
+    sys = CHESSCore.acid_base_system(L.spermidine)
+    @test !isnothing(sys)
+    # a triamine: three protonation steps from the trication down to the neutral free base that is weighed out
+    @test [CHESSCore.charge(s) for s in sys.species] == [3,2,1,0]
+    @test sys.pKa == [8.25,9.71,10.90]
+    @test sys.species[end] == only(keys(CHESSCore.dissolution(L.spermidine).products))
+    @test CHESSCore.pubchemid(L.SpermidineTrication) == 6992097
+
+    # 10 mM of the free base is strongly basic; the trihydrochloride (three equivalents of HCl) is a weak acid
+    # near the weak-acid estimate, and 1.5 equivalents sits near the middle pKa
+    base = (0.01u"mol"*L.spermidine) + (1.0u"L"*L.water)
+    tri  = (0.01u"mol"*L.spermidine) + (0.03u"mol"*L.HCl) + (1.0u"L"*L.water)
+    mid  = (0.01u"mol"*L.spermidine) + (0.015u"mol"*L.HCl) + (1.0u"L"*L.water)
+    @test 11.0 < CHESSCore.pH(base;ionic_strength_correction=false) < 11.8
+    @test 4.8 < CHESSCore.pH(tri;ionic_strength_correction=false) < 5.5
+    @test 9.5 < CHESSCore.pH(mid;ionic_strength_correction=false) < 9.9
+
+    # the Sigma BioReagent product
+    @test only(CHESSCore.reagent_products(L.spermidine)).catalog_number == "S0266"
+end
+
 @testset "Ion species carry PubChem IDs" begin
     # every species declared in ions.jl has an ID
     labels = [m.captures[1] for m in match.(r"^@species (\S+) ",readlines(joinpath(pkgdir(CHESSLabConstants),"src","chemicals","ions.jl"))) if m !== nothing]

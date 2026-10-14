@@ -466,8 +466,6 @@
 @reagent sorbitol "D-sorbitol" Solid "C6H14O6" 1.49u"g/mL" 5780
 @reagent_product sorbitol "Sigma-Aldrich" catalog_number="S1876" product_name="D-SORBITOL"
 @reagent spectinomycin "spectinomycin" Solid "C14H24N2O7" missing 15541
-@reagent spermidine "Spermidine" Solid "C7H19N3" missing 1102
-@reagent_product spermidine "Sigma-Aldrich" catalog_number="S0266" product_name="SPERMIDINE, BIOREAGENT, FOR MOLECULAR B" notes="Product name is cut off in the stocklist"
 @reagent streptomycin "streptomycin" Solid "C21H39N7O12" missing 19649
 @reagent succinic_acid "Succinic Acid" Solid "C4H6O4" 1.572u"g/mL" 1110
 @reagent_product succinic_acid "Sigma-Aldrich" catalog_number="S9512" product_name="SUCCINIC ACID FREE ACID INSECT CELL CULT" notes="Product name is cut off in the stocklist"
