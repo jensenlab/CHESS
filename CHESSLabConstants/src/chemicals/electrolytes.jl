@@ -40,6 +40,13 @@ function _register_electrolyte_dissolutions!()
     # solids.jl and its AcidBaseSystem registration in pKa_data.jl.
     set_dissolution!(sodium_pyruvate,(Na⁺+PyruvateAnion))
     set_dissolution!(sodium_butyrate,(Na⁺+ButyrateAnion))
+    # formate and propionate, and the agmatine, carnitine, and ornithine salts, are what the lab bought
+    # (sodium salts, a sulfate, and hydrochlorides); each cation is the as-weighed end of its acid/base chain.
+    set_dissolution!(sodium_formate,(Na⁺+Formate⁻))
+    set_dissolution!(sodium_propionate,(Na⁺+Propionate⁻))
+    set_dissolution!(agmatine_sulfate,(AgmatineDication+SO4²⁻))
+    set_dissolution!(carnitine_hydrochloride,(CarnitineCation+Cl⁻))
+    set_dissolution!(ornithine_hydrochloride,(OrnithineCation+Cl⁻))
     set_dissolution!(tartrate,(2*Na⁺+TartrateDianion+2*H2O)) # dihydrate
     return nothing
 end

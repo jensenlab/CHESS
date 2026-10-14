@@ -31,7 +31,7 @@
 1u"g" * soluble_starch +
 0.5u"g" * cysteine +
 3u"g" * sodium_acetate_anhydrous +
-0.00001u"g" * resazurin +
+0.00001u"g" * resazurin_sodium +
 1000u"mL" * water)
 
 @stock modified_reinforced_clostridial__agar_1000mL (modified_reinforced_clostridial_1000mL + 15u"g"* agar)

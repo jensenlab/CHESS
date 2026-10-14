@@ -459,13 +459,13 @@ end
     tier1_reagents = [
         :alanine,:valine,:leucine,:isoleucine,:glycine,:proline,:serine,:threonine,:methionine,
         :phenylalanine,:tryptophan,:asparagine,:glutamine,:citruline,:histidine,:cysteine,:tyrosine,
-        :lysine,:arginine,:ornithine,:cystine,
+        :lysine,:arginine,:ornithine_hydrochloride,:cystine,
         :edta,:ascorbate,:sodium_pyruvate,:sodium_butyrate,:tartrate,:biotin,:lipoic_acid,
         :sulfadiazine,:sulfamethazine,:sulfathiazole,:ciprofloxacin,:ofloxacin,
         :penicillin_g,:ampicillin,:amoxicillin,:carbenicillin,:oxacillin,
         :tetracycline,:doxycycline,:chlortetracycline,:minocycline,
         :cycloserine,:erythromycin,:lincomycin,
-        :promethazine,:carnitine,:taurine,:agmatine,:amitrole,:benzamadine,:guanidine,
+        :promethazine,:carnitine_hydrochloride,:taurine,:agmatine_sulfate,:amitrole,:benzamadine,:guanidine,
     ]
     @test length(tier1_reagents) == 52
     for r in tier1_reagents

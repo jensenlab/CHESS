@@ -18,7 +18,9 @@
 @reagent_product adonitol "Sigma-Aldrich" catalog_number="A5502" product_name="ADONITOL"
 @reagent agar "agar" Solid "C14H24O9" missing 71571511
 @reagent_product agar "Fisher Scientific" catalog_number="AC443570010" product_name="Thermo Scientific Chemicals Agar, Bacteriological grade, powder" manufacturer_number="Thermo 443570010"
-@reagent agmatine "Agmatine" Solid "C5H14N4" missing 199
+@reagent agmatine_sulfate "agmatine sulfate" Solid missing missing missing
+# ^ was agmatine, the free base, until 2026-10-13: the lab bought agmatine sulfate. Its dissolution is in electrolytes.jl.
+@reagent_product agmatine_sulfate "Sigma-Aldrich" catalog_number="A7127" product_name="AGMATINE SULFATE"
 @reagent alanine "DL-alanine" Solid "C3H7NO2" missing 602
 @reagent alpha_amylase "alpha-Amylase from porcine pancreas (Type VI-B)" Solid opaque missing missing
 # ^ Sold by enzyme activity (1 MU pack), not by mass. An enzyme preparation, so registered
@@ -100,7 +102,9 @@
 @reagent_product calcium_chloride "Sigma-Aldrich" catalog_number="C3306" product_name="CALCIUM CHLORIDE DIHYDRATE"
 @reagent calcium_l_threonate "Calcium L-threonate" Solid "C8H14CaO10" missing 13388558
 @reagent carbenicillin "carbenicillin" Solid "C17H18N2O6S" missing 20824
-@reagent carnitine "D,L-Carnitine" Solid "C7H15NO3" missing 288
+@reagent carnitine_hydrochloride "DL-carnitine hydrochloride" Solid missing missing missing
+# ^ was carnitine, the free zwitterion, until 2026-10-13: the lab bought DL-carnitine hydrochloride. Its dissolution is in electrolytes.jl.
+@reagent_product carnitine_hydrochloride "Sigma-Aldrich" catalog_number="C9500" product_name="DL-CARNITINE HYDROCHLORIDE"
 @reagent ceftriaxone "ceftriaxone" Solid "C18H18N8O7S3" missing 5479530
 @reagent cellobiose "cellobiose" Solid "C12H22O11" missing 294
 @reagent_product cellobiose "Sigma-Aldrich" catalog_number="22150" product_name="D-(+)-Cellobiose"
@@ -199,7 +203,6 @@
 @reagent_product folic_acid "Sigma-Aldrich" catalog_number="F8758" product_name="FOLIC ACID, BIOREAGENT, SUITABLE FOR" notes="Product name is cut off in the stocklist"
 @reagent formamide "Formamide" Solid "CH3NO" 1.1334u"g/mL" 713
 @reagent_product formamide "Sigma-Aldrich" catalog_number="F7503" product_name="FORMAMIDE, REAGENTPLUS®, >=99.0% (GC)" notes="Product name is cut off in the stocklist"
-@reagent formic_acid "Formic Acid" Solid "CH2O2" 1.22u"g/mL" 284
 @reagent fructose "D-(-)-fructose" Solid "C6H12O6" missing 5984
 @reagent_product fructose "Sigma-Aldrich" catalog_number="F3510" product_name="D(-)FRUCTOSE CELL CULTURE TESTED"
 @reagent fusaric_acid "fusaric_acid" Solid "C10H13NO2" missing 3442
@@ -266,7 +269,10 @@
 @reagent_product l_malic_acid "Fisher Scientific" catalog_number="ICN218073" notes="Manufacturer: MP Biomedicals"
 @reagent l_sorbose "L-Sorbose" Solid "C6H12O6" missing 439192
 @reagent_product l_sorbose "Fisher Scientific" catalog_number="AC225961000" notes="Manufacturer: Thermo Scientific"
-@reagent lactose "D-lactose" Solid "C12H22O11" missing 6134
+@species Lactose "Lactose" 0 "C12H22O11" 6134
+@reagent lactose_monohydrate "D-lactose monohydrate" Solid (Lactose+H2O) missing missing
+# ^ was lactose, the anhydrous sugar, until 2026-10-13: the lab bought the monohydrate.
+@reagent_product lactose_monohydrate "Sigma-Aldrich" catalog_number="61341" product_name="D-Lactose monohydrate, tested according to Ph. Eur." notes="Replaced the ordered 61345 (D-LACTOSE MONOHYDRATE >= 98.0% (HPLC)), per the stocklist follow-up sheet"
 @reagent lactulose "Lactulose" Solid "C12H22O11" missing 11333
 @reagent lb "LB Broth" Solid opaque missing missing
 @reagent_product lb "Fisher Scientific" catalog_number="DF0446-17-3" product_name="BD Difco™ Dehydrated Culture Media: LB Broth, Miller (Luria-Bertani)" manufacturer_number="BD244620"
@@ -279,6 +285,8 @@
 @reagent_product lysine "Sigma-Aldrich" catalog_number="L5626" product_name="L-Lysine monohydrochloride" grade=">98%"
 @reagent magnesium_sulfate "magnesium sulfate heptahydrate" Solid (Mg²⁺+SO4²⁻+7*H2O) 1.68u"g/mL" missing  # heptahydrate
 @reagent_product magnesium_sulfate "Sigma-Aldrich" catalog_number="M1880" product_name="MAGNESIUM SULFATE HEPTAHYDRATE, REAGENTP" notes="Product name is cut off in the stocklist"
+@reagent magnesium_sulfate_anhydrous "magnesium sulfate anhydrous" Solid (Mg²⁺+SO4²⁻) missing missing
+@reagent_product magnesium_sulfate_anhydrous "Fisher Scientific" catalog_number="AA3333736" product_name="Magnesium sulfate, anhydrous, 99.5% min" manufacturer_number="Thermo 03333736"
 @reagent malic_acid "Malic Acid" Solid "C4H6O5" 1.601u"g/mL" 525
 @reagent_product malic_acid "Sigma-Aldrich" catalog_number="240176" product_name="DL-MALIC ACID"
 @reagent maltodextrin "maltodextrin" Solid opaque missing missing
@@ -328,7 +336,9 @@
 @reagent nutrient_broth "Nutrient Broth" Solid opaque missing missing
 @reagent_product nutrient_broth "Fisher Scientific" catalog_number="DF0003-17-8" product_name="BD Difco™ Nutrient Broth" manufacturer_number="BD 234000"
 @reagent ofloxacin "ofloxacin" Solid "C18H20FN3O4" missing 4583
-@reagent ornithine "L-Ornithine" Solid "C5H12N2O2" missing 6262
+@reagent ornithine_hydrochloride "L-ornithine hydrochloride" Solid missing missing missing
+# ^ was ornithine, the free base, until 2026-10-13: the lab bought L-ornithine hydrochloride. Its dissolution is in electrolytes.jl.
+@reagent_product ornithine_hydrochloride "Sigma-Aldrich" catalog_number="W419001" product_name="L-ORNITHINE HYDROCHLORIDE, 99%"
 @reagent oxacillin "oxacillin" Solid "C19H19N3O5S" missing 6196
 @reagent oxalic_acid "Oxalic Acid" Solid "C2H2O4" 1.9u"g/mL" 971
 @reagent_product oxalic_acid "Sigma-Aldrich" catalog_number="75688" product_name="OXALIC ACID ANHYDROUS"
@@ -358,17 +368,25 @@
 @reagent proline "L-proline" Solid "C5H9NO2" 1.064u"g/mL" 145742
 @reagent_product proline "Sigma-Aldrich" catalog_number="P0380" product_name="L-PROLINE, REAGENTPLUS™, >=99% (HPLC" notes="Product name is cut off in the stocklist"
 @reagent promethazine "promethazine" Solid "C17H20N2S" missing 4927
-@reagent propionic_acid "Propionic Acid" Solid "C3H6O2" 0.995u"g/mL" 1032
 @reagent putrescine "Putrescine" Solid "C4H12N2" 0.877u"g/mL" 1045
 @reagent_product putrescine "Fisher Scientific" catalog_number="ICN10044105" notes="Manufacturer: MP Biomedicals"
 @reagent pyridoxal "pyridoxal hydrochloride" Solid "C8H10ClNO3" missing 6171
 @reagent_product pyridoxal "Sigma-Aldrich" catalog_number="93759" product_name="PYRIDOXAL HYDROCHLORIDE"
 @reagent pyridoxamine "pyridoxamine dihydrochloride" Solid "C8H14Cl2N2O2" missing 10664
 @reagent_product pyridoxamine "Sigma-Aldrich" catalog_number="P9380" product_name="PYRIDOXAMINE DIHYDROCHLORIDE"
+@reagent sodium_propionate "sodium propionate" Solid missing missing missing
+# ^ was propionic_acid until 2026-10-13: the lab bought sodium propionate, not the acid. Its dissolution is in electrolytes.jl.
+@reagent_product sodium_propionate "Sigma-Aldrich" catalog_number="P1880" product_name="SODIUM PROPIONATE"
 @reagent sodium_pyruvate "Sodium Pyruvate" Solid 110.04u"g/mol" missing missing
 @reagent_product sodium_pyruvate "Sigma-Aldrich" catalog_number="P5280" product_name="Pyruvic acid sodium, cell culture tested"
-@reagent raffinose "Raffinose" Solid "C18H32O16" missing 439242
-@reagent resazurin "Resazurin" Solid "C12H7NO4" missing 11077
+@species Raffinose "Raffinose" 0 "C18H32O16" 439242
+@reagent raffinose_pentahydrate "raffinose pentahydrate" Solid (Raffinose+5*H2O) missing missing
+# ^ was raffinose, the anhydrous sugar, until 2026-10-13: the lab bought the pentahydrate (Sigma). No product is
+# registered yet: the stocklist gives catalog S8625 for it, which is Sigma's sodium acetate trihydrate.
+@species ResazurinAnion "Resazurin(anion)" -1 "C12H6NO4" 3800213
+@reagent resazurin_sodium "resazurin sodium salt" Solid (Na⁺+ResazurinAnion) missing missing
+# ^ was resazurin, the neutral compound, until 2026-10-13: the lab bought the sodium salt (C12H6NNaO4, 251.17 g/mol).
+@reagent_product resazurin_sodium "Fisher Scientific" catalog_number="AAB2118706" product_name="Thermo Scientific Chemicals Resazurin sodium salt" manufacturer_number="Thermo B2118706"
 @reagent riboflavin "riboflavin (vitamin B2)" Solid "C17H20N4O6" missing 493570
 @reagent_product riboflavin "Sigma-Aldrich" catalog_number="R7649" product_name="RIBOFLAVIN USP"
 @reagent ribothymidine "ribothymidine (5-methyluridine)" Solid "C10H14N2O6" missing 445408
@@ -413,6 +431,9 @@
 # dihydrate"). Density (2.35) was already the dihydrate's value, unchanged. molecular_weight derives
 # from the Dissolution (electrolytes.jl), now including 2 H2O.
 @reagent_product sodium_dichromate "Sigma-Aldrich" catalog_number="398063" product_name="Sodium dichromate dihydrate"
+@reagent sodium_formate "sodium formate" Solid missing missing missing
+# ^ was formic_acid until 2026-10-13: the lab bought sodium formate, not the acid. Its dissolution is in electrolytes.jl.
+@reagent_product sodium_formate "Sigma-Aldrich" catalog_number="247596" product_name="SODIUM FORMATE, 99+%, A.C.S. REAGENT"
 @reagent sodium_molybdate "Sodium Molybdate Dihydrate" Solid (2*Na⁺+MoO4²⁻+2*H2O) 3.5u"g/mL" missing  # dihydrate
 # ^ fixed 2026-08-14: was registered anhydrous (CID 61424, density 3.78) -- corrected to dihydrate
 # (CID 16211258, density 3.5) per the lab's own purchase record (catalog 243655-100G, "Sodium

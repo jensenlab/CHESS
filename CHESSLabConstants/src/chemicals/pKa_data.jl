@@ -30,10 +30,12 @@
 @species Oxalate²⁻ "Oxalate2-" -2 "C2O4" 71081
 @species HOxalate⁻ "HOxalate-" -1 "C2HO4" 3716971
 @species Formate⁻ "Formate-" -1 "CHO2" 283
+@species FormicAcid "Formic acid" 0 "CH2O2" 284 # neutral acid
 @species Malate²⁻ "Malate2-" -2 "C4H4O5" 160434 # the DL-malate record, as the species has no stereochemistry
 @species HMalate⁻ "HMalate-" -1 "C4H5O5"
 @species Tetrahydroxyborate⁻ "B(OH)4-" -1 "B(OH)4" 177595 # B(OH)3 + H2O - H+
 @species Propionate⁻ "Propionate-" -1 "C3H5O2" 104745
+@species PropionicAcid "Propionic acid" 0 "C3H6O2" 1032 # neutral acid
 @species Shikimate⁻ "Shikimate-" -1 "C7H9O5" 7057976
 @species HAlphaKetoglutarate⁻ "HAlphaKetoglutarate-" -1 "C5H5O5"
 @species AlphaKetoglutarate²⁻ "AlphaKetoglutarate2-" -2 "C5H4O5" 164533
@@ -113,6 +115,7 @@
 @species ArginineAnion "Arginine(anion)" -1 "C6H13N4O2" 5460857
 @species OrnithineDication "Ornithine(dication)" 2 "C5H14N2O2"
 @species OrnithineCation "Ornithine(cation)" 1 "C5H13N2O2" 3350920
+@species OrnithineZwitterion "Ornithine(zwitterion)" 0 "C5H12N2O2" 6262
 @species OrnithineAnion "Ornithine(anion)" -1 "C5H11N2O2" 5460253
 
 # cystine (cysteine's disulfide dimer, symmetric, no thiol) -- approximate macroscopic pKa's, see
@@ -202,9 +205,11 @@
 
 # Tier-1: miscellaneous simple bases.
 @species PromethazineCation "Promethazine(cation)" 1 "C17H21N2S" 24848341
+@species CarnitineZwitterion "Carnitine(zwitterion)" 0 "C7H15NO3" 288
 @species CarnitineCation "Carnitine(cation)" 1 "C7H16NO3" # the quaternary N is permanently +1; only the carboxyl equilibrates
 @species TaurineAnion "Taurine(anion)" -1 "C2H6NO3S" # sulfonate stays fully deprotonated, MOPS-style; only the amine equilibrates
 @species AgmatineDication "Agmatine(dication)" 2 "C5H16N4"
+@species AgmatineBase "Agmatine" 0 "C5H14N4" 199 # the neutral base
 @species AgmatineCation "Agmatine(cation)" 1 "C5H15N4"
 @species AmitroleCation "Amitrole(cation)" 1 "C2H5N4"
 @species BenzamidineCation "Benzamidine(cation)" 1 "C7H9N2"
@@ -303,16 +308,14 @@ function _register_acid_base_systems!()
         [_identity(lactic_acid),Lactate⁻],[3.86]))
     set_acid_base_system!(oxalic_acid,AcidBaseSystem(
         [_identity(oxalic_acid),HOxalate⁻,Oxalate²⁻],[1.25,4.14]))
-    set_acid_base_system!(formic_acid,AcidBaseSystem(
-        [_identity(formic_acid),Formate⁻],[3.75]))
+    set_acid_base_system!(sodium_formate,AcidBaseSystem([FormicAcid,Formate⁻],[3.75]))
     set_acid_base_system!(malic_acid,AcidBaseSystem(
         [_identity(malic_acid),HMalate⁻,Malate²⁻],[3.40,5.20]))
     # boric acid's mechanism is actually Lewis-acid hydroxide addition (B(OH)3 + H2O ⇌ B(OH)4⁻ + H+),
     # not proton donation -- conventionally modeled with an apparent pKa, as here.
     set_acid_base_system!(boric_acid,AcidBaseSystem(
         [_identity(boric_acid),Tetrahydroxyborate⁻],[9.24]))
-    set_acid_base_system!(propionic_acid,AcidBaseSystem(
-        [_identity(propionic_acid),Propionate⁻],[4.87]))
+    set_acid_base_system!(sodium_propionate,AcidBaseSystem([PropionicAcid,Propionate⁻],[4.87]))
     # reuses the existing OAc⁻ ion constant (ions.jl) already shared with the sodium acetate salts'
     # Dissolutions -- same conjugate species, whether reached via complete salt dissociation or
     # partial acid equilibrium. Registered against the sodium acetate salts too (shared AcidBaseSystem
@@ -394,8 +397,8 @@ function _register_acid_base_systems!()
         [LysineDication,LysineCation,LysineZwitterion,LysineAnion],[2.18,8.95,10.5]))
     set_acid_base_system!(arginine,AcidBaseSystem(
         [ArginineDication,ArginineCation,_identity(arginine),ArginineAnion],[2.17,9.04,12.48]))
-    set_acid_base_system!(ornithine,AcidBaseSystem(
-        [OrnithineDication,OrnithineCation,_identity(ornithine),OrnithineAnion],[1.94,8.65,10.76]))
+    set_acid_base_system!(ornithine_hydrochloride,AcidBaseSystem(
+        [OrnithineDication,OrnithineCation,OrnithineZwitterion,OrnithineAnion],[1.94,8.65,10.76]))
 
     # cystine (cysteine's disulfide dimer, symmetric, no thiol) -- approximate macroscopic pKa's,
     # lower-confidence than the values above (the true microscopic picture is more complex due to the
@@ -481,9 +484,9 @@ function _register_acid_base_systems!()
 
     # Cluster D: miscellaneous simple bases.
     set_acid_base_system!(promethazine,AcidBaseSystem([PromethazineCation,_identity(promethazine)],[9.1]))
-    set_acid_base_system!(carnitine,AcidBaseSystem([CarnitineCation,_identity(carnitine)],[3.8]))
+    set_acid_base_system!(carnitine_hydrochloride,AcidBaseSystem([CarnitineCation,CarnitineZwitterion],[3.8]))
     set_acid_base_system!(taurine,AcidBaseSystem([_identity(taurine),TaurineAnion],[9.06]))
-    set_acid_base_system!(agmatine,AcidBaseSystem([AgmatineDication,AgmatineCation,_identity(agmatine)],[9.4,12.5]))
+    set_acid_base_system!(agmatine_sulfate,AcidBaseSystem([AgmatineDication,AgmatineCation,AgmatineBase],[9.4,12.5]))
     set_acid_base_system!(amitrole,AcidBaseSystem([AmitroleCation,_identity(amitrole)],[4.2]))
     set_acid_base_system!(benzamadine,AcidBaseSystem([BenzamidineCation,_identity(benzamadine)],[11.6]))
     set_acid_base_system!(guanidine,AcidBaseSystem([GuanidineCation,_identity(guanidine)],[13.6]))
