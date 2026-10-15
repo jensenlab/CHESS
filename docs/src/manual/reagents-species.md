@@ -97,6 +97,13 @@ julia> Rb⁺ == Species("Rb+", 1, "Rb")
 true
 ```
 
+PubChem has entries for few protonation states of a compound, and for those that it has, it keeps several
+entries that differ in which atom carries the proton. A species with no entry of its own therefore takes
+the ID of the compound it is a protonation state of. `Ampicillin(anion)` and `Ampicillin(cation)` carry
+the ID of ampicillin, with their own charge, formula, and molar mass, and a species with an exact entry
+carries that entry's ID. [`audit_pubchem`](@ref) accepts a species whose formula differs from its
+compound's only in hydrogen when the charge differs by the same number.
+
 A species is identified by its name. Two species are equal when their name, charge, and formula are
 equal, whatever order the elements were written in. Registering the same name and charge with a
 different formula therefore gives a different species and never a silent merge. Isomers are separate

@@ -136,6 +136,27 @@ function _title_plausible(name::AbstractString,title::AbstractString)
     return any(w->occursin(first(w,5),title_alnum),name_words) || any(w->occursin(first(w,5),name_alnum),words(title))
 end
 
+# How a species with an elemental formula relates to the PubChem compound it names: `:exact` (the same formula
+# and charge), `:protonation` (the same elements apart from hydrogen, and the charge differs by the number of
+# hydrogens that differ, which is what adding or removing protons does, so the species is a protonation
+# state of the compound), `:unrelated`, or `:unreadable` when PubChem's formula cannot be read.
+function _record_relation(spc::CHESSCore.Species,record::PubChemRecord)
+    theirs = try
+        CHESSCore.parse_formula(first(_split_pubchem_charge(record.formula)))
+    catch err
+        err isa ArgumentError || rethrow()
+        return :unreadable
+    end
+    ours = CHESSCore.formula(spc)
+    hydrogens(d) = get(d,:H,0)
+    without_hydrogen(d) = Dict(k=>v for (k,v) in d if k != :H)
+    without_hydrogen(ours) == without_hydrogen(theirs) || return :unrelated
+    dH = hydrogens(ours) - hydrogens(theirs)
+    dq = CHESSCore.charge(spc) - record.charge
+    dH == 0 && dq == 0 && return :exact
+    return dq == dH ? :protonation : :unrelated
+end
+
 # The findings for one species and its PubChem record (`nothing` if PubChem has none): tuples of
 # (severity, check, detail).
 function _species_findings(spc::CHESSCore.Species,record::Union{PubChemRecord,Nothing})
@@ -146,34 +167,32 @@ function _species_findings(spc::CHESSCore.Species,record::Union{PubChemRecord,No
     if record.isotope_atoms > 0
         push!(findings,(:error,:isotopes,"PubChem compound $cid is isotope-labelled ($(record.isotope_atoms) atoms), but species have natural isotopes"))
     end
-    if record.charge != CHESSCore.charge(spc)
-        push!(findings,(:error,:charge_differs,"the species has charge $(CHESSCore.charge(spc)), PubChem has $(record.charge)"))
-    end
     f = CHESSCore.formula(spc)
+    charge_differs() = push!(findings,(:error,:charge_differs,"the species has charge $(CHESSCore.charge(spc)), PubChem has $(record.charge)"))
     if f isa Dict
-        if ismissing(record.formula)
+        relation = ismissing(record.formula) ? :unknown : _record_relation(spc,record)
+        if relation === :unknown
             push!(findings,(:review,:formula_unknown,"PubChem has no formula for compound $cid"))
-        else
-            pubchem_formula,_ = _split_pubchem_charge(record.formula)
+            record.charge != CHESSCore.charge(spc) && charge_differs()
+        elseif relation === :unreadable
+            push!(findings,(:review,:formula_unreadable,"PubChem's formula $(record.formula) cannot be read as an elemental formula"))
+        elseif relation === :protonation
+            push!(findings,(:info,:protonation_state,"the species is a protonation state of PubChem compound $cid ($(record.formula))"))
+        elseif relation === :unrelated
+            record.charge != CHESSCore.charge(spc) && charge_differs()
+            theirs = CHESSCore.formula_string(CHESSCore.parse_formula(first(_split_pubchem_charge(record.formula))))
             ours = CHESSCore.formula_string(f)
-            theirs = try
-                CHESSCore.formula_string(CHESSCore.parse_formula(pubchem_formula))
-            catch err
-                err isa ArgumentError || rethrow()
-                missing
-            end
-            if ismissing(theirs)
-                push!(findings,(:review,:formula_unreadable,"PubChem's formula $(record.formula) cannot be read as an elemental formula"))
-            elseif theirs != ours
-                push!(findings,(:error,:formula_differs,"the species has formula $ours, PubChem has $theirs"))
-            end
+            theirs != ours && push!(findings,(:error,:formula_differs,"the species has formula $ours, PubChem has $theirs"))
         end
-    elseif !(f isa CHESSCore.OpaqueFormula)
-        mw = CHESSCore.molecular_weight(spc)
-        if !ismissing(mw) && !ismissing(record.molecular_weight)
-            ours = ustrip(u"g/mol",mw)
-            if abs(ours - record.molecular_weight) > max(0.05,0.001*record.molecular_weight)
-                push!(findings,(:error,:mass_differs,"the species has molar mass $(round(ours;digits=3)) g/mol, PubChem has $(record.molecular_weight)"))
+    else
+        record.charge != CHESSCore.charge(spc) && charge_differs()
+        if !(f isa CHESSCore.OpaqueFormula)
+            mw = CHESSCore.molecular_weight(spc)
+            if !ismissing(mw) && !ismissing(record.molecular_weight)
+                ours = ustrip(u"g/mol",mw)
+                if abs(ours - record.molecular_weight) > max(0.05,0.001*record.molecular_weight)
+                    push!(findings,(:error,:mass_differs,"the species has molar mass $(round(ours;digits=3)) g/mol, PubChem has $(record.molecular_weight)"))
+                end
             end
         end
     end
@@ -199,14 +218,16 @@ every record needs no network at all.
 Each row is a finding for one species, with columns `label`, `name`, `charge`, `pubchemid`, `severity`,
 `check`, `detail`, and `pubchem_title`. The severities are:
 
-- `:error`: the ID cannot be right for the species: PubChem has no such compound, or its charge or
-  isotope labelling differs, or the species' formula (or, for a species without one, its molar mass)
-  differs from PubChem's.
+- `:error`: the ID cannot be right for the species: PubChem has no such compound, or its isotope
+  labelling differs, or its charge and the species' formula (or, for a species without one, its molar
+  mass) differ from PubChem's in a way that is not a protonation state of the same compound.
 - `:review`: possibly wrong and worth a look, such as a PubChem title that has no word starting with the
   same five letters as a word of the species' name, or a formula PubChem writes in a form that cannot be
   read.
-- `:info`: shown only with `include_info=true`: a species with no PubChem ID, or two species of the same
-  chemistry that share an ID.
+- `:info`: shown only with `include_info=true`: a species with no PubChem ID, two species of the same
+  chemistry that share an ID, and a species that is a protonation state of its compound, which means that
+  its formula differs from the compound's only in hydrogen and its charge differs by the same number.
+  Species that are protonation states of one compound may share its ID.
 
 A formula check cannot find an ID that was copied together with its formula from the wrong compound, so
 read the `pubchem_title` of any species whose registration came from a lookup.
@@ -241,8 +262,8 @@ function audit_pubchem(species=nothing;records::AbstractDict=Dict{Int,Union{PubC
         end
     end
 
-    # compounds that more than one distinct species names: the same chemistry under two names is only
-    # informational, different chemistry cannot both be right
+    # compounds that more than one distinct species names: the same chemistry under two names, or protonation
+    # states of one compound, is only informational, and other different chemistry cannot both be right
     by_cid = Dict{Int,Vector{Pair{Symbol,CHESSCore.Species}}}()
     for p in pairs
         cid = CHESSCore.pubchemid(p.second)
@@ -251,7 +272,13 @@ function audit_pubchem(species=nothing;records::AbstractDict=Dict{Int,Union{PubC
     for (cid,group) in by_cid
         length(group) > 1 || continue
         chemistry = unique([(CHESSCore.charge(s),CHESSCore.formula(s) isa Dict ? CHESSCore.formula_string(CHESSCore.formula(s)) : CHESSCore.formula(s)) for (_,s) in group])
-        severity = length(chemistry) == 1 ? :info : :error
+        record = records[cid]
+        # different chemistry may share an ID when every species is the compound or a protonation state of it
+        related = record isa PubChemRecord && all(group) do (_,spc)
+            CHESSCore.formula(spc) isa Dict && !ismissing(record.formula) &&
+                _record_relation(spc,record) in (:exact,:protonation)
+        end
+        severity = length(chemistry) == 1 || related ? :info : :error
         detail = "PubChem ID $cid is shared by "*join(["\"$(CHESSCore.name(s))\"" for (_,s) in group],", ")
         for (label,spc) in group
             add!(label,spc,severity,:shared_pubchem_id,detail,records[cid])

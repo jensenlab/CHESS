@@ -156,7 +156,11 @@ digit, or one that names a derivative of the compound, still returns a plausible
 [`audit_pubchem`](@ref) compares every registered species with the record at its ID and returns the
 differences as a table. It reports an ID that PubChem does not have, a charge or isotope labelling that
 differs, a formula or molar mass that differs, and a PubChem title with no word that starts with the same
-five letters as a word of the species' name. Species that share an ID are reported too, and species with no ID are listed when asked for.
+five letters as a word of the species' name. A species may have the formula of the compound's protonation
+state: the same elements apart from hydrogen, and a charge that differs by the number of hydrogens that
+differ. The audit accepts that and lists it as information, so that an acid/base chain whose species share
+one ID is not reported as a conflict. Other species that share an ID are reported too, and species with
+no ID are listed when asked for.
 
 ```julia
 using CHESSLabConstants
@@ -177,6 +181,11 @@ findings = audit_pubchem(; records)   # later: fetches only what is missing
 
 A formula check cannot find an ID that was copied together with its formula from the wrong compound. Read
 the `pubchem_title` column for any species that was added by a lookup.
+
+To record many PubChem IDs at once, `CHESSLabConstants/tools/apply_species_cids.jl` reads a CSV file with the
+columns `label`, `decision`, and `cid`, and adds the ID of every row whose decision is `cid` to the
+`@species` line of that label. It makes a dry run unless it is given `--write`, never changes a line that
+already has an ID, and with `--audit` checks the changed species with `audit_pubchem`.
 
 [Database Architecture](db-architecture.md) describes how CHESSDatabase stores the locations and
 stocks built from registered constants.

@@ -141,6 +141,35 @@ end
     @test only(audit_pubchem([glucose];records).label) == :glucose
 end
 
+@testset "audit_pubchem: a species may be a protonation state of its compound" begin
+    S = CHESSCore.Species
+    amp = S("ampicillin",0,"C16H19N3O4S";pubchemid=6249)
+    anion = S("ampicillin(anion)",-1,"C16H18N3O4S";pubchemid=6249)
+    cation = S("ampicillin(cation)",1,"C16H20N3O4S";pubchemid=6249)
+    dianion = S("ampicillin(dianion)",-2,"C16H17N3O4S";pubchemid=6249)
+    records = Dict{Int,Union{PCR,Nothing}}(6249=>record(6249,"C16H19N3O4S",0;title="Ampicillin"))
+    group = [:amp=>amp,:anion=>anion,:cation=>cation,:dianion=>dianion]
+    found = audit_pubchem(group;records,include_info=true,fetch=_->error("no network expected"))
+    states = found[found.check .== :protonation_state,:]
+    @test Set(states.label) == Set([:anion,:cation,:dianion]) && all(states.severity .== :info)
+    @test isempty(audit_pubchem(group;records,fetch=_->error("no network expected"))) # nothing above info
+    @test all(found[found.check .== :shared_pubchem_id,:severity] .== :info)
+
+    # the relation needs the charge to follow the hydrogens
+    wrong_charge = S("ampicillin wrong charge",1,"C16H18N3O4S";pubchemid=6249) # one hydrogen fewer but one charge more
+    f = audit_pubchem([wrong_charge];records,fetch=_->error("no network expected"))
+    @test Set(f.check) == Set([:charge_differs,:formula_differs])
+    # other elements differ
+    other = S("ampicillin other element",-1,"C16H18N3O5S";pubchemid=6249)
+    @test :formula_differs in audit_pubchem([other];records,fetch=_->error("no network expected")).check
+    # an ion cannot hide behind a compound of a different formula and the same charge
+    sodium = S("sodium",1,"Na";pubchemid=6249)
+    @test :formula_differs in audit_pubchem([sodium];records,fetch=_->error("no network expected")).check
+    # a species that is not a protonation state of the compound still conflicts when two share an ID
+    conflict = audit_pubchem([amp=>amp,:sodium=>sodium];records,fetch=_->error("no network expected"))
+    @test any(conflict.check .== :shared_pubchem_id)
+end
+
 @testset "audit_pubchem on the registry" begin
     species = CHESSLabConstants._lab_species()
     @test length(species) > 300

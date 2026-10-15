@@ -155,7 +155,9 @@ julia> Species("mystery ion",1,missing)
 
 A species may also carry the integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of its compound, as the
 `pubchemid` keyword (`Species("glucose",0,"C6H12O6";pubchemid=5793)`). The ID is descriptive metadata. It
-does not take part in equality or hash, which identify a species by its name, charge, and formula.
+does not take part in equality or hash, which identify a species by its name, charge, and formula. A
+species with no entry of its own in PubChem takes the ID of the compound it is a protonation state of, so
+`Ampicillin(anion)` carries the ID of ampicillin and keeps its own charge, formula, and molar mass.
 
 Unlike `Reagent`, `Species` has real value-based equality/hash (not Julia's identity-based default)
 because dissolutions and the identity-default fallback (see [`dissolution`](@ref)) routinely
@@ -213,7 +215,8 @@ molecular_weight(x::Species) = x.formula isa Dict ? formula_mass(x.formula) :
 """
     pubchemid(x::Species)
 Return the integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of a [`Species`](@ref)'s compound, or
-`missing` if none was given. The ID is metadata and is not part of the species' identity.
+`missing` if none was given. The ID is metadata and is not part of the species' identity. It is the compound
+that the species is, or a protonation state of, and several species of one acid/base chain can share it.
 """
 pubchemid(x::Species)=x.pubchemid
 """
@@ -386,7 +389,8 @@ elemental formula string such as `"C6H12O6"`; the molecular weight is derived fr
 mass (or `missing`) may be given instead of a formula for a species whose formula is not registered
 yet, and `opaque` (or `opaque(mass)` with an average molar mass) for a species whose atomic content
 is intentionally not described. The optional `pubchemid` is the integer PubChem ID of the species'
-compound, recorded as metadata.
+compound, recorded as metadata. A protonation state that PubChem has no entry for takes the ID of its
+parent compound.
 
 Example:
 ```julia
