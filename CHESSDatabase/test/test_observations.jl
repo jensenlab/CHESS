@@ -252,3 +252,54 @@ end
     @test CHESSDatabase._table_exists("ObservedLots") && CHESSDatabase._table_exists("Products")
     connect_SQLite(file)
 end
+
+@testset "trace_contents follows material back to the lots it came from" begin
+    water_lot = Lot("Lab Supply","W-1","LW1";quantity=1u"L",cost=10.0)
+    paba_lot  = Lot("Lab Supply","P-1","LP1";quantity=25u"g",cost=5.0)
+    water_bottle = generate_location(Bottle1L,"ob trace water bottle")
+    observe(water_bottle[1,1],rgt"water",500u"mL") # contents first, lot second
+    observe(water_bottle,water_lot)
+    paba_bottle = generate_location(Bottle1L,"ob trace paba bottle")
+    observe(paba_bottle,paba_lot)
+    observe(paba_bottle[1,1],rgt"paba",10u"g")
+    tap = generate_location(Bottle1L,"ob trace unlabelled water")
+    observe(tap[1,1],rgt"water",1u"L")
+    mix = generate_location(Bottle1L,"ob trace mix")[1,1]
+    id = location_id(mix)
+    share(t,component,lot) = only(filter(r->r.Component==component && isequal(r.Lot,lot),eachrow(t))).Quantity
+
+    bottle_trace = trace_contents(location_id(water_bottle[1,1]))
+    @test nrow(bottle_trace) == 1
+    @test only(bottle_trace).Lot == water_lot
+
+    upload(transfer!,water_bottle[1,1],mix,100u"mL")
+    after_water = get_last_sequence_id()
+    upload(transfer!,paba_bottle[1,1],mix,2u"g")
+    upload(transfer!,tap[1,1],mix,50u"mL")
+    t = trace_contents(id)
+    @test nrow(t) == 3
+    @test share(t,rgt"water",water_lot) ≈ 100u"mL"
+    @test share(t,rgt"paba",paba_lot) ≈ 2u"g"
+    @test share(t,rgt"water",missing) ≈ 50u"mL" # from the bottle with no lot
+
+    # cost: 100 mL of a 1 L lot costing 10, plus 2 g of a 25 g lot costing 5
+    @test reconstruct_cost(id) ≈ 1.0 + 0.4
+    @test ismissing(reconstruct_cost(id;strict=true)) # the unlabelled water has no cost
+    @test ismissing(only(filter(r->ismissing(r.Lot),eachrow(trace_cost(id)))).Cost)
+
+    # a transfer out takes the same fraction of every share
+    out = generate_location(Bottle1L,"ob trace out")[1,1]
+    upload(transfer!,mix,out,CHESSCore.quantity(stock(reconstruct_location(id)))/2)
+    t_out = trace_contents(location_id(out))
+    @test share(t_out,rgt"water",water_lot) ≈ 50u"mL"
+    @test share(t_out,rgt"paba",paba_lot) ≈ 1u"g"
+    @test share(t_out,rgt"water",missing) ≈ 25u"mL"
+    @test reconstruct_cost(location_id(out)) ≈ 0.5 + 0.2
+    @test reconstruct_cost(id) ≈ 0.7 # and the well that sent it keeps the other half
+
+    # earlier in history the mix held only what had arrived by then
+    @test reconstruct_cost(id,after_water) ≈ 1.0
+    @test nrow(trace_contents(id,after_water)) == 1
+
+    @test_throws ErrorException trace_contents(location_id(water_bottle))
+end

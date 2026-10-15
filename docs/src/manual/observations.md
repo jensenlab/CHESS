@@ -84,6 +84,23 @@ the bottle are tracked by the ledger and fall as the bottle is used. `lot(bottle
 a labware, or `nothing`, and [`reconstruct_lot`](@ref) returns the lot that was observed as of a
 ledger position. Observing a new lot replaces the earlier one. Only a labware has a lot.
 
+### Tracing contents to lots
+
+[`trace_contents`](@ref) finds which lots the material in a well came from. It returns a `DataFrame` with
+one row for each component and lot, and a row with a `missing` lot for material that no lot accounts
+for, such as water from a tap. The trace is computed from the ledger when it is asked for and is not
+stored. It follows the transfers into the well and the observations of the wells that fed it: a
+transfer takes the same fraction of every lot's share of a component as it takes of the component,
+and a component observed in an empty well comes from the lot of the well's labware. The lot of the
+labware is the one recorded as of the ledger position being traced, so it does not matter whether the
+contents or the lot of a new bottle was observed first.
+
+[`trace_cost`](@ref) adds the cost of each share, which is the lot's `cost` times the share's fraction of
+the lot's `quantity`. The cost of a solution is therefore a property of the lots that went into it.
+[`reconstruct_cost`](@ref) sums it. Shares with no known cost, because they have no lot or their lot
+has no cost or quantity, add nothing to the sum; `strict = true` returns `missing` instead when there
+are any.
+
 The database keeps each supplier product once in `Products`, with the details of a registered
 [`ReagentProduct`](@ref) and a link to its reagent, and each lot observation in `ObservedLots`.
 
