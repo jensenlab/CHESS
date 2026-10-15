@@ -40,7 +40,7 @@
 @reagent ammonium_sulfate "Ammonium Sulfate" Solid (2*NH4⁺+SO4²⁻) 1.78u"g/mL" missing
 @reagent_product ammonium_sulfate "Fisher Scientific" catalog_number="423400250" product_name="Ammonium Sulfate" grade="99%"
 @reagent amoxicillin "amoxicillin" Solid "C16H19N3O5S" missing 33613
-@reagent_product amoxicillin "Sigma-Aldrich" catalog_number="A8523" product_name="Amoxicillin" notes="95-102% anhydrous basis"
+@reagent_product amoxicillin "Sigma-Aldrich" catalog_number="A8523" product_name="Amoxicillin" notes="95-102% anhydrous basis. Sigma lists the anhydrous form (C16H19N3O5S, 365.40 g/mol) and notes a high moisture content, so check the lot's certificate of analysis"
 @reagent ampicillin_sodium "ampicillin sodium" Solid missing missing missing
 # ^ both products in the lab are the sodium salt (Sigma-Aldrich A8351 and Fisher BP1760, "Ampicillin Sodium Salt"). Its
 # dissolution (Na⁺ + the ampicillin anion) is registered in electrolytes.jl, and its acid/base chain in pKa_data.jl.
@@ -76,6 +76,7 @@
 @reagent_product b_nadp "Sigma-Aldrich" catalog_number="N5755" product_name="β-Nicotinamide adenine dinucleotide phosphate" notes="Manufactured by CombiBlocks. The product name is cut off in the order record."
 @reagent beef_extract "Beef Extract" Solid opaque missing missing
 @reagent_product beef_extract "Fisher Scientific" catalog_number="DF0115-17-3" product_name="Gibco™ Bacto™ Beef Extract, desiccated" manufacturer_number="BD Gibco 211520"
+@reagent_product beef_extract "Gibco" catalog_number="4073205" product_name="Bacto Beef Extract, Desiccated"
 @reagent beef_heart "Beef Heart" Solid opaque missing missing
 @reagent benzamadine "benzamidine" Solid "C7H8N2" missing 2332
 @species MethylBetaDGlucoside "Methyl-beta-D-glucopyranoside" 0 "C7H14O6" 445238
