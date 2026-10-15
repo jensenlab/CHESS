@@ -78,7 +78,6 @@ function trace_contents(location_id::Integer,sequence_id::Integer=get_last_seque
         row.Core == 1 && union!(core,(row.Source,row.Destination))
     end
     observations = get_content_observations(collect(core),0,sequence_id,time)
-    filter!(row->!ismissing(row.ComponentID),observations)
 
     wells = Dict{Int,_TracedWell}()
     well(id) = get!(()->_TracedWell(),wells,id)

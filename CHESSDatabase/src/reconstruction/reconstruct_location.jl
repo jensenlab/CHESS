@@ -20,7 +20,7 @@ See Also: [`reconstruct_location`](@ref)
 function reconstruct_location!(loc::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     reconstruct_environment!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs full parent chain and environmental attributes. We don't need to call reconstruct_parent  and reconstruct_attribute seperately if doing a full environment reconstruction
     reconstruct_children!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # finds the current children of the location but doesn't fully reconstruct them, just creates a reference. 
-    reconstruct_contents!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs stock and cost fields for wells
+    reconstruct_contents!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the stock of wells
     reconstruct_lock!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the locked state (recall locks prevent movement)
     reconstruct_activity!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the activity state
     reconstruct_reads!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the reads recorded for the location

@@ -53,8 +53,8 @@ julia> stock(a1)
  water    water  100 μL          100 %
 ```
 
-The third argument of `deposit!` is a `cost`, a tracked number such as a reagent cost. `withdraw!`
-apportions it proportionally when material is removed. It defaults to zero.
+A well holds no cost. The cost of what a well contains is found by tracing the material back to the lots
+it came from. See [Observations](observations.md#Tracing-contents-to-lots).
 
 ## Transferring between wells
 

@@ -164,9 +164,9 @@ w1=b1[1,1]
 
 w2=b2[1,1]
 
-deposit!(w2,50u"g"*rgt"paba", 20)
-deposit!(w1,500u"mL"*rgt"water" + 2u"g" *rgt"iron_nitrate",3)
-deposit!(w1,1u"OD*mL"*org"SMU_UA159",0)
+deposit!(w2,50u"g"*rgt"paba")
+deposit!(w1,500u"mL"*rgt"water" + 2u"g" *rgt"iron_nitrate")
+deposit!(w1,1u"OD*mL"*org"SMU_UA159")
 cache(w1)
 cache(w2)
 

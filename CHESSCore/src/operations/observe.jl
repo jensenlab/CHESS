@@ -45,15 +45,15 @@ operations, an observation makes no claim about how the state came about. It onl
 state is.
 
 - **Component:** `component` is present in `well` at exactly `quant`, and every other component is
-  unchanged. `observe!(well, rgt"glucose", 2u"g")`. A zero `quant` asserts absence. Cost is unchanged.
+  unchanged. `observe!(well, rgt"glucose", 2u"g")`. A zero `quant` asserts absence.
 - **Attribute:** `loc`'s own attribute is `attribute`, as with [`set_attribute!`](@ref). A `missing`
   value means `loc` has no local value and defers to its parent.
 - **Parent:** `child` is located in `parent` (or nowhere, for `nothing`). This moves `child` like
   [`move_into!`](@ref) but ignores `child`'s lock. Occupancy rules still apply.
 - **Lot:** `labware` was received as `lot` (see [`Lot`](@ref)): its product, lot number, purchased
-  quantity and arrival date. Only a [`Labware`](@ref), such as a reagent bottle, has a lot. Observing a
-  new lot replaces the earlier one.
-- **Scalar facets:** `facet` is one of `:cost` (a `Well`'s cost), `:locked` or `:active`.
+  quantity, cost and arrival date. Only a [`Labware`](@ref), such as a reagent bottle, has a lot.
+  Observing a new lot replaces the earlier one.
+- **Scalar facets:** `facet` is one of `:locked` or `:active`.
 
 See [`_check_capability`](@ref) for `instrument`.
 """
@@ -98,15 +98,12 @@ observe!(loc::Location,::Lot;kwargs...) = throw(ArgumentError(
 
 function observe!(loc::Location,facet::Symbol,value;instrument::Union{Location,Nothing}=nothing)
     _check_capability(instrument,observe!)
-    if facet === :cost
-        loc isa Well || throw(ArgumentError("only a Well has a cost to observe"))
-        loc.cost=value
-    elseif facet === :locked
+    if facet === :locked
         loc.is_locked=value
     elseif facet === :active
         loc.is_active=value
     else
-        throw(ArgumentError("unknown observable facet :$facet; expected :cost, :locked or :active"))
+        throw(ArgumentError("unknown observable facet :$facet; expected :locked or :active"))
     end
     return nothing
 end

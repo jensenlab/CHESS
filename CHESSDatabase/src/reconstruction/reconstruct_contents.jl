@@ -122,11 +122,11 @@ function get_content_caches(location_id::Integer, starting::Integer=0, ending::I
 
         ),
         
-            y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,StockID,Cost)
-        AS(SELECT e.EncumbranceID,0,0,e.EncumbranceID,v.LocationID, v.StockID,v.Cost
+            y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,StockID)
+        AS(SELECT e.EncumbranceID,0,0,e.EncumbranceID,v.LocationID, v.StockID
             FROM encumbrance_subset e INNER JOIN EncumberedCachedContents v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
-            SELECT Max(c.ID),c.LedgerID,l.SequenceID,0,c.LocationID,c.StockID,c.Cost
+            SELECT Max(c.ID),c.LedgerID,l.SequenceID,0,c.LocationID,c.StockID
             FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID = $location_id AND c.Time <= $ledger_time Group By l.SequenceID) 
             SELECT * FROM y WHERE LocationID=$location_id ORDER BY EncumbranceID,SequenceID ")
     else
@@ -135,8 +135,8 @@ function get_content_caches(location_id::Integer, starting::Integer=0, ending::I
         AS(
             SELECT Max(ID), SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID 
             ) ,
-        y (ID,LedgerID,SequenceID, EncumbranceID,LocationID,StockID,Cost)
-        AS( SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.StockID,c.Cost FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID =$location_id AND c.Time <= $ledger_time Group By LedgerID ORDER BY SequenceID ) 
+        y (ID,LedgerID,SequenceID, EncumbranceID,LocationID,StockID)
+        AS( SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.StockID FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID =$location_id AND c.Time <= $ledger_time Group By LedgerID ORDER BY SequenceID ) 
         SELECT * from y
         " )
         
@@ -345,7 +345,7 @@ end
     fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time::DateTime=Dates.now();encumbrances=false)
 
 Look up `location_id`'s most recent cached [`Stock`](@ref) within `starting..ending`. Returns
-`(stock, cost, foot)`.
+`(stock, foot)`.
 
 `stock` is `nothing` when no `CachedContents` row exists in that window at all -- distinct from a
 row that exists and legitimately caches an empty stock (which returns `Empty()`, not `nothing`).
@@ -355,26 +355,25 @@ empty as of this cache point."
 """
 function fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time::DateTime=Dates.now();encumbrances=false)
     caches=get_content_caches(location_id,starting,ending,time;encumbrances=encumbrances)
-    nrow(caches) == 0 && return nothing, 0, 0
+    nrow(caches) == 0 && return nothing, 0
 
     row=caches[end,:]
     stock_id=row.StockID
     foot=row.SequenceID
-    cost=row.Cost
 
     stock=Empty()
     if !ismissing(stock_id)
         stock=get_stock(stock_id)
     end
 
-    return stock , cost, foot
+    return stock, foot
 end
 
 """
     reconstruct_contents(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Location
     reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Vector{<:Location}
 
-Rebuild the stock and cost of wells from the ledger's transfer history, returning new locations for
+Rebuild the stock of wells from the ledger's transfer history, returning new locations for
 the given IDs. [`reconstruct_contents!`](@ref) writes the result into existing
 [`Location`](@ref)s instead. IDs that are not [`Well`](@ref)s come back as bare locations with no contents.
 
@@ -396,9 +395,9 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
             push_location!(all_locs,loc_id,0,loc)
             continue
         end
-        stock,cost,cache_foot = fetch_content_cache(loc_id,0,max_cache,time;encumbrances=encumbrances)
+        stock,cache_foot = fetch_content_cache(loc_id,0,max_cache,time;encumbrances=encumbrances)
         if !isnothing(stock)
-            deposit!(loc,stock,cost)
+            deposit!(loc,stock)
         end
 
         push_location!(all_locs,CHESSCore.location_id(loc),cache_foot,loc)
@@ -431,7 +430,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         end
     end
 
-    # component and cost observations on every well whose own state this call reads back: the
+    # component observations on every well whose own state this call reads back: the
     # requested wells plus the core ancestor closure. Collateral destinations never need them.
     target_wells=filter(id -> find_most_recent_location(all_locs,id) isa CHESSCore.Well,location_ids)
     observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time)
@@ -462,11 +461,11 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
             continue
         end
 
-        new_stock,new_cost,new_foot=fetch_content_cache(loc_id,foot,cache_dict[loc_id],time;encumbrances=false)
+        new_stock,new_foot=fetch_content_cache(loc_id,foot,cache_dict[loc_id],time;encumbrances=false)
         n,t=get_location_info(loc_id)
         new_loc=t(loc_id,n)
         if !isnothing(new_stock)
-            deposit!(new_loc,new_stock,new_cost)
+            deposit!(new_loc,new_stock)
             push_location!(all_locs,loc_id,new_foot,new_loc)
         else
             push!(reconstructions_needed,loc_id)
@@ -526,7 +525,7 @@ end
     reconstruct_contents!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
     reconstruct_contents!(locations::Vector{<:Location}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
 
-Set the stock and cost of each [`Well`](@ref) in `locations` to its reconstructed state. Other
+Set the stock of each [`Well`](@ref) in `locations` to its reconstructed state. Other
 locations are left alone. Arguments work as in [`reconstruct_contents`](@ref).
 """
 function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)
@@ -537,7 +536,6 @@ function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Intege
     for i in eachindex(locations)
         if locations[i] isa CHESSCore.Well
             locations[i].stock=CHESSCore.stock(parallel_locs[i])
-            locations[i].cost=CHESSCore.cost(parallel_locs[i])
         else
             continue 
         end 
@@ -549,7 +547,6 @@ function reconstruct_contents!(location::Location,sequence_id::Integer=get_last_
     parallel_loc=reconstruct_contents(location_id(location),sequence_id,time,max_cache,loc_index,encumbrances=encumbrances)
     if location isa CHESSCore.Well
         location.stock=CHESSCore.stock(parallel_loc)
-        location.cost=CHESSCore.cost(parallel_loc)
     end 
     return nothing 
 end 
@@ -569,13 +566,12 @@ end
 """
     get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
 
-Every component and cost observation on `locs` between `starting` and `ending` sequence points,
-ordered by `SequenceID`. Component rows have a missing `Cost`, and cost rows a missing
-`ComponentID`/`Quantity`/`Unit`.
+Every component observation on `locs` between `starting` and `ending` sequence points,
+ordered by `SequenceID`.
 """
 function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
     isempty(locs) && return DataFrame(LedgerID=Int[],SequenceID=Int[],LocationID=Int[],ComponentID=Union{Int,Missing}[],
-        Quantity=Union{Float64,Missing}[],Unit=Union{String,Missing}[],Cost=Union{Float64,Missing}[])
+        Quantity=Union{Float64,Missing}[],Unit=Union{String,Missing}[])
     ledger_time=db_time(time)
     entry=query_join_vector(locs)
     return query_db("""
@@ -583,11 +579,8 @@ function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,en
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             )
-        SELECT o.LedgerID,l.SequenceID,o.LocationID,o.ComponentID,o.Quantity,o.Unit,NULL AS Cost
+        SELECT o.LedgerID,l.SequenceID,o.LocationID,o.ComponentID,o.Quantity,o.Unit
             FROM ObservedComponents o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
-        UNION ALL
-        SELECT o.LedgerID,l.SequenceID,o.LocationID,NULL,NULL,NULL,o.Cost
-            FROM ObservedCosts o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
         ORDER BY SequenceID
         """)
 end
@@ -607,12 +600,8 @@ function _apply_content_observations!(all_locs,rows)
     isnothing(entry) && return nothing
     loc=deepcopy(entry[2])
     for row in eachrow(rows)
-        if ismissing(row.ComponentID)
-            loc.cost=row.Cost
-        else
-            quant=row.Quantity*_parse_unit(row.Unit)
-            loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
-        end
+        quant=row.Quantity*_parse_unit(row.Unit)
+        loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
     end
     push_location!(all_locs,loc_id,seq_id,loc)
     return nothing

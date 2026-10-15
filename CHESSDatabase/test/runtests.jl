@@ -56,7 +56,7 @@ end
     move_into!(eph_root,eph_plate)
     set_attribute!(eph_root,Temperature(19u"°C"))
     lock!(eph_plate)
-    deposit!(eph_plate[1,1],0.1u"g"*rgt"paba",5)
+    deposit!(eph_plate[1,1],0.1u"g"*rgt"paba")
 
     committed = commit_location!(eph_root)
     @test CHESSCore.is_committed(committed)
@@ -131,7 +131,7 @@ end
 
     # labware_to_df / df_to_labware round-trip, "q" format
     bottle = generate_location(Bottle1L,"df interop test bottle")
-    deposit!(bottle.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle.children[1,1],10u"g"*rgt"paba")
     df_q,units_q = labware_to_df(bottle,"q";reagent_context=[CHESSCore,TestChemOrg])
     @test df_q.labware[1] == string(kind(bottle).name) # kind-based, not typeof(lw)
     lws_q = df_to_labware(df_q,units_q;reagent_context=[CHESSCore,TestChemOrg])
@@ -140,7 +140,7 @@ end
 
     # "vc" format round-trip on a Solution-derived stock (fits vc's volume/concentration model)
     bottle2 = generate_location(Bottle1L,"df interop test bottle vc")
-    deposit!(bottle2.children[1,1],100u"mL"*rgt"water",5)
+    deposit!(bottle2.children[1,1],100u"mL"*rgt"water")
     df_vc,units_vc = labware_to_df(bottle2,"vc";reagent_context=[CHESSCore,TestChemOrg])
     lws_vc = df_to_labware(df_vc,units_vc;reagent_context=[CHESSCore,TestChemOrg])
     @test stock(lws_vc[1][df_vc.well[1]]) == stock(bottle2.children[1,1])
@@ -148,7 +148,7 @@ end
     # "vc" format now also works on a Mixture-derived stock -- previously crashed (MethodError) since
     # the exported concentration unit was always g/µL regardless of the total's dimension
     bottle3 = generate_location(Bottle1L,"df interop test bottle vc mixture")
-    deposit!(bottle3.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle3.children[1,1],10u"g"*rgt"paba")
     df_vc3,units_vc3 = labware_to_df(bottle3,"vc";reagent_context=[CHESSCore,TestChemOrg])
     @test units_vc3[1,"paba"] == "%"
     lws_vc3 = df_to_labware(df_vc3,units_vc3;reagent_context=[CHESSCore,TestChemOrg])
@@ -633,7 +633,7 @@ end
 
 @testset "update(...; replace/insert) rolls back its ledger row on failure" begin
     ur_bottle = generate_location(Bottle1L,"update rollback bottle")
-    deposit!(ur_bottle[1,1],500u"mL"*rgt"water",1)
+    deposit!(ur_bottle[1,1],500u"mL"*rgt"water")
     cache(ur_bottle[1,1])
     ur_plate = generate_location(WP96,"update rollback plate")
     ur_src, ur_dst, ur_empty = ur_bottle[1,1], ur_plate[1,1], ur_plate[1,2]

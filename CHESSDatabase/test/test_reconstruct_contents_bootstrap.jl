@@ -14,7 +14,7 @@ upload(move_into!,rcb_lab,rcb_room)
 rcb_bottle = generate_location(Bottle1L,"rcb source bottle")
 upload(move_into!,rcb_room,rcb_bottle)
 rcb_source_well = rcb_bottle[1,1]
-deposit!(rcb_source_well,500u"mL"*rgt"water",1)
+deposit!(rcb_source_well,500u"mL"*rgt"water")
 cache(rcb_source_well)  # cached NOW, before the target well below is ever created
 
 # The target well is created (and auto-cached as Empty by `generate_location`) strictly *after*

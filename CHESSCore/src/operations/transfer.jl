@@ -10,7 +10,6 @@ see [`build_location`](@ref) (or CHESSDatabase's `reconstruct_location`). See [`
 """
 function transfer!(donor::Well,recipient::Well,quantity::Union{Unitful.Volume,Unitful.Mass},configuration::String="";instrument::Union{Location,Nothing}=nothing)
     _check_capability(instrument,transfer!)
-    trf_stock,trf_cost=withdraw!(donor,quantity)
-    deposit!(recipient,trf_stock,trf_cost)
+    deposit!(recipient,withdraw!(donor,quantity))
     nothing
 end

@@ -138,8 +138,7 @@ its children is required, unlike for other locations.
 `reconstruct_contents` is the most involved reconstruction, because the current stock of a well can
 depend on transfers made several steps before any cached snapshot. It proceeds in three steps:
 
-1. It fetches the content cache of each requested well, or starts from `Empty()` with zero cost if
-   none exists.
+1. It fetches the content cache of each requested well, or starts from `Empty()` if none exists.
 2. It finds the earliest cached snapshot among the requested wells. It then searches `Transfers`,
    and `EncumberedTransfers` when `encumbrances=true`, for every transfer that could have
    contributed material to any requested well, however many transfers back that goes.

@@ -299,7 +299,7 @@ CHESSCore.set_occupancy_cost!(:Shared,:CatC,1//3)
     # plate1 fixture (later testsets deposit into plate1's own wells and rely on them starting Empty)
     occ_check_plate = build_location(WP96,"occupancy check plate")
     @test occupancy(occ_check_plate) == 1//1
-    deposit!(occ_check_plate[1,1],1u"µL"*rgt"water",0)
+    deposit!(occ_check_plate[1,1],1u"µL"*rgt"water")
     @test occupancy(occ_check_plate) == 1//1
 end
 
@@ -404,7 +404,7 @@ end
 
     w1=plate1[1,1]
     w2=plate1[1,2]
-    deposit!(w1,0.05u"g"*rgt"paba",0)
+    deposit!(w1,0.05u"g"*rgt"paba")
     @test_nowarn transfer!(w1,w2,0.01u"g";instrument=capable)
     @test_throws ArgumentError transfer!(w1,w2,0.01u"g";instrument=incapable)
 
@@ -1087,7 +1087,7 @@ end
     # labware_to_df / df_to_labware round-trip, "q" format -- build_location, not generate_location:
     # this exercises exactly the fix df_to_labware itself relies on (no database needed)
     bottle = build_location(Bottle1L,"df interop test bottle")
-    deposit!(bottle.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle.children[1,1],10u"g"*rgt"paba")
     df_q,units_q = labware_to_df(bottle,"q";reagent_context=[CHESSCore,TestChemOrg])
     @test df_q.labware[1] == string(kind(bottle).name) # kind-based, not typeof(lw)
     lws_q = df_to_labware(df_q,units_q;reagent_context=[CHESSCore,TestChemOrg])
@@ -1097,7 +1097,7 @@ end
 
     # "vc" format round-trip on a Solution-derived stock (fits vc's volume/concentration model)
     bottle2 = build_location(Bottle1L,"df interop test bottle vc")
-    deposit!(bottle2.children[1,1],100u"mL"*rgt"water",5)
+    deposit!(bottle2.children[1,1],100u"mL"*rgt"water")
     df_vc,units_vc = labware_to_df(bottle2,"vc";reagent_context=[CHESSCore,TestChemOrg])
     lws_vc = df_to_labware(df_vc,units_vc;reagent_context=[CHESSCore,TestChemOrg])
     @test stock(lws_vc[1][df_vc.well[1]]) == stock(bottle2.children[1,1])
@@ -1105,7 +1105,7 @@ end
 
     # "vc" format also works on a Mixture-derived stock (cross-dimension branch: mass/volume)
     bottle3 = build_location(Bottle1L,"df interop test bottle vc mixture")
-    deposit!(bottle3.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle3.children[1,1],10u"g"*rgt"paba")
     df_vc3,units_vc3 = labware_to_df(bottle3,"vc";reagent_context=[CHESSCore,TestChemOrg])
     @test units_vc3[1,"paba"] == "%"
     lws_vc3 = df_to_labware(df_vc3,units_vc3;reagent_context=[CHESSCore,TestChemOrg])
@@ -1345,7 +1345,7 @@ end
 
     # Well: delegates to Stock's own detailed display
     well = children(plate1)[1,1]
-    deposit!(well,1u"µL"*rgt"water",0)
+    deposit!(well,1u"µL"*rgt"water")
     well_report = sprint(show,MIME("text/plain"),well)
     @test occursin("Well:",well_report)
     @test occursin("capacity",well_report)
@@ -1430,14 +1430,14 @@ end
     @test is_locked(children(inst2b)[1]) # the deferred-lock reconstruction actually took effect
 
     # standalone Well (not attached to any Labware)
-    standalone_well = CHESSCore.Well(nothing,"standalone",Well1000000;stock=b,cost=3)
+    standalone_well = CHESSCore.Well(nothing,"standalone",Well1000000;stock=b)
     d_well = location_to_dict(standalone_well; reagent_context=[CHESSCore,TestChemOrg])
     @test _is_json_safe(d_well)
     well2 = dict_to_location(d_well; reagent_context=[CHESSCore,TestChemOrg])
     @test CHESSCore.softequal(standalone_well,well2)
 
     # Labware: an entire plate + its wells round-trips as one unit (the explicit non-flat exception)
-    deposit!(plate1[1,1],1u"µL"*rgt"water",0)
+    deposit!(plate1[1,1],1u"µL"*rgt"water")
     d_plate = location_to_dict(plate1; reagent_context=[CHESSCore,TestChemOrg])
     @test _is_json_safe(d_plate)
     @test length(d_plate["wells"]) == shape(plate1)[1] && length(d_plate["wells"][1]) == shape(plate1)[2]
@@ -1446,7 +1446,6 @@ end
     @test name(plate2) == name(plate1)
     for row in 1:shape(plate1)[1], col in 1:shape(plate1)[2]
         @test stock(plate2[row,col]) == stock(plate1[row,col])
-        @test cost(plate2[row,col]) == cost(plate1[row,col])
     end
 end
 
@@ -1455,20 +1454,19 @@ end
     plt = Plots.plot(plate)
     @test plt isa Plots.Plot
 
-    deposit!(plate[1,1],10u"µL"*rgt"water",0)
+    deposit!(plate[1,1],10u"µL"*rgt"water")
     plt2 = plot_well_heatmap!(Plots.plot(plate),plate)
     @test plt2 isa Plots.Plot
 end
 
 @testset "observe!: declare state without history" begin
     w=Well(nothing,"observed well",Well1000)
-    deposit!(w,100u"µL"*rgt"water"+2.35u"mg"*rgt"paba",1.5)
+    deposit!(w,100u"µL"*rgt"water"+2.35u"mg"*rgt"paba")
 
-    # a component observation replaces exactly that component and leaves the rest and the cost alone
+    # a component observation replaces exactly that component and leaves the rest alone
     observe!(w,rgt"paba",2.04u"mg")
     @test solids(stock(w))[rgt"paba"] == 2.04u"mg"
     @test liquids(stock(w))[rgt"water"] == 100u"µL"
-    @test cost(w) == 1.5
 
     # observing a liquid changes the total volume
     observe!(w,rgt"water",50u"µL")
@@ -1490,11 +1488,10 @@ end
     @test s == 100u"µL"*rgt"water"
 
     # scalar facets
-    observe!(w,:cost,4.0)
-    @test cost(w) == 4.0
     observe!(w,:active,false)
     @test !is_active(w)
     @test_throws ArgumentError observe!(w,:colour,1)
+    @test_throws ArgumentError observe!(w,:cost,1.0) # cost is a property of the lots that went in, not of a well
 
     # attributes are own attributes; missing defers to the parent
     room=GenericLocation(nothing,"observed room",Room)

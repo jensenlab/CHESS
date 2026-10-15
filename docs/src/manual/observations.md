@@ -21,8 +21,7 @@ the volume that the transfers predict.
 - `observe!(child, parent)` states that a child is in a parent, or nowhere when the parent is
   `nothing`. This moves the child like `move_into!` and ignores a lock on the child. Occupancy rules
   still apply.
-- `observe!(location, facet, value)` states a scalar fact. The facet is `:cost`, `:locked`, or
-  `:active`.
+- `observe!(location, facet, value)` states a scalar fact. The facet is `:locked` or `:active`.
 - `observe!(labware, lot)` states the [`Lot`](@ref) that a labware was received as. See
   [Receiving labware as a lot](#Receiving-labware-as-a-lot).
 
@@ -30,7 +29,7 @@ the volume that the transfers predict.
 
 [`observe`](@ref) records an observation in the database and returns its ledger ID. It takes the same
 facts as `observe!` and updates the location in memory as well. With no fact, it observes all of the
-location as it is in memory: every component, its cost, its own attributes, its parent, and its lock
+location as it is in memory: every component, its own attributes, its parent, and its lock
 and activity. The keyword `recursive` also observes everything inside the location, and everything
 shares one ledger entry. `upload(observe!, ...)` records a single observation like any other
 operation (see [Committing & Uploading](committing-uploading.md)).
@@ -108,7 +107,7 @@ The database keeps each supplier product once in `Products`, with the details of
 
 [`observation_discrepancies`](@ref) compares every observation of a list of locations with what the
 history predicted just before it, and returns the differences as a `DataFrame`. The columns are
-`LedgerID`, `SequenceID`, `LocationID`, `Facet` (`"component"`, `"cost"`, `"attribute"`, `"parent"`,
+`LedgerID`, `SequenceID`, `LocationID`, `Facet` (`"component"`, `"attribute"`, `"parent"`,
 `"locked"`, or `"active"`), `Key` (the component or attribute, or `missing`), `Predicted`, and
 `Observed`. An attribute is compared with the effective environment of the location, so a value that
 it inherits counts as predicted. A parent is reported as a location ID, or `missing` for none.

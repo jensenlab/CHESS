@@ -14,13 +14,13 @@ for sol in solids
     st = Empty() 
     st+= 3u"g" * sol
     st += 15u"ml" * water 
-    deposit!(children(con)[1],st,0)
+    deposit!(children(con)[1],st)
     push!(conicals,con)
 end
 
 con = build_location(location_kinds[:Conical50],"water")
 st = 15u"ml" * water 
-deposit!(children(con)[1],st,0) 
+deposit!(children(con)[1],st) 
 push!(conicals,con)
 
 target_plates = Labware[]

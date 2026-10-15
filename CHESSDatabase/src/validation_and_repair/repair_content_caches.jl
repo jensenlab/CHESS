@@ -24,7 +24,7 @@ function repair_content_caches(locs::Vector{<:Integer},sequence_id::Integer)
         for cache in eachrow(caches)
 
             cache_seq_id=cache.SequenceID
-            old_stock,a,b=fetch_content_cache(loc_id,0,cache_seq_id)
+            old_stock,_=fetch_content_cache(loc_id,0,cache_seq_id)
             new_loc=reconstruct_contents(loc_id,cache_seq_id,Dates.now(),cache_seq_id-1) # reconstruct but only use caches from before the one we are testing
             cache_ledger_id=get_last_ledger_id(cache_seq_id)
             if cache_ledger_id != cache.LedgerID || old_stock != stock(new_loc) 

@@ -5,7 +5,7 @@
 # Complements, rather than replaces, the tabular "vc"/"q" DataFrame interface (dataframe_interface.jl)
 # -- that one is still the right tool for bulk, flat batches of stock definitions (e.g. a wet-lab CSV
 # template); this one is for a whole Location (or tree of them) with full fidelity: attributes, reads,
-# cost, lock/active state, and (for GenericLocation) nested children. Always uncommitted
+# lock/active state, and (for GenericLocation) nested children. Always uncommitted
 # (via build_location) -- location_id/parent are omitted, mirroring df_to_labware's design boundary;
 # commit the result yourself (e.g. commit_location! in CHESSDatabase) if you want it tracked.
 
@@ -137,8 +137,7 @@ keyed by attribute name, each an [`attribute_to_dict`](@ref) result), and `"read
 Per-subtype: `GenericLocation` adds `"children"` (nested `location_to_dict` results, recursive). Any
 capability-bearing location ([`is_capable`](@ref), `GenericLocation` or `Labware` alike) also adds
 informational (non-authoritative -- see [`dict_to_location`](@ref))
-`"actuatable_attributes"`/`"performable_operations"`/`"readable_types"`. `Well` adds `"cost"` and
-`"stock"` ([`stock_to_dict`](@ref)). `Labware` adds `"wells"` -- a `shape[1]`-row, `shape[2]`-column
+`"actuatable_attributes"`/`"performable_operations"`/`"readable_types"`. `Well` adds `"stock"` ([`stock_to_dict`](@ref)). `Labware` adds `"wells"` -- a `shape[1]`-row, `shape[2]`-column
 nested array of per-slot `Well` dicts, in the same `(row,col)` order as `children(x)` -- plus
 informational `"vendor"`/`"catalog"`. This is the one non-flat exception: a `Labware` and its wells
 round-trip as a single unit, matching how a human actually thinks about a plate when planning an
@@ -176,7 +175,6 @@ function _location_to_dict!(d::Dict, x::GenericLocation; kwargs...)
 end
 
 function _location_to_dict!(d::Dict, x::Well; reagent_context=CHESSCore, org_context=CHESSCore, kwargs...)
-    d["cost"] = cost(x)
     d["stock"] = stock_to_dict(stock(x); reagent_context, org_context)
     return nothing
 end
@@ -251,7 +249,7 @@ function _build(::Type{GenericLocation}, k::LocationKind, d::Dict; kwargs...)
 end
 
 function _build(::Type{Well}, k::LocationKind, d::Dict; kwargs...)
-    w = Well(nothing, d["name"], k; stock=dict_to_stock(d["stock"]; kwargs...), cost=d["cost"])
+    w = Well(nothing, d["name"], k; stock=dict_to_stock(d["stock"]; kwargs...))
     _apply_common!(w, d)
     return w
 end

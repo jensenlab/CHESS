@@ -218,7 +218,6 @@ function create_db(path)
         LocationID INTEGER,
         StockID INTEGER, 
         LedgerID INTEGER,
-        Cost REAL,
         Time INTEGER,
         FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY(StockID) REFERENCES CachedStocks(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -443,17 +442,6 @@ function create_db(path)
     );
     """
 
-    create_ObservedCosts="""
-    CREATE TABLE ObservedCosts(
-        ID INTEGER PRIMARY KEY NOT NULL,
-        LedgerID INTEGER,
-        LocationID INTEGER,
-        Cost REAL,
-        $observation_columns,
-        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
-    );
-    """
-
     # IsInherited = 1 when the observed value matched what the location already inherited from its
     # parent: the row is kept for audit and discrepancy reporting, but replay skips it so the
     # location keeps following its parent.
@@ -559,7 +547,6 @@ function create_db(path)
         EncumbranceID INTEGER,
         LocationID INTEGER,
         StockID INTEGER,
-        Cost REAL,
         FOREIGN KEY(EncumbranceID) REFERENCES Encumbrances(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY(StockID) REFERENCES CachedStocks(ID) ON UPDATE CASCADE ON DELETE RESTRICT
@@ -703,13 +690,12 @@ function create_db(path)
     DBInterface.execute(db,create_InstrumentSettings)
     #observations
     DBInterface.execute(db,create_ObservedComponents)
-    DBInterface.execute(db,create_ObservedCosts)
     DBInterface.execute(db,create_ObservedAttributes)
     DBInterface.execute(db,create_ObservedParents)
     DBInterface.execute(db,create_ObservedLocks)
     DBInterface.execute(db,create_ObservedActivity)
     _create_lot_tables!(db)
-    for tbl in ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
+    for tbl in ("ObservedComponents","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
         DBInterface.execute(db,"CREATE INDEX idx_$(lowercase(tbl))_ledger ON $tbl(LedgerID);")
     end
 

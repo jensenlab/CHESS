@@ -12,7 +12,7 @@ so committing in place is not possible). Use the returned value going forward, t
 Already-committed locations embedded in an otherwise-uncommitted subtree are left as-is (reattached,
 not re-committed) -- `commit_location!` is safe to call on a mixed tree.
 
-Whatever the new locations hold beyond a fresh location's defaults (stock, cost, attributes, lock and
+Whatever the new locations hold beyond a fresh location's defaults (stock, attributes, lock and
 activity state, and which location each child sits in) is recorded as observations on a single new
 ledger entry, so the ledger alone can reconstruct it. The new locations are then cached at that entry.
 
@@ -40,7 +40,7 @@ function _commit_tree!(loc::Well,new_locs::Vector{Location})
     is_committed(loc) && return loc
     real_id = upload_new_location(name(loc),kind(loc))
     real = Well(real_id,name(loc),kind(loc);stock=stock(loc),attributes=attributes(loc),
-        cost=cost(loc),is_active=is_active(loc))
+        is_active=is_active(loc))
     push!(new_locs,real)
     return real
 end
@@ -90,7 +90,7 @@ See also: [`commit_location!`](@ref), [`reconstruct_location`](@ref), [`build_lo
 """
 function release_location(loc::Well)
     return Well(nothing,name(loc),kind(loc);stock=stock(loc),attributes=attributes(loc),
-        cost=cost(loc),is_active=is_active(loc))
+        is_active=is_active(loc))
 end
 
 function release_location(loc::Labware)

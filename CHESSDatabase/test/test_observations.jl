@@ -12,23 +12,20 @@ ob_room = generate_location(Room,"ob room")
     bottle = generate_location(Bottle1L,"ob new bottle")
     w = bottle[1,1]
     observe(w,rgt"water",500u"mL")
-    observe(w,:cost,12.0)
     @test stock(w) == 500u"mL"*rgt"water" # updated in memory too
     ob_drop_content_caches(location_id(w)) # the ledger alone holds it
     @test ob_contents(location_id(w)) == 500u"mL"*rgt"water"
-    @test cost(reconstruct_contents(location_id(w))) == 12.0
 end
 
 @testset "commit_location! records starting state as observations" begin
     eph = build_location(Bottle1L,"ob committed bottle")
-    deposit!(eph[1,1],100u"mL"*rgt"water"+2.35u"g"*rgt"paba",3)
+    deposit!(eph[1,1],100u"mL"*rgt"water"+2.35u"g"*rgt"paba")
     before = get_last_sequence_id()
     bottle = commit_location!(eph)
     @test get_last_sequence_id() == before + 1 # one ledger entry for the whole commit
     w_id = location_id(bottle[1,1])
     ob_drop_content_caches(w_id)
     @test ob_contents(w_id) == 100u"mL"*rgt"water"+2.35u"g"*rgt"paba"
-    @test cost(reconstruct_contents(w_id)) == 3
 
     # a location committed with nothing in it needs no ledger entry
     before = get_last_sequence_id()
@@ -172,7 +169,7 @@ end
     # the pre-observation way to seed a bottle: change it in memory, then cache it
     bottle = generate_location(Bottle1L,"ob legacy bottle")
     w = bottle[1,1]
-    deposit!(w,250u"mL"*rgt"water",4)
+    deposit!(w,250u"mL"*rgt"water")
     cache(w)
     dest = generate_location(Bottle1L,"ob legacy dest")[1,1]
     upload(transfer!,w,dest,50u"mL")
@@ -187,7 +184,6 @@ end
     ob_drop_content_caches(location_id(dest))
     @test ob_contents(location_id(w)) == 200u"mL"*rgt"water"
     @test ob_contents(location_id(dest)) == 50u"mL"*rgt"water"
-    @test cost(reconstruct_contents(location_id(w))) ≈ 3.2
 end
 
 @testset "observe: a bottle is received as a lot" begin

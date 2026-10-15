@@ -132,7 +132,7 @@ export can_move_into, move_into!
 #labware
 export shape, vendor, catalog, wells, stocks, add_stock!, plot_well_heatmap!
 #wells
-export wellcapacity, stock, cost,  sterilize!,transfer!, drain!,deposit!,withdraw!
+export wellcapacity, stock, sterilize!,transfer!, drain!,deposit!,withdraw!
 # dataframe interop
 export df_to_stock, stock_to_df, df_to_labware, labware_to_df
 # location <-> dict interop (JSON-safe, for tools outside CHESS)
