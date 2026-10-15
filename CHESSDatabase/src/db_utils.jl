@@ -20,6 +20,7 @@ after [`migrate_chemistry!`](@ref) is run on it; `connect_SQLite` warns when it 
 function connect_SQLite(path)
     _current_db[] = SQLite.DB(path)
     _warn_if_unmigrated()
+    _ensure_lot_tables!()
     return nothing
 end
 

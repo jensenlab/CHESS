@@ -30,6 +30,14 @@ Each table below is listed as `Name(column, column, ...)`.
   `Location`, whatever its Julia type.
 - `Barcodes(Barcode, LocationID, Name)` maps a physical barcode string to a `Location`.
 
+## Lots
+
+- `Products(ID, Supplier, CatalogNumber, ProductName, ManufacturerNumber, Grade, Notes,
+  ReagentComponentID)` holds each supplier product that a lot refers to, once. `ReagentComponentID` is
+  the reagent that the product is registered under, or `NULL`.
+- `ObservedLots(ID, LedgerID, LocationID, ProductID, Lot, GTIN, Quantity, Unit, Cost, Received, Notes, ...)`
+  holds the lot that a labware was received as. See [Observations](observations.md).
+
 ## Components and chemistry
 
 `Components(ID, Type)`, `Reagents(ComponentID, Name, Type, MolecularWeight, Density, CID)`,

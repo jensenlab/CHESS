@@ -73,6 +73,9 @@ that snapshot, up to `sequence_id`. `max_cache` defaults to `sequence_id` and ca
 [Caching & Repair](caching-repair.md) uses this to reconstruct a value as if a given snapshot did
 not exist.
 
+A lot is not replayed or cached. [`reconstruct_lot`](@ref) reads the most recent lot observation at or
+before `sequence_id`.
+
 Each sub-reconstruction has a mutating form whose name ends in `!`: `reconstruct_parent!`,
 `reconstruct_children!`, `reconstruct_attributes!`, `reconstruct_contents!`,
 `reconstruct_lock!`, `reconstruct_activity!`, and `reconstruct_environment!`. These set that part of the state of locations

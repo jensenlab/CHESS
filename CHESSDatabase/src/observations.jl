@@ -3,7 +3,7 @@
 # operations: component and cost observations inside `reconstruct_contents`, and the others through
 # the `*_events` unions in reconstruction_utils.jl.
 
-const observation_tables = ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
+const observation_tables = ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity","ObservedLots")
 
 _optional_db_time(t) = isnothing(t) ? nothing : db_time(t)
 
@@ -179,6 +179,7 @@ function _full_facets(n::Location,predicted_stock::Stock,predicted_attrs::Attrib
         push!(facets,(n,:locked,is_locked(n)))
     end
     push!(facets,(n,:active,is_active(n)))
+    isnothing(CHESSCore.lot(n)) || push!(facets,(n,CHESSCore.lot(n)))
     return facets
 end
 
@@ -202,6 +203,7 @@ function _genesis_facets(n::Location)
     end
     !(n isa Well) && is_locked(n) && push!(facets,(n,:locked,true))
     is_active(n) || push!(facets,(n,:active,false))
+    isnothing(CHESSCore.lot(n)) || push!(facets,(n,CHESSCore.lot(n)))
     return facets
 end
 

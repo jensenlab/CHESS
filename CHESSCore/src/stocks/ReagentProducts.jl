@@ -42,6 +42,17 @@ function ReagentProduct(supplier::AbstractString;catalog_number=missing,product_
     return ReagentProduct(supplier,catalog_number,product_name,manufacturer_number,grade,notes)
 end
 
+"""
+    Lot(product::ReagentProduct,lot::AbstractString;gtin,quantity,received,notes)
+
+The [`Lot`](@ref) of a registered `product`. The product needs a catalog number to be identified by.
+"""
+function Lot(product::ReagentProduct,lot::AbstractString;kwargs...)
+    ismissing(product.catalog_number) && throw(ArgumentError(
+        "$(product.supplier)'s product has no catalog number, so a lot cannot be tied to it"))
+    return Lot(product.supplier,product.catalog_number,lot;kwargs...)
+end
+
 # Value equality: `missing` fields compare equal to each other, which `==` would not do.
 Base.:(==)(a::ReagentProduct,b::ReagentProduct) = all(f->isequal(getfield(a,f),getfield(b,f)),fieldnames(ReagentProduct))
 Base.hash(a::ReagentProduct,h::UInt) = foldl((acc,f)->hash(getfield(a,f),acc),fieldnames(ReagentProduct);init=hash(:ReagentProduct,h))

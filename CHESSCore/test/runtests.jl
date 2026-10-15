@@ -1519,3 +1519,32 @@ end
     @test isnothing(parent(bench))
     @test_throws FixedMembershipError observe!(w,room) # wells stay fused to their labware
 end
+
+@testset "Lot" begin
+    product = ReagentProduct("Sigma-Aldrich";catalog_number="258148")
+    l = Lot(product,"MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14))
+    @test l == Lot("Sigma-Aldrich","258148","MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14))
+    @test hash(l) == hash(Lot("Sigma-Aldrich","258148","MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14)))
+    @test sprint(show,l) == "Sigma-Aldrich 258148 lot MKCS9055"
+    @test_throws ArgumentError Lot("Sigma-Aldrich","258148","")
+    @test_throws ArgumentError Lot("Sigma-Aldrich","258148","X";quantity=1u"s")
+    @test_throws DomainError Lot("Sigma-Aldrich","258148","X";quantity=-1u"g")
+    @test_throws DomainError Lot("Sigma-Aldrich","258148","X";cost=-1)
+    @test_throws ArgumentError Lot(ReagentProduct("in-house"),"X")
+
+    bottle = build_location(Bottle1L,"HCl bottle")
+    @test isnothing(lot(bottle))
+    @test isnothing(observe!(bottle,l))
+    @test lot(bottle) == l
+    other = Lot("Sigma-Aldrich","258148","MKCS9056")
+    observe!(bottle,other)
+    @test lot(bottle) == other # a new lot replaces the earlier one
+    @test isnothing(lot(bottle.children[1,1]))
+    @test_throws ArgumentError observe!(bottle.children[1,1],l) # only labware is received as a lot
+
+    d = location_to_dict(bottle)
+    @test dict_to_lot(d["lot"]) == other
+    observe!(bottle,l)
+    @test lot(dict_to_location(location_to_dict(bottle))) == l
+    @test !haskey(location_to_dict(build_location(Bottle1L,"plain")),"lot")
+end

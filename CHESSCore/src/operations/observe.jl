@@ -38,6 +38,7 @@ end
     observe!(loc::Location, attribute::Attribute; instrument=nothing)
     observe!(child::Location, parent::Union{Location,Nothing}; instrument=nothing)
     observe!(loc::Location, facet::Symbol, value; instrument=nothing)
+    observe!(labware::Labware, lot::Lot; instrument=nothing)
 
 Declare one fact about `loc` as ground truth, whatever history predicted. Unlike the other
 operations, an observation makes no claim about how the state came about. It only states what the
@@ -49,6 +50,9 @@ state is.
   value means `loc` has no local value and defers to its parent.
 - **Parent:** `child` is located in `parent` (or nowhere, for `nothing`). This moves `child` like
   [`move_into!`](@ref) but ignores `child`'s lock. Occupancy rules still apply.
+- **Lot:** `labware` was received as `lot` (see [`Lot`](@ref)): its product, lot number, purchased
+  quantity and arrival date. Only a [`Labware`](@ref), such as a reagent bottle, has a lot. Observing a
+  new lot replaces the earlier one.
 - **Scalar facets:** `facet` is one of `:cost` (a `Well`'s cost), `:locked` or `:active`.
 
 See [`_check_capability`](@ref) for `instrument`.
@@ -82,6 +86,15 @@ function observe!(child::Location,newparent::Union{Location,Nothing};instrument:
     isnothing(oldparent) || remove!(oldparent,child)
     return nothing
 end
+
+function observe!(labware::Labware,lot::Lot;instrument::Union{Location,Nothing}=nothing)
+    _check_capability(instrument,observe!)
+    labware.lot=lot
+    return nothing
+end
+
+observe!(loc::Location,::Lot;kwargs...) = throw(ArgumentError(
+    "only a Labware is received as a lot, and $(name(loc)) is a $(nameof(typeof(loc)))"))
 
 function observe!(loc::Location,facet::Symbol,value;instrument::Union{Location,Nothing}=nothing)
     _check_capability(instrument,observe!)

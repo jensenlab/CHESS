@@ -23,6 +23,8 @@ the volume that the transfers predict.
   still apply.
 - `observe!(location, facet, value)` states a scalar fact. The facet is `:cost`, `:locked`, or
   `:active`.
+- `observe!(labware, lot)` states the [`Lot`](@ref) that a labware was received as. See
+  [Receiving labware as a lot](#Receiving-labware-as-a-lot).
 
 ## Recording an observation
 
@@ -60,6 +62,30 @@ julia> stock(reconstruct_location(a2))
 
 The first observation put 200 µL of water into well A1 and no operation produced it. Later
 operations replay on top of an observation, so the transfer moved 50 µL from it.
+
+## Receiving labware as a lot
+
+A [`Lot`](@ref) records where a received piece of labware came from: the supplier and catalog number of
+its product, the manufacturer's lot number, and optionally the global trade item number (`gtin`) from
+the barcode, the quantity purchased, what that quantity cost, the arrival date, and notes. A reagent bottle is a labware, so a
+new bottle is received with three observations: its barcode, its contents, and its lot.
+
+```julia
+bottle = generate_location(Bottle1L, "HCl 37%")
+assign_barcode!(Barcode("010406183773616210MKCS9055240258148-2.5L422null"), bottle)
+observe(bottle[1, 1], rgt"HCl", 2.5u"L")
+observe(bottle, Lot("Sigma-Aldrich", "258148", "MKCS9055";
+                    gtin = "04061837736162", quantity = 2.5u"L", cost = 61.5,
+                    received = Date(2026, 10, 14)))
+```
+
+A lot is provenance. The quantity is the amount purchased and does not change, while the contents of
+the bottle are tracked by the ledger and fall as the bottle is used. `lot(bottle)` returns the lot of
+a labware, or `nothing`, and [`reconstruct_lot`](@ref) returns the lot that was observed as of a
+ledger position. Observing a new lot replaces the earlier one. Only a labware has a lot.
+
+The database keeps each supplier product once in `Products`, with the details of a registered
+[`ReagentProduct`](@ref) and a link to its reagent, and each lot observation in `ObservedLots`.
 
 ## Comparing observations with history
 

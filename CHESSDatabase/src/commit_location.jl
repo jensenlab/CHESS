@@ -50,7 +50,7 @@ function _commit_tree!(loc::Labware,new_locs::Vector{Location})
     real_id = upload_new_location(name(loc),kind(loc))
     cs = _commit_tree!.(children(loc),Ref(new_locs))
     real = Labware(real_id,name(loc),kind(loc);children=cs,attributes=attributes(loc),
-        is_locked=is_locked(loc),is_active=is_active(loc))
+        is_locked=is_locked(loc),is_active=is_active(loc),lot=CHESSCore.lot(loc))
     for c in cs
         c.parent = real
     end
@@ -96,7 +96,7 @@ end
 function release_location(loc::Labware)
     cs = release_location.(children(loc))
     eph = Labware(nothing,name(loc),kind(loc);children=cs,attributes=attributes(loc),
-        is_locked=is_locked(loc),is_active=is_active(loc))
+        is_locked=is_locked(loc),is_active=is_active(loc),lot=CHESSCore.lot(loc))
     for c in cs
         c.parent = eph
     end

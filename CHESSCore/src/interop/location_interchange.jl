@@ -187,7 +187,38 @@ function _location_to_dict!(d::Dict, x::Labware; kwargs...)
     d["wells"] = [[location_to_dict(ch[row, col]; kwargs...) for col in 1:sh[2]] for row in 1:sh[1]]
     d["vendor"] = vendor(x)
     d["catalog"] = catalog(x)
+    isnothing(lot(x)) || (d["lot"] = lot_to_dict(lot(x)))
     return nothing
+end
+
+"""
+    lot_to_dict(l::Lot) -> Dict{String,Any}
+
+Convert a [`Lot`](@ref) to a plain, JSON-safe `Dict`. Missing optional fields are omitted, the quantity
+is stored as `"quantity"` and `"unit"`, and the arrival date as an ISO string.
+
+See also: [`dict_to_lot`](@ref)
+"""
+function lot_to_dict(l::Lot)
+    d = Dict{String,Any}("supplier" => l.supplier, "catalog_number" => l.catalog_number, "lot" => l.lot)
+    ismissing(l.gtin) || (d["gtin"] = l.gtin)
+    ismissing(l.quantity) || (d["quantity"] = ustrip(l.quantity); d["unit"] = unit_to_string(unit(l.quantity)))
+    ismissing(l.cost) || (d["cost"] = l.cost)
+    ismissing(l.received) || (d["received"] = string(l.received))
+    ismissing(l.notes) || (d["notes"] = l.notes)
+    return d
+end
+
+"""
+    dict_to_lot(d::Dict) -> Lot
+
+Inverse of [`lot_to_dict`](@ref).
+"""
+function dict_to_lot(d::Dict)
+    quantity = haskey(d, "quantity") ? d["quantity"] * string_to_unit(d["unit"]) : missing
+    received = haskey(d, "received") ? Date(d["received"]) : missing
+    return Lot(d["supplier"], d["catalog_number"], d["lot"];
+        gtin = get(d, "gtin", missing), quantity, cost = get(d, "cost", missing), received, notes = get(d, "notes", missing))
 end
 
 function _apply_common!(loc::Location, d::Dict)
@@ -232,7 +263,7 @@ function _build(::Type{Labware}, k::LocationKind, d::Dict; kwargs...)
     for row in 1:sh[1], col in 1:sh[2]
         ch[row, col] = _build_location_tree(wells_data[row][col]; kwargs...)
     end
-    lw = Labware(nothing, d["name"], k; children=ch)
+    lw = Labware(nothing, d["name"], k; children=ch, lot = haskey(d, "lot") ? dict_to_lot(d["lot"]) : nothing)
     _apply_common!(lw, d)
     return lw
 end

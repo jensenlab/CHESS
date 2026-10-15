@@ -24,6 +24,7 @@ function reconstruct_location!(loc::Location,sequence_id::Integer=get_last_seque
     reconstruct_lock!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the locked state (recall locks prevent movement)
     reconstruct_activity!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the activity state
     reconstruct_reads!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the reads recorded for the location
+    reconstruct_lot!(loc,sequence_id,time) # reconstructs the lot a labware was received as
     return nothing
 end
 

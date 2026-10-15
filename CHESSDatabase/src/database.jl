@@ -708,6 +708,7 @@ function create_db(path)
     DBInterface.execute(db,create_ObservedParents)
     DBInterface.execute(db,create_ObservedLocks)
     DBInterface.execute(db,create_ObservedActivity)
+    _create_lot_tables!(db)
     for tbl in ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
         DBInterface.execute(db,"CREATE INDEX idx_$(lowercase(tbl))_ledger ON $tbl(LedgerID);")
     end

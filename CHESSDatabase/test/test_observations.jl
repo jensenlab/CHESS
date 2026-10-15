@@ -189,3 +189,66 @@ end
     @test ob_contents(location_id(dest)) == 50u"mL"*rgt"water"
     @test cost(reconstruct_contents(location_id(w))) ≈ 3.2
 end
+
+@testset "observe: a bottle is received as a lot" begin
+    bottle = generate_location(Bottle1L,"ob lot bottle")
+    id = location_id(bottle)
+    @test isnothing(reconstruct_lot(id))
+    first_lot = Lot("Sigma-Aldrich","258148","MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14),notes="37 %")
+    seq_before = get_last_sequence_id()
+    observe(bottle,first_lot)
+    @test CHESSCore.lot(bottle) == first_lot # updated in memory too
+    @test reconstruct_lot(id) == first_lot
+    @test CHESSCore.lot(reconstruct_location(id)) == first_lot
+
+    # the product is recorded once and shared by later lots of it
+    n_products = nrow(query_db("SELECT 1 FROM Products WHERE Supplier = 'Sigma-Aldrich' AND CatalogNumber = '258148'"))
+    @test n_products == 1
+    second_lot = Lot("Sigma-Aldrich","258148","MKCS9056")
+    other = generate_location(Bottle1L,"ob second lot bottle")
+    observe(other,second_lot)
+    @test nrow(query_db("SELECT 1 FROM Products WHERE Supplier = 'Sigma-Aldrich' AND CatalogNumber = '258148'")) == 1
+
+    # a later observation replaces the lot, and reconstruction at an earlier point still sees the first
+    observe(bottle,second_lot)
+    @test reconstruct_lot(id) == second_lot
+    @test reconstruct_lot(id,get_last_sequence_id()-1) == first_lot
+    @test isnothing(reconstruct_lot(id,seq_before))
+
+    # only labware is received as a lot
+    @test_throws ArgumentError observe(bottle[1,1],first_lot)
+end
+
+@testset "a registered product's details and reagent are kept with the lot's product" begin
+    @reagent_product rgt"water" "Lot Test Supplier" catalog_number="LT-1" product_name="Test water" grade="HPLC"
+    bottle = generate_location(Bottle1L,"ob registered product bottle")
+    observe(bottle,Lot(only(filter(p->p.supplier=="Lot Test Supplier",reagent_products(rgt"water"))),"LOT1"))
+    row = query_db("SELECT * FROM Products WHERE Supplier = 'Lot Test Supplier'")
+    @test row.ProductName[1] == "Test water"
+    @test row.Grade[1] == "HPLC"
+    @test row.ReagentComponentID[1] == CHESSDatabase.get_component_id(rgt"water")
+end
+
+@testset "commit_location! and observe(labware) carry the lot" begin
+    eph = build_location(Bottle1L,"ob lot committed bottle")
+    l = Lot("Fisher Scientific","SS255","H142";quantity=1u"L")
+    observe!(eph,l)
+    bottle = commit_location!(eph)
+    @test CHESSCore.lot(bottle) == l
+    @test reconstruct_lot(location_id(bottle)) == l
+    @test any(f->length(f)==2 && f[2] isa Lot,CHESSDatabase._genesis_facets(bottle))
+    @test CHESSCore.lot(release_location(bottle)) == l
+end
+
+@testset "a database made before lots gains the tables on connecting" begin
+    path = joinpath(mktempdir(),"old.db")
+    create_db(path)
+    connect_SQLite(path)
+    for tbl in ("ObservedLots","Products")
+        execute_db("DROP TABLE $tbl")
+    end
+    @test !CHESSDatabase._table_exists("ObservedLots")
+    connect_SQLite(path)
+    @test CHESSDatabase._table_exists("ObservedLots") && CHESSDatabase._table_exists("Products")
+    connect_SQLite(file)
+end

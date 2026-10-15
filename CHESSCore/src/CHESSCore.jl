@@ -60,6 +60,7 @@ include("./locations/Location.jl")
 include("./locations/Occupancy.jl")
 include("./environments/Environment.jl")
 include("./operations/capability.jl")
+include("./locations/Lot.jl")
 include("./locations/Labware.jl")
 include("./stocks/StockComponent.jl")
 include("./stocks/ElementalFormula.jl")
@@ -104,6 +105,7 @@ export charge, Dissolution, dissolution, set_dissolution!, dissolutions, by_mass
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types
+export Lot, lot # where a received piece of labware came from
 export is_capable, actuatable_attributes, performable_operations, readable_types
 export @species, @reagent, @organism , @attribute, @spc_str, @rgt_str, @org_str, @attr_str # macros for constants
 export set_occupancy_cost!, occupancy_rules, kind, is_committed, build_location, plate_namer, childtype
@@ -135,7 +137,7 @@ export wellcapacity, stock, cost,  sterilize!,transfer!, drain!,deposit!,withdra
 export df_to_stock, stock_to_df, df_to_labware, labware_to_df
 # location <-> dict interop (JSON-safe, for tools outside CHESS)
 export location_to_dict, dict_to_location, stock_to_dict, dict_to_stock
-export attribute_to_dict, dict_to_attribute, read_to_dict, dict_to_read
+export lot_to_dict, dict_to_lot, attribute_to_dict, dict_to_attribute, read_to_dict, dict_to_read
 export string_to_component, component_to_string, reagent_df, component_df, all_reagents, all_components, concentration
 export vc_to_stock, stock_to_vc, q_to_stock, stock_to_q
 export registry_summary

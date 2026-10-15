@@ -53,10 +53,12 @@ include("./validation_and_repair/validation.jl")
 include("./update_operation.jl")
 # observations
 include("./observations.jl")
+include("./lots.jl")
 
 #database
 export create_db, migrate_chemistry!
 #observations.jl
+export reconstruct_lot, reconstruct_lot!, get_product_id
 export observe, upload_observation, observation_discrepancies, backfill_observations
 #ledger.jl
 export append_ledger,insert_ledger,update_ledger,replace_ledger
