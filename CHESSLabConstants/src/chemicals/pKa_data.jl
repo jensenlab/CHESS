@@ -170,6 +170,7 @@
 @species OfloxacinAnion "Ofloxacin(anion)" -1 "C18H19FN3O4"
 @species PenicillinGAnion "PenicillinG(anion)" -1 "C16H17N2O4S"
 @species AmpicillinCation "Ampicillin(cation)" 1 "C16H20N3O4S"
+@species AmpicillinNeutral "Ampicillin" 0 "C16H19N3O4S" 6249
 @species AmpicillinAnion "Ampicillin(anion)" -1 "C16H18N3O4S" 640430
 @species AmoxicillinCation "Amoxicillin(cation)" 1 "C16H20N3O5S"
 @species AmoxicillinAnion "Amoxicillin(anion)" -1 "C16H18N3O5S" 25137942
@@ -468,7 +469,7 @@ function _register_acid_base_systems!()
     set_acid_base_system!(ofloxacin,AcidBaseSystem([OfloxacinCation,_identity(ofloxacin),OfloxacinAnion],[6.1,8.7])) # representative, same class as ciprofloxacin
     # Penicillins:
     set_acid_base_system!(penicillin_g,AcidBaseSystem([_identity(penicillin_g),PenicillinGAnion],[2.75]))
-    set_acid_base_system!(ampicillin,AcidBaseSystem([AmpicillinCation,_identity(ampicillin),AmpicillinAnion],[2.5,7.3]))
+    set_acid_base_system!(ampicillin_sodium,AcidBaseSystem([AmpicillinCation,AmpicillinNeutral,AmpicillinAnion],[2.5,7.3]))
     set_acid_base_system!(amoxicillin,AcidBaseSystem([AmoxicillinCation,_identity(amoxicillin),AmoxicillinAnion,AmoxicillinDianion],[2.4,7.4,9.6]))
     # carbenicillin/oxacillin each technically have a second, less-relevant ionizable group; simplified
     # to a single representative carboxyl pKa here, same spirit as boric_acid/shikimic_acid.

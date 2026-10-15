@@ -462,7 +462,7 @@ end
         :lysine,:arginine,:ornithine_hydrochloride,:cystine,
         :edta,:ascorbate,:sodium_pyruvate,:sodium_butyrate,:tartrate,:biotin,:lipoic_acid,
         :sulfadiazine,:sulfamethazine,:sulfathiazole,:ciprofloxacin,:ofloxacin,
-        :penicillin_g,:ampicillin,:amoxicillin,:carbenicillin,:oxacillin,
+        :penicillin_g,:ampicillin_sodium,:amoxicillin,:carbenicillin,:oxacillin,
         :tetracycline,:doxycycline,:chlortetracycline,:minocycline,
         :cycloserine,:erythromycin,:lincomycin,
         :promethazine,:carnitine_hydrochloride,:taurine,:agmatine_sulfate,:amitrole,:benzamadine,:guanidine,

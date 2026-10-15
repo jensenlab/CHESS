@@ -2,11 +2,10 @@
 # author-time cache (JLConstants_database.db) via register_reagent! -- see chemical_utils.jl. To add
 # a new compound, call register_reagent!, paste the returned line in below (alphabetically), commit.
 
-@reagent HCl "Hydrochloric Acid" Solid (CHESSCore.H⁺+Cl⁻) 1.05u"g/mL" missing
-@reagent NaOH "Sodium Hydroxide" Solid (Na⁺+CHESSCore.OH⁻) 1.5u"g/mL" missing
 @reagent acetamide "Acetamide" Solid "C2H5NO" 1.159u"g/mL" 178
 @reagent_product acetamide "Sigma-Aldrich" catalog_number="A0500" product_name="ACETAMIDE"
 @reagent acid_red_1 "Acid Red 1" Solid "C18H13N3Na2O8S2" missing 19522
+@reagent_product acid_red_1 "Sigma-Aldrich" catalog_number="210633" notes="dye content 60%"
 @reagent adenine "adenine" Solid "C5H5N5" missing 190
 @reagent_product adenine "Sigma-Aldrich" catalog_number="1152" product_name="Adenine" notes="Manufacturer: Millipore"
 @reagent adenosine "adenosine" Solid "C10H13N5O4" missing 60961
@@ -22,12 +21,14 @@
 # ^ was agmatine, the free base, until 2026-10-13: the lab bought agmatine sulfate. Its dissolution is in electrolytes.jl.
 @reagent_product agmatine_sulfate "Sigma-Aldrich" catalog_number="A7127" product_name="AGMATINE SULFATE"
 @reagent alanine "DL-alanine" Solid "C3H7NO2" missing 602
+@reagent_product alanine "Sigma-Aldrich" catalog_number="A7502" product_name="DL-Alanine" grade="99%"
 @reagent alpha_amylase "alpha-Amylase from porcine pancreas (Type VI-B)" Solid opaque missing missing
 # ^ Sold by enzyme activity (1 MU pack), not by mass. An enzyme preparation, so registered
 # opaque with no molar mass, for identity/inventory purposes only, same as the other undefined biological
 # materials here.
 @reagent_product alpha_amylase "Sigma-Aldrich" catalog_number="A3176" product_name="alpha-Amylase from porcine pancreas Type VI-B"
 @reagent alpha_cyclodextrin "Alpha-Cyclodextrin" Solid "C36H60O30" missing 444913
+@reagent_product alpha_cyclodextrin "Fisher Scientific" catalog_number="J60687.14" product_name="Alpha Cyclodextrin" notes="cyclohexapentylose"
 @reagent alpha_ketoglutaric_acid "Alpha Ketoglutaric Acid (2-Oxoglutaric Acid)" Solid "C5H6O5" missing 51
 @reagent_product alpha_ketoglutaric_acid "Sigma-Aldrich" catalog_number="75890" product_name="A-KETOGLUTARIC ACID >= 99.0% (T)"
 @reagent amitrole "amitrole (3-amino-1,2,4-triazole)" Solid "C2H4N4" 1.138u"g/mL" 1639
@@ -37,8 +38,14 @@
 @reagent ammonium_nitrate "Ammonium Nitrate" Solid (NH4⁺+NO3⁻) 1.72u"g/mL" missing
 @reagent_product ammonium_nitrate "Sigma-Aldrich" catalog_number="A9642" product_name="AMMONIUM NITRATE, >=99.0%"
 @reagent ammonium_sulfate "Ammonium Sulfate" Solid (2*NH4⁺+SO4²⁻) 1.78u"g/mL" missing
+@reagent_product ammonium_sulfate "Fisher Scientific" catalog_number="423400250" product_name="Ammonium Sulfate" grade="99%"
 @reagent amoxicillin "amoxicillin" Solid "C16H19N3O5S" missing 33613
-@reagent ampicillin "ampicillin" Solid "C16H19N3O4S" missing 6249
+@reagent_product amoxicillin "Sigma-Aldrich" catalog_number="A8523" product_name="Amoxicillin" notes="95-102% anhydrous basis"
+@reagent ampicillin_sodium "ampicillin sodium" Solid missing missing missing
+# ^ both products in the lab are the sodium salt (Sigma-Aldrich A8351 and Fisher BP1760, "Ampicillin Sodium Salt"). Its
+# dissolution (Na⁺ + the ampicillin anion) is registered in electrolytes.jl, and its acid/base chain in pKa_data.jl.
+@reagent_product ampicillin_sodium "Sigma-Aldrich" catalog_number="A8351" product_name="Ampicillin Sodium Salt"
+@reagent_product ampicillin_sodium "Fisher Scientific" catalog_number="BP1760" product_name="Ampicillin Sodium Salt"
 @reagent arabinan "Arabinan" Solid opaque missing missing
 # ^ Sigma-Aldrich AABH9BD89ECE-250MG (sugar-beet arabinan). Polydisperse polysaccharide, no PubChem
 # CID/fixed MW exists -- registered for identity/inventory purposes only (same pattern as agar/
@@ -159,6 +166,7 @@
 # ^ distinct from the existing alanine (DL, CID 602) and l_alanine (CID 5950) -- same formula/MW
 # as its stereoisomers, but no density data on PubChem for this specific CID (not assumed to match
 # l_alanine's 1.432 g/mL just because enantiomers share physical properties -- no per-CID citation).
+@reagent_product d_alanine "Fisher Scientific" catalog_number="A10231.14" product_name="D-Alanine" grade="99%"
 @reagent d_arabitol "D-Arabitol" Solid "C5H12O5" missing 94154
 @reagent_product d_arabitol "Fisher Scientific" catalog_number="AC302870050" notes="Manufacturer: Thermo Scientific"
 @reagent d_galactarate "D-Galactaric Acid (Mucic Acid)" Solid "C6H10O8" missing 3037582
@@ -261,6 +269,7 @@
 @reagent_product isoleucine "Sigma-Aldrich" catalog_number="I2752" product_name="L-ISOLEUCINE, REAGENT GRADE, >=98% (HPLC" notes="Product name is cut off in the stocklist"
 @reagent kanamycin "kanamycin" Solid "C18H36N4O11" missing 6032
 @reagent l_alanine "L-Alanine" Solid "C3H7NO2" 1.432u"g/mL" 5950
+@reagent_product l_alanine "Fisher Scientific" catalog_number="A15804.14" product_name="L-Alanine" grade="99%"
 @reagent_product l_alanine "Sigma-Aldrich" catalog_number="A7469" product_name="L-ALANINE, FROM NON-ANIMAL SOURCE, MEET" notes="Product name is cut off in the stocklist"
 @reagent l_arabinose "L-Arabinose" Solid "C5H10O5" missing 439195
 @reagent l_fucose "L-Fucose" Solid "C6H12O5" missing 17106
@@ -505,6 +514,7 @@
 @reagent tyrosine "L-tyrosine" Solid "C9H11NO3" missing 6057
 @reagent_product tyrosine "Sigma-Aldrich" catalog_number="T8566" product_name="L-TYROSINE BIOXTRA, MEETS EP, JP, USP" notes="Product name is cut off in the stocklist"
 @reagent uracil "uracil" Solid "C4H4N2O2" missing 1174
+@reagent_product uracil "Fisher Scientific" catalog_number="157300250" product_name="Uracil" grade="99%"
 @reagent urea "Urea" Solid "CH4N2O" 1.34u"g/mL" 1176
 # ^ Anhydrous neutral urea. Density is PubChem's. No AcidBaseSystem: urea is
 # a very weak base, conjugate acid pKa 0.10 at 21 °C (Perrin, Dissociation Constants of Organic Bases

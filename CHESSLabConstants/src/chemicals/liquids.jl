@@ -1,7 +1,16 @@
 # Static @reagent definitions for every Liquid, alphabetized by lab ID. Generated once from the
 # author-time cache (JLConstants_database.db) via register_reagent! -- see chemical_utils.jl.
 
+@reagent HCl "Hydrochloric Acid" Liquid (CHESSCore.H⁺+Cl⁻+3.446*H2O) 1.18u"g/mL" missing
+# ^ the 37% w/w solution that is purchased: per mole of HCl, 36.458 g * 63/37 = 62.08 g of water, which is 3.446 mol.
+# Density is the 1.18 g/mL at 20 C that Sigma-Aldrich lists for 258148.
+@reagent_product HCl "Sigma-Aldrich" catalog_number="258148" product_name="Hydrochloric Acid" notes="37 % solution (liquid)"
+@reagent NaOH "Sodium Hydroxide" Liquid (Na⁺+CHESSCore.OH⁻+5.180*H2O) 1.32u"g/mL" missing
+# ^ the 10 N solution that is purchased, 30% w/w: per mole of NaOH, 39.997 g * 70/30 = 93.33 g of water, which is 5.180 mol.
+# Density is the 1.32 g/mL that Fisher lists for the 10 N solution (SS2554, the 4 L size of SS255), which gives 9.9 mol/L.
+@reagent_product NaOH "Fisher Scientific" catalog_number="SS255" product_name="Sodium Hydroxide Solution (10N)" notes="30% w/w"
 @reagent acetic_acid "Acetic Acid" Liquid "C2H4O2" 1.049u"g/mL" 176
+@reagent_product acetic_acid "Sigma-Aldrich" catalog_number="695092" product_name="Acetic Acid" notes="glacial >99.7%"
 @reagent butyric_acid "Butyric Acid" Liquid "C4H8O2" 0.958u"g/mL" 264
 @reagent diacetyl "Diacetyl (2,3-Butanedione)" Liquid "C4H6O2" 0.99u"g/mL" 650
 @reagent_product diacetyl "Fisher Scientific" catalog_number="B0682100ML" notes="Manufacturer: TCI America"

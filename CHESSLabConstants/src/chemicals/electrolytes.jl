@@ -42,6 +42,8 @@ function _register_electrolyte_dissolutions!()
     set_dissolution!(sodium_butyrate,(Na⁺+ButyrateAnion))
     # formate and propionate, and the agmatine, carnitine, and ornithine salts, are what the lab bought
     # (sodium salts, a sulfate, and hydrochlorides); each cation is the as-weighed end of its acid/base chain.
+    # ampicillin is purchased as the sodium salt (Sigma-Aldrich A8351, Fisher BP1760).
+    set_dissolution!(ampicillin_sodium,(Na⁺+AmpicillinAnion))
     set_dissolution!(sodium_formate,(Na⁺+Formate⁻))
     set_dissolution!(sodium_propionate,(Na⁺+Propionate⁻))
     set_dissolution!(agmatine_sulfate,(AgmatineDication+SO4²⁻))
