@@ -145,7 +145,7 @@ function get_component_id(reagent::Reagent)
     d  = ismissing(density(reagent)) ? missing : ustrip(uconvert(u"g/mL",density(reagent)))
     conds,params = sql_where(
         "Name"=>name(reagent),
-        "Type"=>string(typeof(reagent)),
+        "Type"=>string(nameof(typeof(reagent))),
         "MolecularWeight"=>mw,
         "Density"=>d,
     )
@@ -161,7 +161,7 @@ function upload_component(reagent::Reagent)
     execute_db("INSERT INTO Components(Type) Values(?)",("Reagent",))
     id=query_db("SELECT Max(ID) FROM Components")[1,1]
     execute_db("INSERT INTO Reagents(ComponentID,Name,Type,MolecularWeight,Density,CID) Values(?,?,?,?,?,?)",
-        (id,name(reagent),string(typeof(reagent)),mw,d,pc))
+        (id,name(reagent),string(nameof(typeof(reagent))),mw,d,pc))
     upload_dissolution(id,reagent)
     return id
 end

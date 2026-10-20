@@ -73,7 +73,8 @@ function get_component(id::Integer)
 
     if comp_type == "Reagent"
         c = query_db("SELECT Name, Type,MolecularWeight,Density FROM Reagents WHERE ComponentID = ?",(id,))[1,:]
-        typ=eval(Symbol(c["Type"]))
+        # stored as the bare type name; older databases may hold the module-qualified form ("CHESSCore.Liquid")
+        typ=getfield(CHESSCore,Symbol(last(split(c["Type"],'.'))))
         reagent = typ(c["Name"],c["MolecularWeight"]*u"g/mol",c["Density"]*u"g/mL")
         restore_dissolution!(reagent,id)
         return reagent
