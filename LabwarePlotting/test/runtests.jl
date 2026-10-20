@@ -54,6 +54,21 @@ end
 @testset "plot_heatmap!" begin
     plt = plot_grid(trues(2,2))
     @test plot_heatmap!(plt,[1.0 NaN; 2.0 3.0]) isa Plots.Plot
+
+    # values differing only by floating-point noise get a pinned color range
+    pin = LabwarePlotting._pin_degenerate_clims
+    noisy = fill(1000.0,8,12); noisy[1,4] = nextfloat(1000.0)
+    @test pin(noisy,(;)).clims == (0.0,nextfloat(1000.0))
+    @test pin(noisy,(;clims=(0,5))).clims == (0,5)
+    @test !haskey(pin([1.0 NaN; 2.0 3.0],(;)),:clims)
+    real_diff = copy(noisy); real_diff[1,4] = 999.0
+    @test !haskey(pin(real_diff,(;)),:clims)
+    mktempdir() do dir
+        plt = plot_grid(trues(8,12))
+        @test plot_heatmap!(plt,noisy) isa Plots.Plot
+        savefig(plt,joinpath(dir,"noise.png"))
+        @test isfile(joinpath(dir,"noise.png"))
+    end
 end
 
 @testset "role_palette" begin
