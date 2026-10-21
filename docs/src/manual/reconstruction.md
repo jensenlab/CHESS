@@ -147,3 +147,16 @@ depend on transfers made several steps before any cached snapshot. It proceeds i
 
 [Caching & Repair](caching-repair.md) describes how the caches stay correct as the history is
 amended.
+
+## Finding many locations at once
+
+Reconstruction rebuilds one location. To list or filter many, [`find_locations`](@ref) returns the ID,
+name, kind, parent and activity of every location that matches a kind, name, parent, barcode or
+activity filter, in one query, as of any `sequence_id` and `time`. It pages with `limit` and `offset`.
+[`descendants`](@ref) lists everything inside a location at any depth, with each location's depth.
+Both resolve the parent and activity from the ledger the way the reconstructions do, so amendments and
+earlier ledger positions give the answers they should, and a well's parent is its labware.
+
+The labware of a well does not depend on the ledger or on any cache: [`well_container`](@ref) and
+[`well_containers`](@ref) read the `Containment` table, which is written once when the well is created.
+[`reconstruct_locations`](@ref) reconstructs a list of locations in full.

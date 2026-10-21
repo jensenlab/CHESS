@@ -51,6 +51,7 @@ include("./validation_and_repair/validation.jl")
 
 # ledger updates
 include("./update_operation.jl")
+include("./location_queries.jl")
 # observations
 include("./observations.jl")
 include("./lots.jl")
@@ -61,6 +62,8 @@ include("./discards.jl")
 
 #database
 export create_db, migrate_chemistry!
+#location_queries.jl
+export find_locations, descendants, reconstruct_locations
 #discards.jl
 export upload_discard, upload_remove_from_parent
 #containment.jl

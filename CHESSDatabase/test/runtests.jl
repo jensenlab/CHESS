@@ -712,5 +712,6 @@ end
 include("test_observations.jl")
 include("test_forward_tracing.jl")
 include("test_discard.jl")
+include("test_location_queries.jl")
 
 rm(file)
