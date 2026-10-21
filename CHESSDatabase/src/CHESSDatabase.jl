@@ -55,9 +55,15 @@ include("./update_operation.jl")
 include("./observations.jl")
 include("./lots.jl")
 include("./tracing.jl")
+include("./forward_tracing.jl")
+include("./containment.jl")
 
 #database
 export create_db, migrate_chemistry!
+#containment.jl
+export well_container, well_containers, container_wells, rebuild_containment!
+#forward_tracing.jl
+export trace_forward, forward_containers, forward_runs
 #observations.jl
 export reconstruct_lot, reconstruct_lot!, get_product_id, trace_contents, trace_cost, reconstruct_cost
 export observe, upload_observation, observation_discrepancies, backfill_observations

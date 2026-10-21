@@ -29,6 +29,12 @@ Each table below is listed as `Name(column, column, ...)`.
 - `LocationTypes(Name)` and `Locations(ID, Name, Type)` hold one row for every committed
   `Location`, whatever its Julia type.
 - `Barcodes(Barcode, LocationID, Name)` maps a physical barcode string to a `Location`.
+- `Containment(WellID, ContainerID, RowIdx, ColIdx)` records which labware each well belongs to, and the
+  well's position in it. A well never leaves its labware, so a row is written once when the well is
+  created and is never repaired or changed by amending the ledger. It is not a cache. Databases made
+  before the table existed gain it, filled from the parent caches, when they are connected to
+  ([`rebuild_containment!`](@ref) repeats that fill). [`well_container`](@ref),
+  [`well_containers`](@ref) and [`container_wells`](@ref) read it.
 
 ## Lots
 

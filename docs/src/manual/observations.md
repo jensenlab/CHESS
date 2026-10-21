@@ -103,6 +103,43 @@ are any.
 The database keeps each supplier product once in `Products`, with the details of a registered
 [`ReagentProduct`](@ref) and a link to its reagent, and each lot observation in `ObservedLots`.
 
+### Tracing material forward
+
+[`trace_forward`](@ref) is the reverse of [`trace_contents`](@ref): it finds every well that received
+material from a given well, or from the labware received as a given [`Lot`](@ref). It is the list to
+check when a lot is found to be bad, or when a transfer is corrected with [`update`](@ref) and
+everything downstream of it needs review. The result is a `DataFrame` with one row for each well reached,
+starting with the starting wells, with the labware of each well, the sequence and ledger entry at which
+material first reached it, the number of transfers from the start, and the well it came from. Following
+the `ViaWell` column rebuilds the path.
+
+```julia
+trace_forward(location_id(source_well))
+trace_forward(Lot("Sigma-Aldrich", "258148", "MKCS9055"))
+```
+
+The trace follows the recorded transfers in the order they happened. A transfer out of a well carries
+the material on only if it comes after the material arrived, so a transfer out of a well before it
+received anything from the starting well is not followed. A trace of a lot starts from every well of the
+labware that has the lot as of the ledger position traced, and a later observation of another lot removes
+a labware from the lot.
+
+The trace follows transfers only. It can include a well that no longer holds any of the material, because
+an observation may have overwritten the component in an intermediate well, and planned operations are not
+followed. [`forward_containers`](@ref) lists the labware that hold the wells reached and
+[`forward_runs`](@ref) lists the runs recorded on those wells or labware.
+
+Like the other reconstructions, a trace is computed from the ledger each time and nothing is stored.
+Amending the ledger with `update(...; replace = s)` or `insert = s` changes the next trace, and a trace
+as of an earlier time gives the list as it stood then:
+
+```julia
+before = Dates.now()
+update(transfer!, a, c, 5u"µL"; replace = s)         # the transfer went to c, not b
+trace_forward(location_id(a))                         # reaches c, not b
+trace_forward(location_id(a), get_last_sequence_id(), before)  # the earlier list, reaches b
+```
+
 ## Comparing observations with history
 
 [`observation_discrepancies`](@ref) compares every observation of a list of locations with what the

@@ -54,6 +54,7 @@ function _commit_tree!(loc::Labware,new_locs::Vector{Location})
     for c in cs
         c.parent = real
     end
+    upload_containment(real)
     push!(new_locs,real)
     return real
 end

@@ -21,6 +21,7 @@ function connect_SQLite(path)
     _current_db[] = SQLite.DB(path)
     _warn_if_unmigrated()
     _ensure_lot_tables!()
+    _ensure_containment_table!()
     return nothing
 end
 
