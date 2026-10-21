@@ -75,7 +75,7 @@ function trace_contents(location_id::Integer,sequence_id::Integer=get_last_seque
     transfers = get_transfer_ancestors([location_id],0,sequence_id,time)
     core = Set{Int}([location_id])
     for row in eachrow(transfers)
-        row.Core == 1 && union!(core,(row.Source,row.Destination))
+        row.Core == 1 && union!(core,ismissing(row.Destination) ? (row.Source,) : (row.Source,row.Destination))
     end
     observations = get_content_observations(collect(core),0,sequence_id,time)
 
@@ -98,10 +98,10 @@ function trace_contents(location_id::Integer,sequence_id::Integer=get_last_seque
         quant = row.Quantity*_parse_unit(row.Unit)
         if kind === :observation
             _observe_traced!(well(row.LocationID),component(row.ComponentID),quant,bottle_lot(row.LocationID))
-        elseif row.Core == 1
+        elseif row.Core == 1 && !ismissing(row.Destination)
             out_stock,out_shares = _withdraw_traced!(well(row.Source),quant)
             _deposit_traced!(well(row.Destination),out_stock,out_shares)
-        else # a core well's outgoing transfer to a well that never feeds back into it
+        else # a discard, or a core well's outgoing transfer to a well that never feeds back into it
             _withdraw_traced!(well(row.Source),quant)
         end
     end

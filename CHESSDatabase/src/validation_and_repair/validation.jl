@@ -9,6 +9,8 @@ function validate_operation_type(ledger_id::Integer)
         return validate_lock
     elseif isa_activity(ledger_id)
         return validate_activity
+    elseif isa_discard(ledger_id)
+        return validate_discard
     elseif isa_observation(ledger_id)
         return validate_observation
     else
@@ -52,7 +54,7 @@ function validate_movement(ledger_id::Integer;encumbrances=false)
 
     seq_id=get_sequence_id(ledger_id)
 
-    a=reconstruct_children(prt,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances)
+    ismissing(prt) || reconstruct_children(prt,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances) # a removal has no new parent
     b=reconstruct_parent(chld,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances)
     return nothing 
 end 

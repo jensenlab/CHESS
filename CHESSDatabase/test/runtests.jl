@@ -711,5 +711,6 @@ end
 # last: backfill_observations inserts ledger entries, shifting the sequence ids earlier tests hard-code
 include("test_observations.jl")
 include("test_forward_tracing.jl")
+include("test_discard.jl")
 
 rm(file)

@@ -78,6 +78,7 @@ include("./locations/plotting.jl")
 
 include("./operations/movement.jl")
 include("./operations/transfer.jl")
+include("./operations/discard.jl")
 include("./operations/attributes.jl")
 include("./operations/reads.jl")
 include("./operations/observe.jl")
@@ -128,11 +129,11 @@ export parent_cost, child_cost, occupancy, occupancy_cost , children, children_n
 # `parent` is deliberately not exported here -- Base.parent (extended for Location in Location.jl)
 # is already visible everywhere by default; exporting it too collides with Base's own unrelated
 # `parent` generic (see the comment above Base.parent(x::Location) in Location.jl).
-export can_move_into, move_into!
+export can_move_into, move_into!, remove_from_parent!
 #labware
 export shape, vendor, catalog, wells, stocks, add_stock!, plot_well_heatmap!
 #wells
-export wellcapacity, stock, sterilize!,transfer!, drain!,deposit!,withdraw!
+export wellcapacity, stock, sterilize!,transfer!, discard!, drain!,deposit!,withdraw!
 # dataframe interop
 export df_to_stock, stock_to_df, df_to_labware, labware_to_df
 # location <-> dict interop (JSON-safe, for tools outside CHESS)

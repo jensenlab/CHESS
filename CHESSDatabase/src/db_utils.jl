@@ -22,6 +22,7 @@ function connect_SQLite(path)
     _warn_if_unmigrated()
     _ensure_lot_tables!()
     _ensure_containment_table!()
+    _ensure_discard_table!()
     return nothing
 end
 

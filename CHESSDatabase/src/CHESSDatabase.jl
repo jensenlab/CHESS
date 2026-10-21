@@ -57,9 +57,12 @@ include("./lots.jl")
 include("./tracing.jl")
 include("./forward_tracing.jl")
 include("./containment.jl")
+include("./discards.jl")
 
 #database
 export create_db, migrate_chemistry!
+#discards.jl
+export upload_discard, upload_remove_from_parent
 #containment.jl
 export well_container, well_containers, container_wells, rebuild_containment!
 #forward_tracing.jl

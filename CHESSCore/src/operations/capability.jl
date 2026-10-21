@@ -2,8 +2,8 @@
 """
     _check_capability(instrument::Union{Location,Nothing}, fun::Function)
 
-Shared gate for the four operations whose CHESS Database tables carry an `InstrumentID`
-(`move_into!`/`transfer!`/`set_attribute!`/`record_read!`): if `instrument` is given, it must have
+Shared gate for the operations whose CHESS Database tables carry an `InstrumentID`
+(`move_into!`/`remove_from_parent!`/`transfer!`/`discard!`/`set_attribute!`/`record_read!`): if `instrument` is given, it must have
 `fun` in its [`performable_operations`](@ref), or this throws `ArgumentError`. A no-op if `instrument`
 is `nothing` (the default everywhere it's used) -- this never mutates `instrument` and never changes
 the mutation logic of the operation itself, it only validates.

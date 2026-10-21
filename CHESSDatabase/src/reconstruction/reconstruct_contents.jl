@@ -192,7 +192,7 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
             FROM encumbrance_subset e INNER JOIN EncumberedTransfers c ON e.EncumbranceID = c.EncumbranceID
         UNION ALL
             SELECT t.LedgerID,l.SequenceID,0,t.Source, t.Destination, t.Quantity, t.Unit
-            FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID ) ,
+            FROM $(transfer_events) t INNER JOIN ledger_subset l ON t.LedgerID = l.ID ) ,
         x (LedgerID,SequenceID,EncumbranceID,Source,Destination,Quantity,Unit)
         AS(
          SELECT y.LedgerID,y.SequenceID,y.EncumbranceID, Source,Destination,y.Quantity,y.Unit
@@ -229,7 +229,7 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
          -- for a well that was never bootstrapped.
          y (LedgerID,Source,Destination,Quantity,Unit)
         AS(SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit
-            FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
+            FROM $(transfer_events) t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
 
          x (LedgerID,Source,Destination,Quantity,Unit)
         AS(
@@ -325,6 +325,7 @@ function transfers_touch(location_id,starting::Integer=0,ending::Integer=get_las
     out=get_transfer_descendents([location_id],starting,ending,time;encumbrances=encumbrances) 
     out_set=Tuple{Integer,Integer,Integer}[]
     for row in eachrow(out)
+        ismissing(row.Destination) && continue # a discard reaches no other well
         push!(out_set,(row.Destination,row.LedgerID,row.EncumbranceID))
     end
     return out_set
@@ -334,6 +335,7 @@ function transfers_touched_by(location_id,starting::Integer=0,ending::Integer=ge
     out=get_transfer_ancestors([location_id],starting,ending,time;encumbrances=encumbrances) 
     out_set=Tuple{Integer,Integer,Integer}[]
     for row in eachrow(out)
+        ismissing(row.Destination) && continue # a discard reaches no other well
         push!(out_set,(row.Destination,row.LedgerID,row.EncumbranceID))
     end
     return out_set
@@ -426,7 +428,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         for row in eachrow(transfers)
             if row.Core == 1
                 push!(core_locs,row.Source)
-                push!(core_locs,row.Destination)
+                ismissing(row.Destination) || push!(core_locs,row.Destination)
             end
         end
     end
@@ -445,7 +447,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
 
 
         cache_dict[row.Source]=seq_id
-        cache_dict[row.Destination]=seq_id
+        ismissing(row.Destination) || (cache_dict[row.Destination]=seq_id)
     end
     # a core well must also be bootstrapped from before its first observation
     for row in eachrow(observations)
@@ -495,7 +497,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         quant= row.Quantity * _parse_unit(row.Unit)
         src = find_most_recent_location(all_locs,row.Source,seq_id)
 
-        if row.Core == 0
+        if row.Core == 0 || ismissing(row.Destination) # a discard has no destination to track
             # Collateral: this row exists only so a *core* location's balance is correctly reduced
             # by whatever it sent elsewhere -- the destination itself is never read back out of this
             # call (see get_transfer_ancestors's docstring), so there's no need to find, deepcopy, or

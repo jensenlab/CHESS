@@ -13,6 +13,8 @@ The database-writing function that [`upload`](@ref) and [`update`](@ref) call to
 |---|---|
 | `move_into!` | `upload_movement` |
 | `transfer!` | [`upload_transfer`](@ref) |
+| `discard!` | [`upload_discard`](@ref) |
+| `remove_from_parent!` | [`upload_remove_from_parent`](@ref) |
 | `set_attribute!` | `upload_environment_attribute` |
 | `record_read!` | [`upload_read`](@ref) |
 | `lock!`, `unlock!`, `toggle_lock!` | `upload_lock` |
@@ -32,6 +34,8 @@ function upload_operation(fun::Function)
         toggle_lock! => upload_lock,
         move_into! => upload_movement,
         transfer! => upload_transfer,
+        discard! => upload_discard,
+        remove_from_parent! => upload_remove_from_parent,
         set_attribute! => upload_environment_attribute,
         record_read! => upload_read,
         assign_barcode! => update_barcode,
