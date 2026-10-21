@@ -17,6 +17,8 @@ function infeasibility_hint(grouped::Dict{Symbol,Vector{NamedTuple}})
         return "This usually means an in-place well's existing content includes a chemical the target never declares (so it defaults to priority-0 / must-be-zero) while being pinned to carry that chemical forward."
     elseif haskey(grouped, :pinning) && haskey(grouped, :capacity)
         return "This usually means a pinned in-place well's existing content already exceeds, or leaves no room within, its declared or physical capacity."
+    elseif haskey(grouped, :unit_mismatch)
+        return "This usually means a powder source is only reachable by an instrument that cannot weigh, or a liquid source only by one that cannot measure volume -- add a configuration with a piston of the right kind (for example the \"human\" configuration weighs powders)."
     elseif haskey(grouped, :invalid_flow)
         return "This usually means no configured instrument (config/piston/position combination) can physically route between these wells -- add a compatible configuration, or remove this transfer requirement."
     elseif haskey(grouped, :minimum_shot) && (haskey(grouped, :priority0) || haskey(grouped, :mass_balance))

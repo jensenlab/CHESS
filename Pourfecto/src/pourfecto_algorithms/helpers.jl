@@ -77,6 +77,18 @@ function planning_concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Sol
     end
 end
 
+"""
+    planning_concentration(stock::CHESSCore.Mixture, ingredient::CHESSCore.Solid)
+
+Mass fraction of `ingredient` in a powder `Mixture`, expressed as `g/mg` so that `normalize_inputs`
+can express it per milligram of the source, the planning unit of a powder source (see
+[`amount_unit`](@ref)).
+"""
+function planning_concentration(stock::CHESSCore.Mixture,ingredient::CHESSCore.Solid)
+    ingredient in stock || return 0*u"g/mg"
+    return uconvert(u"g/mg",solids(stock)[ingredient]/CHESSCore.quantity(stock))
+end
+
 function planning_concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Liquid)
     ingredient in stock || return 0*u"percent"
     return uconvert(u"percent",liquids(stock)[ingredient]/CHESSCore.quantity(stock))
@@ -95,6 +107,34 @@ function planning_concentration(stock::CHESSCore.Stock,ingredient::CHESSCore.Org
     return uconvert(u"OD",CHESSCore.concentration(stock,ingredient))
 end
 
+"""
+    amount_unit(s::CHESSCore.Stock)
+
+The unit in which the planner counts the amount drawn from `s`: milligrams (`u"mg"`) for a powder
+`Mixture`, which is weighed, and microliters (`u"µL"`) for every other stock, which is measured by
+volume. Milligrams keep the numbers of a weighed amount on the same scale as microliters, so
+`min_vol_threshold` and the rounding of planned transfers apply to both.
+"""
+amount_unit(::CHESSCore.Stock) = u"µL"
+amount_unit(::CHESSCore.Mixture) = u"mg"
+
+"""
+    amount_dimension(s::CHESSCore.Stock) -> Symbol
+
+`:mass` for a powder `Mixture` and `:volume` for every other stock; the dimension a [`Piston`](@ref)
+must have ([`piston_dimension`](@ref)) to draw from `s`.
+"""
+amount_dimension(s::CHESSCore.Stock) = amount_unit(s) == u"mg" ? :mass : :volume
+
+# concentration of one component of a source per one planning unit of that source, relative to the
+# normalization factor of the component. Zero stays zero without a unit conversion, because a
+# component that a source does not hold carries a unit that cannot convert to the source's unit
+# (the percent of an absent liquid in a powder mixture, for example).
+function per_unit_amount(conc,normfactor,unit)
+    iszero(ustrip(conc)) && return 0.0
+    return ustrip(uconvert(inv(unit),conc/normfactor))
+end
+
 function normalize_inputs(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:CHESSCore.Stock})
 
     chems = union(all_components(sources),all_components(targets))
@@ -103,6 +143,7 @@ function normalize_inputs(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:C
     nc = length(chems)
     S = [planning_concentration(s,c) for s in sources, c in chems]
     T = [quantity(t,c) for t in targets, c in chems]
+    units = amount_unit.(sources)
     Sout = zeros(ns,nc)
     Tout = zeros(nt,nc)
     for c in 1:nc
@@ -110,7 +151,9 @@ function normalize_inputs(sources::Vector{<:CHESSCore.Stock},targets::Vector{<:C
         if ustrip(normfactor) == 0 # if all targets are zero (the gram unit is irrellevant)
             normfactor = maximum(quantity.(sources,(chems[c],))) # the normalization factor should be based on the maximum quantity in the sources 
         end
-        Sout[:,c] .= ustrip.(uconvert.((u"µL^-1",),S[:,c]./normfactor))
+        for s in 1:ns
+            Sout[s,c] = per_unit_amount(S[s,c],normfactor,units[s])
+        end
         Tout[:,c] .= T[:,c] ./normfactor
 
     end 
@@ -121,6 +164,31 @@ end
 
 
 
+
+"""
+    check_source_compatibility(sources, source_labware, configs; pinned=Int[])
+
+Throw a `StockCompatibilityError` when a non-empty source can be drawn by none of `configs`, because no
+configuration has a [`Piston`](@ref) of the dimension the source needs: a mass piston for a powder
+`Mixture`, a volume piston for any other stock. `sources` are the flattened source stocks of
+`source_labware`. Sources whose index is in `pinned` (in-place wells that stay where they are) are not
+drawn at all and are skipped. Whether a compatible configuration can also reach the source's labware is
+left to the scheduler.
+"""
+function check_source_compatibility(sources::Vector{<:CHESSCore.Stock},source_labware::Vector{<:Labware},configs::Vector{<:Configuration};pinned::AbstractVector{<:Integer}=Int[])
+    dims = Set(piston_dimension(p) for c in configs for p in pistons(head(c)))
+    wells = vcat(well_names.(source_labware)...)
+    problems = String[]
+    for s in eachindex(sources)
+        sources[s] isa CHESSCore.Empty && continue
+        s in pinned && continue
+        amount_dimension(sources[s]) in dims && continue
+        what = amount_dimension(sources[s]) == :mass ? "a powder, which must be weighed, and no configuration has a mass piston" : "a liquid, which must be measured by volume, and no configuration has a volume piston"
+        push!(problems,"well $(wells[s][2]) of labware \"$(wells[s][1])\" holds $what")
+    end
+    isempty(problems) && return nothing
+    throw(StockCompatibilityError("the instrument configurations cannot handle every source: " * join(problems,"; ") * ". Add a configuration that can, for example \"human\", which weighs powders and measures liquids."))
+end
 
 function total_quantity(stocks::Vector{<:CHESSCore.Stock},chem::CHESSCore.StockComponent)
 
@@ -341,6 +409,14 @@ function is_valid_flow(a::AspNode, d::DispNode)
 end  
 
 
+"""
+    piston_unit(p::Piston)
+
+The planning unit of the amounts a piston moves: `u"µL"` for a volume piston and `u"mg"` for a mass
+piston, matching [`amount_unit`](@ref).
+"""
+piston_unit(p::Piston) = piston_dimension(p) == :mass ? u"mg" : u"µL"
+
 function minimum_shot(a::AspNode) 
     piston_idx = a.piston 
     h = head(a.mask)
@@ -350,7 +426,7 @@ function minimum_shot(a::AspNode)
 
     min_asp = asp_limits[1]
 
-    return ustrip(uconvert(u"µl",min_asp))
+    return ustrip(uconvert(piston_unit(p),min_asp))
 end 
 function maximum_shot(a::AspNode) 
     piston_idx = a.piston 
@@ -361,7 +437,7 @@ function maximum_shot(a::AspNode)
 
     max_asp = asp_limits[2]
 
-    return ustrip(uconvert(u"µl",max_asp))
+    return ustrip(uconvert(piston_unit(p),max_asp))
 end 
 
 
@@ -374,7 +450,7 @@ function minimum_shot(a::DispNode)
 
     min_disp= disp_limits[1]
 
-    return ustrip(uconvert(u"µl",min_disp))
+    return ustrip(uconvert(piston_unit(p),min_disp))
 end 
 
 function maximum_shot(a::DispNode) 
@@ -386,7 +462,7 @@ function maximum_shot(a::DispNode)
 
     max_disp = disp_limits[2]
 
-    return ustrip(uconvert(u"µl",max_disp))
+    return ustrip(uconvert(piston_unit(p),max_disp))
 end 
 
 
@@ -413,7 +489,13 @@ function node_costs(asp_nodes::Vector{AspNode},disp_nodes::Vector{DispNode},c::V
 end 
 
 
-function stock_quantity(s::CHESSCore.Stock;unit = u"µL")
+"""
+    stock_quantity(s::CHESSCore.Stock; unit = amount_unit(s))
+
+The amount of `s` as a plain number in `unit`, which defaults to the planning unit of `s`
+([`amount_unit`](@ref)). An empty stock has quantity zero.
+"""
+function stock_quantity(s::CHESSCore.Stock;unit = amount_unit(s))
         sq = CHESSCore.quantity(s)
         stock_quantity = 0
         if !ismissing(sq)
@@ -421,6 +503,19 @@ function stock_quantity(s::CHESSCore.Stock;unit = u"µL")
         end 
         return stock_quantity
 end 
+
+
+"""
+    target_volume(s::CHESSCore.Stock)
+
+The liquid volume of `s` in µL, the quantity a target well must hold. A powder `Mixture` and an
+empty stock hold no liquid, so their volume is zero.
+"""
+function target_volume(s::CHESSCore.Stock)
+    q = CHESSCore.quantity(s)
+    (ismissing(q) || !(q isa Unitful.Volume)) && return 0.0
+    return ustrip(uconvert(u"µL",q))
+end
 
 
 function pourfecto_model_solution(m::JuMP.Model) 

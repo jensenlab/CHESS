@@ -142,7 +142,7 @@ pc = pourfecto(
 | `optimizer` | `Gurobi.Optimizer` | any JuMP-compatible optimizer | Solver | Sets the solver used for planning and scheduling. See [Choosing a solver](@ref pourfecto_choosing_a_solver). |
 | `solver_timelimit` | `30` | `Real` | Solver | Sets the solver's time limit, in seconds. Applies to any solver. |
 | `grb_feasibility_tol` | `1e-6` | `Real` | Solver | Sets Gurobi’s [`FeasibilityTol`](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol) parameter. Every MILP scheduling objective also uses it as the indicator and big-M epsilon, whichever solver is active. |
-| `min_vol_threshold` | `0.1` | `Real` | Planning | Sets the minimum volume threshold in µL. Any required transfer must be at least this large. |
+| `min_vol_threshold` | `0.1` | `Real` | Planning | Sets the minimum volume threshold in µL. Any required transfer must be at least this large. A powder transfer is counted in mg, so the same number is a minimum in mg. |
 | `require_nonzero` | `true` | `Bool` | Planning | If a target contains a reagent, require that some amount of that reagent is delivered, even if the optimal relaxed solution would deliver none. |
 | `enforce_minimum_shot` | `false` | `Bool` | Scheduling | Enforces minimum shot-volume constraints for each instrument. **Caution:** this introduces binary variables and turns the problem into a MILP. |
 | `slack_tol` | `1e-2` | `Real` | Planning | Sets the tolerance for preserving slack values across priority levels. A value of `0.01` corresponds to a 1% tolerance. |

@@ -86,12 +86,16 @@ function build_planning_model(sources::Vector{<:CHESSCore.Stock},
     # constraints to ensure we don't overproduce targets. For an in-place target sharing a well
     # with a source (see same_well_pairs), the true limit is the well's physical capacity, not its
     # declared quantity -- the declared quantity is what's being solved for, not a known bound.
+    # Only liquid sources (counted in µL) fill a well: a weighed powder (counted in mg) is taken to
+    # add no volume, so it is left out of the sum.
+    liquid_sources = findall(s -> amount_dimension(s) == :volume,sources)
     same_well_targets = Set(last.(same_well_pairs))
     for st in eachindex(targets)
+        isempty(liquid_sources) && break # nothing can fill a well, so there is no capacity to limit
         if st in same_well_targets && !ismissing(target_capacities[st])
-            con = @constraint(model, sum(V[:,st]) <= target_capacities[st])
+            con = @constraint(model, sum(V[liquid_sources,st]) <= target_capacities[st])
         else
-            con = @constraint(model,sum(V[:,st]) <= stock_quantity(targets[st]))
+            con = @constraint(model,sum(V[liquid_sources,st]) <= target_volume(targets[st]))
         end
         registry[con] = (category=:capacity, description="capacity constraint on $(target_labels[st])")
     end
@@ -189,10 +193,12 @@ function build_scheduling_model(
         sources = stocks(source_labware)
         targets = stocks(target_labware)
 
-        M = ustrip(uconvert(u"µL",sum((q for q in CHESSCore.quantity.(sources) if !ismissing(q));init=0u"µL"))) # Empty sources contribute 0 to the big-M bound, matching stock_quantity's ismissing convention
+        M = sum(stock_quantity.(sources);init=0.0) # Big-M bound on any single flow, in the planning units of the sources (µL for liquids, mg for powders). Empty sources contribute 0, matching stock_quantity's ismissing convention
 
         swp = same_well_pairs(source_labware,target_labware) # empty unless a labware name is shared between source_labware and target_labware (in-place mode)
         target_caps = target_well_capacities(target_labware)
+
+        check_source_compatibility(sources,source_labware,configs;pinned=first.(swp))
 
         src_wellnames = vcat(well_names.(source_labware)...)
         tgt_wellnames = vcat(well_names.(target_labware)...)
@@ -261,6 +267,20 @@ function build_scheduling_model(
                                 asp_labware_name = CHESSCore.name(labware(asp_nodes[a].mask))
                                 disp_labware_name = CHESSCore.name(labware(disp_nodes[d].mask))
                                 registry[con] = (category=:invalid_flow, description="no valid instrument flow: config \"$(CHESSCore.name(asp_nodes[a].configuration))\" cannot route from labware \"$(asp_labware_name)\" (aspirate, piston $(asp_nodes[a].piston)) to labware \"$(disp_labware_name)\" (dispense, piston $(disp_nodes[d].piston))")
+                        end
+                end
+        end
+
+        # a source is only drawn by a piston of its own dimension: powder by a mass piston, liquid by a volume piston
+        for s in 1:S
+                src_dimension = amount_dimension(sources[s])
+                for t in 1:T
+                        for idx in flow_connections[s,t]
+                                piston_idx = asp_nodes[idx[1]].piston
+                                node_dimension = piston_dimension(pistons(head(asp_nodes[idx[1]].mask))[piston_idx])
+                                node_dimension == src_dimension && continue
+                                con = @constraint(model,Q[idx] == 0)
+                                registry[con] = (category=:unit_mismatch, description="$(source_labels[s]) holds a $(src_dimension == :mass ? "powder, which must be weighed" : "liquid, which must be measured by volume"), so it cannot be drawn by the $(node_dimension) piston $(piston_idx) of config \"$(CHESSCore.name(asp_nodes[idx[1]].configuration))\"")
                         end
                 end
         end

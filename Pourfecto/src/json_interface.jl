@@ -6,6 +6,7 @@ type_tag(T::Type) = string(T)
 const INSTRUMENT_TYPES = Dict{String,DataType}(
     "Cobra" => Cobra ,
     "EightChannel"=> EightChannel,
+    "Human" => Human,
     "Nimbus" => Nimbus,
     "PlateMaster" => PlateMaster,
     "SingleChannel" => SingleChannel,
@@ -46,6 +47,22 @@ function raise_volume(d::JSON.Object{String,Any})
     return d["value"] * uparse(d["unit"])
 end
 
+# Piston limits are volumes for a liquid piston and masses for a powder piston.
+function lower_mass(m::Unitful.Mass)
+    #convert to mg for consistency
+    return Dict(TYPEKEY => "Unitful.Mass",
+                "value" => float(ustrip(uconvert(u"mg", m))),
+                "unit"  => "mg")
+end
+
+lower_amount(v::Unitful.Volume) = lower_volume(v)
+lower_amount(m::Unitful.Mass) = lower_mass(m)
+
+function raise_amount(d::JSON.Object{String,Any})
+    d[TYPEKEY] in ("Unitful.Volume","Unitful.Mass") || error("Not a Unitful.Volume or Unitful.Mass dict")
+    return d["value"] * uparse(d["unit"])
+end
+
 # ----------------------------
 # BitMatrix helpers
 # ----------------------------
@@ -70,8 +87,8 @@ function JSON.lower(p::Piston{A,R}) where {A<:Actuator, R<:RepeaterStyle}
         TYPEKEY => "Piston",
         "actuator" => String(nameof(A)),
         "repeater" => String(nameof(R)),
-        "asp" => [lower_volume(p.asp[1]), lower_volume(p.asp[2])],
-        "disp" => [lower_volume(p.disp[1]), lower_volume(p.disp[2])],
+        "asp" => [lower_amount(p.asp[1]), lower_amount(p.asp[2])],
+        "disp" => [lower_amount(p.disp[1]), lower_amount(p.disp[2])],
         "deadPad" => p.deadPad,
     )
 end
@@ -154,8 +171,8 @@ raise_piston(d::JSON.Object{String,Any}) = begin
     d[TYPEKEY] == "Piston" || error("Not a Piston dict")
     A = ACTUATOR_TYPES[d["actuator"]]
     R = REPEATER_TYPES[d["repeater"]]
-    asp1 = raise_volume(d["asp"][1]); asp2 = raise_volume(d["asp"][2])
-    disp1 = raise_volume(d["disp"][1]); disp2 = raise_volume(d["disp"][2])
+    asp1 = raise_amount(d["asp"][1]); asp2 = raise_amount(d["asp"][2])
+    disp1 = raise_amount(d["disp"][1]); disp2 = raise_amount(d["disp"][2])
     dead = d["deadPad"]
     Piston{A,R}((asp1, asp2), (disp1, disp2), dead)
 end

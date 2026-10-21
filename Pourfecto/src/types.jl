@@ -77,14 +77,27 @@ const REPEATER_TYPES = Dict{String,DataType}(
       deadPad::Real
   end
 
-Pistons control how liquid moves in and out of the Head of a Liquid handler. They are parameterized by an [`Actuator`](@ref) and a [`RepeaterSytle`]. The fields of the piston define their maximum and minimum aspirating and dispensing volumes. The `deadPad` field is a multiplicative factor to account for error and miscalibration in the piston. 
+Pistons control how material moves in and out of the Head of an instrument. They are parameterized by an [`Actuator`](@ref) and a [`RepeaterSytle`]. The fields of the piston define their minimum and maximum aspirating and dispensing amounts. The amounts are volumes for a piston that moves liquid, or masses for a piston that moves powder (for example the weighing piston of the `Human` instrument). All four limits of a piston must share one dimension; see [`piston_dimension`](@ref). The `deadPad` field is a multiplicative factor to account for error and miscalibration in the piston. 
 
 """
 struct Piston{A <: Actuator, R<: RepeaterStyle}  
-    asp::Tuple{Unitful.Volume,Unitful.Volume}
-    disp::Tuple{Unitful.Volume,Unitful.Volume}
+    asp::Tuple{Union{Unitful.Volume,Unitful.Mass},Union{Unitful.Volume,Unitful.Mass}}
+    disp::Tuple{Union{Unitful.Volume,Unitful.Mass},Union{Unitful.Volume,Unitful.Mass}}
     deadPad::Real
+    function Piston{A,R}(asp,disp,deadPad) where {A <: Actuator, R <: RepeaterStyle}
+        limits = (asp...,disp...)
+        all(x-> x isa Unitful.Volume,limits) || all(x-> x isa Unitful.Mass,limits) || error("all of a piston's aspirate and dispense limits must be volumes, or all must be masses")
+        new{A,R}(asp,disp,deadPad)
+    end
 end
+
+"""
+    piston_dimension(p::Piston) -> Symbol
+
+`:volume` for a piston that moves liquid and `:mass` for a piston that moves powder. A source stock can only be drawn
+through a piston of the matching dimension (see [`amount_unit`](@ref)).
+"""
+piston_dimension(p::Piston) = p.asp[1] isa Unitful.Mass ? :mass : :volume
 
 
 
@@ -638,8 +651,8 @@ where `V` is the transfer-volume decision variable.
 - Transfer volumes are rounded to a number of digits derived from
   `params(p)[:min_vol_threshold]` to reduce numerical noise:
   `digits = -floor(log10(min_vol_threshold))`.
-- Volumes are interpreted as microliters and converted to `Unitful` quantities via
-  `V .* u"µL"`.
+- Transfer amounts are interpreted in each source's planning unit ([`amount_unit`](@ref)):
+  microliters for a liquid source and milligrams for a powder (`Mixture`) source.
 
 ## See Also
 [`target_stocks`](@ref)
@@ -648,8 +661,6 @@ function planned_stocks(p::Pourcast)
 
   
   V = transfers(p)
-
-  V = V .* u"µL"
 
   #=
   if any(V .< 0u"µL")
@@ -663,7 +674,7 @@ function planned_stocks(p::Pourcast)
     for t in eachindex(T) 
         st = Empty() 
         for s in eachindex(S) 
-          st += V[s,t] * S[s]
+          st += (V[s,t] * amount_unit(S[s])) * S[s]
         end 
       push!(planned,st)
     end 

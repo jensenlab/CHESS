@@ -44,6 +44,7 @@ include("masks.jl")
 include("dataframe_interface.jl")
 include("well_connections.jl")
 include("in_place.jl")
+include("human.jl")
 
 function all_planned_approx_target(p::Pourcast;kwargs...)
     ps = planned_stocks(p)
