@@ -73,6 +73,9 @@ that snapshot, up to `sequence_id`. `max_cache` defaults to `sequence_id` and ca
 [Caching & Repair](caching-repair.md) uses this to reconstruct a value as if a given snapshot did
 not exist.
 
+A lot is not replayed or cached. [`reconstruct_lot`](@ref) reads the most recent lot observation at or
+before `sequence_id`.
+
 Each sub-reconstruction has a mutating form whose name ends in `!`: `reconstruct_parent!`,
 `reconstruct_children!`, `reconstruct_attributes!`, `reconstruct_contents!`,
 `reconstruct_lock!`, `reconstruct_activity!`, and `reconstruct_environment!`. These set that part of the state of locations
@@ -135,8 +138,7 @@ its children is required, unlike for other locations.
 `reconstruct_contents` is the most involved reconstruction, because the current stock of a well can
 depend on transfers made several steps before any cached snapshot. It proceeds in three steps:
 
-1. It fetches the content cache of each requested well, or starts from `Empty()` with zero cost if
-   none exists.
+1. It fetches the content cache of each requested well, or starts from `Empty()` if none exists.
 2. It finds the earliest cached snapshot among the requested wells. It then searches `Transfers`,
    and `EncumberedTransfers` when `encumbrances=true`, for every transfer that could have
    contributed material to any requested well, however many transfers back that goes.
@@ -145,3 +147,16 @@ depend on transfers made several steps before any cached snapshot. It proceeds i
 
 [Caching & Repair](caching-repair.md) describes how the caches stay correct as the history is
 amended.
+
+## Finding many locations at once
+
+Reconstruction rebuilds one location. To list or filter many, [`find_locations`](@ref) returns the ID,
+name, kind, parent and activity of every location that matches a kind, name, parent, barcode or
+activity filter, in one query, as of any `sequence_id` and `time`. It pages with `limit` and `offset`.
+[`descendants`](@ref) lists everything inside a location at any depth, with each location's depth.
+Both resolve the parent and activity from the ledger the way the reconstructions do, so amendments and
+earlier ledger positions give the answers they should, and a well's parent is its labware.
+
+The labware of a well does not depend on the ledger or on any cache: [`well_container`](@ref) and
+[`well_containers`](@ref) read the `Containment` table, which is written once when the well is created.
+[`reconstruct_locations`](@ref) reconstructs a list of locations in full.

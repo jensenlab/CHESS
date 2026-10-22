@@ -98,6 +98,7 @@ function create_db(path)
             Charge INTEGER,
             Formula TEXT,
             MolecularWeight REAL,
+            CID INTEGER,
             Unique(Name,Charge,Formula,MolecularWeight)
         );
         """
@@ -217,7 +218,6 @@ function create_db(path)
         LocationID INTEGER,
         StockID INTEGER, 
         LedgerID INTEGER,
-        Cost REAL,
         Time INTEGER,
         FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY(StockID) REFERENCES CachedStocks(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -442,17 +442,6 @@ function create_db(path)
     );
     """
 
-    create_ObservedCosts="""
-    CREATE TABLE ObservedCosts(
-        ID INTEGER PRIMARY KEY NOT NULL,
-        LedgerID INTEGER,
-        LocationID INTEGER,
-        Cost REAL,
-        $observation_columns,
-        FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT
-    );
-    """
-
     # IsInherited = 1 when the observed value matched what the location already inherited from its
     # parent: the row is kept for audit and discrepancy reporting, but replay skips it so the
     # location keeps following its parent.
@@ -558,7 +547,6 @@ function create_db(path)
         EncumbranceID INTEGER,
         LocationID INTEGER,
         StockID INTEGER,
-        Cost REAL,
         FOREIGN KEY(EncumbranceID) REFERENCES Encumbrances(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY(LocationID) REFERENCES Locations(ID) ON UPDATE CASCADE ON DELETE RESTRICT,
         FOREIGN KEY(StockID) REFERENCES CachedStocks(ID) ON UPDATE CASCADE ON DELETE RESTRICT
@@ -702,12 +690,14 @@ function create_db(path)
     DBInterface.execute(db,create_InstrumentSettings)
     #observations
     DBInterface.execute(db,create_ObservedComponents)
-    DBInterface.execute(db,create_ObservedCosts)
     DBInterface.execute(db,create_ObservedAttributes)
     DBInterface.execute(db,create_ObservedParents)
     DBInterface.execute(db,create_ObservedLocks)
     DBInterface.execute(db,create_ObservedActivity)
-    for tbl in ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
+    _create_lot_tables!(db)
+    _create_containment_table!(db)
+    _create_discard_table!(db)
+    for tbl in ("ObservedComponents","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
         DBInterface.execute(db,"CREATE INDEX idx_$(lowercase(tbl))_ledger ON $tbl(LedgerID);")
     end
 
@@ -766,11 +756,12 @@ _table_exists(name::String) = nrow(query_db("SELECT name FROM sqlite_master WHER
 _column_exists(table::String,col::String) = col in query_db("SELECT name FROM pragma_table_info('$table')").name
 
 _needs_chemistry_migration() = (_table_exists("Chemicals") && !_table_exists("Species")) ||
-                               (_table_exists("CompositionRules") && !_table_exists("Dissolutions"))
+                               (_table_exists("CompositionRules") && !_table_exists("Dissolutions")) ||
+                               (_table_exists("Species") && !_column_exists("Species","CID"))
 
 function _warn_if_unmigrated()
     if _needs_chemistry_migration()
-        @warn "This database uses the old Chemicals/CompositionRules tables; run migrate_chemistry!() to convert them to Species/Dissolutions before using it."
+        @warn "This database uses the old Chemicals/CompositionRules tables or has no Species.CID column; run migrate_chemistry!() to convert it before using it."
     end
     return nothing
 end
@@ -782,7 +773,9 @@ Convert the connected database from the old `Chemicals` and `CompositionRules` t
 `Species` and `Dissolutions` tables: rename `Chemicals` to `Species` and add its nullable `Formula`
 column, rename `CompositionRules` to `Dissolutions`, and rename the `ChemicalID` column of
 `Dissolutions` to `SpeciesID`. Existing rows keep their stored molecular weights and have no formula.
-Returns `true` if the database was converted and `false` if there was nothing to do (already
+It also adds the nullable `CID` column to `Species`, which holds a species' PubChem ID, and gives each
+species the `CID` of the one reagent it is the only product of, since PubChem IDs used to be stored on
+reagents. The reagents' own `CID` column is left in place and no longer read. Returns `true` if the database was converted and `false` if there was nothing to do (already
 migrated, or a new database). Run it once per existing database; the changes are made in a single
 transaction.
 """
@@ -798,6 +791,18 @@ function migrate_chemistry!()
         end
         if _table_exists("Dissolutions") && _column_exists("Dissolutions","ChemicalID")
             execute_db("ALTER TABLE Dissolutions RENAME COLUMN ChemicalID TO SpeciesID")
+        end
+        if !_column_exists("Species","CID")
+            execute_db("ALTER TABLE Species ADD COLUMN CID INTEGER")
+            if _table_exists("Reagents") && _column_exists("Reagents","CID")
+                execute_db("""
+                    UPDATE Species SET CID = (
+                        SELECT r.CID FROM Reagents r INNER JOIN Dissolutions d ON d.ReagentComponentID = r.ComponentID
+                        WHERE d.SpeciesID = Species.ID AND r.CID IS NOT NULL
+                          AND (SELECT COUNT(*) FROM Dissolutions d2 WHERE d2.ReagentComponentID = r.ComponentID) = 1
+                        LIMIT 1)
+                    WHERE CID IS NULL""")
+            end
         end
     end
     return true

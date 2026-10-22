@@ -29,15 +29,32 @@ Each table below is listed as `Name(column, column, ...)`.
 - `LocationTypes(Name)` and `Locations(ID, Name, Type)` hold one row for every committed
   `Location`, whatever its Julia type.
 - `Barcodes(Barcode, LocationID, Name)` maps a physical barcode string to a `Location`.
+- `Containment(WellID, ContainerID, RowIdx, ColIdx)` records which labware each well belongs to, and the
+  well's position in it. A well never leaves its labware, so a row is written once when the well is
+  created and is never repaired or changed by amending the ledger. It is not a cache. Databases made
+  before the table existed gain it, filled from the parent caches, when they are connected to
+  ([`rebuild_containment!`](@ref) repeats that fill). [`well_container`](@ref),
+  [`well_containers`](@ref) and [`container_wells`](@ref) read it.
+
+## Lots
+
+- `Products(ID, Supplier, CatalogNumber, ProductName, ManufacturerNumber, Grade, Notes,
+  ReagentComponentID)` holds each supplier product that a lot refers to, once. `ReagentComponentID` is
+  the reagent that the product is registered under, or `NULL`.
+- `ObservedLots(ID, LedgerID, LocationID, ProductID, Lot, GTIN, Quantity, Unit, Cost, Received, Notes, ...)`
+  holds the lot that a labware was received as. See [Observations](observations.md).
 
 ## Components and chemistry
 
 `Components(ID, Type)`, `Reagents(ComponentID, Name, Type, MolecularWeight, Density, CID)`,
-`Species(ID, Name, Charge, Formula, MolecularWeight)`, `Dissolutions(ID, ReagentComponentID,
+`Species(ID, Name, Charge, Formula, MolecularWeight, CID)`, `Dissolutions(ID, ReagentComponentID,
 SpeciesID, Coefficient)`, and `Organisms(ID, ComponentID, Genus, Species, Strain)` persist the
 `Reagent`, `Species`, `Organism`, and `Dissolution` types of `CHESSCore`. A species with an
 elemental formula stores the formula as a Hill-order string and no molecular weight, since the weight
-derives from the formula. A species without a formula stores its molecular weight.
+derives from the formula. A species without a formula stores its molecular weight. A species' PubChem ID
+is stored in `Species.CID`. It is descriptive and not part of the species' natural key. The
+`Reagents.CID` column belongs to databases written before PubChem IDs moved to species. It is no longer
+read, and [`migrate_chemistry!`](@ref) copies it onto the species of a reagent made of one species.
 
 A database created before the `Chemicals` and `CompositionRules` tables were renamed `Species` and
 `Dissolutions` is converted by

@@ -12,23 +12,20 @@ ob_room = generate_location(Room,"ob room")
     bottle = generate_location(Bottle1L,"ob new bottle")
     w = bottle[1,1]
     observe(w,rgt"water",500u"mL")
-    observe(w,:cost,12.0)
     @test stock(w) == 500u"mL"*rgt"water" # updated in memory too
     ob_drop_content_caches(location_id(w)) # the ledger alone holds it
     @test ob_contents(location_id(w)) == 500u"mL"*rgt"water"
-    @test cost(reconstruct_contents(location_id(w))) == 12.0
 end
 
 @testset "commit_location! records starting state as observations" begin
     eph = build_location(Bottle1L,"ob committed bottle")
-    deposit!(eph[1,1],100u"mL"*rgt"water"+2.35u"g"*rgt"paba",3)
+    deposit!(eph[1,1],100u"mL"*rgt"water"+2.35u"g"*rgt"paba")
     before = get_last_sequence_id()
     bottle = commit_location!(eph)
     @test get_last_sequence_id() == before + 1 # one ledger entry for the whole commit
     w_id = location_id(bottle[1,1])
     ob_drop_content_caches(w_id)
     @test ob_contents(w_id) == 100u"mL"*rgt"water"+2.35u"g"*rgt"paba"
-    @test cost(reconstruct_contents(w_id)) == 3
 
     # a location committed with nothing in it needs no ledger entry
     before = get_last_sequence_id()
@@ -172,7 +169,7 @@ end
     # the pre-observation way to seed a bottle: change it in memory, then cache it
     bottle = generate_location(Bottle1L,"ob legacy bottle")
     w = bottle[1,1]
-    deposit!(w,250u"mL"*rgt"water",4)
+    deposit!(w,250u"mL"*rgt"water")
     cache(w)
     dest = generate_location(Bottle1L,"ob legacy dest")[1,1]
     upload(transfer!,w,dest,50u"mL")
@@ -187,5 +184,118 @@ end
     ob_drop_content_caches(location_id(dest))
     @test ob_contents(location_id(w)) == 200u"mL"*rgt"water"
     @test ob_contents(location_id(dest)) == 50u"mL"*rgt"water"
-    @test cost(reconstruct_contents(location_id(w))) ≈ 3.2
+end
+
+@testset "observe: a bottle is received as a lot" begin
+    bottle = generate_location(Bottle1L,"ob lot bottle")
+    id = location_id(bottle)
+    @test isnothing(reconstruct_lot(id))
+    first_lot = Lot("Sigma-Aldrich","258148","MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14),notes="37 %")
+    seq_before = get_last_sequence_id()
+    observe(bottle,first_lot)
+    @test CHESSCore.lot(bottle) == first_lot # updated in memory too
+    @test reconstruct_lot(id) == first_lot
+    @test CHESSCore.lot(reconstruct_location(id)) == first_lot
+
+    # the product is recorded once and shared by later lots of it
+    n_products = nrow(query_db("SELECT 1 FROM Products WHERE Supplier = 'Sigma-Aldrich' AND CatalogNumber = '258148'"))
+    @test n_products == 1
+    second_lot = Lot("Sigma-Aldrich","258148","MKCS9056")
+    other = generate_location(Bottle1L,"ob second lot bottle")
+    observe(other,second_lot)
+    @test nrow(query_db("SELECT 1 FROM Products WHERE Supplier = 'Sigma-Aldrich' AND CatalogNumber = '258148'")) == 1
+
+    # a later observation replaces the lot, and reconstruction at an earlier point still sees the first
+    observe(bottle,second_lot)
+    @test reconstruct_lot(id) == second_lot
+    @test reconstruct_lot(id,get_last_sequence_id()-1) == first_lot
+    @test isnothing(reconstruct_lot(id,seq_before))
+
+    # only labware is received as a lot
+    @test_throws ArgumentError observe(bottle[1,1],first_lot)
+end
+
+@testset "a registered product's details and reagent are kept with the lot's product" begin
+    @reagent_product rgt"water" "Lot Test Supplier" catalog_number="LT-1" product_name="Test water" grade="HPLC"
+    bottle = generate_location(Bottle1L,"ob registered product bottle")
+    observe(bottle,Lot(only(filter(p->p.supplier=="Lot Test Supplier",reagent_products(rgt"water"))),"LOT1"))
+    row = query_db("SELECT * FROM Products WHERE Supplier = 'Lot Test Supplier'")
+    @test row.ProductName[1] == "Test water"
+    @test row.Grade[1] == "HPLC"
+    @test row.ReagentComponentID[1] == CHESSDatabase.get_component_id(rgt"water")
+end
+
+@testset "commit_location! and observe(labware) carry the lot" begin
+    eph = build_location(Bottle1L,"ob lot committed bottle")
+    l = Lot("Fisher Scientific","SS255","H142";quantity=1u"L")
+    observe!(eph,l)
+    bottle = commit_location!(eph)
+    @test CHESSCore.lot(bottle) == l
+    @test reconstruct_lot(location_id(bottle)) == l
+    @test any(f->length(f)==2 && f[2] isa Lot,CHESSDatabase._genesis_facets(bottle))
+    @test CHESSCore.lot(release_location(bottle)) == l
+end
+
+@testset "a database made before lots gains the tables on connecting" begin
+    path = joinpath(mktempdir(),"old.db")
+    create_db(path)
+    connect_SQLite(path)
+    for tbl in ("ObservedLots","Products")
+        execute_db("DROP TABLE $tbl")
+    end
+    @test !CHESSDatabase._table_exists("ObservedLots")
+    connect_SQLite(path)
+    @test CHESSDatabase._table_exists("ObservedLots") && CHESSDatabase._table_exists("Products")
+    connect_SQLite(file)
+end
+
+@testset "trace_contents follows material back to the lots it came from" begin
+    water_lot = Lot("Lab Supply","W-1","LW1";quantity=1u"L",cost=10.0)
+    paba_lot  = Lot("Lab Supply","P-1","LP1";quantity=25u"g",cost=5.0)
+    water_bottle = generate_location(Bottle1L,"ob trace water bottle")
+    observe(water_bottle[1,1],rgt"water",500u"mL") # contents first, lot second
+    observe(water_bottle,water_lot)
+    paba_bottle = generate_location(Bottle1L,"ob trace paba bottle")
+    observe(paba_bottle,paba_lot)
+    observe(paba_bottle[1,1],rgt"paba",10u"g")
+    tap = generate_location(Bottle1L,"ob trace unlabelled water")
+    observe(tap[1,1],rgt"water",1u"L")
+    mix = generate_location(Bottle1L,"ob trace mix")[1,1]
+    id = location_id(mix)
+    share(t,component,lot) = only(filter(r->r.Component==component && isequal(r.Lot,lot),eachrow(t))).Quantity
+
+    bottle_trace = trace_contents(location_id(water_bottle[1,1]))
+    @test nrow(bottle_trace) == 1
+    @test only(bottle_trace).Lot == water_lot
+
+    upload(transfer!,water_bottle[1,1],mix,100u"mL")
+    after_water = get_last_sequence_id()
+    upload(transfer!,paba_bottle[1,1],mix,2u"g")
+    upload(transfer!,tap[1,1],mix,50u"mL")
+    t = trace_contents(id)
+    @test nrow(t) == 3
+    @test share(t,rgt"water",water_lot) ≈ 100u"mL"
+    @test share(t,rgt"paba",paba_lot) ≈ 2u"g"
+    @test share(t,rgt"water",missing) ≈ 50u"mL" # from the bottle with no lot
+
+    # cost: 100 mL of a 1 L lot costing 10, plus 2 g of a 25 g lot costing 5
+    @test reconstruct_cost(id) ≈ 1.0 + 0.4
+    @test ismissing(reconstruct_cost(id;strict=true)) # the unlabelled water has no cost
+    @test ismissing(only(filter(r->ismissing(r.Lot),eachrow(trace_cost(id)))).Cost)
+
+    # a transfer out takes the same fraction of every share
+    out = generate_location(Bottle1L,"ob trace out")[1,1]
+    upload(transfer!,mix,out,CHESSCore.quantity(stock(reconstruct_location(id)))/2)
+    t_out = trace_contents(location_id(out))
+    @test share(t_out,rgt"water",water_lot) ≈ 50u"mL"
+    @test share(t_out,rgt"paba",paba_lot) ≈ 1u"g"
+    @test share(t_out,rgt"water",missing) ≈ 25u"mL"
+    @test reconstruct_cost(location_id(out)) ≈ 0.5 + 0.2
+    @test reconstruct_cost(id) ≈ 0.7 # and the well that sent it keeps the other half
+
+    # earlier in history the mix held only what had arrived by then
+    @test reconstruct_cost(id,after_water) ≈ 1.0
+    @test nrow(trace_contents(id,after_water)) == 1
+
+    @test_throws ErrorException trace_contents(location_id(water_bottle))
 end

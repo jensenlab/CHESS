@@ -19,16 +19,15 @@ mutable struct Well <: Location
     stock::Stock
     attributes::AttributeDict
     reads::Vector{Read}
-    cost::Real
     is_active::Bool
     function Well(location_id::Union{Integer,Nothing},name::String,kind::LocationKind;
             parent::Union{Labware,Nothing}=nothing,stock::Stock=Empty(),
-            attributes::AttributeDict=AttributeDict(),reads::Vector{Read}=Read[],cost::Real=0,is_active::Bool=true)
+            attributes::AttributeDict=AttributeDict(),reads::Vector{Read}=Read[],is_active::Bool=true)
         cap=wellcapacity(kind)
         if !isnothing(cap)
             (CHESSCore.volume_estimate(stock) <= cap) || throw(WellCapacityError(CHESSCore.volume_estimate(stock),cap))
         end
-        new(location_id,name,kind,parent,stock,attributes,reads,cost,is_active)
+        new(location_id,name,kind,parent,stock,attributes,reads,is_active)
     end
 end
 
@@ -75,15 +74,6 @@ stock(x::Well)=x.stock
 
 # all wells are always locked
 is_locked(::Well)=true
-
-
-"""
-    cost(::Well)
-
-Access the cost property of a well
-
-"""
-cost(x::Well) = x.cost
 
 
 occupancy(::Well) = 1//1
@@ -163,13 +153,12 @@ end
 
 
 """
-    withdraw!(donor::Well, quant::Union{Unitful.Volume,Unitful.Mass}) -> (Stock, Real)
+    withdraw!(donor::Well, quant::Union{Unitful.Volume,Unitful.Mass}) -> Stock
 
-Remove `quant` of `donor`'s stock and return it along with its share of the well's cost.
+Remove `quant` of `donor`'s stock and return it.
 
 The withdrawn [`Stock`](@ref) is a proportional slice of the well's contents: withdrawing a
-quarter of the total quantity takes a quarter of every reagent and organism. The well's cost is
-reduced by the same fraction, and that amount is returned as the second value. `quant` must have
+quarter of the total quantity takes a quarter of every reagent and organism. `quant` must have
 the same dimension (volume or mass) as the well's total quantity, otherwise an error is thrown.
 
 See also: [`deposit!`](@ref), [`transfer!`](@ref).
@@ -181,26 +170,21 @@ function withdraw!(donor::Well,quant::Union{Unitful.Volume,Unitful.Mass})
     factor=Unitful.uconvert(NoUnits,quant/q_tot)
     st_out= factor*st
     donor.stock=st-st_out
-    transfer_cost=factor*cost(donor)
-    donor.cost -= transfer_cost
-    return st_out, transfer_cost
+    return st_out
 end
 
 """
-    deposit!(recipient::Well, stock::Stock, cost::Real=0)
+    deposit!(recipient::Well, stock::Stock)
 
 Add `stock` into `recipient`'s current [`Stock`](@ref), guarded by [`wellcapacity`](@ref) (throws
-[`WellCapacityError`](@ref) if the combined stock would exceed it). `cost` is a plain tracked number
-(e.g. a reagent cost) added to the well's running cost, apportioned proportionally whenever
-[`withdraw!`](@ref) pulls material back out. Defaults to `0` for deposits that don't track a cost.
+[`WellCapacityError`](@ref) if the combined stock would exceed it).
 
 See also: [`withdraw!`](@ref), [`transfer!`](@ref).
 """
-function deposit!(recipient::Well,stock::Stock,cost::Real=0)
+function deposit!(recipient::Well,stock::Stock)
     st=CHESSCore.stock(recipient)
     new_stock=st+stock
     check_capacity(new_stock,recipient)
     recipient.stock=new_stock
-    recipient.cost += cost
     nothing
 end

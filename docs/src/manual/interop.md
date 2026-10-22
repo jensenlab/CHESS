@@ -26,7 +26,7 @@ julia> ctx = [CHESSCore, CHESSLabConstants];
 
 julia> bottle = build_location(loc"Bottle500mL", "Bottle 1");
 
-julia> deposit!(bottle.children[1,1], 10u"g" * rgt"paba", 5)
+julia> deposit!(bottle.children[1,1], 10u"g" * rgt"paba")
 
 julia> df_q, units_q = labware_to_df(bottle, "q"; reagent_context=ctx);
 
@@ -54,7 +54,7 @@ quantity to relate the concentrations to:
 ```jldoctest interop
 julia> bottle2 = build_location(loc"Bottle500mL", "Bottle 2");
 
-julia> deposit!(bottle2.children[1,1], 100u"mL" * rgt"water", 5)
+julia> deposit!(bottle2.children[1,1], 100u"mL" * rgt"water")
 
 julia> df_vc, units_vc = labware_to_df(bottle2, "vc"; reagent_context=ctx);
 
@@ -188,7 +188,7 @@ The types add:
 
 - `GenericLocation` adds a `"children"` list, and each child is converted in the same way. Children
   can have children, nested as deep as the hierarchy goes.
-- `Well` adds `"cost"` and `"stock"`, which is a nested `stock_to_dict`.
+- `Well` adds `"stock"`, which is a nested `stock_to_dict`.
 - `Labware` stores `"wells"` as a nested two-dimensional array that matches its shape, so a
   `Labware` and its wells convert to a `Dict` and back as one unit.
 - A capability-bearing location, a `GenericLocation` or `Labware` whose kind has `is_instrument`

@@ -53,8 +53,8 @@ julia> stock(a1)
  water    water  100 μL          100 %
 ```
 
-The third argument of `deposit!` is a `cost`, a tracked number such as a reagent cost. `withdraw!`
-apportions it proportionally when material is removed. It defaults to zero.
+A well holds no cost. The cost of what a well contains is found by tracing the material back to the lots
+it came from. See [Observations](observations.md#Tracing-contents-to-lots).
 
 ## Transferring between wells
 
@@ -85,6 +85,21 @@ julia> stock(a2)
 ────────────────────────────────────────
  water    water  40.0 μL          100 %
 ```
+
+## Discarding material
+
+[`discard!`](@ref) removes a quantity from a well and sends it nowhere: it is used up, poured to waste,
+or thrown away. It takes a proportional slice of every component, as [`withdraw!`](@ref) does, and
+throws if the well holds less than the quantity. In a database, `upload(discard!, well, quantity)`
+records a withdrawal in the `Discards` table instead of a lower observed amount, so the ledger keeps
+the fact that material was taken. Replay, [`trace_contents`](@ref) and cache repair treat it as a
+withdrawal from the source, and `update(discard!, ...; replace = s)` or `insert = s` amends one like any
+other entry; a discard can replace only a discard. Planned operations (encumbrances) do not include
+discards.
+
+[`remove_from_parent!`](@ref) is the matching operation for location: it takes a location out of its
+parent and leaves it located nowhere. It refuses a locked location and a well. In a database it is a
+movement with no parent, and amends like a move.
 
 ## Well names and positions
 

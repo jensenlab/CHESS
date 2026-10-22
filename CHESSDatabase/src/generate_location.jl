@@ -14,6 +14,7 @@ function generate_location(kind::LocationKind,name::String=string(UUIDs.uuid4())
     end
     lw=CHESSCore._build_location(kind,name,next_id,child_namer...)
     cache(lw)
+    lw isa Labware && upload_containment(lw)
     if lw isa Labware
         cache.(children(lw))
     end

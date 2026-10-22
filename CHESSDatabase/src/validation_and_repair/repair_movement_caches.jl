@@ -4,8 +4,11 @@ function repair_movement_caches(ledger_id::Integer)
     sequence_id=get_sequence_id(ledger_id)
 
     participants=get_participants(get_movement_participants,sequence_id)
-    unique_parents= unique(map(x-> x[1],participants) )
     unique_children=unique(map(x->x[2],participants))
+    # a movement with no parent is a removal, so the parent that lost the child needs its caches repaired
+    # too: it is the parent the child had just before this entry
+    lost=[CHESSCore.parent(reconstruct_parent(chld,sequence_id-1)) for chld in unique_children]
+    unique_parents= unique(vcat(collect(skipmissing(map(x-> x[1],participants))),location_id.(filter(!isnothing,lost))))
     repair_movement_caches(unique_parents,unique_children,sequence_id)
 end
 

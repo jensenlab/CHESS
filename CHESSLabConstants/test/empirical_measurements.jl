@@ -56,7 +56,7 @@ const MEDIA_COMPONENT_MEASUREMENTS = [
      "during manufacture -- not from glucose's own chemistry. Unlike lactic_acid's purity correction, " *
      "this isn't a fixed citable constant (varies by vendor/lot/grade, per USP's own 3.2-6.5 range), so " *
      "it's left undocumented in the model rather than guessed at."),
-    (label="calcium_chloride 1.8g/500mL",stock=1.8u"g"*rgt"calcium_chloride"+500u"mL"*rgt"water",
+    (label="calcium_chloride_dihydrate 1.8g/500mL",stock=1.8u"g"*rgt"calcium_chloride_dihydrate"+500u"mL"*rgt"water",
      measured_pH=5.56,ph_kwargs=(water_correction=true,),notes="media component panel"),
     (label="yeast_extract 41.6g/250mL",stock=41.6u"g"*rgt"yeast_extract"+250u"mL"*rgt"water",
      measured_pH=6.96,ph_kwargs=(water_correction=true,),notes="media component panel"),
@@ -64,10 +64,10 @@ const MEDIA_COMPONENT_MEASUREMENTS = [
      measured_pH=8.22,ph_kwargs=(water_correction=true,),notes="media component panel"),
     (label="sodium_chloride 10g/500mL",stock=10u"g"*rgt"sodium_chloride"+500u"mL"*rgt"water",
      measured_pH=5.93,ph_kwargs=(water_correction=true,),notes="media component panel"),
-    # sodium_phosphate_mono 11.5g/500mL -- no measured pH yet, add when available
+    # sodium_phosphate_mono_anhydrous 11.5g/500mL -- no measured pH yet, add when available
     (label="potassium_phosphate_mono 40g/500mL",stock=40u"g"*rgt"potassium_phosphate_mono"+500u"ml"*rgt"water",
      measured_pH=4.24,ph_kwargs=(water_correction=true,),notes="media component panel"),
-    (label="magnesium_sulfate 0.49g/500mL",stock=0.49u"g"*rgt"magnesium_sulfate"+500u"ml"*rgt"water",
+    (label="magnesium_sulfate_heptahydrate 0.49g/500mL",stock=0.49u"g"*rgt"magnesium_sulfate_heptahydrate"+500u"ml"*rgt"water",
      measured_pH=5.67,ph_kwargs=(water_correction=true,),notes="media component panel"),
     (label="alpha_cyclodextrin 0.15g/10mL",stock=0.15u"g"*rgt"alpha_cyclodextrin"+10u"mL"*rgt"water",
      measured_pH=5.91,ph_kwargs=(water_correction=true,),notes="media component panel"),
@@ -112,17 +112,17 @@ const amino_acids_20x =
     0.634u"g"*rgt"tyrosine" + 0.410u"g"*rgt"valine" + 1u"l"*rgt"water"
 
 const nps_20x =
-    0.2u"g"*rgt"acetamide" + 0.4u"g"*rgt"formamide" + 0.4u"g"*rgt"agmatine" +
+    0.2u"g"*rgt"acetamide" + 0.4u"g"*rgt"formamide" + 0.4u"g"*rgt"agmatine_sulfate" +
     0.4u"g"*rgt"ammonium_nitrate" + 0.4u"g"*rgt"taurine" + 0.4u"g"*rgt"spermidine" +
-    0.4u"g"*rgt"carnitine" + 0.4u"g"*rgt"choline_chloride" + 0.4u"g"*rgt"ornithine" + 1u"l"*rgt"water"
+    0.4u"g"*rgt"carnitine_hydrochloride" + 0.4u"g"*rgt"choline_chloride" + 0.4u"g"*rgt"ornithine_hydrochloride" + 1u"l"*rgt"water"
 
 const phosphates_20x =
-    11.6u"g"*rgt"potassium_phosphate_di" + 10u"g"*rgt"sodium_phosphate_di" +
-    2.85u"g"*rgt"sodium_phosphate_mono" + 1u"l"*rgt"water"
+    11.6u"g"*rgt"potassium_phosphate_di" + 10u"g"*rgt"sodium_phosphate_di_heptahydrate" +
+    2.85u"g"*rgt"sodium_phosphate_mono_anhydrous" + 1u"l"*rgt"water"
 
 const salts_20x =
-    1510u"mg"*rgt"calcium_chloride" + 100u"mg"*rgt"edta" + 2u"g"*rgt"magnesium_sulfate" +
-    100u"mg"*rgt"manganese_chloride" + 100u"mg"*rgt"manganese_sulfate" +
+    1510u"mg"*rgt"calcium_chloride_dihydrate" + 100u"mg"*rgt"edta" + 2u"g"*rgt"magnesium_sulfate_heptahydrate" +
+    100u"mg"*rgt"manganese_chloride_tetrahydrate" + 100u"mg"*rgt"manganese_sulfate_monohydrate" +
     200u"mg"*rgt"sodium_chloride" + 1u"l"*rgt"water"
 
 const bicarbonate_10x = 12.5u"g"*rgt"sodium_bicarbonate" + 1u"L"*rgt"water"

@@ -119,10 +119,21 @@ function move_into!(parent::Union{Location,Nothing},child::Location,lock::Bool=f
     end
 end
 
+"""
+    remove_from_parent!(child::Location; instrument=nothing)
 
-
-
-
-
-
-
+Take `child` out of its parent and leave it located nowhere, like [`move_into!`](@ref) with no new
+parent. Throws [`LockedLocationError`](@ref) if `child` is locked, [`FixedMembershipError`](@ref) if
+`child` is a [`Well`](@ref) (wells are fixed in their labware), and `ArgumentError` if `child` has
+no parent. See [`_check_capability`](@ref) for `instrument`.
+"""
+function remove_from_parent!(child::Location;instrument::Union{Location,Nothing}=nothing)
+    _check_capability(instrument,remove_from_parent!)
+    oldparent=child.parent
+    isnothing(oldparent) && throw(ArgumentError("$(name(child)) has no parent to be removed from"))
+    hasproperty(child,:is_locked) && is_locked(child) && throw(LockedLocationError(child))
+    remove!(oldparent,child)
+    child.parent=nothing
+    invalidate_environment!(child)
+    return nothing
+end

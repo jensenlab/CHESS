@@ -98,7 +98,7 @@ function build_realistic_lab(; n_bottles::Int=20, n_intermediate_plates::Int=60,
         upload(move_into!, reagent_room, bottle)
         well = bottle[1, 1]
         reagent = getfield(CHESSLabConstants, reagent_names[mod1(i, length(reagent_names))])
-        deposit!(well, 500_000u"µL" * reagent, 1)
+        deposit!(well, 500_000u"µL" * reagent)
         push!(bottles, well)
     end
 
@@ -265,7 +265,7 @@ function start_transfer_chain(max_n::Int)
         append!(spare_wells, vec(children(plate)))
     end
 
-    deposit!(source_well, 500_000u"µL" * CHESSLabConstants.water, 1)
+    deposit!(source_well, 500_000u"µL" * CHESSLabConstants.water)
     cache(source_well)  # last, once every plate above already exists -- see docstring
 
     return ChainState(room, source_well, spare_wells, 0)

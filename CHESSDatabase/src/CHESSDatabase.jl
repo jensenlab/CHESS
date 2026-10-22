@@ -51,12 +51,27 @@ include("./validation_and_repair/validation.jl")
 
 # ledger updates
 include("./update_operation.jl")
+include("./location_queries.jl")
 # observations
 include("./observations.jl")
+include("./lots.jl")
+include("./tracing.jl")
+include("./forward_tracing.jl")
+include("./containment.jl")
+include("./discards.jl")
 
 #database
 export create_db, migrate_chemistry!
+#location_queries.jl
+export find_locations, descendants, reconstruct_locations
+#discards.jl
+export upload_discard, upload_remove_from_parent
+#containment.jl
+export well_container, well_containers, container_wells, rebuild_containment!
+#forward_tracing.jl
+export trace_forward, forward_containers, forward_runs
 #observations.jl
+export reconstruct_lot, reconstruct_lot!, get_product_id, trace_contents, trace_cost, reconstruct_cost
 export observe, upload_observation, observation_discrepancies, backfill_observations
 #ledger.jl
 export append_ledger,insert_ledger,update_ledger,replace_ledger

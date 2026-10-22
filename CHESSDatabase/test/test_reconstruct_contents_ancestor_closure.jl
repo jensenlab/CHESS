@@ -23,8 +23,8 @@
         upload(move_into!,bacl_room,bacl_bottleC)
         bacl_aw = bacl_bottleA[1,1]
         bacl_cw = bacl_bottleC[1,1]
-        deposit!(bacl_aw,500u"mL"*rgt"water",1)
-        deposit!(bacl_cw,500u"mL"*rgt"glycerol",1)
+        deposit!(bacl_aw,500u"mL"*rgt"water")
+        deposit!(bacl_cw,500u"mL"*rgt"glycerol")
         cache(bacl_aw); cache(bacl_cw)
 
         bacl_plate = generate_location(WP96,"bacl plate 1")
@@ -62,8 +62,8 @@
         upload(move_into!,bacl_room2,bacl_bottleC2)
         bacl_aw2 = bacl_bottleA2[1,1]
         bacl_cw2 = bacl_bottleC2[1,1]
-        deposit!(bacl_aw2,500u"mL"*rgt"water",1)
-        deposit!(bacl_cw2,500u"mL"*rgt"glycerol",1)
+        deposit!(bacl_aw2,500u"mL"*rgt"water")
+        deposit!(bacl_cw2,500u"mL"*rgt"glycerol")
         cache(bacl_aw2); cache(bacl_cw2)
 
         bacl_plate2 = generate_location(WP96,"bacl plate 2")
@@ -95,7 +95,7 @@
         bacl_bottleD = generate_location(Bottle1L,"bacl D")
         upload(move_into!,bacl_room3,bacl_bottleD)
         bacl_dw = bacl_bottleD[1,1]
-        deposit!(bacl_dw,500u"mL"*rgt"water",1)
+        deposit!(bacl_dw,500u"mL"*rgt"water")
         cache(bacl_dw)
 
         bacl_plate3 = generate_location(WP96,"bacl plate 3")
@@ -119,7 +119,7 @@
         # W1) must not be replayed as a collateral row against an un-bootstrapped bottle.
         bacl_bottle4 = generate_location(Bottle1L,"bacl bottle 4")
         bacl_bw4 = bacl_bottle4[1,1]
-        deposit!(bacl_bw4,500u"mL"*rgt"water",1)
+        deposit!(bacl_bw4,500u"mL"*rgt"water")
         cache(bacl_bw4)
         bacl_plate4 = generate_location(WP96,"bacl plate 4")
         bacl_W1, bacl_W2 = bacl_plate4[1,1], bacl_plate4[1,2]

@@ -216,8 +216,8 @@ function _cache_species!(lab_id::AbstractString,name::AbstractString,charge::Int
     return nothing
 end
 
-_species_line(lab_id,name,charge,mw;formula=missing) =
-    "@species $lab_id \"$name\" $charge $(ismissing(formula) ? "$(mw)u\"g/mol\"" : "\"$formula\"")"
+_species_line(lab_id,name,charge,mw;formula=missing,pubchemid=missing) =
+    "@species $lab_id \"$name\" $charge $(ismissing(formula) ? "$(mw)u\"g/mol\"" : "\"$formula\"")$(ismissing(pubchemid) ? "" : " $pubchemid")"
 
 """
     register_species!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
@@ -230,14 +230,14 @@ via [`get_molecular_formula`](@ref) and [`get_mw_density`](@ref) (density is fet
 the elemental formula, from which the molecular weight is derived. PubChem writes an ion's charge as a
 suffix of its formula (`"Na+"`, `"O4S-2"`); the tool removes it after checking that it agrees with
 `charge`. When the formula cannot be used, because its charge disagrees or it cannot be read as an
-elemental formula, the tool warns and the line falls back to the stored molecular weight. The line
-carries no PubChem ID, so the ID is authoring convenience only, not permanent provenance. Paste the
-returned line into the appropriate file in `chemicals/` and commit.
+elemental formula, the tool warns and the line falls back to the stored molecular weight. The line ends
+with the PubChem ID, which the species keeps as metadata. Paste the returned line into the appropriate
+file in `chemicals/` and commit.
 
 Example:
 ```julia-repl
 julia> register_species!("Na⁺","Na+",1,923)
-"@species Na⁺ \\"Na+\\" 1 \\"Na\\""
+"@species Na⁺ \\"Na+\\" 1 \\"Na\\" 923"
 ```
 """
 function register_species!(lab_id::AbstractString,name::AbstractString,charge::Integer,pubchemid::Integer)
@@ -253,11 +253,11 @@ function register_species!(lab_id::AbstractString,name::AbstractString,charge::I
             end
         end
         ismissing(formula) || _check_formula_mass(lab_id,formula,mw)
-        return _species_line(lab_id,name,charge,mw;formula)
+        return _species_line(lab_id,name,charge,mw;formula,pubchemid)
     end
     molecular_weight,_ = get_mw_density(pubchemid)
     formula = _fetch_formula(pubchemid,charge)
     ismissing(formula) || _check_formula_mass(lab_id,formula,molecular_weight)
     _cache_species!(lab_id,name,charge,molecular_weight,pubchemid,formula)
-    return _species_line(lab_id,name,charge,molecular_weight;formula)
+    return _species_line(lab_id,name,charge,molecular_weight;formula,pubchemid)
 end
