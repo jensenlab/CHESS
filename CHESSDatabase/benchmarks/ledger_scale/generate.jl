@@ -134,8 +134,8 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
     exec("INSERT INTO CachedStocks(ID,StockHash) VALUES (1, x'0000000000000000')")
     exec("""
     WITH RECURSIVE s(i) AS (SELECT $well_base UNION ALL SELECT i+1 FROM s WHERE i < $n_loc)
-    INSERT INTO CachedContents(LocationID,StockID,LedgerID,Cost,Time)
-    SELECT i, 1, 1 + CAST($(ls_rnd("i",13))*$B AS INTEGER), 0.0, $LS_ORIGIN FROM s WHERE $(ls_rnd("i",14)) < 0.01""")
+    INSERT INTO CachedContents(LocationID,StockID,LedgerID,Time)
+    SELECT i, 1, 1 + CAST($(ls_rnd("i",13))*$B AS INTEGER), $LS_ORIGIN FROM s WHERE $(ls_rnd("i",14)) < 0.01""")
 
     counts = NamedTuple(Symbol(t) => DataFrame(exec("SELECT COUNT(*) AS n FROM $t")).n[1] for t in
         ("Ledger","EnvironmentAttributes","Reads","Transfers","Movements","Locks","Activity","CachedContents","Locations"))

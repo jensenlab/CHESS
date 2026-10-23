@@ -105,6 +105,10 @@ function query_list(seq)
         ("reconstruct_lock","plate",false,id->CHESSDatabase.reconstruct_lock(id,seq,now_)),
         ("reconstruct_activity","plate",false,id->CHESSDatabase.reconstruct_activity(id,seq,now_)),
         ("reconstruct_parent","plate",false,id->CHESSDatabase.reconstruct_parent(id,seq,now_)),
+        ("reconstruct_lot","plate",false,id->CHESSDatabase.reconstruct_lot(id,seq,now_)),
+        ("find_locations(parent)","incubator",false,id->CHESSDatabase.find_locations(;parent=id,sequence_id=seq,time=now_)),
+        ("descendants","incubator",false,id->CHESSDatabase.descendants(id;sequence_id=seq,time=now_)),
+        ("trace_forward(well)","chain6",true,id->CHESSDatabase.trace_forward(id,seq,now_)),
         ("reconstruct_contents","chain12",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
         ("reconstruct_contents","chain1",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
     ]
@@ -112,10 +116,10 @@ end
 
 # reservoirs need real contents for reconstruct_contents to replay transfers out of them
 function stock_reservoirs!(lay)
-    water = Liquid("bench water",18.015u"g/mol",1.0u"g/mL",962)
+    water = Liquid("bench water",18.015u"g/mol",1.0u"g/mL")
     sid = CHESSDatabase.cache(5.0e8u"µL"*water)
     for r in lay.reservoirs
-        execute_db("INSERT INTO CachedContents(LocationID,StockID,LedgerID,Cost,Time) Values(?,?,?,?,?)",(r,sid,1,0.0,LS_ORIGIN))
+        execute_db("INSERT INTO CachedContents(LocationID,StockID,LedgerID,Time) Values(?,?,?,?)",(r,sid,1,LS_ORIGIN))
     end
 end
 
