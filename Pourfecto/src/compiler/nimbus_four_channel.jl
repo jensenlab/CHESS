@@ -300,7 +300,19 @@ function compute_synchronized_cycles(ordered_windows::Vector{DispenseWindow}, ch
 
     function refill!(c::Int, at_window::Int)
         if !isempty(current[c])
-            push!(cycles[c],current[c])
+            # The reload trip happens before window `at_window`'s dispense, so only items from earlier
+            # windows were dispensed from the closing load. Anything later was assigned to it but not yet
+            # used: hand it back so it is packed into the new load. Otherwise it would be dispensed from
+            # the tip on top of the new aspirate, exceeding capacity. The closing aspirate shrinks to
+            # what was actually dispensed.
+            n_used = count(p -> p[1] < at_window, current[c])
+            assigned[c] -= length(current[c]) - n_used
+            if n_used == 0
+                # nothing from that load was used: the trip that loaded it is superseded
+                pop!(trigger_window[c])
+            else
+                push!(cycles[c],current[c][1:n_used])
+            end
             current[c] = Tuple{Int,DispenseItem}[]
             current_vol[c] = 0.0
         end

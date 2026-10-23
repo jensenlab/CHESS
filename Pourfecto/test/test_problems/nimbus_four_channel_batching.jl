@@ -628,6 +628,70 @@ reagent_order(df) = collect(unique(zip(df[!,"Source Labware ID"],df[!,"Source Po
         @test dispose_entries == pickup_entries
     end
 
+    @testset "synchronized reloads never aspirate onto a part-full tip" begin
+        @testset "cycle closed at a reload keeps only what was dispensed before it" begin
+            # channel 1: 20 x 100 uL, one per window; channel 2: 400 uL at windows 1,3,5,7. Channel 2's
+            # second load (window 5) is a sync trip, which channel 1 joins with 600 uL still unused.
+            windows = DispenseWindow[]
+            for w in 1:20
+                active = Tuple{Int,DispenseItem}[(1,DispenseItem(w,CartesianIndex(1,w),100.0))]
+                w in (1,3,5,7) && push!(active,(2,DispenseItem(100+w,CartesianIndex(3,w),400.0)))
+                push!(windows,DispenseWindow("P",:DeepWP96,w,1,active))
+            end
+            items = Dict(c=>channel_event_sequence(windows,c) for c in 1:2)
+            cycles,trigger,_ = compute_synchronized_cycles(windows,1:2,items,1000.0)
+            for c in 1:2
+                @test length(cycles[c]) == length(trigger[c])
+                @test all(cy -> sum(it.volume for (_,it) in cy) <= 1000.0,cycles[c])
+                # no cycle holds an item dispensed after the next cycle's trip
+                for ci in 1:length(cycles[c])-1
+                    @test all(p -> p[1] < trigger[c][ci+1],cycles[c][ci])
+                end
+                # every item is in exactly one cycle, in order
+                @test [p[1] for cy in cycles[c] for p in cy] == [p[1] for p in items[c]]
+            end
+            @test [p[1] for p in cycles[1][1]] == [1,2,3,4]
+        end
+
+        @testset "per-channel tip volume stays within [0, capacity] when replaying the compiled protocol" begin
+            sources = Labware[build_location(location_kinds[:Conical50],"nimbus4ch_replay_src$i") for i in 1:4]
+            target = build_location(location_kinds[:DeepWP96],"nimbus4ch_replay_target")
+            targets = Labware[target]
+            config = configurations["nimbus_four_channel"]
+            slotting = slotting_greedy(vcat(sources,targets),config)
+            R,C = size(target)
+            well_col(letter_row,col) = (col-1)*R + letter_row
+
+            Random.seed!(7)
+            design = DataFrame(zeros(4,R*C),:auto)
+            for row in 1:R, col in 1:C, i in 1:4
+                rand() < 0.5 && (design[i,well_col(row,col)] = i == 1 ? 40.0 : 30.0 + 300.0*rand())
+            end
+            df = convert_design_four_channel(design,sources,targets,slotting,config)
+            action_df = batch_design_four_channel(df,config;insert_blowouts=true,dead_volume_buffer=20.0)
+
+            tip = zeros(4)
+            for row in eachrow(action_df)
+                for c in 1:4
+                    vol = row["Volume $c"]
+                    if row.Action == "Aspirate" && row["Labware Position $c"] != "None"
+                        tip[c] += vol
+                        @test tip[c] <= 1000.0 + 1e-6
+                    elseif row.Action == "Dispense" && row["Labware Position $c"] != "None"
+                        tip[c] -= vol
+                        @test tip[c] >= -0.1
+                    elseif row.Action == "Blowout" && row["Labware Position $c"] != "None"
+                        @test abs(tip[c] - vol) < 0.1 # blowout drains exactly the dead volume left
+                        tip[c] = 0.0
+                    elseif row.Action in ("TipPickup","TipDisposal") && row["Labware Position $c"] in ("Pickup","Dispose")
+                        @test abs(tip[c]) < 0.1 # nothing left in a tip that is swapped or discarded
+                        tip[c] = 0.0
+                    end
+                end
+            end
+        end
+    end
+
     @testset "regression: Nimbus.jl (single-channel) is untouched by this instrument's presence" begin
         @test haskey(configurations,"nimbus")
         @test haskey(configurations,"nimbus_four_channel")
