@@ -69,7 +69,7 @@ acid with a weak one at about the same number of moles (1 mL of acetic acid is r
 julia> acid = 0.0175u"mol" * rgt"HCl" + 100u"mL" * rgt"water";
 
 julia> pH(acid)
-0.7569619513137055
+0.7632626479894901
 
 julia> vinegar = 1u"mL" * rgt"acetic_acid" + 100u"mL" * rgt"water";
 
@@ -174,7 +174,7 @@ needed to reach a target pH. It does not modify `s`, since `Stock`s are immutabl
 julia> adjusted = adjust_pH(vinegar, 4.0, rgt"acetic_acid", rgt"NaOH");
 
 julia> pH(adjusted)
-3.999987245275406
+3.999919269088423
 
 julia> pH(vinegar) # the original stock is untouched
 2.7434825265372638

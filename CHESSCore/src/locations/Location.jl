@@ -260,8 +260,6 @@ function toggle_activity!(x::Location;instrument::Union{Location,Nothing}=nothin
     x.is_active=!is_active(x)
 end
 
-cost(::Location)=0 # refers to the cost of the contents of a location. cost is implemented for Well but needs to be defined for all locations.
-
 """
     mutable struct GenericLocation <: Location
 

@@ -97,7 +97,7 @@ category. It is the fastest way to see what a lab module such as `CHESSLabConsta
 ```jldoctest registering
 julia> registry_summary([CHESSCore, MyLab]).reagents
 1-element Vector{NamedTuple}:
- (module_ = MyLab, name = :ethanol, type = Liquid, molecular_weight = 46.07 g mol⁻¹, density = 0.789 g mL⁻¹, pubchemid = 702)
+ (module_ = MyLab, name = :ethanol, type = Liquid, molecular_weight = 46.07 g mol⁻¹, density = 0.789 g mL⁻¹, pubchemid = 702, products = ReagentProduct[])
 ```
 
 With no arguments, `registry_summary()` covers every lab module registered globally. Unlike the
@@ -141,12 +141,51 @@ register_organism!("SMU_UA159", "Streptococcus", "mutans", "UA159"; atcc_id = "7
 ```
 
 PubChem describes the compound of the ID it is given, so the ID must be that of the form actually
-weighed out. A hydrate needs the hydrate's PubChem ID. A salt that dissolves into ions needs a
-`Dissolution` in place of the single formula the function returns. A compound with no PubChem entry,
+weighed out when the reagent is a single compound. A hydrate or a salt that dissolves into ions needs a
+`Dissolution` in place of the single formula the function returns, and each species in it carries its
+own PubChem ID. A compound with no PubChem entry,
 such as a rich-media broth, is registered without a PubChem ID. The line then has `missing`
 chemistry, or `opaque` when `register_reagent!` is called with `opaque=true` for an undefined mixture.
 [`get_molecular_formula`](@ref) takes a PubChem ID and returns the formula as PubChem writes it, and
 [`get_mw_density`](@ref) returns the molecular weight in g/mol and the density in g/mL.
+
+## Checking PubChem IDs
+
+A species keeps the PubChem ID of its compound, and a wrong ID is easy to write: an ID that is off by a
+digit, or one that names a derivative of the compound, still returns a plausible record.
+[`audit_pubchem`](@ref) compares every registered species with the record at its ID and returns the
+differences as a table. It reports an ID that PubChem does not have, a charge or isotope labelling that
+differs, a formula or molar mass that differs, and a PubChem title with no word that starts with the same
+five letters as a word of the species' name. A species may have the formula of the compound's protonation
+state: the same elements apart from hydrogen, and a charge that differs by the number of hydrogens that
+differ. The audit accepts that and lists it as information, so that an acid/base chain whose species share
+one ID is not reported as a conflict. Other species that share an ID are reported too, and species with
+no ID are listed when asked for.
+
+```julia
+using CHESSLabConstants
+
+findings = audit_pubchem()
+```
+
+The audit fetches each distinct ID once, in batches with a pause between requests. When PubChem answers
+that there are too many requests, the audit stops instead of retrying, because repeated requests extend the
+block. [`fetch_pubchem_records`](@ref) fills a dictionary as it goes, so passing the same dictionary to
+the next call continues where the first stopped and fetches nothing it already holds:
+
+```julia
+records = Dict{Int,Union{CHESSLabConstants.PubChemRecord,Nothing}}()
+findings = audit_pubchem(; records)   # may stop early with a PubChemThrottled error
+findings = audit_pubchem(; records)   # later: fetches only what is missing
+```
+
+A formula check cannot find an ID that was copied together with its formula from the wrong compound. Read
+the `pubchem_title` column for any species that was added by a lookup.
+
+To record many PubChem IDs at once, `CHESSLabConstants/tools/apply_species_cids.jl` reads a CSV file with the
+columns `label`, `decision`, and `cid`, and adds the ID of every row whose decision is `cid` to the
+`@species` line of that label. It makes a dry run unless it is given `--write`, never changes a line that
+already has an ID, and with `--audit` checks the changed species with `audit_pubchem`.
 
 [Database Architecture](db-architecture.md) describes how CHESSDatabase stores the locations and
 stocks built from registered constants.

@@ -16,13 +16,13 @@ for sol in solids4
     st = Empty()
     st += 20u"g" * sol
     st += 50u"ml" * water4
-    deposit!(children(con)[1],st,0)
+    deposit!(children(con)[1],st)
     push!(conicals4,con)
 end
 
 con4 = build_location(location_kinds[:Conical50],"water4ch")
 st4 = 50u"ml" * water4
-deposit!(children(con4)[1],st4,0)
+deposit!(children(con4)[1],st4)
 push!(conicals4,con4)
 
 target_plate4 = build_location(location_kinds[:DeepWP96])

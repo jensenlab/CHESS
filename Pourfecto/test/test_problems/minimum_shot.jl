@@ -9,7 +9,7 @@ source = build_location(location_kinds[:Conical15],"A source")
 st = Empty()
 st += 1u"g" * A
 st += 5u"ml" * water
-deposit!(children(source)[1],st,0)
+deposit!(children(source)[1],st)
 
 target = build_location(location_kinds[:Conical15],"A target")
 children(target)[1].stock = 100u"mg" * A + 500u"µL" * water

@@ -226,8 +226,8 @@ end
 
 function encumber_cache_contents(encumberid::Integer,loc::Well)
     stock_id=cache(stock(loc))
-    execute_db("INSERT INTO EncumberedCachedContents(EncumbranceID,LocationID,StockID,Cost) Values(?,?,?,?)",
-        (encumberid,location_id(loc),stock_id,cost(loc)))
+    execute_db("INSERT INTO EncumberedCachedContents(EncumbranceID,LocationID,StockID) Values(?,?,?)",
+        (encumberid,location_id(loc),stock_id))
     return nothing
 end
 

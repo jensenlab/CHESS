@@ -7,11 +7,13 @@ Represents a physical material: a substance you can weigh out or pipette and sto
 identify the materials in the lab's mixtures and solutions, tracked in [`Stock`](@ref)'s
 `SolidDict`/`LiquidDict`.
 
-All `Reagent` subtypes have four fields utilized by CHESSCore:
+All `Reagent` subtypes have three fields utilized by CHESSCore:
 1) `name`: the name by which the reagent will be referred to
 2) `molecular_weight`: the reagent's stored molecular weight. For a reagent defined by a formula or a [`Dissolution`](@ref), this is the weight derived from it when the reagent was defined, and [`molecular_weight`](@ref) re-derives it from the registered [`dissolution`](@ref) whenever one exists. If the weight is unknown, `missing`.
 3) `density`: the reagent's density at STP, if known, is used by CHESSCore to facilitate conversions between mass and volume quantities of the reagent. If `density` is unknown or undefined, it is assigned a value of `missing`
-4) `pubchemid`: the reagent's integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov), which identifies the reagent's compound in the PubChem database.
+
+A reagent has no PubChem ID of its own: PubChem identifies compounds, so the ID belongs to the [`Species`](@ref)
+a reagent is made of (see [`pubchemid`](@ref)).
 
 See also: [`Species`](@ref) for what a reagent breaks into once dissolved, [`@reagent`](@ref) for defining
 one, and [`StockComponent`](@ref) for the common dispatch/gathering ancestor `Reagent` shares
@@ -61,9 +63,15 @@ density(x::Reagent)=x.density
 """
     pubchemid(x::Reagent)
 
-access the pubchemid property of a reagent
+The [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of a reagent that is made of a single
+[`Species`](@ref): the ID of that species. `missing` for a reagent that breaks into several species,
+or whose species has no ID. The ID is kept on the species, not the reagent.
 """
-pubchemid(x::Reagent)=x.pubchemid
+function pubchemid(x::Reagent)
+    species = collect(keys(dissolution(x).products))
+    length(species) == 1 || return missing
+    return pubchemid(only(species))
+end
 
 
 
@@ -77,7 +85,6 @@ struct Solid <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
     density::Union{Unitful.Density,Missing}
-    pubchemid::Union{Integer,Missing}
 end
 """
     struct Liquid <: Reagent
@@ -88,7 +95,6 @@ struct Liquid <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
     density::Union{Unitful.Density,Missing}
-    pubchemid::Union{Integer,Missing}
 end
 
 """
@@ -101,7 +107,6 @@ struct Gas <: Reagent
     name::String
     molecular_weight::Union{Unitful.MolarMass,Missing}
     density::Union{Unitful.Density,Missing}
-    pubchemid::Union{Integer,Missing}
 end
 
 # Reagent has a name::String field, so it isn't isbits and Julia's default ==/hash fall back to
@@ -122,8 +127,8 @@ _hash_canon(x::Missing) = x
 _hash_canon(x::Unitful.MolarMass) = uconvert(u"g/mol",x)
 _hash_canon(x::Unitful.Density) = uconvert(u"g/mL",x)
 
-Base.:(==)(a::T,b::T) where T<:Reagent = a.name==b.name && isequal(a.molecular_weight,b.molecular_weight) && isequal(a.density,b.density) && isequal(a.pubchemid,b.pubchemid)
-Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.molecular_weight),hash(_hash_canon(a.density),hash(a.pubchemid,h)))))
+Base.:(==)(a::T,b::T) where T<:Reagent = a.name==b.name && isequal(a.molecular_weight,b.molecular_weight) && isequal(a.density,b.density)
+Base.hash(a::Reagent,h::UInt) = hash(typeof(a),hash(a.name,hash(_hash_canon(a.molecular_weight),hash(_hash_canon(a.density),h))))
 
 """
     struct Species
@@ -148,6 +153,12 @@ julia> Species("glucose",0,"C6H12O6")
 julia> Species("mystery ion",1,missing)
 ```
 
+A species may also carry the integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of its compound, as the
+`pubchemid` keyword (`Species("glucose",0,"C6H12O6";pubchemid=5793)`). The ID is descriptive metadata. It
+does not take part in equality or hash, which identify a species by its name, charge, and formula. A
+species with no entry of its own in PubChem takes the ID of the compound it is a protonation state of, so
+`Ampicillin(anion)` carries the ID of ampicillin and keeps its own charge, formula, and molar mass.
+
 Unlike `Reagent`, `Species` has real value-based equality/hash (not Julia's identity-based default)
 because dissolutions and the identity-default fallback (see [`dissolution`](@ref)) routinely
 construct `Species` values on the fly, and those must compare equal to independently-constructed-but-
@@ -160,18 +171,21 @@ struct Species
     charge::Integer
     formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula}
     stored_molecular_weight::Union{Unitful.MolarMass,Missing}
-    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula},stored_molecular_weight::Union{Unitful.MolarMass,Missing})
+    pubchemid::Union{Integer,Missing}
+    function Species(name::AbstractString,charge::Integer,formula::Union{Dict{Symbol,Int},Missing,OpaqueFormula},stored_molecular_weight::Union{Unitful.MolarMass,Missing},pubchemid::Union{Integer,Missing}=missing)
+        !ismissing(pubchemid) && pubchemid <= 0 && throw(ArgumentError(
+            "Species \"$name\" was given PubChem ID $pubchemid; a PubChem ID is a positive integer"))
         !ismissing(formula) && !ismissing(stored_molecular_weight) && throw(ArgumentError(
             "Species \"$name\" was given both a formula and a stored molecular weight; give one or the other"))
         formula isa Dict && isempty(formula) && throw(ArgumentError("Species \"$name\" has an empty formula"))
-        new(String(name),charge,formula,stored_molecular_weight)
+        new(String(name),charge,formula,stored_molecular_weight,pubchemid)
     end
 end
-Species(name::AbstractString,charge::Integer,formula::AbstractString) = Species(name,charge,parse_formula(formula),missing)
-Species(name::AbstractString,charge::Integer,formula::OpaqueFormula) = Species(name,charge,formula,missing)
-Species(name::AbstractString,charge::Integer,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,charge,missing,molecular_weight)
-Species(name::AbstractString,formula::AbstractString) = Species(name,0,formula)
-Species(name::AbstractString,molecular_weight::Union{Unitful.MolarMass,Missing}) = Species(name,0,molecular_weight)
+Species(name::AbstractString,charge::Integer,formula::AbstractString;pubchemid=missing) = Species(name,charge,parse_formula(formula),missing,pubchemid)
+Species(name::AbstractString,charge::Integer,formula::OpaqueFormula;pubchemid=missing) = Species(name,charge,formula,missing,pubchemid)
+Species(name::AbstractString,charge::Integer,molecular_weight::Union{Unitful.MolarMass,Missing};pubchemid=missing) = Species(name,charge,missing,molecular_weight,pubchemid)
+Species(name::AbstractString,formula::AbstractString;pubchemid=missing) = Species(name,0,formula;pubchemid)
+Species(name::AbstractString,molecular_weight::Union{Unitful.MolarMass,Missing};pubchemid=missing) = Species(name,0,molecular_weight;pubchemid)
 
 Base.:(==)(a::Species,b::Species) = a.name==b.name && a.charge==b.charge && isequal(a.formula,b.formula) && isequal(a.stored_molecular_weight,b.stored_molecular_weight)
 Base.hash(a::Species,h::UInt) = hash(a.name,hash(a.charge,hash(a.formula,hash(_hash_canon(a.stored_molecular_weight),h))))
@@ -199,6 +213,13 @@ has the average molecular weight given to `opaque`, or `missing` if none was giv
 molecular_weight(x::Species) = x.formula isa Dict ? formula_mass(x.formula) :
     x.formula isa OpaqueFormula ? x.formula.molecular_weight : x.stored_molecular_weight
 """
+    pubchemid(x::Species)
+Return the integer [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of a [`Species`](@ref)'s compound, or
+`missing` if none was given. The ID is metadata and is not part of the species' identity. It is the compound
+that the species is, or a protonation state of, and several species of one acid/base chain can share it.
+"""
+pubchemid(x::Species)=x.pubchemid
+"""
     formula(x::Species)
 Return the elemental formula of a [`Species`](@ref) as a dictionary from element symbol to atom
 count, `missing` if no formula is registered, or `CHESSCore.opaque` if the atomic content is
@@ -224,7 +245,7 @@ The canonical hydrogen ion (proton), used by [`pH`](@ref)/[`total_concentration`
 *negative* count, so it nets against acids in the same sum) should reuse this
 exact value rather than defining its own separate "H+" `Species`, so contributions net correctly.
 """
-const H⁺ = Species("H+",1,"H")
+const H⁺ = Species("H+",1,"H";pubchemid=1038)
 
 """
     const OH⁻
@@ -233,30 +254,34 @@ The canonical hydroxide ion, used by [`net_hydrogen_ion_concentration`](@ref)/[`
 should register their real dissolution using this value (e.g. `Na⁺ + OH⁻` for NaOH) rather
 than a negative [`H⁺`](@ref) count -- see [`Dissolution`](@ref).
 """
-const OH⁻ = Species("OH-",-1,"OH")
+const OH⁻ = Species("OH-",-1,"OH";pubchemid=961)
 
 """
     struct Dissolution
 
 Describes the stoichiometric products of a [`Reagent`](@ref) breaking down into [`Species`](@ref)s
 — e.g. `Dissolution(Dict(Na⁺=>1, Cl⁻=>1))` for NaCl, or `Dissolution(Dict(glucose_chem=>1))`
-for a non-dissociating reagent (its own identity). Coefficients must be non-negative -- represent an
+for a non-dissociating reagent (its own identity). Coefficients are amounts per mole of reagent and need
+not be whole numbers: a hemihydrate is `Dissolution(Dict(compound=>1, H2O=>0.5))`, and a product sold as a
+solution carries its solvent (see [`by_mass`](@ref)). Coefficients must be non-negative -- represent an
 acid/base's hydroxide contribution via [`OH⁻`](@ref), not a negative [`H⁺`](@ref) count (see
 [`net_hydrogen_ion_concentration`](@ref)) -- since [`molecular_weight`](@ref) sums a reagent's
 registered products directly.
 
 `+` and `*` build a `Dissolution` from [`Species`](@ref) values: `spc"Na+" + spc"Cl-"`, or
-`spc"Mg2+" + 2*spc"Cl-"`. A reagent is defined from one by [`@reagent`](@ref) or registered
+`spc"Mg2+" + 2*spc"Cl-"`, or `spc"H2O"*0.5` for half a water. A reagent is defined from one by [`@reagent`](@ref) or registered
 with [`set_dissolution!`](@ref).
 """
 struct Dissolution
-    products::Dict{Species,Int}
-    function Dissolution(products::Dict{Species,Int})
-        all(c->c>=0, values(products)) || throw(ArgumentError(
+    products::Dict{Species,Float64}
+    function Dissolution(products::Dict{Species,Float64})
+        all(c->isfinite(c) && c>=0, values(products)) || throw(ArgumentError(
             "Dissolution coefficients must be non-negative -- represent bases via OH⁻ (see `OH⁻`), not a negative H⁺ count"))
         new(products)
     end
 end
+
+Dissolution(products::AbstractDict{Species,<:Real}) = Dissolution(Dict{Species,Float64}(products))
 
 Base.:(==)(a::Dissolution,b::Dissolution) = a.products == b.products
 Base.hash(a::Dissolution,h::UInt) = hash(a.products,hash(:Dissolution,h))
@@ -281,8 +306,8 @@ coefficients, must sum to zero; otherwise an `ArgumentError` is thrown.
 """
 function set_dissolution!(r::Reagent,rule::Dissolution)
     net = sum(coeff*charge(spc) for (spc,coeff) in rule.products)
-    net == 0 || throw(ArgumentError(
-        "The dissolution of \"$(name(r))\" has a net charge of $net; a reagent is neutral, so the charges of its products must sum to zero"))
+    abs(net) < 1e-9 || throw(ArgumentError(
+        "The dissolution of \"$(name(r))\" has a net charge of $(isinteger(net) ? Int(net) : round(net;digits=6)); a reagent is neutral, so the charges of its products must sum to zero"))
     dissolutions[r]=rule
     return nothing
 end
@@ -324,29 +349,52 @@ function dissolution(x::Reagent)
     return Dissolution(Dict(Species(name(x),0,molecular_weight(x))=>1))
 end
 
-Base.:*(n::Integer,c::Species) = Dissolution(Dict(c=>n))
-Base.:*(c::Species,n::Integer) = n*c
-Base.:*(n::Integer,d::Dissolution) = Dissolution(Dict(k=>v*n for (k,v) in d.products))
-Base.:*(d::Dissolution,n::Integer) = n*d
-Base.:+(a::Species,b::Species) = Dissolution(mergewith(+,Dict(a=>1),Dict(b=>1)))
-Base.:+(a::Dissolution,b::Species) = Dissolution(mergewith(+,a.products,Dict(b=>1)))
+Base.:*(n::Real,c::Species) = Dissolution(Dict(c=>n))
+Base.:*(c::Species,n::Real) = n*c
+Base.:*(n::Real,d::Dissolution) = Dissolution(Dict(k=>v*n for (k,v) in d.products))
+Base.:*(d::Dissolution,n::Real) = n*d
+Base.:+(a::Species,b::Species) = Dissolution(mergewith(+,Dict(a=>1.0),Dict(b=>1.0)))
+Base.:+(a::Dissolution,b::Species) = Dissolution(mergewith(+,a.products,Dict(b=>1.0)))
 Base.:+(a::Species,b::Dissolution) = b+a
 Base.:+(a::Dissolution,b::Dissolution) = Dissolution(mergewith(+,a.products,b.products))
 
+"""
+    by_mass(parts::Pair{<:Species,<:Real}...)
+
+Build a [`Dissolution`](@ref) from the mass fractions of a product's species, as a label gives them:
+`by_mass(lactic_acid_species => 0.88, H2O => 0.12)` for an 88% w/w lactic acid solution. The fractions
+need only be proportional; they are converted to moles per mole of the **first** species, so the first
+species is the one a reagent's molar amount counts. The reagent's [`molecular_weight`](@ref) is then
+the mass of product per mole of that species. Every species needs a known molecular weight.
+"""
+function by_mass(parts::Pair{Species,<:Real}...)
+    isempty(parts) && throw(ArgumentError("by_mass needs at least one species"))
+    moles = map(parts) do (spc,fraction)
+        fraction >= 0 || throw(ArgumentError("mass fractions must be non-negative"))
+        mw = molecular_weight(spc)
+        ismissing(mw) && throw(ArgumentError("the molecular weight of $(name(spc)) is unknown, so its mass fraction cannot be converted to moles"))
+        fraction/ustrip(u"g/mol",mw)
+    end
+    moles[1] > 0 || throw(ArgumentError("the first species of by_mass needs a positive mass fraction"))
+    return Dissolution(Dict{Species,Float64}(spc=>m/moles[1] for ((spc,_),m) in zip(parts,moles)))
+end
+
 
 """
-    @species labname name charge formula
+    @species labname name charge formula [pubchemid]
 
 Define a new [`Species`](@ref) value (e.g. an ion like Na⁺, or a standalone neutral species) and
 import it into the workspace under `labname`. `charge` is `0` for neutral species. `formula` is an
 elemental formula string such as `"C6H12O6"`; the molecular weight is derived from it. A molar
 mass (or `missing`) may be given instead of a formula for a species whose formula is not registered
 yet, and `opaque` (or `opaque(mass)` with an average molar mass) for a species whose atomic content
-is intentionally not described.
+is intentionally not described. The optional `pubchemid` is the integer PubChem ID of the species'
+compound, recorded as metadata. A protonation state that PubChem has no entry for takes the ID of its
+parent compound.
 
 Example:
 ```julia
-julia> @species Na⁺ "Na+" 1 "Na"
+julia> @species Na⁺ "Na+" 1 "Na" 923
 Na+
 
 julia> @species glucose_species "D-glucose" 0 "C6H12O6"
@@ -356,7 +404,7 @@ D-glucose
 See also: [`@reagent`](@ref) for defining physical-form `Reagent`s instead, [`@spc_str`](@ref),
 [`Dissolution`](@ref).
 """
-macro species(labsymb,name,charge,formula)
+macro species(labsymb,name,charge,formula,pubchemid=:(missing))
     ls = Symbol(labsymb)
     formula = _opaque_marker(formula)
     docstr = """
@@ -364,10 +412,11 @@ macro species(labsymb,name,charge,formula)
 
         The species $name (charge $charge)
 
-        Formula: $formula
+        Formula: $formula\
+        PubChem ID: $pubchemid
         """
     esc(quote
-        const global $ls = CHESSCore.Species($name,$charge,$formula)
+        const global $ls = CHESSCore.Species($name,$charge,$formula;pubchemid=$pubchemid)
         @doc $docstr $ls
     end)
 end
@@ -392,6 +441,11 @@ The `chemistry` argument says what the reagent is made of, and is one of:
 - `missing`, when nothing is known about its chemistry; or
 - `opaque`, for an undefined mixture such as yeast extract whose atomic content is intentionally not
   described, or `opaque(1415.6u"g/mol")` for one with a known average molar mass.
+
+The `pubchemid` argument is the [PubChem ID](https://pubchem.ncbi.nlm.nih.gov) of the species the
+reagent is made of, or `missing`. It applies when the chemistry is a formula, a molar mass, `missing`, or
+`opaque`, which make one species. A reagent defined by a [`Dissolution`](@ref) takes `missing` here and
+gets its IDs from the species it breaks into, so passing an ID with a dissolution is an error.
 
 The reagent's [`dissolution`](@ref) is registered with [`set_dissolution!`](@ref) (discoverable in
 [`dissolutions`](@ref)), and is kept with the defining module so it survives precompilation.
@@ -423,7 +477,7 @@ Reagents can also be defined manually with type constructors.
 
 Example:
 ```julia
-julia> water=Liquid("water",18.015u"g/mol",1.00u"g/mL",962)
+julia> water=Liquid("water",18.015u"g/mol",1.00u"g/mL")
 water
 ```
 
@@ -524,35 +578,41 @@ macro reagent_symbols(labsymb,name,type,chemistry,density,pubchemid)
     docstr= """
             $labsymb
 
-        The $type reagent $name with [`PubChem ID`](https://pubchem.ncbi.nlm.nih.gov) $pubchemid
+        The $type reagent $name
 
         Chemistry: $chemistry\\
-        Density: $density
+        Density: $density\\
+        PubChem ID: $pubchemid
 
         See also: [`$type`](@ref)
         """
-    cprops = :(__rgt_mw,$density,$pubchemid)
+    cprops = :(__rgt_mw,$density)
     esc(quote
-        local __rgt_chemistry = $CHESSCore._reagent_chemistry($name,$chemistry)
+        local __rgt_chemistry = $CHESSCore._reagent_chemistry($name,$chemistry,$pubchemid)
         local __rgt_mw = __rgt_chemistry[1]
         $(chemprops_expr(__module__,ln,cprops))
-        const global $ls = $type($name,__rgt_mw,$density,$pubchemid)
+        const global $ls = $type($name,__rgt_mw,$density)
         $(dissolutions_expr(__module__,ls,:(__rgt_chemistry[2])))
         @doc $docstr $ls
     end)
 end
 
 # What a `@reagent` chemistry argument means: returns the reagent's molecular weight (stored on the
-# `Reagent`) and its `Dissolution`.
+# `Reagent`) and its `Dissolution`. `pubchemid` is the PubChem ID of the species that a formula, molar
+# mass, `missing`, or `opaque` chemistry makes; a `Dissolution` brings its own species and takes none.
 _identity_dissolution(spc::Species) = Dissolution(Dict(spc=>1))
 _dissolution_mass(d::Dissolution) = sum(coeff*molecular_weight(spc) for (spc,coeff) in d.products)
-function _reagent_chemistry(name::AbstractString,formula::AbstractString)
-    d = _identity_dissolution(Species(name,0,formula))
+function _reagent_chemistry(name::AbstractString,formula::AbstractString,pubchemid)
+    d = _identity_dissolution(Species(name,0,formula;pubchemid))
     return (_dissolution_mass(d),d)
 end
-_reagent_chemistry(name::AbstractString,d::Dissolution) = (_dissolution_mass(d),d)
-_reagent_chemistry(name::AbstractString,mw::Union{Unitful.MolarMass,Missing}) = (mw,_identity_dissolution(Species(name,0,mw)))
-_reagent_chemistry(name::AbstractString,o::OpaqueFormula) = (o.molecular_weight,_identity_dissolution(Species(name,0,o)))
+function _reagent_chemistry(name::AbstractString,d::Dissolution,pubchemid)
+    ismissing(pubchemid) || throw(ArgumentError(
+        "Reagent \"$name\" is defined by a Dissolution, so it takes `missing` as its PubChem ID; give the PubChem IDs to the species it breaks into"))
+    return (_dissolution_mass(d),d)
+end
+_reagent_chemistry(name::AbstractString,mw::Union{Unitful.MolarMass,Missing},pubchemid) = (mw,_identity_dissolution(Species(name,0,mw;pubchemid)))
+_reagent_chemistry(name::AbstractString,o::OpaqueFormula,pubchemid) = (o.molecular_weight,_identity_dissolution(Species(name,0,o;pubchemid)))
 
 
 
@@ -777,6 +837,18 @@ end
 
 function convert(y::Unitful.AmountUnits,x::Unitful.Mass,ingredient::Union{Reagent,Species})
     ismissing(molecular_weight(ingredient)) ? error("$(ingredient)'s molecular weight is unknown") : return uconvert(y,x / molecular_weight(ingredient))
+end
+
+"""
+    convert(desired_unit, mass::Unitful.Mass, liquid::Liquid)
+
+Convert a mass of a [`Liquid`](@ref) to a volume with the liquid's density, so a liquid sold or weighed by mass
+can be dosed. Throws an `ArgumentError` if the density is unknown.
+"""
+function convert(y::Unitful.VolumeUnits,x::Unitful.Mass,ingredient::Liquid)
+    ismissing(density(ingredient)) && throw(ArgumentError(
+        "$(ingredient)'s density is unknown, so a mass of it cannot be converted to a volume"))
+    return uconvert(y,x / density(ingredient))
 end
 
 function convert(y::Unitful.DensityUnits,x::Unitful.Molarity,ingredient::Union{Reagent,Species})

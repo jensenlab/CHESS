@@ -4,6 +4,7 @@ using CHESSCore, Unitful, DataFrames, SQLite, DBInterface, HTTP, JSON
 
 include("./pubchem.jl")
 include("./chemicals/chemical_utils.jl")
+include("./pubchem_audit.jl")
 
 include("./environments/attributes.jl")
 include("./reads/reads.jl")
@@ -25,7 +26,7 @@ include("./standard_stocks/thy.jl")
 include("./standard_stocks/cdm.jl")
 include("./standard_stocks/align_base_media.jl")
 
-export get_mw_density, get_molecular_formula, register_reagent!, register_organism!, register_species!
+export get_mw_density, get_molecular_formula, register_reagent!, register_organism!, register_species!, fetch_pubchem_records, audit_pubchem
 
 function __init__()
     CHESSCore.register_lab(CHESSLabConstants)

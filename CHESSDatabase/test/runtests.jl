@@ -36,6 +36,7 @@ include("test_reconstruct_contents_ancestor_closure.jl")
 include("test_phase0_fixes.jl")
 
 include("test_ledger_indexes.jl")
+include("test_reagent_type_string.jl")
 
 # Fixtures used by testsets below that originally relied on core_runtests.jl's script-level bindings
 # (b = a Mixture stock; Cl⁻ = a test-local dissociation Species) -- now that CHESSCore and
@@ -61,7 +62,7 @@ end
     move_into!(eph_root,eph_plate)
     set_attribute!(eph_root,Temperature(19u"°C"))
     lock!(eph_plate)
-    deposit!(eph_plate[1,1],0.1u"g"*rgt"paba",5)
+    deposit!(eph_plate[1,1],0.1u"g"*rgt"paba")
 
     committed = commit_location!(eph_root)
     @test CHESSCore.is_committed(committed)
@@ -136,7 +137,7 @@ end
 
     # labware_to_df / df_to_labware round-trip, "q" format
     bottle = generate_location(Bottle1L,"df interop test bottle")
-    deposit!(bottle.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle.children[1,1],10u"g"*rgt"paba")
     df_q,units_q = labware_to_df(bottle,"q";reagent_context=[CHESSCore,TestChemOrg])
     @test df_q.labware[1] == string(kind(bottle).name) # kind-based, not typeof(lw)
     lws_q = df_to_labware(df_q,units_q;reagent_context=[CHESSCore,TestChemOrg])
@@ -145,7 +146,7 @@ end
 
     # "vc" format round-trip on a Solution-derived stock (fits vc's volume/concentration model)
     bottle2 = generate_location(Bottle1L,"df interop test bottle vc")
-    deposit!(bottle2.children[1,1],100u"mL"*rgt"water",5)
+    deposit!(bottle2.children[1,1],100u"mL"*rgt"water")
     df_vc,units_vc = labware_to_df(bottle2,"vc";reagent_context=[CHESSCore,TestChemOrg])
     lws_vc = df_to_labware(df_vc,units_vc;reagent_context=[CHESSCore,TestChemOrg])
     @test stock(lws_vc[1][df_vc.well[1]]) == stock(bottle2.children[1,1])
@@ -153,7 +154,7 @@ end
     # "vc" format now also works on a Mixture-derived stock -- previously crashed (MethodError) since
     # the exported concentration unit was always g/µL regardless of the total's dimension
     bottle3 = generate_location(Bottle1L,"df interop test bottle vc mixture")
-    deposit!(bottle3.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle3.children[1,1],10u"g"*rgt"paba")
     df_vc3,units_vc3 = labware_to_df(bottle3,"vc";reagent_context=[CHESSCore,TestChemOrg])
     @test units_vc3[1,"paba"] == "%"
     lws_vc3 = df_to_labware(df_vc3,units_vc3;reagent_context=[CHESSCore,TestChemOrg])
@@ -177,8 +178,8 @@ end
 @testset "Separate Species/Reagent DB registries" begin
     # bug fix: Reagents is keyed by ComponentID now, not Name -- a Solid and a Liquid sharing a name
     # (distinct Reagent values per value-based equality) each get their own persisted row
-    s1 = Solid("dbtest",137.14u"g/mol",1.35u"g/mL",978)
-    l1 = Liquid("dbtest",200.0u"g/mol",0.9u"g/mL",111)
+    s1 = Solid("dbtest",137.14u"g/mol",1.35u"g/mL")
+    l1 = Liquid("dbtest",200.0u"g/mol",0.9u"g/mL")
     id_s1 = CHESSDatabase.upload_component(s1)
     id_l1 = CHESSDatabase.upload_component(l1)
     rows = query_db("SELECT * FROM Reagents WHERE Name='dbtest' ORDER BY ComponentID")
@@ -187,7 +188,7 @@ end
     @test rows[2,:MolecularWeight] == 200.0 && rows[2,:Density] == 0.9
 
     # dissolution round-trips through the Species/Dissolutions tables
-    hcl_db = Solid("hcl_dbtest",36.46u"g/mol",1.0u"g/mL",missing)
+    hcl_db = Solid("hcl_dbtest",36.46u"g/mol",1.0u"g/mL")
     set_dissolution!(hcl_db,Dissolution(Dict(H⁺=>1,Cl⁻=>1)))
     id_hcl = CHESSDatabase.upload_component(hcl_db)
     comp_rows = query_db("""
@@ -205,14 +206,45 @@ end
     reconstructed = CHESSDatabase.get_component(id_hcl)
     @test molecular_weight(reconstructed) == molecular_weight(hcl_db)
     @test dissolution(reconstructed).products == dissolution(hcl_db).products
+
+    # a fractional coefficient (half a water of hydration) survives the round trip
+    hemi_water = CHESSCore.Species("hemi_dbtest water",0,"H2O")
+    hemi_db = Solid("hemi_dbtest",missing,missing)
+    set_dissolution!(hemi_db,Dissolution(Dict(H⁺=>1,Cl⁻=>1,hemi_water=>0.5)))
+    id_hemi = CHESSDatabase.upload_component(hemi_db)
+    reconstructed_hemi = CHESSDatabase.get_component(id_hemi)
+    @test dissolution(reconstructed_hemi).products[hemi_water] == 0.5
+    @test dissolution(reconstructed_hemi).products == dissolution(hemi_db).products
+    @test molecular_weight(reconstructed_hemi) == molecular_weight(hemi_db)
+
+    # a species' PubChem ID is stored on its row, outside the natural key, and restored with it
+    cid_spc = CHESSCore.Species("cid_dbtest ion",1,"K";pubchemid=813)
+    id_cid = CHESSDatabase.get_species_id(cid_spc)
+    @test query_db("SELECT CID FROM Species WHERE ID = ?",(id_cid,))[1,1] == 813
+    @test pubchemid(CHESSDatabase.get_species(id_cid)) == 813
+    @test CHESSDatabase.get_species_id(CHESSCore.Species("cid_dbtest ion",1,"K")) == id_cid # same row, with or without the ID
+
+    # a row without an ID takes the ID of a later upload; a different ID is not stored and is warned about
+    id_fill = CHESSDatabase.get_species_id(CHESSCore.Species("cid_dbtest fill",1,"Rb"))
+    @test ismissing(query_db("SELECT CID FROM Species WHERE ID = ?",(id_fill,))[1,1])
+    @test CHESSDatabase.get_species_id(CHESSCore.Species("cid_dbtest fill",1,"Rb";pubchemid=105153)) == id_fill
+    @test query_db("SELECT CID FROM Species WHERE ID = ?",(id_fill,))[1,1] == 105153
+    @test_logs (:warn,r"keeping the stored ID") CHESSDatabase.get_species_id(CHESSCore.Species("cid_dbtest fill",1,"Rb";pubchemid=1))
+    @test query_db("SELECT CID FROM Species WHERE ID = ?",(id_fill,))[1,1] == 105153
+
+    # a reagent made of one species keeps that species' ID through upload and reconstruction
+    urea_db = Solid("urea_dbtest",60.056u"g/mol",1.34u"g/mL")
+    set_dissolution!(urea_db,Dissolution(Dict(CHESSCore.Species("urea_dbtest",0,"CH4N2O";pubchemid=1176)=>1)))
+    id_urea = CHESSDatabase.upload_component(urea_db)
+    @test pubchemid(CHESSDatabase.get_component(id_urea)) == 1176
 end
 
 @testset "DB round-trip equivalence, natural-key dedup, SQL escaping, hash precision" begin
     # round-trip equality: reconstructed objects are == and hash-equal to the originals
-    for r in (Solid("rt_solid",137.14u"g/mol",1.35u"g/mL",978),
-              Liquid("rt_liquid",18.015u"g/mol",1.0u"g/mL",missing),
-              Gas("rt_gas",44.01u"g/mol",1.98u"g/L",124389),
-              Solid("rt_unknown",missing,missing,missing))
+    for r in (Solid("rt_solid",137.14u"g/mol",1.35u"g/mL"),
+              Liquid("rt_liquid",18.015u"g/mol",1.0u"g/mL"),
+              Gas("rt_gas",44.01u"g/mol",1.98u"g/L"),
+              Solid("rt_unknown",missing,missing))
         id = CHESSDatabase.get_component_id(r)
         r2 = CHESSDatabase.get_component(id)
         @test r == r2
@@ -271,19 +303,19 @@ end
     @test CHESSDatabase.get_species_id(Species("H+_rt",1,"H2")) != id_spc
 
     # natural-key dedup: re-uploading the identical reagent/chemical/organism reuses the same row
-    s_dedup = Solid("dedup_test",137.14u"g/mol",1.35u"g/mL",978)
+    s_dedup = Solid("dedup_test",137.14u"g/mol",1.35u"g/mL")
     id1 = CHESSDatabase.get_component_id(s_dedup)
     id2 = CHESSDatabase.get_component_id(s_dedup)
     @test id1 == id2
     @test nrow(query_db("SELECT * FROM Reagents WHERE Name='dedup_test'")) == 1
 
     # ...but a Solid and Liquid sharing a name are still distinct rows
-    s_distinct = Solid("distinct_test",1.0u"g/mol",1.0u"g/mL",1)
-    l_distinct = Liquid("distinct_test",1.0u"g/mol",1.0u"g/mL",1)
+    s_distinct = Solid("distinct_test",1.0u"g/mol",1.0u"g/mL")
+    l_distinct = Liquid("distinct_test",1.0u"g/mol",1.0u"g/mL")
     @test CHESSDatabase.get_component_id(s_distinct) != CHESSDatabase.get_component_id(l_distinct)
 
     # SQL escaping: names/comments containing apostrophes no longer break upload
-    apostrophe_solid = Solid("O'Brien's reagent",137.14u"g/mol",1.35u"g/mL",978)
+    apostrophe_solid = Solid("O'Brien's reagent",137.14u"g/mol",1.35u"g/mL")
     id_ap = CHESSDatabase.get_component_id(apostrophe_solid)
     @test CHESSDatabase.get_component(id_ap) == apostrophe_solid
 
@@ -297,7 +329,7 @@ end
     # BLOB hex-literal encoding (sql_hash_literal), not a lossy bare numeric literal
     big_stock = nothing
     for i in 1:2000
-        cand = i*u"g"*Solid("stockhash$i",100.0u"g/mol",1.0u"g/mL",missing)
+        cand = i*u"g"*Solid("stockhash$i",100.0u"g/mol",1.0u"g/mL")
         if hash(cand) > typemax(Int64)
             big_stock = cand
             break
@@ -310,7 +342,7 @@ end
 
     # parameterized queries: a name containing a SQL comment sequence and a semicolon-separated
     # statement attempt round-trips as inert data instead of being interpreted as SQL
-    injection_solid = Solid("x'; DROP TABLE Reagents; --",100.0u"g/mol",1.0u"g/mL",missing)
+    injection_solid = Solid("x'; DROP TABLE Reagents; --",100.0u"g/mol",1.0u"g/mL")
     id_inj = CHESSDatabase.get_component_id(injection_solid)
     @test CHESSDatabase.get_component(id_inj) == injection_solid
     @test nrow(query_db("SELECT * FROM Reagents")) > 0 # table was not dropped
@@ -323,7 +355,7 @@ end
     @test_nowarn upload(record_read!,main_room,Observation("obs'; DROP TABLE Reads; --"))
 
     # missing -> NULL: bound `missing` parameters store real SQL NULLs, not the string "NULL"
-    missing_solid = Solid("missing_fields_test",missing,missing,missing)
+    missing_solid = Solid("missing_fields_test",missing,missing)
     id_missing = CHESSDatabase.get_component_id(missing_solid)
     row = query_db("SELECT * FROM Reagents WHERE ComponentID = ?",(id_missing,))
     @test nrow(row) == 1
@@ -607,7 +639,7 @@ end
 
 @testset "update(...; replace/insert) rolls back its ledger row on failure" begin
     ur_bottle = generate_location(Bottle1L,"update rollback bottle")
-    deposit!(ur_bottle[1,1],500u"mL"*rgt"water",1)
+    deposit!(ur_bottle[1,1],500u"mL"*rgt"water")
     cache(ur_bottle[1,1])
     ur_plate = generate_location(WP96,"update rollback plate")
     ur_src, ur_dst, ur_empty = ur_bottle[1,1], ur_plate[1,1], ur_plate[1,2]
@@ -682,6 +714,9 @@ end
 
 # last: backfill_observations inserts ledger entries, shifting the sequence ids earlier tests hard-code
 include("test_observations.jl")
+include("test_forward_tracing.jl")
+include("test_discard.jl")
+include("test_location_queries.jl")
 
 # the reconstruction code against its frozen original on generated ledgers (uses its own databases)
 include("equivalence/test_equivalence.jl")

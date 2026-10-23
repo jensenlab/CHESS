@@ -6,7 +6,7 @@ Composition and acid/base chemistry are on the [Solution Chemistry](core-chemist
 
 ```@autodocs
 Modules = [CHESS.CHESSCore]
-Pages = ["stocks/StockComponent.jl", "stocks/ElementalFormula.jl", "stocks/Chemicals.jl", "stocks/Organisms.jl",
+Pages = ["stocks/StockComponent.jl", "stocks/ElementalFormula.jl", "stocks/Chemicals.jl", "stocks/ReagentProducts.jl", "stocks/Organisms.jl",
          "stocks/Stocks.jl", "stocks/StockDisplay.jl"]
 ```
 

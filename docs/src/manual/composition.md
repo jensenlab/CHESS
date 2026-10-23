@@ -96,16 +96,17 @@ julia> pH(saline)
 7.0
 ```
 
-CHESS registers hydrochloric acid with the dissolution `H⁺ + Cl⁻`:
+CHESS registers hydrochloric acid as the 37% w/w solution that the lab purchases, with the
+dissolution `H⁺ + Cl⁻ + 3.446 H₂O`:
 
 ```jldoctest composition
 julia> acid = 0.1u"g" * rgt"HCl" + 100u"mL" * rgt"water";
 
 julia> net_hydrogen_ion_concentration(acid)
-2.7428822206374456e-5 mol mL⁻¹
+1.0139808026240472e-5 mol mL⁻¹
 
 julia> pH(acid)
-1.5617928406001496
+1.9939702672841095
 ```
 
 Because `pH` subtracts `OH⁻` from `H⁺`, a base is registered with its dissolution (for

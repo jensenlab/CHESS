@@ -55,7 +55,8 @@ ERROR: ArgumentError: Invalid formula "Na+" at position 3: charge is not part of
 Isotopes are not supported. Every formula describes the natural isotopic mixture, and the notation
 `[13C]` and the symbols `D` and `T` are reserved for a later extension, so they raise an error
 instead of being read as something else. A formula also cannot describe a fractional amount, such
-as the half water of a hemihydrate.
+as the half water of a hemihydrate. A [`Dissolution`](@ref) can (see
+[Fractional amounts](#Fractional-amounts)).
 
 ## Species
 
@@ -80,6 +81,29 @@ julia> round(u"g/mol", molecular_weight(Li⁺); digits=3)
 
 [`@spc_str`](@ref) recalls a registered species by name. The ASCII form `spc"Na+"` finds `Na⁺`.
 
+A species can record the PubChem ID of its compound, as an optional last argument of
+[`@species`](@ref). The ID is descriptive metadata, available from [`pubchemid`](@ref). It is not part of
+the species' identity, so a species is equal to one with the same name, charge, and formula whatever IDs
+they carry:
+
+```jldoctest reagents
+julia> @species Rb⁺ "Rb+" 1 "Rb" 105153
+Rb⁺
+
+julia> pubchemid(Rb⁺)
+105153
+
+julia> Rb⁺ == Species("Rb+", 1, "Rb")
+true
+```
+
+PubChem has entries for few protonation states of a compound, and for those that it has, it keeps several
+entries that differ in which atom carries the proton. A species with no entry of its own therefore takes
+the ID of the compound it is a protonation state of. `Ampicillin(anion)` and `Ampicillin(cation)` carry
+the ID of ampicillin, with their own charge, formula, and molar mass, and a species with an exact entry
+carries that entry's ID. [`audit_pubchem`](@ref) accepts a species whose formula differs from its
+compound's only in hydrogen when the charge differs by the same number.
+
 A species is identified by its name. Two species are equal when their name, charge, and formula are
 equal, whatever order the elements were written in. Registering the same name and charge with a
 different formula therefore gives a different species and never a silent merge. Isomers are separate
@@ -100,9 +124,12 @@ species has no stored weight that could disagree with it.
 ## Reagent types
 
 `Reagent` is an abstract type with three concrete subtypes, `Solid`, `Liquid`, and `Gas`, which
-share four fields: `name`, `molecular_weight`, `density`, and `pubchemid`. A solid is dosed by mass
-or amount and a liquid by volume. CHESS already includes a starter set of reagents, which
-[`@rgt_str`](@ref) recalls by name:
+share three fields: `name`, `molecular_weight`, and `density`. A solid is dosed by mass or amount and a
+liquid by volume. A liquid can also be dosed by mass or amount: either is converted to a volume with the
+liquid's density, and an unknown density is an error. A reagent has no PubChem ID of its own, because PubChem identifies compounds. The
+ID belongs to the species a reagent is made of, and [`pubchemid`](@ref) of a reagent made of one species
+returns that species' ID. CHESS already includes a starter set of reagents, which [`@rgt_str`](@ref)
+recalls by name:
 
 ```jldoctest reagents
 julia> rgt"water"
@@ -121,7 +148,8 @@ julia> pubchemid(rgt"water")
 ## Defining a reagent
 
 [`@reagent`](@ref) registers a new reagent from a label, a name, a type, a description of its
-chemistry, a density, and a PubChem ID. The chemistry argument says what the reagent is made of. An
+chemistry, a density, and the PubChem ID of the species it is made of. The chemistry argument says
+what the reagent is made of. An
 elemental formula string registers the reagent as a single neutral species with that formula, and
 the molecular weight is derived from the formula:
 
@@ -154,6 +182,39 @@ missing
 ```
 
 An invalid formula string is rejected when the reagent is defined.
+
+## Products
+
+A reagent is a material identified by its composition. A [`ReagentProduct`](@ref) records one way the lab
+obtains it: the supplier, the catalog number, the vendor's product name, the manufacturer number, the grade
+as the vendor states it, and notes. A reagent has no product, one, or several. Two vendors' urea are two
+products of one reagent, and the in-house water supply is a product with no catalog number. A product holds
+only what stays true across purchases. Price, quantity, received date, lot, and shelf location describe a
+purchase or a bottle and are not recorded. A stated purity is information only: the reagent is the pure
+composition, and nothing reads the grade.
+
+[`@reagent_product`](@ref) registers a product of a reagent, and [`reagent_products`](@ref) returns the
+products registered for it:
+
+```jldoctest reagents
+julia> @reagent carbamide "carbamide" Solid "CH4N2O" 1.34u"g/mL" missing
+carbamide
+
+julia> @reagent_product carbamide "Sigma-Aldrich" catalog_number="U5128" product_name="Urea ACS reagent" grade="ACS reagent"
+
+julia> @reagent_product carbamide "in-house"
+
+julia> reagent_products(carbamide)
+2-element Vector{ReagentProduct}:
+ Sigma-Aldrich U5128
+ in-house
+
+julia> reagent_products(carbamide)[1].grade
+"ACS reagent"
+```
+
+A product that is already registered for the reagent is not added twice. Products are kept with the module
+that registers them, as dissolutions are, so a lab module's products are available once it is registered.
 
 ## Opaque reagents
 
@@ -190,17 +251,17 @@ reagent's own identity as a single species, which means no dissociation:
 
 ```jldoctest reagents
 julia> dissolution(rgt"water")
-Dissolution(Dict{Species, Int64}(water => 1))
+Dissolution(Dict{Species, Float64}(water => 1.0))
 ```
 
-`+` and `*` on species build a `Dissolution`. Adding species lists them, and multiplying by a whole
-number sets a coefficient, as for the two chlorides that balance Ca²⁺:
+`+` and `*` on species build a `Dissolution`. Adding species lists them, and multiplying by a number
+sets a coefficient, as for the two chlorides that balance Ca²⁺:
 
 ```jldoctest reagents
 julia> salt = spc"Ca2+" + 2*spc"Cl-";
 
 julia> salt.products[spc"Cl-"], salt.products[spc"Ca2+"]
-(2, 1)
+(2.0, 1.0)
 ```
 
 A dissolution in the chemistry argument of [`@reagent`](@ref) registers the reagent and its
@@ -214,6 +275,44 @@ lithium chloride
 julia> round(u"g/mol", molecular_weight(LiCl); digits=2)
 42.39 g mol⁻¹
 ```
+
+### Fractional amounts
+
+Coefficients are amounts per mole of reagent and do not have to be whole numbers. A hemihydrate is one
+mole of the compound with half a mole of water:
+
+```jldoctest reagents
+julia> @species Glucoside "my glucoside" 0 "C7H14O6"
+Glucoside
+
+julia> @reagent hemihydrate "my hemihydrate" Solid (Glucoside + 0.5*spc"H2O") missing missing
+my hemihydrate
+
+julia> round(u"g/mol", molecular_weight(hemihydrate); digits=2)
+203.19 g mol⁻¹
+```
+
+A product sold as a solution is described the same way, with its solvent as a species. [`by_mass`](@ref)
+takes the mass fractions that the label gives and converts them to moles per mole of the first species,
+which is the species that a molar amount of the reagent counts. An 88% w/w solution of an acid has the
+molar mass of the whole product per mole of acid:
+
+```jldoctest reagents
+julia> @species MyAcid "my acid" 0 "C3H6O3"
+MyAcid
+
+julia> @reagent solution "my 88% acid" Liquid by_mass(MyAcid => 0.88, spc"H2O" => 0.12) 1.2u"g/mL" missing
+my 88% acid
+
+julia> round(u"g/mol", molecular_weight(solution); digits=1)
+102.4 g mol⁻¹
+
+julia> round(dissolution(solution).products[spc"H2O"]; digits=3)
+0.682
+```
+
+Only the composition is modeled. A solid sold at a purity grade, such as 99%, is registered as the
+pure species.
 
 [`set_dissolution!`](@ref) registers the dissolution of a reagent that is already defined. The
 dissolutions are held in [`dissolutions`](@ref), keyed by the reagent itself and not by its type,

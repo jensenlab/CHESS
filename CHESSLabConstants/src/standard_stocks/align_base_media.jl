@@ -31,7 +31,7 @@
 1u"g" * soluble_starch +
 0.5u"g" * cysteine +
 3u"g" * sodium_acetate_anhydrous +
-0.00001u"g" * resazurin +
+0.00001u"g" * resazurin_sodium +
 1000u"mL" * water)
 
 @stock modified_reinforced_clostridial__agar_1000mL (modified_reinforced_clostridial_1000mL + 15u"g"* agar)
@@ -77,11 +77,11 @@ m9_glucose =
 100u"mL" * water 
 
 m9_magnesium_sulfate = 
-1.204u"g" * magnesium_sulfate + 
+1.204u"g" * magnesium_sulfate_anhydrous + 
 10u"mL" * water 
 
 m9_calcium_chloride = 
-1.110u"g" * calcium_chloride + 
+1.110u"g" * calcium_chloride_dihydrate + 
 10u"mL" * water 
 
 m9_thiamine = 

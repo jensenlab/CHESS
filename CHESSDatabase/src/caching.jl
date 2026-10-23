@@ -102,8 +102,8 @@ end
 function cache_contents(loc::Well,ledger_id::Integer,time::DateTime=Dates.now())
     stock_id=cache(stock(loc))
     upload_time=db_time(time)
-    execute_db("INSERT OR IGNORE INTO CachedContents(LocationID,StockID,LedgerID,Cost,Time) Values(?,?,?,?,?)",
-        (location_id(loc),stock_id,ledger_id,cost(loc),upload_time))
+    execute_db("INSERT OR IGNORE INTO CachedContents(LocationID,StockID,LedgerID,Time) Values(?,?,?,?)",
+        (location_id(loc),stock_id,ledger_id,upload_time))
     return nothing
 end
 

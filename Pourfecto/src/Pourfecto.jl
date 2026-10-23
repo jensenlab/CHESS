@@ -84,6 +84,7 @@ include("./compiler/batching.jl")
 include("plotting/plotting.jl")
 include("./compiler/helpers.jl")
 include("./instruments/SingleChannel.jl")
+include("./instruments/Human.jl")
 include("./instruments/EightChannel.jl")
 include("./instruments/PlateMaster.jl")
 include("./instruments/Cobra.jl")
@@ -186,6 +187,7 @@ export json_to_pourcast, pourcast_to_json # json interface
 export plot , plot_labware , plot_flows # visualization
 
 export compile # compiler 
+export protocol_steps, human_configuration # the plan as data, and the human instrument
 
 
 end # module Pourfecto

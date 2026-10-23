@@ -32,6 +32,7 @@ pages = [
         "manual/pourcasts.md",
         "manual/compiling.md",
         "manual/instruments.md",
+        "manual/human.md",
         "manual/complexity.md",
         "manual/troubleshooting.md",
     ],

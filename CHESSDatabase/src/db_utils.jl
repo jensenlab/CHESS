@@ -27,7 +27,10 @@ function connect_SQLite(path)
     SQLite.busy_timeout(db,10_000)
     _current_db[] = db
     _warn_if_unmigrated()
-    _ensure_indexes!()
+    _ensure_lot_tables!()
+    _ensure_containment_table!()
+    _ensure_discard_table!()
+    _ensure_indexes!() # last, so the tables above are indexed too
     return nothing
 end
 

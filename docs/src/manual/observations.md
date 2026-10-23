@@ -21,14 +21,15 @@ the volume that the transfers predict.
 - `observe!(child, parent)` states that a child is in a parent, or nowhere when the parent is
   `nothing`. This moves the child like `move_into!` and ignores a lock on the child. Occupancy rules
   still apply.
-- `observe!(location, facet, value)` states a scalar fact. The facet is `:cost`, `:locked`, or
-  `:active`.
+- `observe!(location, facet, value)` states a scalar fact. The facet is `:locked` or `:active`.
+- `observe!(labware, lot)` states the [`Lot`](@ref) that a labware was received as. See
+  [Receiving labware as a lot](#Receiving-labware-as-a-lot).
 
 ## Recording an observation
 
 [`observe`](@ref) records an observation in the database and returns its ledger ID. It takes the same
 facts as `observe!` and updates the location in memory as well. With no fact, it observes all of the
-location as it is in memory: every component, its cost, its own attributes, its parent, and its lock
+location as it is in memory: every component, its own attributes, its parent, and its lock
 and activity. The keyword `recursive` also observes everything inside the location, and everything
 shares one ledger entry. `upload(observe!, ...)` records a single observation like any other
 operation (see [Committing & Uploading](committing-uploading.md)).
@@ -61,11 +62,89 @@ julia> stock(reconstruct_location(a2))
 The first observation put 200 µL of water into well A1 and no operation produced it. Later
 operations replay on top of an observation, so the transfer moved 50 µL from it.
 
+## Receiving labware as a lot
+
+A [`Lot`](@ref) records where a received piece of labware came from: the supplier and catalog number of
+its product, the manufacturer's lot number, and optionally the global trade item number (`gtin`) from
+the barcode, the quantity purchased, what that quantity cost, the arrival date, and notes. A reagent bottle is a labware, so a
+new bottle is received with three observations: its barcode, its contents, and its lot.
+
+```julia
+bottle = generate_location(Bottle1L, "HCl 37%")
+assign_barcode!(Barcode("010406183773616210MKCS9055240258148-2.5L422null"), bottle)
+observe(bottle[1, 1], rgt"HCl", 2.5u"L")
+observe(bottle, Lot("Sigma-Aldrich", "258148", "MKCS9055";
+                    gtin = "04061837736162", quantity = 2.5u"L", cost = 61.5,
+                    received = Date(2026, 10, 14)))
+```
+
+A lot is provenance. The quantity is the amount purchased and does not change, while the contents of
+the bottle are tracked by the ledger and fall as the bottle is used. `lot(bottle)` returns the lot of
+a labware, or `nothing`, and [`reconstruct_lot`](@ref) returns the lot that was observed as of a
+ledger position. Observing a new lot replaces the earlier one. Only a labware has a lot.
+
+### Tracing contents to lots
+
+[`trace_contents`](@ref) finds which lots the material in a well came from. It returns a `DataFrame` with
+one row for each component and lot, and a row with a `missing` lot for material that no lot accounts
+for, such as water from a tap. The trace is computed from the ledger when it is asked for and is not
+stored. It follows the transfers into the well and the observations of the wells that fed it: a
+transfer takes the same fraction of every lot's share of a component as it takes of the component,
+and a component observed in an empty well comes from the lot of the well's labware. The lot of the
+labware is the one recorded as of the ledger position being traced, so it does not matter whether the
+contents or the lot of a new bottle was observed first.
+
+[`trace_cost`](@ref) adds the cost of each share, which is the lot's `cost` times the share's fraction of
+the lot's `quantity`. The cost of a solution is therefore a property of the lots that went into it.
+[`reconstruct_cost`](@ref) sums it. Shares with no known cost, because they have no lot or their lot
+has no cost or quantity, add nothing to the sum; `strict = true` returns `missing` instead when there
+are any.
+
+The database keeps each supplier product once in `Products`, with the details of a registered
+[`ReagentProduct`](@ref) and a link to its reagent, and each lot observation in `ObservedLots`.
+
+### Tracing material forward
+
+[`trace_forward`](@ref) is the reverse of [`trace_contents`](@ref): it finds every well that received
+material from a given well, or from the labware received as a given [`Lot`](@ref). It is the list to
+check when a lot is found to be bad, or when a transfer is corrected with [`update`](@ref) and
+everything downstream of it needs review. The result is a `DataFrame` with one row for each well reached,
+starting with the starting wells, with the labware of each well, the sequence and ledger entry at which
+material first reached it, the number of transfers from the start, and the well it came from. Following
+the `ViaWell` column rebuilds the path.
+
+```julia
+trace_forward(location_id(source_well))
+trace_forward(Lot("Sigma-Aldrich", "258148", "MKCS9055"))
+```
+
+The trace follows the recorded transfers in the order they happened. A transfer out of a well carries
+the material on only if it comes after the material arrived, so a transfer out of a well before it
+received anything from the starting well is not followed. A trace of a lot starts from every well of the
+labware that has the lot as of the ledger position traced, and a later observation of another lot removes
+a labware from the lot.
+
+The trace follows transfers only. It can include a well that no longer holds any of the material, because
+an observation may have overwritten the component in an intermediate well, and planned operations are not
+followed. [`forward_containers`](@ref) lists the labware that hold the wells reached and
+[`forward_runs`](@ref) lists the runs recorded on those wells or labware.
+
+Like the other reconstructions, a trace is computed from the ledger each time and nothing is stored.
+Amending the ledger with `update(...; replace = s)` or `insert = s` changes the next trace, and a trace
+as of an earlier time gives the list as it stood then:
+
+```julia
+before = Dates.now()
+update(transfer!, a, c, 5u"µL"; replace = s)         # the transfer went to c, not b
+trace_forward(location_id(a))                         # reaches c, not b
+trace_forward(location_id(a), get_last_sequence_id(), before)  # the earlier list, reaches b
+```
+
 ## Comparing observations with history
 
 [`observation_discrepancies`](@ref) compares every observation of a list of locations with what the
 history predicted just before it, and returns the differences as a `DataFrame`. The columns are
-`LedgerID`, `SequenceID`, `LocationID`, `Facet` (`"component"`, `"cost"`, `"attribute"`, `"parent"`,
+`LedgerID`, `SequenceID`, `LocationID`, `Facet` (`"component"`, `"attribute"`, `"parent"`,
 `"locked"`, or `"active"`), `Key` (the component or attribute, or `missing`), `Predicted`, and
 `Observed`. An attribute is compared with the effective environment of the location, so a value that
 it inherits counts as predicted. A parent is reported as a location ID, or `missing` for none.

@@ -328,3 +328,73 @@ end
 
 
     
+
+
+"""
+    protocol_steps(design::AbstractMatrix{<:Real}, sources::Vector{<:Labware}, targets::Vector{<:Labware}; instrument::AbstractString="") -> DataFrame
+    protocol_steps(pourcast::Pourcast) -> DataFrame
+
+The plan as data, one row for each transfer from a source well to a target well:
+
+| column | meaning |
+|:--|:--|
+| `step` | position in the protocol, from 1 |
+| `kind` | `"weigh"` for a powder, `"pipette"` for a liquid measured by volume |
+| `component` | the reagents of the source stock, sorted and comma-separated |
+| `amount`, `unit` | the planned amount, in `"mg"` for `"weigh"` steps and `"µL"` for `"pipette"` steps |
+| `source_labware`, `source_well` | where the material comes from |
+| `target_labware`, `target_well` | where it goes |
+| `instrument` | the name of the configuration that carries out the step |
+
+`design[i,j]` is the amount moved from source well `i` to target well `j`, with wells numbered
+labware by labware, in the order of `sources` and `targets` (the design of a protocol that `compile`
+passes to `write_instrument_files`). The `Pourcast` method collects the steps of every configuration.
+
+The order is deterministic: by target well (target labware in order, then well in order), then weighing
+before pipetting, then by source well (source labware in order, then well in order), then by
+instrument. Acid or base added to reach a pH is an ordinary planned step of its target, because the
+target stock already contains it. A step records an amount to move and nothing else: a protocol that
+needs a different order, or steps such as mixing and filtering, takes these rows and arranges and extends
+them.
+"""
+function protocol_steps(design::AbstractMatrix{<:Real},sources::Vector{<:Labware},targets::Vector{<:Labware};instrument::AbstractString="")
+    src_names = vcat(labware_well_names.(sources)...)
+    tgt_names = vcat(labware_well_names.(targets)...)
+    src_stocks = stocks(sources)
+    size(design) == (nrow(src_names),nrow(tgt_names)) || error("the design is $(size(design,1))x$(size(design,2)), but there are $(nrow(src_names)) source wells and $(nrow(tgt_names)) target wells")
+    src_kind = [amount_dimension(s) == :mass ? "weigh" : "pipette" for s in src_stocks]
+    src_component = [join(sort(component_to_string.(all_components([s]))),", ") for s in src_stocks]
+
+    keys = Tuple{Int,Int,Int}[] # (target well, kind order, source well); the sort order of the steps
+    rows = NamedTuple[]
+    for j in 1:size(design,2), i in 1:size(design,1)
+        design[i,j] > 0 || continue
+        push!(keys,(j,src_kind[i] == "weigh" ? 1 : 2,i))
+        push!(rows,(kind=src_kind[i],component=src_component[i],amount=Float64(design[i,j]),unit=src_kind[i] == "weigh" ? "mg" : "µL",
+            source_labware=src_names.labware[i],source_well=src_names.well[i],
+            target_labware=tgt_names.labware[j],target_well=tgt_names.well[j],instrument=String(instrument)))
+    end
+    order = sortperm(keys)
+    steps = DataFrame(rows[order])
+    if isempty(rows)
+        steps = DataFrame(kind=String[],component=String[],amount=Float64[],unit=String[],source_labware=String[],source_well=String[],target_labware=String[],target_well=String[],instrument=String[])
+    end
+    insertcols!(steps,1,:step=>collect(1:nrow(steps)))
+    return steps
+end
+
+function protocol_steps(pc::Pourcast)
+    trfs = transfers_by_config(pc)
+    cons = configs(pc)
+    parts = [protocol_steps(trfs[c],source_labware(pc),target_labware(pc);instrument=last(split(CHESSCore.name(cons[c]),"."))) for c in eachindex(cons)]
+    isempty(parts) && return protocol_steps(zeros(0,0),Labware[],Labware[])
+    # sort every configuration's steps together, by target well, then kind, then source well, then instrument
+    tgt_order = Dict(w=>k for (k,w) in enumerate(zip(vcat(labware_well_names.(target_labware(pc))...).labware,vcat(labware_well_names.(target_labware(pc))...).well)))
+    src_order = Dict(w=>k for (k,w) in enumerate(zip(vcat(labware_well_names.(source_labware(pc))...).labware,vcat(labware_well_names.(source_labware(pc))...).well)))
+    steps = vcat(parts...)
+    isempty(steps) && return steps
+    sortkey = [(tgt_order[(r.target_labware,r.target_well)],r.kind == "weigh" ? 1 : 2,src_order[(r.source_labware,r.source_well)],r.instrument) for r in eachrow(steps)]
+    steps = steps[sortperm(sortkey),:]
+    steps.step = collect(1:nrow(steps))
+    return steps
+end

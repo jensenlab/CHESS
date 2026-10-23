@@ -13,6 +13,8 @@ The database-writing function that [`upload`](@ref) and [`update`](@ref) call to
 |---|---|
 | `move_into!` | `upload_movement` |
 | `transfer!` | [`upload_transfer`](@ref) |
+| `discard!` | [`upload_discard`](@ref) |
+| `remove_from_parent!` | [`upload_remove_from_parent`](@ref) |
 | `set_attribute!` | `upload_environment_attribute` |
 | `record_read!` | [`upload_read`](@ref) |
 | `lock!`, `unlock!`, `toggle_lock!` | `upload_lock` |
@@ -32,6 +34,8 @@ function upload_operation(fun::Function)
         toggle_lock! => upload_lock,
         move_into! => upload_movement,
         transfer! => upload_transfer,
+        discard! => upload_discard,
+        remove_from_parent! => upload_remove_from_parent,
         set_attribute! => upload_environment_attribute,
         record_read! => upload_read,
         assign_barcode! => update_barcode,
@@ -139,7 +143,7 @@ end
 
 Return the `Components.ID`/`Reagents.ComponentID` for `reagent`, uploading it first (via
 `upload_component`) if no row with a matching natural key (name/type/molecular weight/
-density/pubchem ID) already exists. `Reagent` has a small, fixed set of scalar fields, so identity is
+density) already exists. `Reagent` has a small, fixed set of scalar fields, so identity is
 looked up directly by those fields rather than via a content hash.
 """
 function get_component_id(reagent::Reagent)
@@ -147,10 +151,9 @@ function get_component_id(reagent::Reagent)
     d  = ismissing(density(reagent)) ? missing : ustrip(uconvert(u"g/mL",density(reagent)))
     conds,params = sql_where(
         "Name"=>name(reagent),
-        "Type"=>string(typeof(reagent)),
+        "Type"=>string(nameof(typeof(reagent))),
         "MolecularWeight"=>mw,
         "Density"=>d,
-        "CID"=>pubchemid(reagent),
     )
     id = query_db("SELECT ComponentID FROM Reagents WHERE $conds",params)
     nrow(id)==1 && return id[1,1]
@@ -164,7 +167,7 @@ function upload_component(reagent::Reagent)
     execute_db("INSERT INTO Components(Type) Values(?)",("Reagent",))
     id=query_db("SELECT Max(ID) FROM Components")[1,1]
     execute_db("INSERT INTO Reagents(ComponentID,Name,Type,MolecularWeight,Density,CID) Values(?,?,?,?,?,?)",
-        (id,name(reagent),string(typeof(reagent)),mw,d,pc))
+        (id,name(reagent),string(nameof(typeof(reagent))),mw,d,pc))
     upload_dissolution(id,reagent)
     return id
 end
@@ -173,13 +176,23 @@ end
     get_species_id(spc::Species)
 
 Return the `Species.ID` for `spc`, uploading it first (via [`upload_species`](@ref)) if no row with a
-matching natural key (name/charge/formula/stored molecular weight) already exists.
+matching natural key (name/charge/formula/stored molecular weight) already exists. The PubChem ID is
+metadata and is not part of the key: a row that has no ID yet takes the one `spc` carries, and a row
+whose ID differs keeps it and logs a warning.
 """
 function get_species_id(spc::Species)
     conds,params = sql_where(_species_key(spc)...)
-    id=query_db("SELECT ID FROM Species WHERE $conds",params)
-    nrow(id)==1 && return id[1,1]
-    return upload_species(spc)
+    id=query_db("SELECT ID, CID FROM Species WHERE $conds",params)
+    nrow(id)==1 || return upload_species(spc)
+    cid = pubchemid(spc)
+    if !ismissing(cid)
+        if ismissing(id[1,"CID"])
+            execute_db("UPDATE Species SET CID = ? WHERE ID = ?",(cid,id[1,"ID"]))
+        elseif id[1,"CID"] != cid
+            @warn "Species \"$(name(spc))\" has PubChem ID $cid but the database stores $(id[1,"CID"]); keeping the stored ID"
+        end
+    end
+    return id[1,"ID"]
 end
 
 # The natural key of a species row. A species with a formula stores the formula (as a canonical
@@ -208,8 +221,8 @@ a `Stock` directly). Returns its `Species.ID`.
 """
 function upload_species(spc::Species)
     key = Dict(_species_key(spc))
-    execute_db("INSERT OR IGNORE INTO Species(Name,Charge,Formula,MolecularWeight) Values(?,?,?,?)",
-        (key["Name"],key["Charge"],key["Formula"],key["MolecularWeight"]))
+    execute_db("INSERT OR IGNORE INTO Species(Name,Charge,Formula,MolecularWeight,CID) Values(?,?,?,?,?)",
+        (key["Name"],key["Charge"],key["Formula"],key["MolecularWeight"],pubchemid(spc)))
     return get_species_id(spc)
 end
 

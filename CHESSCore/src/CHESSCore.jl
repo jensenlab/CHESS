@@ -31,7 +31,7 @@ function _chemprops(m::Module)
     if isdefined(m,chemprops_name)
         getproperty(m,chemprops_name)
     else
-        Core.eval(m,:(const $chemprops_name = Dict{Symbol,Tuple{Union{Unitful.MolarMass,Missing},Union{Unitful.Density,Missing},Union{Integer,Missing}}}()))
+        Core.eval(m,:(const $chemprops_name = Dict{Symbol,Tuple{Union{Unitful.MolarMass,Missing},Union{Unitful.Density,Missing}}}()))
     end
 end
 
@@ -60,10 +60,12 @@ include("./locations/Location.jl")
 include("./locations/Occupancy.jl")
 include("./environments/Environment.jl")
 include("./operations/capability.jl")
+include("./locations/Lot.jl")
 include("./locations/Labware.jl")
 include("./stocks/StockComponent.jl")
 include("./stocks/ElementalFormula.jl")
 include("./stocks/Chemicals.jl")
+include("./stocks/ReagentProducts.jl")
 include("./stocks/Organisms.jl")
 include("./stocks/Stocks.jl")
 include("./stocks/StockDisplay.jl")
@@ -76,6 +78,7 @@ include("./locations/plotting.jl")
 
 include("./operations/movement.jl")
 include("./operations/transfer.jl")
+include("./operations/discard.jl")
 include("./operations/attributes.jl")
 include("./operations/reads.jl")
 include("./operations/observe.jl")
@@ -98,10 +101,12 @@ export LocationKind, location_kinds, concretetype, @location_kind, @loc_str
 export StockComponent # common dispatch/gathering ancestor for Reagent and Organism
 export Reagent,Solid,Liquid,Gas # physical-form types
 export Species,H⁺,OH⁻ # chemical-identity types
-export charge, Dissolution, dissolution, set_dissolution!, dissolutions
+export ReagentProduct, reagent_products, add_reagent_product!, @reagent_product # where a reagent is obtained
+export charge, Dissolution, dissolution, set_dissolution!, dissolutions, by_mass
 export Organism # Organism type
 export Stock,Empty, Mixture, Solution, Culture, @stock, @stock_str, stock_recipes # Stock types
 export Location, GenericLocation, Labware, Well #location types
+export Lot, lot # where a received piece of labware came from
 export is_capable, actuatable_attributes, performable_operations, readable_types
 export @species, @reagent, @organism , @attribute, @spc_str, @rgt_str, @org_str, @attr_str # macros for constants
 export set_occupancy_cost!, occupancy_rules, kind, is_committed, build_location, plate_namer, childtype
@@ -124,16 +129,16 @@ export parent_cost, child_cost, occupancy, occupancy_cost , children, children_n
 # `parent` is deliberately not exported here -- Base.parent (extended for Location in Location.jl)
 # is already visible everywhere by default; exporting it too collides with Base's own unrelated
 # `parent` generic (see the comment above Base.parent(x::Location) in Location.jl).
-export can_move_into, move_into!
+export can_move_into, move_into!, remove_from_parent!
 #labware
 export shape, vendor, catalog, wells, stocks, add_stock!, plot_well_heatmap!
 #wells
-export wellcapacity, stock, cost,  sterilize!,transfer!, drain!,deposit!,withdraw!
+export wellcapacity, stock, sterilize!,transfer!, discard!, drain!,deposit!,withdraw!
 # dataframe interop
 export df_to_stock, stock_to_df, df_to_labware, labware_to_df
 # location <-> dict interop (JSON-safe, for tools outside CHESS)
 export location_to_dict, dict_to_location, stock_to_dict, dict_to_stock
-export attribute_to_dict, dict_to_attribute, read_to_dict, dict_to_read
+export lot_to_dict, dict_to_lot, attribute_to_dict, dict_to_attribute, read_to_dict, dict_to_read
 export string_to_component, component_to_string, reagent_df, component_df, all_reagents, all_components, concentration
 export vc_to_stock, stock_to_vc, q_to_stock, stock_to_q
 export registry_summary

@@ -1,9 +1,9 @@
 # Observations: ground-truth statements about one facet of a location at a ledger position, recorded
 # without any claim about how the state came about. Replay applies them in sequence with the
-# operations: component and cost observations inside `reconstruct_contents`, and the others through
+# operations: component observations inside `reconstruct_contents`, and the others through
 # the `*_events` unions in reconstruction_utils.jl.
 
-const observation_tables = ("ObservedComponents","ObservedCosts","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity")
+const observation_tables = ("ObservedComponents","ObservedAttributes","ObservedParents","ObservedLocks","ObservedActivity","ObservedLots")
 
 _optional_db_time(t) = isnothing(t) ? nothing : db_time(t)
 
@@ -61,14 +61,12 @@ function upload_observation(child::Location,newparent::Union{Location,Nothing};l
 end
 
 function upload_observation(loc::Location,facet::Symbol,value;ledger_id::Integer=append_ledger(),kwargs...)
-    if facet === :cost
-        _insert_observation("ObservedCosts",["LocationID","Cost"],(location_id(loc),Float64(value));ledger_id=ledger_id,kwargs...)
-    elseif facet === :locked
+    if facet === :locked
         _insert_observation("ObservedLocks",["LocationID","IsLocked"],(location_id(loc),Int(value));ledger_id=ledger_id,kwargs...)
     elseif facet === :active
         _insert_observation("ObservedActivity",["LocationID","IsActive"],(location_id(loc),Int(value));ledger_id=ledger_id,kwargs...)
     else
-        throw(ArgumentError("unknown observable facet :$facet; expected :cost, :locked or :active"))
+        throw(ArgumentError("unknown observable facet :$facet; expected :locked or :active"))
     end
 end
 
@@ -97,7 +95,7 @@ With `facet` arguments, observe one fact, e.g. `observe(well, rgt"glucose", 2u"g
 [`observe!`](@ref) for every form); `loc` is updated in memory too.
 
 With no `facet`, observe all of `loc` as it currently is in memory: every stock component (and a zero
-for any component history predicts but `loc` lacks), its cost, its own attributes (and `missing` for
+for any component history predicts but `loc` lacks), its own attributes (and `missing` for
 any own attribute history predicts but `loc` lacks), its parent, lock and activity. `recursive`
 also observes every location inside `loc`. All of it shares one ledger entry.
 
@@ -165,7 +163,6 @@ function _full_facets(n::Location,predicted_stock::Stock,predicted_attrs::Attrib
         for (c,q) in _components(predicted_stock)
             haskey(current,c) || push!(facets,(n,c,zero(q)))
         end
-        push!(facets,(n,:cost,CHESSCore.cost(n)))
     end
     own=CHESSCore.attributes(n)
     for attr in values(own)
@@ -179,18 +176,18 @@ function _full_facets(n::Location,predicted_stock::Stock,predicted_attrs::Attrib
         push!(facets,(n,:locked,is_locked(n)))
     end
     push!(facets,(n,:active,is_active(n)))
+    isnothing(CHESSCore.lot(n)) || push!(facets,(n,CHESSCore.lot(n)))
     return facets
 end
 
 # `upload_observation` argument tuples declaring what a newly committed location `n` holds beyond a
-# fresh location's defaults (empty, no cost or attributes, unlocked, active, no parent)
+# fresh location's defaults (empty, no attributes, unlocked, active, no parent)
 function _genesis_facets(n::Location)
     facets=Tuple[]
     if n isa Well
         for (c,q) in _components(CHESSCore.stock(n))
             push!(facets,(n,c,q))
         end
-        CHESSCore.cost(n) == 0 || push!(facets,(n,:cost,CHESSCore.cost(n)))
     end
     for attr in values(CHESSCore.attributes(n))
         ismissing(CHESSCore.value(attr)) || push!(facets,(n,attr,false))
@@ -202,6 +199,7 @@ function _genesis_facets(n::Location)
     end
     !(n isa Well) && is_locked(n) && push!(facets,(n,:locked,true))
     is_active(n) || push!(facets,(n,:active,false))
+    isnothing(CHESSCore.lot(n)) || push!(facets,(n,CHESSCore.lot(n)))
     return facets
 end
 
@@ -221,7 +219,7 @@ function _observation_participants(sequence_id::Integer)
     return Dict(tbl => query_db("SELECT * FROM $tbl WHERE LedgerID IN $entry") for tbl in observation_tables)
 end
 
-_content_participants(p) = Vector{Int}(unique(skipmissing(vcat(p["ObservedComponents"].LocationID,p["ObservedCosts"].LocationID))))
+_content_participants(p) = Vector{Int}(unique(skipmissing(p["ObservedComponents"].LocationID)))
 
 function validate_observation(ledger_id::Integer;encumbrances=false)
     seq_id=get_sequence_id(ledger_id)
@@ -271,7 +269,7 @@ end
 
 Compare every observation of `location_ids` up to `sequence_id` with what history predicted just
 before it, and return the ones that differ as a `DataFrame` with columns `LedgerID`, `SequenceID`,
-`LocationID`, `Facet` (`"component"`, `"cost"`, `"attribute"`, `"parent"`, `"locked"` or `"active"`),
+`LocationID`, `Facet` (`"component"`, `"attribute"`, `"parent"`, `"locked"` or `"active"`),
 `Key` (the component or attribute, else `missing`), `Predicted` and `Observed`.
 
 Attributes are compared with the location's effective environment, so a value it inherits counts.
@@ -292,10 +290,6 @@ function observation_discrepancies(location_ids::Vector{<:Integer};sequence_id::
         comps=_components(CHESSCore.stock(reconstruct_contents(row.LocationID,row.SequenceID-1)))
         predicted=haskey(comps,component) ? uconvert(unit(observed),comps[component]) : zero(observed)
         isapprox(predicted,observed;rtol=1e-9) || report!(row,row.LocationID,"component",component,predicted,observed)
-    end
-    for row in eachrow(rows("ObservedCosts"))
-        predicted=CHESSCore.cost(reconstruct_contents(row.LocationID,row.SequenceID-1))
-        isapprox(predicted,row.Cost;rtol=1e-9) || report!(row,row.LocationID,"cost",missing,predicted,row.Cost)
     end
     for row in eachrow(rows("ObservedAttributes"))
         kind=get_attribute(row.Attribute)
@@ -389,7 +383,6 @@ function _unexplained_cache_facets(lid::Integer,seq::Integer,max_ids)
             for (c,q) in was
                 haskey(now_,c) || push!(facets,(w,c,zero(q)))
             end
-            isapprox(CHESSCore.cost(w),row.Cost;rtol=1e-9) || push!(facets,(w,:cost,row.Cost))
         end
     end
 

@@ -20,14 +20,25 @@ mutable struct Labware <: Location
     reads::Vector{Read}
     is_locked::Bool
     is_active::Bool
+    lot::Union{Lot,Nothing}
 end
 
 function Labware(location_id::Union{Integer,Nothing},name::String,kind::LocationKind;
         parent::Union{Location,Nothing}=nothing,
         children::Matrix{<:Location}=Matrix{Location}(undef,something(kind.shape,(0,0))...),
-        attributes::AttributeDict=AttributeDict(),reads::Vector{Read}=Read[],is_locked::Bool=false,is_active::Bool=true)
-    return Labware(location_id,name,kind,parent,Matrix{Location}(children),attributes,reads,is_locked,is_active)
+        attributes::AttributeDict=AttributeDict(),reads::Vector{Read}=Read[],is_locked::Bool=false,is_active::Bool=true,
+        lot::Union{Lot,Nothing}=nothing)
+    return Labware(location_id,name,kind,parent,Matrix{Location}(children),attributes,reads,is_locked,is_active,lot)
 end
+
+"""
+    lot(x::Location)
+
+The [`Lot`](@ref) that a [`Labware`](@ref) was received as, or `nothing` when none was recorded. Only
+labware carries a lot; every other location returns `nothing`. Record one with [`observe!`](@ref).
+"""
+lot(x::Labware) = x.lot
+lot(::Location) = nothing
 
 # No parent_cost override here -- Labware uses the generic, kind-data-driven definition
 # (Occupancy.jl) like any other Location. "A Labware's slots are fixed at creation" is enforced

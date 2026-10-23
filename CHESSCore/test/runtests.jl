@@ -299,7 +299,7 @@ CHESSCore.set_occupancy_cost!(:Shared,:CatC,1//3)
     # plate1 fixture (later testsets deposit into plate1's own wells and rely on them starting Empty)
     occ_check_plate = build_location(WP96,"occupancy check plate")
     @test occupancy(occ_check_plate) == 1//1
-    deposit!(occ_check_plate[1,1],1u"µL"*rgt"water",0)
+    deposit!(occ_check_plate[1,1],1u"µL"*rgt"water")
     @test occupancy(occ_check_plate) == 1//1
 end
 
@@ -404,7 +404,7 @@ end
 
     w1=plate1[1,1]
     w2=plate1[1,2]
-    deposit!(w1,0.05u"g"*rgt"paba",0)
+    deposit!(w1,0.05u"g"*rgt"paba")
     @test_nowarn transfer!(w1,w2,0.01u"g";instrument=capable)
     @test_throws ArgumentError transfer!(w1,w2,0.01u"g";instrument=incapable)
 
@@ -782,6 +782,188 @@ end
     @test (Na⁺+2*Cl⁻).products == Dict(Na⁺=>1,Cl⁻=>2)
 end
 
+@testset "Dissolution with fractional coefficients" begin
+    water_spc = CHESSCore.Species("test water",0,18.015u"g/mol")
+    sugar_spc = CHESSCore.Species("test sugar",0,194.18u"g/mol")
+
+    # a hemihydrate is the compound plus half a water, per mole of compound
+    hemi = sugar_spc + 0.5*water_spc
+    @test hemi.products == Dict(sugar_spc=>1,water_spc=>0.5)
+    @test (water_spc*0.5).products == Dict(water_spc=>0.5)
+    @test (1//2*water_spc).products == Dict(water_spc=>0.5)
+    @test (3*(sugar_spc + 0.5*water_spc)).products == Dict(sugar_spc=>3,water_spc=>1.5)
+    @test Dissolution(Dict(sugar_spc=>1,water_spc=>1//2)) == hemi
+    @test hash(Dissolution(Dict(sugar_spc=>1,water_spc=>1//2))) == hash(hemi)
+
+    @reagent TestHemihydrate "test hemihydrate" Solid hemi missing missing
+    @test molecular_weight(TestHemihydrate) ≈ (194.18+0.5*18.015)u"g/mol"
+    r = composition(2u"mol"*TestHemihydrate)
+    @test molar_amount(r,sugar_spc) ≈ 2u"mol"
+    @test molar_amount(r,water_spc) ≈ 1u"mol"
+
+    @test_throws ArgumentError Dissolution(Dict(water_spc=>-0.5))
+    @test_throws ArgumentError Dissolution(Dict(water_spc=>NaN))
+
+    # charge balance still holds with a fractional coefficient
+    ion = CHESSCore.Species("test half ion",1,"K")
+    anion = CHESSCore.Species("test half anion",-2,"SO4")
+    @test_throws ArgumentError set_dissolution!(TestHemihydrate,ion + anion)
+    @test isnothing(set_dissolution!(TestHemihydrate,2*ion + anion + 0.5*water_spc))
+end
+
+@testset "by_mass" begin
+    acid = CHESSCore.Species("test lactic acid",0,90.078u"g/mol")
+    solvent = CHESSCore.Species("test solvent water",0,18.015u"g/mol")
+    d = by_mass(acid=>0.88, solvent=>0.12)
+    @test d.products[acid] == 1
+    @test d.products[solvent] ≈ (0.12/18.015)/(0.88/90.078)
+    @test by_mass(acid=>88, solvent=>12).products[solvent] ≈ d.products[solvent] # only the proportions matter
+
+    # the reagent's molecular weight is the product mass per mole of the first species
+    @reagent TestAssayAcid "test 88% acid" Liquid d 1.2u"g/mL" missing
+    @test molecular_weight(TestAssayAcid) ≈ 90.078u"g/mol"/0.88
+    # 10 mL at 1.2 g/mL is 12 g of product, 88% of it acid and 12% of it solvent
+    r = composition(10u"mL"*TestAssayAcid)
+    @test mass(r,acid) ≈ 12u"g"*0.88
+    @test mass(r,solvent) ≈ 12u"g"*0.12
+
+    @test by_mass(acid=>1) == Dissolution(Dict(acid=>1))
+    @test_throws ArgumentError by_mass()
+    @test_throws ArgumentError by_mass(acid=>0, solvent=>1)
+    @test_throws ArgumentError by_mass(acid=>-1, solvent=>1)
+    @test_throws ArgumentError by_mass(CHESSCore.Species("test unweighed",0,missing)=>1, solvent=>1)
+end
+
+@testset "Liquids dosed by mass or amount" begin
+    lq = Liquid("mass-dosed liquid",100.0u"g/mol",0.8u"g/mL")
+
+    # a mass converts to a volume through the density
+    @test CHESSCore.liquids(0.8u"g"*lq)[lq] ≈ 1.0u"mL"
+    @test CHESSCore.liquids(250u"mg"*lq)[lq] ≈ 0.3125u"mL"
+    @test CHESSCore.liquids(0.0008u"kg"*lq)[lq] ≈ 1.0u"mL"
+    @test CHESSCore.liquids(2u"mL"*lq)[lq] ≈ 2.0u"mL" # a volume is unchanged
+
+    # a molar amount goes through the molecular weight and then the density
+    @test CHESSCore.liquids(0.01u"mol"*lq)[lq] ≈ 1.25u"mL"
+
+    # it composes with other quantities like any stock
+    diluent = Liquid("test diluent",18.015u"g/mol",1.0u"g/mL")
+    mixed = 0.8u"g"*lq + 1u"L"*diluent
+    @test CHESSCore.liquids(mixed)[lq] ≈ 1.0u"mL"
+    lq_species = only(keys(dissolution(lq).products))
+    @test molar_amount(composition(0.8u"g"*lq),lq_species) ≈ 0.008u"mol"
+    @test molar_amount(composition(0.8u"g"*lq),lq_species) ≈ molar_amount(composition(1.0u"mL"*lq),lq_species)
+
+    # a solid is unchanged
+    sd = Solid("mass-dosed solid",100.0u"g/mol",1.0u"g/mL")
+    @test CHESSCore.solids(1u"g"*sd)[sd] ≈ 1u"g"
+
+    # an unknown density, or weight, is a clear error
+    no_density = Liquid("liquid with no density",100.0u"g/mol",missing)
+    no_weight = Liquid("liquid with no weight",missing,0.8u"g/mL")
+    @test_throws ArgumentError 1u"g"*no_density
+    @test_throws ArgumentError 1u"mol"*no_density
+    @test occursin("density is unknown",sprint(showerror,try 1u"g"*no_density catch e e end))
+    @test CHESSCore.liquids(1u"g"*no_weight)[no_weight] ≈ 1.25u"mL" # a mass needs no molecular weight
+    @test_throws ErrorException 1u"mol"*no_weight
+    @test CHESSCore.liquids(1u"mL"*no_density)[no_density] ≈ 1u"mL" # a volume needs neither
+end
+
+module ProductLab
+using CHESSCore, Unitful
+@reagent widget "widget" Solid "C2H6O" missing missing
+@reagent_product widget "Acme Chemical" catalog_number="W-100" product_name="Widget, reagent grade" grade="reagent grade"
+@reagent_product widget "Beta Supply" catalog_number="B9" manufacturer_number="M-77" notes="second source"
+@reagent bare "bare" Solid "CH4" missing missing
+end
+
+@testset "ReagentProduct" begin
+    p = ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent")
+    @test p.supplier == "Sigma-Aldrich" && p.catalog_number == "U5128" && p.grade == "ACS reagent"
+    @test ismissing(p.manufacturer_number) && ismissing(p.notes)
+    @test sprint(show,p) == "Sigma-Aldrich U5128"
+    @test sprint(show,ReagentProduct("in-house";product_name="deionized water")) == "in-house"
+
+    # value equality, with missing fields comparing equal
+    @test p == ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent")
+    @test hash(p) == hash(ReagentProduct("Sigma-Aldrich";catalog_number="U5128",product_name="Urea ACS reagent",grade="ACS reagent"))
+    @test p != ReagentProduct("Sigma-Aldrich";catalog_number="U5129",product_name="Urea ACS reagent",grade="ACS reagent")
+    @test ReagentProduct("a") == ReagentProduct("a")
+    @test ReagentProduct(SubString("Acme Co",1,4);catalog_number=SubString("X123",1,2)).catalog_number == "X1"
+
+    @test_throws ArgumentError ReagentProduct("")
+    @test_throws ArgumentError ReagentProduct("   ")
+
+    # adding and reading
+    reagent = Solid("product test reagent",missing,missing)
+    @test isempty(reagent_products(reagent))
+    add_reagent_product!(reagent,p)
+    add_reagent_product!(reagent,ReagentProduct("Fisher";catalog_number="A1"))
+    add_reagent_product!(reagent,p) # already registered
+    @test reagent_products(reagent) == [p,ReagentProduct("Fisher";catalog_number="A1")]
+    push!(reagent_products(reagent),ReagentProduct("Elsewhere")) # a copy: the registry is unchanged
+    @test length(reagent_products(reagent)) == 2
+    # a product belongs to the reagent it was added to
+    @test isempty(reagent_products(Solid("another reagent",missing,missing)))
+end
+
+@testset "@reagent_product" begin
+    # the macro registers the product in CHESSCore and keeps it with the calling module
+    products = reagent_products(ProductLab.widget)
+    @test length(products) == 2
+    @test products[1] == ReagentProduct("Acme Chemical";catalog_number="W-100",product_name="Widget, reagent grade",grade="reagent grade")
+    @test products[2] == ReagentProduct("Beta Supply";catalog_number="B9",manufacturer_number="M-77",notes="second source")
+    @test isempty(reagent_products(ProductLab.bare))
+    @test length(CHESSCore._reagent_products(ProductLab)[ProductLab.widget]) == 2
+
+    # register_lab restores a module's products from the module's own copy
+    delete!(CHESSCore.product_registry,ProductLab.widget)
+    @test isempty(reagent_products(ProductLab.widget))
+    CHESSCore.register_lab(ProductLab)
+    @test reagent_products(ProductLab.widget) == products
+
+    # the registry summary lists them
+    summary = CHESSCore.registry_summary(ProductLab)
+    @test only(r.products for r in summary.reagents if r.name === :widget) == products
+    @test isempty(only(r.products for r in summary.reagents if r.name === :bare))
+
+    # options are written name=value, and only the known options are accepted
+    expansion_error(ex) = try macroexpand(@__MODULE__,ex); nothing catch e e isa LoadError ? e.error : e end
+    @test expansion_error(:(@reagent_product widget "Acme" 5)) isa ArgumentError
+    @test_throws MethodError ReagentProduct("Acme";price=3)
+end
+
+@testset "Species PubChem ID" begin
+    glucose = CHESSCore.Species("pc glucose",0,"C6H12O6";pubchemid=5793)
+    @test pubchemid(glucose) == 5793
+    @test ismissing(pubchemid(CHESSCore.Species("pc glucose",0,"C6H12O6")))
+
+    # every constructor form takes the keyword
+    @test pubchemid(CHESSCore.Species("pc water",0,"H2O";pubchemid=962)) == 962
+    @test pubchemid(CHESSCore.Species("pc water neutral","H2O";pubchemid=962)) == 962
+    @test pubchemid(CHESSCore.Species("pc stored",1,22.99u"g/mol";pubchemid=923)) == 923
+    @test pubchemid(CHESSCore.Species("pc stored neutral",22.99u"g/mol";pubchemid=923)) == 923
+    @test pubchemid(CHESSCore.Species("pc unknown",1,missing;pubchemid=5)) == 5
+    @test pubchemid(CHESSCore.Species("pc opaque",0,CHESSCore.opaque;pubchemid=9)) == 9
+
+    # the ID is metadata: it does not take part in equality or hash
+    @test glucose == CHESSCore.Species("pc glucose",0,"C6H12O6")
+    @test hash(glucose) == hash(CHESSCore.Species("pc glucose",0,"C6H12O6"))
+    @test glucose == CHESSCore.Species("pc glucose",0,"C6H12O6";pubchemid=1)
+
+    @test_throws ArgumentError CHESSCore.Species("pc bad",0,"H2O";pubchemid=0)
+    @test_throws ArgumentError CHESSCore.Species("pc bad",0,"H2O";pubchemid=-3)
+
+    # @species takes the ID as an optional fifth argument
+    @species PcSodium "pc Na+" 1 "Na" 923
+    @species PcNoId "pc no id" 0 "H2O"
+    @test pubchemid(PcSodium) == 923
+    @test ismissing(pubchemid(PcNoId))
+
+    summary = CHESSCore.registry_summary(Main)
+    @test any(c -> c.name === :PcSodium && c.pubchemid == 923, summary.species)
+end
+
 const Mg²⁺=CHESSCore.Species("Mg2+",2,24.305u"g/mol")
 
 @reagent MgCl2 "magnesium chloride" Solid (Mg²⁺+2*Cl⁻) missing missing
@@ -846,11 +1028,11 @@ end
 end
 
 @testset "Reagent value-based equality" begin
-    s1 = Solid("paba",137.14u"g/mol",1.35u"g/mL",978)
-    s2 = Solid("paba",137.14u"g/mol",1.35u"g/mL",978)
+    s1 = Solid("paba",137.14u"g/mol",1.35u"g/mL")
+    s2 = Solid("paba",137.14u"g/mol",1.35u"g/mL")
     @test s1 == s2
     @test hash(s1) == hash(s2)
-    l1 = Liquid("paba",137.14u"g/mol",1.35u"g/mL",978)
+    l1 = Liquid("paba",137.14u"g/mol",1.35u"g/mL")
     @test s1 != l1 # same fields, different concrete type -- must stay distinct
     d = Dict(s1=>5u"g")
     @test d[s2] == 5u"g" # Dict lookup succeeds with a separately-constructed-but-equal key
@@ -905,7 +1087,7 @@ end
     # labware_to_df / df_to_labware round-trip, "q" format -- build_location, not generate_location:
     # this exercises exactly the fix df_to_labware itself relies on (no database needed)
     bottle = build_location(Bottle1L,"df interop test bottle")
-    deposit!(bottle.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle.children[1,1],10u"g"*rgt"paba")
     df_q,units_q = labware_to_df(bottle,"q";reagent_context=[CHESSCore,TestChemOrg])
     @test df_q.labware[1] == string(kind(bottle).name) # kind-based, not typeof(lw)
     lws_q = df_to_labware(df_q,units_q;reagent_context=[CHESSCore,TestChemOrg])
@@ -915,7 +1097,7 @@ end
 
     # "vc" format round-trip on a Solution-derived stock (fits vc's volume/concentration model)
     bottle2 = build_location(Bottle1L,"df interop test bottle vc")
-    deposit!(bottle2.children[1,1],100u"mL"*rgt"water",5)
+    deposit!(bottle2.children[1,1],100u"mL"*rgt"water")
     df_vc,units_vc = labware_to_df(bottle2,"vc";reagent_context=[CHESSCore,TestChemOrg])
     lws_vc = df_to_labware(df_vc,units_vc;reagent_context=[CHESSCore,TestChemOrg])
     @test stock(lws_vc[1][df_vc.well[1]]) == stock(bottle2.children[1,1])
@@ -923,7 +1105,7 @@ end
 
     # "vc" format also works on a Mixture-derived stock (cross-dimension branch: mass/volume)
     bottle3 = build_location(Bottle1L,"df interop test bottle vc mixture")
-    deposit!(bottle3.children[1,1],10u"g"*rgt"paba",5)
+    deposit!(bottle3.children[1,1],10u"g"*rgt"paba")
     df_vc3,units_vc3 = labware_to_df(bottle3,"vc";reagent_context=[CHESSCore,TestChemOrg])
     @test units_vc3[1,"paba"] == "%"
     lws_vc3 = df_to_labware(df_vc3,units_vc3;reagent_context=[CHESSCore,TestChemOrg])
@@ -1163,7 +1345,7 @@ end
 
     # Well: delegates to Stock's own detailed display
     well = children(plate1)[1,1]
-    deposit!(well,1u"µL"*rgt"water",0)
+    deposit!(well,1u"µL"*rgt"water")
     well_report = sprint(show,MIME("text/plain"),well)
     @test occursin("Well:",well_report)
     @test occursin("capacity",well_report)
@@ -1248,14 +1430,14 @@ end
     @test is_locked(children(inst2b)[1]) # the deferred-lock reconstruction actually took effect
 
     # standalone Well (not attached to any Labware)
-    standalone_well = CHESSCore.Well(nothing,"standalone",Well1000000;stock=b,cost=3)
+    standalone_well = CHESSCore.Well(nothing,"standalone",Well1000000;stock=b)
     d_well = location_to_dict(standalone_well; reagent_context=[CHESSCore,TestChemOrg])
     @test _is_json_safe(d_well)
     well2 = dict_to_location(d_well; reagent_context=[CHESSCore,TestChemOrg])
     @test CHESSCore.softequal(standalone_well,well2)
 
     # Labware: an entire plate + its wells round-trips as one unit (the explicit non-flat exception)
-    deposit!(plate1[1,1],1u"µL"*rgt"water",0)
+    deposit!(plate1[1,1],1u"µL"*rgt"water")
     d_plate = location_to_dict(plate1; reagent_context=[CHESSCore,TestChemOrg])
     @test _is_json_safe(d_plate)
     @test length(d_plate["wells"]) == shape(plate1)[1] && length(d_plate["wells"][1]) == shape(plate1)[2]
@@ -1264,7 +1446,6 @@ end
     @test name(plate2) == name(plate1)
     for row in 1:shape(plate1)[1], col in 1:shape(plate1)[2]
         @test stock(plate2[row,col]) == stock(plate1[row,col])
-        @test cost(plate2[row,col]) == cost(plate1[row,col])
     end
 end
 
@@ -1273,20 +1454,19 @@ end
     plt = Plots.plot(plate)
     @test plt isa Plots.Plot
 
-    deposit!(plate[1,1],10u"µL"*rgt"water",0)
+    deposit!(plate[1,1],10u"µL"*rgt"water")
     plt2 = plot_well_heatmap!(Plots.plot(plate),plate)
     @test plt2 isa Plots.Plot
 end
 
 @testset "observe!: declare state without history" begin
     w=Well(nothing,"observed well",Well1000)
-    deposit!(w,100u"µL"*rgt"water"+2.35u"mg"*rgt"paba",1.5)
+    deposit!(w,100u"µL"*rgt"water"+2.35u"mg"*rgt"paba")
 
-    # a component observation replaces exactly that component and leaves the rest and the cost alone
+    # a component observation replaces exactly that component and leaves the rest alone
     observe!(w,rgt"paba",2.04u"mg")
     @test solids(stock(w))[rgt"paba"] == 2.04u"mg"
     @test liquids(stock(w))[rgt"water"] == 100u"µL"
-    @test cost(w) == 1.5
 
     # observing a liquid changes the total volume
     observe!(w,rgt"water",50u"µL")
@@ -1308,11 +1488,10 @@ end
     @test s == 100u"µL"*rgt"water"
 
     # scalar facets
-    observe!(w,:cost,4.0)
-    @test cost(w) == 4.0
     observe!(w,:active,false)
     @test !is_active(w)
     @test_throws ArgumentError observe!(w,:colour,1)
+    @test_throws ArgumentError observe!(w,:cost,1.0) # cost is a property of the lots that went in, not of a well
 
     # attributes are own attributes; missing defers to the parent
     room=GenericLocation(nothing,"observed room",Room)
@@ -1336,4 +1515,33 @@ end
     observe!(bench,nothing)
     @test isnothing(parent(bench))
     @test_throws FixedMembershipError observe!(w,room) # wells stay fused to their labware
+end
+
+@testset "Lot" begin
+    product = ReagentProduct("Sigma-Aldrich";catalog_number="258148")
+    l = Lot(product,"MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14))
+    @test l == Lot("Sigma-Aldrich","258148","MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14))
+    @test hash(l) == hash(Lot("Sigma-Aldrich","258148","MKCS9055";gtin="04061837736162",quantity=2.5u"L",cost=61.5,received=Date(2026,10,14)))
+    @test sprint(show,l) == "Sigma-Aldrich 258148 lot MKCS9055"
+    @test_throws ArgumentError Lot("Sigma-Aldrich","258148","")
+    @test_throws ArgumentError Lot("Sigma-Aldrich","258148","X";quantity=1u"s")
+    @test_throws DomainError Lot("Sigma-Aldrich","258148","X";quantity=-1u"g")
+    @test_throws DomainError Lot("Sigma-Aldrich","258148","X";cost=-1)
+    @test_throws ArgumentError Lot(ReagentProduct("in-house"),"X")
+
+    bottle = build_location(Bottle1L,"HCl bottle")
+    @test isnothing(lot(bottle))
+    @test isnothing(observe!(bottle,l))
+    @test lot(bottle) == l
+    other = Lot("Sigma-Aldrich","258148","MKCS9056")
+    observe!(bottle,other)
+    @test lot(bottle) == other # a new lot replaces the earlier one
+    @test isnothing(lot(bottle.children[1,1]))
+    @test_throws ArgumentError observe!(bottle.children[1,1],l) # only labware is received as a lot
+
+    d = location_to_dict(bottle)
+    @test dict_to_lot(d["lot"]) == other
+    observe!(bottle,l)
+    @test lot(dict_to_location(location_to_dict(bottle))) == l
+    @test !haskey(location_to_dict(build_location(Bottle1L,"plain")),"lot")
 end

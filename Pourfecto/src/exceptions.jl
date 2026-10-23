@@ -18,4 +18,6 @@
     
     struct StockCompatibilityError <: Exception 
         msg::AbstractString 
-    end 
+    end
+
+    Base.showerror(io::IO,e::StockCompatibilityError) = print(io,"StockCompatibilityError: ",e.msg)
