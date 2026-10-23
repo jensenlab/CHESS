@@ -565,20 +565,25 @@ end
 
 @testset "Acid/base equilibrium pH: strong-electrolyte equivalence" begin
     # same stocks as "Ionic dissociation and pH" above -- no reagent here has a registered
-    # AcidBaseSystem, so pH(::Stock) must take the exact fast path, matching the original
-    # strong-electrolyte-only closed-form formula bit-for-bit (not merely converge to the same place)
+    # AcidBaseSystem, so pH(::Stock) must take the closed-form fast path, which solves
+    # [H+] - Kw/[H+] = n (water autoionization included)
     neutral=(0.001u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
     acidic=(0.002u"mol"*HydrochloricAcid)+(0.001u"mol"*SodiumHydroxide)
     basic=(0.001u"mol"*HydrochloricAcid)+(0.002u"mol"*SodiumHydroxide)
 
-    expected(s) = begin
-        conc = ustrip(uconvert(u"mol/L",net_hydrogen_ion_concentration(s)))
-        iszero(conc) ? 7.0 : conc>0 ? -log10(conc) : 14-(-log10(-conc))
-    end
+    netconc(s) = ustrip(uconvert(u"mol/L",net_hydrogen_ion_concentration(s)))
 
-    @test pH(neutral) == expected(neutral)
-    @test pH(acidic) == expected(acidic)
-    @test pH(basic) == expected(basic)
+    @test pH(neutral) == 7.0
+    # these stocks are far from neutrality (|n| >> sqrt(Kw)), where the closed form must agree with the
+    # simple -log10(n) / 14+log10(-n) estimate to within the Kw/n^2 term
+    @test pH(acidic) ≈ -log10(netconc(acidic)) atol=1e-9
+    @test pH(basic) ≈ 14+log10(-netconc(basic)) atol=1e-9
+
+    # near neutrality, water autoionization matters: 1e-8 M excess strong acid gives 6.978, not 8
+    @test CHESSCore._pH_strong_electrolyte_only(1.0e-8u"mol/L") ≈ 6.9783 atol=1e-4
+    @test CHESSCore._pH_strong_electrolyte_only(-1.0e-8u"mol/L") ≈ 14-6.9783 atol=1e-4
+    # symmetric: pH(n) + pH(-n) == 14
+    @test CHESSCore._pH_strong_electrolyte_only(3.0e-7u"mol/L")+CHESSCore._pH_strong_electrolyte_only(-3.0e-7u"mol/L") ≈ 14.0 atol=1e-9
 
     families,strong_ions = CHESSCore._analytical_species(neutral)
     @test isempty(families) # confirms this really is the fast path, not a coincidence
@@ -674,6 +679,18 @@ end
     conc_fam = AnalyticalSpecies(conc_sys,1.0u"mol/L")
     p2 = pH([conc_fam],Tuple{CHESSCore.Species,Unitful.Molarity}[];ionic_strength_correction=true)
     @test isfinite(p2)
+
+    # low-level fast path (no families): net positive strong-ion charge is balanced by OH-, so basic;
+    # net negative is balanced by H+, so acidic -- the same sign convention as the general solver
+    test_cation = CHESSCore.Species("TestCation",1,23.0u"g/mol")
+    test_anion = CHESSCore.Species("TestAnion",-1,35.0u"g/mol")
+    no_families = CHESSCore.AbstractAnalyticalSpecies[]
+    @test pH(no_families,[(test_cation,1e-3u"mol/L")]) ≈ 11.0 atol=1e-6
+    @test pH(no_families,[(test_anion,1e-3u"mol/L")]) ≈ 3.0 atol=1e-6
+    @test pH(no_families,[(test_cation,1e-3u"mol/L"),(test_anion,1e-3u"mol/L")]) == 7.0
+    # agrees with the general solver, forced through a negligible family so the fast path is bypassed
+    tiny_fam = AnalyticalSpecies(dilute_sys,1e-12u"mol/L")
+    @test pH([tiny_fam],[(test_cation,1e-3u"mol/L")];ionic_strength_correction=false) ≈ pH(no_families,[(test_cation,1e-3u"mol/L")]) atol=1e-4
 end
 
 @testset "adjust_pH" begin

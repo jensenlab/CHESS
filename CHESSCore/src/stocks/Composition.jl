@@ -215,11 +215,11 @@ depends on the very speciation it corrects. Set `ionic_strength_correction=false
 
 Fast path: when no reagent in `s` has a registered `AcidBaseSystem` (the common
 complete/strong-electrolyte-only case -- e.g. a stock built only from NaCl, HCl, NaOH, ...), this
-computes the exact original closed-form formula directly from
-[`net_hydrogen_ion_concentration`](@ref) (`7.0` if net-neutral, `-log10` of the net H⁺ concentration
-if acidic, `14 - (-log10(...))` if basic) -- guaranteed bit-identical to CHESSCore's original
-strong-electrolyte-only `pH`, not merely expected to converge to the same place via the general
-solver. Strong bases should still register their real dissolution (e.g. `Na⁺ + OH⁻` for
+computes a closed form directly from
+[`net_hydrogen_ion_concentration`](@ref) `n`: the positive root of `[H⁺] - Kw/[H⁺] = n` (see
+`CHESSCore._pH_strong_electrolyte_only`), which includes water autoionization and so stays
+correct near neutrality (`7.0` exactly if net-neutral). No activity correction is applied on this
+path. Strong bases should still register their real dissolution (e.g. `Na⁺ + OH⁻` for
 NaOH) via [`set_dissolution!`](@ref) -- mixing an acid and a base nets out through this same
 mechanism either way.
 
