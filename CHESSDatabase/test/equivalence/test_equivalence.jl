@@ -76,9 +76,10 @@ function eqv_snapshot(loc)
     c = children(loc)
     push!(parts,(:children,c isa AbstractMatrix ? [isassigned(c,i) ? location_id(c[i]) : nothing for i in eachindex(c)] : sort!(location_id.(collect(c)))))
     if loc isa CHESSCore.Well
-        push!(parts,(:stock,eqv_stock_summary(CHESSCore.stock(loc)),round(Float64(CHESSCore.cost(loc));sigdigits=9)))
+        push!(parts,(:stock,eqv_stock_summary(CHESSCore.stock(loc))))
     end
     hasproperty(loc,:is_locked) && push!(parts,(:locked,CHESSCore.is_locked(loc)))
+    hasproperty(loc,:lot) && push!(parts,(:lot,string(loc.lot)))
     push!(parts,(:active,CHESSCore.is_active(loc)))
     push!(parts,(:reads,sort!(string.(collect(CHESSCore.reads(loc))))))
     return parts
@@ -156,6 +157,17 @@ const EQV_FUNCTION_CHECKS = Tuple{String,Function,Function}[
     ("get_instrument_settings",eqv_canon,(M,p)->M.get_instrument_settings(p.loc,p.seq,eqv_time(p))),
     ("get_reads",eqv_canon,(M,p)->M.get_reads(p.loc,p.seq,eqv_time(p))),
     ("get_all_protocols",eqv_canon,(M,p)->M.get_all_protocols(p.seq,eqv_time(p);enforced_only=p.enc)),
+    ("reconstruct_lot",eqv_canon,(M,p)->M.reconstruct_lot(p.loc,p.seq,eqv_time(p))),
+    ("trace_forward(well)",eqv_canon,(M,p)->M.trace_forward(p.loc,p.seq,eqv_time(p))),
+    ("trace_forward(lot)",eqv_canon,(M,p)->M.trace_forward(Lot("EQV Supplier","EQV-$(p.loc % 2)","LOT$(p.loc2 % 4)"),p.seq,eqv_time(p))),
+    ("trace_contents",eqv_canon,(M,p)->M.trace_contents(p.loc,p.seq,eqv_time(p))),
+    ("reconstruct_cost",eqv_canon,(M,p)->M.reconstruct_cost(p.loc,p.seq,eqv_time(p))),
+    ("find_locations()",eqv_canon,(M,p)->M.find_locations(;sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(parent)",eqv_canon,(M,p)->M.find_locations(;parent=p.loc,sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(kind, active)",eqv_canon,(M,p)->M.find_locations(;kind=p.enc ? :WP96 : :Well200,active=p.loc2 % 2 == 0,sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(no parent)",eqv_canon,(M,p)->M.find_locations(;parent=nothing,kind=:WP96,sequence_id=p.seq,time=eqv_time(p))),
+    ("descendants",eqv_canon,(M,p)->M.descendants(p.loc;sequence_id=p.seq,time=eqv_time(p))),
+    ("descendants(kinds, depth)",eqv_canon,(M,p)->M.descendants(p.loc;kinds=[:Well200],max_depth=2,sequence_id=p.seq,time=eqv_time(p))),
     ("get_last_sequence_id",eqv_canon,(M,p)->M.get_last_sequence_id(eqv_time(p))),
     ("get_last_ledger_id(time)",eqv_canon,(M,p)->M.get_last_ledger_id(eqv_time(p))),
     ("get_last_ledger_id(slot,time)",eqv_canon,(M,p)->M.get_last_ledger_id(p.seq,eqv_time(p))),
@@ -205,7 +217,7 @@ end
 
 const EQV_OPERATION_TABLES = ["Transfers","Movements","EnvironmentAttributes","Reads","Locks","Activity","InstrumentSettings",
     "CachedContents","CachedAncestors","CachedDescendants","CachedEnvironments","CachedLockActivity",
-    "ObservedParents","ObservedAttributes","ObservedLocks","ObservedActivity","ObservedComponents","ObservedCosts","ProtocolEnforcement"]
+    "ObservedParents","ObservedAttributes","ObservedLocks","ObservedActivity","ObservedComponents","ProtocolEnforcement","Discards","ObservedLots"]
 
 """
     eqv_check_visibility(rng, w, n; predicate) -> Int

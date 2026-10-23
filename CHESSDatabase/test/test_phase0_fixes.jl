@@ -73,8 +73,8 @@ end
             upload(move_into!,room,l)
         end
         src,other_src,dest = bottle[1,1],other[1,1],plate[1,1]
-        deposit!(src,500u"mL"*rgt"water",1); cache(src)
-        deposit!(other_src,500u"mL"*rgt"water",1); cache(other_src)
+        deposit!(src,500u"mL"*rgt"water"); cache(src)
+        deposit!(other_src,500u"mL"*rgt"water"); cache(other_src)
         lid = upload(transfer!,src,dest,50u"µL")
         @test CHESSDatabase.validate(lid) === nothing # healthy ledger
 

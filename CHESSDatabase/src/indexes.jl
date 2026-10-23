@@ -35,7 +35,10 @@ const CHESS_INDEXES = Tuple{String,Vector{String}}[
     ("ObservedLocks",["LocationID","LedgerID"]),
     ("ObservedActivity",["LocationID","LedgerID"]),
     ("ObservedComponents",["LocationID","LedgerID"]),
-    ("ObservedCosts",["LocationID","LedgerID"]),
+    ("ObservedLots",["ProductID","Lot"]),
+    ("ObservedLots",["LocationID","LedgerID"]),
+    ("Discards",["Source","LedgerID"]),
+    ("Discards",["LedgerID"]),
 
     ("CachedContents",["LocationID","LedgerID"]),
     ("CachedAncestors",["LocationID","LedgerID"]),

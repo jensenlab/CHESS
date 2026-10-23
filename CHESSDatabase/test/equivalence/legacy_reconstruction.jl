@@ -1,14 +1,15 @@
 # FROZEN ORACLE -- do not edit, do not "fix", do not delete code from it.
 #
-# A verbatim copy of the ledger-visibility reconstruction code of CHESSDatabase as it was at commit d232bbd
-# (the original ledger_subset queries and everything that calls them), in its own module so the tests can
+# A verbatim copy of the ledger-visibility reconstruction code of CHESSDatabase as it was at commit 4e09b96
+# (ledger getters: d232bbd) (the original ledger_subset queries and everything that calls them), in its own module so the tests can
 # call "the old function" next to the new one on the same database. Plan decision D9. It is deliberately
 # independent of the production source: when production code changes, this file does not.
 #
 # Contents, in order: the ledger getters (ledger.jl); the pure helpers of reconstruction_utils.jl; the
 # files reconstruct_{parent,children,attributes,environment,contents,lock,activity,reads,location}.jl whole;
 # get_instrument_settings (instrument_settings.jl); get_all_protocols (encumbrances.jl);
-# observation_discrepancies (observations.jl). Functions that read no ledger-visible state
+# observation_discrepancies (observations.jl); reconstruct_lot (lots.jl); tracing.jl, forward_tracing.jl and
+# location_queries.jl whole. Functions that read no ledger-visible state
 # (get_location_info, get_stock, get_component, ...) are imported from CHESSDatabase instead of copied.
 # The only edit is the module wrapper and the imports below.
 module Legacy
@@ -16,7 +17,7 @@ module Legacy
 using CHESSCore, Dates, DataFrames, Unitful
 import CHESSDatabase
 import CHESSDatabase: query_db, execute_db, db_time, julia_time, query_join_vector, get_location_info,
-    get_stock, get_component, _parse_unit, get_sequence_id
+    get_stock, get_component, _parse_unit, get_sequence_id, container_wells, well_container, well_containers, _id_chunk
 
 # ===================================================================== ledger.jl (getters)
 """
@@ -137,6 +138,7 @@ end
 # exactly like the operation it declares the outcome of. Observed attributes that only confirmed an
 # inherited value (IsInherited = 1) never become own attributes, so they're left out.
 const movement_events = "(SELECT LedgerID,Parent,Child FROM Movements UNION ALL SELECT LedgerID,Parent,Child FROM ObservedParents)"
+const transfer_events = "(SELECT LedgerID,Source,Destination,Quantity,Unit FROM Transfers UNION ALL SELECT LedgerID,Source,NULL AS Destination,Quantity,Unit FROM Discards)"
 const attribute_events = "(SELECT LedgerID,LocationID,Attribute,Value,Unit FROM EnvironmentAttributes UNION ALL SELECT LedgerID,LocationID,Attribute,Value,Unit FROM ObservedAttributes WHERE IsInherited = 0)"
 const lock_events = "(SELECT LedgerID,LocationID,IsLocked FROM Locks UNION ALL SELECT LedgerID,LocationID,IsLocked FROM ObservedLocks)"
 const activity_events = "(SELECT LedgerID,LocationID,IsActive FROM Activity UNION ALL SELECT LedgerID,LocationID,IsActive FROM ObservedActivity)"
@@ -884,11 +886,11 @@ function get_content_caches(location_id::Integer, starting::Integer=0, ending::I
 
         ),
         
-            y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,StockID,Cost)
-        AS(SELECT e.EncumbranceID,0,0,e.EncumbranceID,v.LocationID, v.StockID,v.Cost
+            y (ID,LedgerID,SequenceID,EncumbranceID,LocationID,StockID)
+        AS(SELECT e.EncumbranceID,0,0,e.EncumbranceID,v.LocationID, v.StockID
             FROM encumbrance_subset e INNER JOIN EncumberedCachedContents v ON e.EncumbranceID = v.EncumbranceID
         UNION ALL 
-            SELECT Max(c.ID),c.LedgerID,l.SequenceID,0,c.LocationID,c.StockID,c.Cost
+            SELECT Max(c.ID),c.LedgerID,l.SequenceID,0,c.LocationID,c.StockID
             FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID = $location_id AND c.Time <= $ledger_time Group By l.SequenceID) 
             SELECT * FROM y WHERE LocationID=$location_id ORDER BY EncumbranceID,SequenceID ")
     else
@@ -897,8 +899,8 @@ function get_content_caches(location_id::Integer, starting::Integer=0, ending::I
         AS(
             SELECT Max(ID), SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID 
             ) ,
-        y (ID,LedgerID,SequenceID, EncumbranceID,LocationID,StockID,Cost)
-        AS( SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.StockID,c.Cost FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID =$location_id AND c.Time <= $ledger_time Group By LedgerID ORDER BY SequenceID ) 
+        y (ID,LedgerID,SequenceID, EncumbranceID,LocationID,StockID)
+        AS( SELECT Max(c.ID),c.LedgerID,l.SequenceID,0, c.LocationID,c.StockID FROM CachedContents c INNER JOIN ledger_subset l ON c.LedgerID = l.ID WHERE c.LocationID =$location_id AND c.Time <= $ledger_time Group By LedgerID ORDER BY SequenceID ) 
         SELECT * from y
         " )
         
@@ -953,7 +955,7 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
             FROM encumbrance_subset e INNER JOIN EncumberedTransfers c ON e.EncumbranceID = c.EncumbranceID
         UNION ALL
             SELECT t.LedgerID,l.SequenceID,0,t.Source, t.Destination, t.Quantity, t.Unit
-            FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID ) ,
+            FROM $(transfer_events) t INNER JOIN ledger_subset l ON t.LedgerID = l.ID ) ,
         x (LedgerID,SequenceID,EncumbranceID,Source,Destination,Quantity,Unit)
         AS(
          SELECT y.LedgerID,y.SequenceID,y.EncumbranceID, Source,Destination,y.Quantity,y.Unit
@@ -990,7 +992,7 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
          -- for a well that was never bootstrapped.
          y (LedgerID,Source,Destination,Quantity,Unit)
         AS(SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit
-            FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
+            FROM $(transfer_events) t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
 
          x (LedgerID,Source,Destination,Quantity,Unit)
         AS(
@@ -1086,6 +1088,7 @@ function transfers_touch(location_id,starting::Integer=0,ending::Integer=get_las
     out=get_transfer_descendents([location_id],starting,ending,time;encumbrances=encumbrances) 
     out_set=Tuple{Integer,Integer,Integer}[]
     for row in eachrow(out)
+        ismissing(row.Destination) && continue # a discard reaches no other well
         push!(out_set,(row.Destination,row.LedgerID,row.EncumbranceID))
     end
     return out_set
@@ -1095,6 +1098,7 @@ function transfers_touched_by(location_id,starting::Integer=0,ending::Integer=ge
     out=get_transfer_ancestors([location_id],starting,ending,time;encumbrances=encumbrances) 
     out_set=Tuple{Integer,Integer,Integer}[]
     for row in eachrow(out)
+        ismissing(row.Destination) && continue # a discard reaches no other well
         push!(out_set,(row.Destination,row.LedgerID,row.EncumbranceID))
     end
     return out_set
@@ -1107,7 +1111,7 @@ end
     fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time::DateTime=Dates.now();encumbrances=false)
 
 Look up `location_id`'s most recent cached [`Stock`](@ref) within `starting..ending`. Returns
-`(stock, cost, foot)`.
+`(stock, foot)`.
 
 `stock` is `nothing` when no `CachedContents` row exists in that window at all -- distinct from a
 row that exists and legitimately caches an empty stock (which returns `Empty()`, not `nothing`).
@@ -1117,26 +1121,25 @@ empty as of this cache point."
 """
 function fetch_content_cache(location_id::Integer,starting::Integer,ending::Integer,time::DateTime=Dates.now();encumbrances=false)
     caches=get_content_caches(location_id,starting,ending,time;encumbrances=encumbrances)
-    nrow(caches) == 0 && return nothing, 0, 0
+    nrow(caches) == 0 && return nothing, 0
 
     row=caches[end,:]
     stock_id=row.StockID
     foot=row.SequenceID
-    cost=row.Cost
 
     stock=Empty()
     if !ismissing(stock_id)
         stock=get_stock(stock_id)
     end
 
-    return stock , cost, foot
+    return stock, foot
 end
 
 """
     reconstruct_contents(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Location
     reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false) -> Vector{<:Location}
 
-Rebuild the stock and cost of wells from the ledger's transfer history, returning new locations for
+Rebuild the stock of wells from the ledger's transfer history, returning new locations for
 the given IDs. [`reconstruct_contents!`](@ref) writes the result into existing
 [`Location`](@ref)s instead. IDs that are not [`Well`](@ref)s come back as bare locations with no contents.
 
@@ -1158,9 +1161,9 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
             push_location!(all_locs,loc_id,0,loc)
             continue
         end
-        stock,cost,cache_foot = fetch_content_cache(loc_id,0,max_cache,time;encumbrances=encumbrances)
+        stock,cache_foot = fetch_content_cache(loc_id,0,max_cache,time;encumbrances=encumbrances)
         if !isnothing(stock)
-            deposit!(loc,stock,cost)
+            deposit!(loc,stock)
         end
 
         push_location!(all_locs,CHESSCore.location_id(loc),cache_foot,loc)
@@ -1188,12 +1191,12 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         for row in eachrow(transfers)
             if row.Core == 1
                 push!(core_locs,row.Source)
-                push!(core_locs,row.Destination)
+                ismissing(row.Destination) || push!(core_locs,row.Destination)
             end
         end
     end
 
-    # component and cost observations on every well whose own state this call reads back: the
+    # component observations on every well whose own state this call reads back: the
     # requested wells plus the core ancestor closure. Collateral destinations never need them.
     target_wells=filter(id -> find_most_recent_location(all_locs,id) isa CHESSCore.Well,location_ids)
     observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time)
@@ -1207,7 +1210,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
 
 
         cache_dict[row.Source]=seq_id
-        cache_dict[row.Destination]=seq_id
+        ismissing(row.Destination) || (cache_dict[row.Destination]=seq_id)
     end
     # a core well must also be bootstrapped from before its first observation
     for row in eachrow(observations)
@@ -1224,11 +1227,11 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
             continue
         end
 
-        new_stock,new_cost,new_foot=fetch_content_cache(loc_id,foot,cache_dict[loc_id],time;encumbrances=false)
+        new_stock,new_foot=fetch_content_cache(loc_id,foot,cache_dict[loc_id],time;encumbrances=false)
         n,t=get_location_info(loc_id)
         new_loc=t(loc_id,n)
         if !isnothing(new_stock)
-            deposit!(new_loc,new_stock,new_cost)
+            deposit!(new_loc,new_stock)
             push_location!(all_locs,loc_id,new_foot,new_loc)
         else
             push!(reconstructions_needed,loc_id)
@@ -1257,7 +1260,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         quant= row.Quantity * _parse_unit(row.Unit)
         src = find_most_recent_location(all_locs,row.Source,seq_id)
 
-        if row.Core == 0
+        if row.Core == 0 || ismissing(row.Destination) # a discard has no destination to track
             # Collateral: this row exists only so a *core* location's balance is correctly reduced
             # by whatever it sent elsewhere -- the destination itself is never read back out of this
             # call (see get_transfer_ancestors's docstring), so there's no need to find, deepcopy, or
@@ -1288,7 +1291,7 @@ end
     reconstruct_contents!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
     reconstruct_contents!(locations::Vector{<:Location}, sequence_id=get_last_sequence_id(), time=Dates.now(), max_cache=sequence_id; encumbrances=false)
 
-Set the stock and cost of each [`Well`](@ref) in `locations` to its reconstructed state. Other
+Set the stock of each [`Well`](@ref) in `locations` to its reconstructed state. Other
 locations are left alone. Arguments work as in [`reconstruct_contents`](@ref).
 """
 function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)
@@ -1299,7 +1302,6 @@ function reconstruct_contents!(locations::Vector{<:Location},sequence_id::Intege
     for i in eachindex(locations)
         if locations[i] isa CHESSCore.Well
             locations[i].stock=CHESSCore.stock(parallel_locs[i])
-            locations[i].cost=CHESSCore.cost(parallel_locs[i])
         else
             continue 
         end 
@@ -1311,7 +1313,6 @@ function reconstruct_contents!(location::Location,sequence_id::Integer=get_last_
     parallel_loc=reconstruct_contents(location_id(location),sequence_id,time,max_cache,loc_index,encumbrances=encumbrances)
     if location isa CHESSCore.Well
         location.stock=CHESSCore.stock(parallel_loc)
-        location.cost=CHESSCore.cost(parallel_loc)
     end 
     return nothing 
 end 
@@ -1331,13 +1332,12 @@ end
 """
     get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
 
-Every component and cost observation on `locs` between `starting` and `ending` sequence points,
-ordered by `SequenceID`. Component rows have a missing `Cost`, and cost rows a missing
-`ComponentID`/`Quantity`/`Unit`.
+Every component observation on `locs` between `starting` and `ending` sequence points,
+ordered by `SequenceID`.
 """
 function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
     isempty(locs) && return DataFrame(LedgerID=Int[],SequenceID=Int[],LocationID=Int[],ComponentID=Union{Int,Missing}[],
-        Quantity=Union{Float64,Missing}[],Unit=Union{String,Missing}[],Cost=Union{Float64,Missing}[])
+        Quantity=Union{Float64,Missing}[],Unit=Union{String,Missing}[])
     ledger_time=db_time(time)
     entry=query_join_vector(locs)
     return query_db("""
@@ -1345,11 +1345,8 @@ function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,en
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             )
-        SELECT o.LedgerID,l.SequenceID,o.LocationID,o.ComponentID,o.Quantity,o.Unit,NULL AS Cost
+        SELECT o.LedgerID,l.SequenceID,o.LocationID,o.ComponentID,o.Quantity,o.Unit
             FROM ObservedComponents o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
-        UNION ALL
-        SELECT o.LedgerID,l.SequenceID,o.LocationID,NULL,NULL,NULL,o.Cost
-            FROM ObservedCosts o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
         ORDER BY SequenceID
         """)
 end
@@ -1369,12 +1366,8 @@ function _apply_content_observations!(all_locs,rows)
     isnothing(entry) && return nothing
     loc=deepcopy(entry[2])
     for row in eachrow(rows)
-        if ismissing(row.ComponentID)
-            loc.cost=row.Cost
-        else
-            quant=row.Quantity*_parse_unit(row.Unit)
-            loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
-        end
+        quant=row.Quantity*_parse_unit(row.Unit)
+        loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
     end
     push_location!(all_locs,loc_id,seq_id,loc)
     return nothing
@@ -1825,10 +1818,11 @@ See Also: [`reconstruct_location`](@ref)
 function reconstruct_location!(loc::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     reconstruct_environment!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs full parent chain and environmental attributes. We don't need to call reconstruct_parent  and reconstruct_attribute seperately if doing a full environment reconstruction
     reconstruct_children!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # finds the current children of the location but doesn't fully reconstruct them, just creates a reference. 
-    reconstruct_contents!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs stock and cost fields for wells
+    reconstruct_contents!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the stock of wells
     reconstruct_lock!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the locked state (recall locks prevent movement)
     reconstruct_activity!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the activity state
     reconstruct_reads!(loc,sequence_id,time,max_cache;encumbrances=encumbrances) # reconstructs the reads recorded for the location
+    reconstruct_lot!(loc,sequence_id,time) # reconstructs the lot a labware was received as
     return nothing
 end
 
@@ -1942,7 +1936,7 @@ _components(s::Stock) = merge(Dict{StockComponent,Any}(),solids(s),liquids(s),or
 
 Compare every observation of `location_ids` up to `sequence_id` with what history predicted just
 before it, and return the ones that differ as a `DataFrame` with columns `LedgerID`, `SequenceID`,
-`LocationID`, `Facet` (`"component"`, `"cost"`, `"attribute"`, `"parent"`, `"locked"` or `"active"`),
+`LocationID`, `Facet` (`"component"`, `"attribute"`, `"parent"`, `"locked"` or `"active"`),
 `Key` (the component or attribute, else `missing`), `Predicted` and `Observed`.
 
 Attributes are compared with the location's effective environment, so a value it inherits counts.
@@ -1963,10 +1957,6 @@ function observation_discrepancies(location_ids::Vector{<:Integer};sequence_id::
         comps=_components(CHESSCore.stock(reconstruct_contents(row.LocationID,row.SequenceID-1)))
         predicted=haskey(comps,component) ? uconvert(unit(observed),comps[component]) : zero(observed)
         isapprox(predicted,observed;rtol=1e-9) || report!(row,row.LocationID,"component",component,predicted,observed)
-    end
-    for row in eachrow(rows("ObservedCosts"))
-        predicted=CHESSCore.cost(reconstruct_contents(row.LocationID,row.SequenceID-1))
-        isapprox(predicted,row.Cost;rtol=1e-9) || report!(row,row.LocationID,"cost",missing,predicted,row.Cost)
     end
     for row in eachrow(rows("ObservedAttributes"))
         kind=get_attribute(row.Attribute)
@@ -1995,5 +1985,504 @@ end
 observation_discrepancies(location_id::Integer;kwargs...) = observation_discrepancies([location_id];kwargs...)
 
 
+
+# ===================================================================== lots.jl (reconstruct_lot)
+"""
+    reconstruct_lot(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now()) -> Union{Lot,Nothing}
+
+The [`Lot`](@ref) most recently observed for the location as of `sequence_id` and `time`, or `nothing`
+when none was observed.
+
+See also: [`reconstruct_lot!`](@ref).
+"""
+function reconstruct_lot(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    rows=query_db("""
+        WITH ledger_subset (ID,SequenceID) AS (
+            SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID)
+        SELECT p.Supplier, p.CatalogNumber, o.Lot, o.GTIN, o.Quantity, o.Unit, o.Cost, o.Received, o.Notes
+        FROM ObservedLots o INNER JOIN ledger_subset l ON o.LedgerID = l.ID INNER JOIN Products p ON o.ProductID = p.ID
+        WHERE o.LocationID = ? ORDER BY l.SequenceID DESC, o.ID DESC LIMIT 1
+        """,(db_time(time),sequence_id,location_id))
+    nrow(rows)==0 && return nothing
+    r=rows[1,:]
+    quantity = ismissing(r.Quantity) ? missing : r.Quantity*_parse_unit(r.Unit)
+    received = ismissing(r.Received) ? missing : Date(r.Received)
+    return Lot(r.Supplier,r.CatalogNumber,r.Lot;gtin=r.GTIN,quantity,cost=r.Cost,received,notes=r.Notes)
+end
+
+"""
+    reconstruct_lot!(location::Location, sequence_id=get_last_sequence_id(), time=Dates.now())
+
+Set the lot of a [`Labware`](@ref) to its reconstructed lot. Other locations have no lot and are left
+unchanged. Arguments work as in [`reconstruct_lot`](@ref).
+"""
+function reconstruct_lot!(location::Labware,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    location.lot=reconstruct_lot(location_id(location),sequence_id,time)
+    return nothing
+end
+reconstruct_lot!(::Location,args...) = nothing
+
+# ===================================================================== tracing.jl
+# Tracing: which lots the material in a well came from, found by replaying the ledger. A trace is
+# computed on demand and never stored. It follows the same transfers and component observations as
+# `reconstruct_contents`, and carries alongside each well's stock the quantity of each component that
+# came from each lot.
+
+# Replay state of one well: its stock, and the quantity of each component traced to a lot. Material in
+# the stock that no share accounts for is untraced.
+mutable struct _TracedWell
+    stock::Stock
+    shares::Dict{Tuple{StockComponent,Lot},Unitful.Quantity}
+end
+_TracedWell() = _TracedWell(Empty(),Dict{Tuple{StockComponent,Lot},Unitful.Quantity}())
+
+function _component_quantity(st::Stock,component::StockComponent)
+    dict = component isa Solid ? solids(st) : component isa Liquid ? liquids(st) : organisms(st)
+    return get(dict,component,nothing)
+end
+
+# move the fraction `factor` of a well's stock and traced shares out, returning what left
+function _withdraw_traced!(w::_TracedWell,quant)
+    factor = Unitful.uconvert(Unitful.NoUnits,quant/CHESSCore.quantity(w.stock))
+    out_stock = factor*w.stock
+    out_shares = Dict(k=>factor*q for (k,q) in w.shares)
+    w.stock = w.stock - out_stock
+    for (k,q) in out_shares
+        w.shares[k] -= q
+    end
+    return out_stock,out_shares
+end
+
+function _deposit_traced!(w::_TracedWell,stock::Stock,shares)
+    w.stock = w.stock + stock
+    mergewith!(+,w.shares,shares)
+    return nothing
+end
+
+# State that `component` is present in the well at exactly `quant`. Material already there keeps its
+# proportions among lots and untraced material. A component appearing in an empty well is traced to the
+# lot of the well's labware, when it has one.
+function _observe_traced!(w::_TracedWell,component::StockComponent,quant,bottle_lot::Union{Lot,Nothing})
+    old = _component_quantity(w.stock,component)
+    w.stock = set_component(w.stock,component,quant)
+    if isnothing(old) || iszero(old)
+        for k in filter(k->k[1]==component,collect(keys(w.shares)))
+            delete!(w.shares,k)
+        end
+        isnothing(bottle_lot) || iszero(quant) || (w.shares[(component,bottle_lot)] = quant)
+    else
+        factor = Unitful.uconvert(Unitful.NoUnits,quant/old)
+        for k in keys(w.shares)
+            k[1]==component && (w.shares[k] *= factor)
+        end
+    end
+    return nothing
+end
+
+"""
+    trace_contents(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now()) -> DataFrame
+
+Trace what a well holds back to the lots it came from, as of `sequence_id` and `time`. The result has one
+row for each component and lot, with columns `Component`, `Lot`, and `Quantity`. Material that cannot be
+tied to a lot, such as water drawn from a tap, appears as a row with a `missing` `Lot`.
+
+The trace follows the transfers into the well and the observations of its ancestors, with each transfer
+taking the same fraction of every lot's share of a component as of the component itself. A component
+observed in a well that held none of it comes from the [`Lot`](@ref) of the well's labware as of
+`sequence_id`, which is how a bottle's contents are attributed to the bottle's lot. A component observed
+in a well that already held some keeps its proportions among lots.
+
+The trace is computed from the ledger each time and is not stored. See also [`trace_cost`](@ref).
+"""
+function trace_contents(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    name,build = get_location_info(location_id)
+    build(location_id,name) isa CHESSCore.Well || error("only a well holds contents to trace, and location $location_id is not one")
+    transfers = get_transfer_ancestors([location_id],0,sequence_id,time)
+    core = Set{Int}([location_id])
+    for row in eachrow(transfers)
+        row.Core == 1 && union!(core,ismissing(row.Destination) ? (row.Source,) : (row.Source,row.Destination))
+    end
+    observations = get_content_observations(collect(core),0,sequence_id,time)
+
+    wells = Dict{Int,_TracedWell}()
+    well(id) = get!(()->_TracedWell(),wells,id)
+    lots = Dict{Int,Union{Lot,Nothing}}()
+    function bottle_lot(well_id)
+        get!(lots,well_id) do
+            parent = CHESSCore.parent(reconstruct_parent(well_id,sequence_id,time))
+            isnothing(parent) ? nothing : reconstruct_lot(CHESSCore.location_id(parent),sequence_id,time)
+        end
+    end
+    components = Dict{Int,StockComponent}()
+    component(id) = get!(()->get_component(id),components,id)
+
+    events = vcat([(row.SequenceID,:transfer,row) for row in eachrow(transfers)],
+                  [(row.SequenceID,:observation,row) for row in eachrow(observations)])
+    sort!(events;by=first)
+    for (_,kind,row) in events
+        quant = row.Quantity*_parse_unit(row.Unit)
+        if kind === :observation
+            _observe_traced!(well(row.LocationID),component(row.ComponentID),quant,bottle_lot(row.LocationID))
+        elseif row.Core == 1 && !ismissing(row.Destination)
+            out_stock,out_shares = _withdraw_traced!(well(row.Source),quant)
+            _deposit_traced!(well(row.Destination),out_stock,out_shares)
+        else # a discard, or a core well's outgoing transfer to a well that never feeds back into it
+            _withdraw_traced!(well(row.Source),quant)
+        end
+    end
+
+    result = DataFrame(Component=StockComponent[],Lot=Union{Lot,Missing}[],Quantity=Unitful.Quantity[])
+    w = well(location_id)
+    for (component,total) in _components(w.stock)
+        traced = [(k[2],q) for (k,q) in w.shares if k[1]==component]
+        sort!(traced;by=t->(t[1].supplier,t[1].catalog_number,t[1].lot))
+        for (lot,q) in traced
+            push!(result,(component,lot,q))
+        end
+        remainder = total - sum(last.(traced);init=zero(total))
+        abs(Unitful.ustrip(remainder)) > 1e-9*abs(Unitful.ustrip(total)) && push!(result,(component,missing,remainder))
+    end
+    return result
+end
+
+# What `quantity` of `component` costs, given the lot's price for its whole quantity. `missing` when the
+# lot has no cost or quantity or its quantity cannot be expressed in the component's terms.
+function _lot_cost(component::StockComponent,lot::Union{Lot,Missing},quantity)
+    (ismissing(lot) || ismissing(lot.cost) || ismissing(lot.quantity)) && return missing
+    total = try
+        _in_quantity_of(component,lot.quantity,quantity)
+    catch err
+        err isa Union{ArgumentError,Unitful.DimensionError} || rethrow()
+        return missing
+    end
+    return lot.cost*Unitful.uconvert(Unitful.NoUnits,quantity/total)
+end
+
+# a lot's purchased quantity in the dimension of `like`, converting through the component's density or
+# molar mass when the lot is bought in a different dimension than the component is tracked in
+function _in_quantity_of(component::StockComponent,purchased,like)
+    Unitful.dimension(purchased) == Unitful.dimension(like) && return purchased
+    component isa Reagent || throw(ArgumentError("$(component) cannot be converted between dimensions"))
+    mass = Unitful.dimension(purchased) == Unitful.dimension(u"g") ? purchased :
+           Unitful.dimension(purchased) == Unitful.dimension(u"mol") ? purchased*molecular_weight(component) :
+           purchased*density(component)
+    Unitful.dimension(like) == Unitful.dimension(u"g") && return Unitful.uconvert(Unitful.unit(like),mass)
+    return Unitful.uconvert(Unitful.unit(like),mass/density(component))
+end
+
+"""
+    trace_cost(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now()) -> DataFrame
+
+The cost of what a well holds, share by share. It is [`trace_contents`](@ref) with a `Cost` column: the
+cost of each share is the lot's `cost` times the share's fraction of the lot's `quantity`. The cost is
+`missing` for a share with no lot, and for one whose lot has no cost or quantity.
+
+See also: [`reconstruct_cost`](@ref).
+"""
+function trace_cost(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    traced = trace_contents(location_id,sequence_id,time)
+    traced.Cost = Union{Float64,Missing}[_lot_cost(r.Component,r.Lot,r.Quantity) for r in eachrow(traced)]
+    return traced
+end
+
+"""
+    reconstruct_cost(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(); strict=false)
+
+The cost of what a well holds: the sum of [`trace_cost`](@ref) over the shares whose cost is known. Material
+with no known cost does not add to the sum, so the result is a lower bound unless every share is costed.
+With `strict=true` the result is `missing` unless every share is costed.
+"""
+function reconstruct_cost(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now();strict::Bool=false)
+    costs = trace_cost(location_id,sequence_id,time).Cost
+    strict && any(ismissing,costs) && return missing
+    return sum(skipmissing(costs);init=0.0)
+end
+
+# ===================================================================== forward_tracing.jl
+# Forward tracing: where material went after it was in a well or lot. This is the reverse of
+# `trace_contents`, which finds the lots that the material in a well came from. A forward trace follows
+# the recorded transfers out of a well, and out of every well they reach, in the order they happened. It is
+# computed from the ledger each time and nothing is stored, so an amendment (`update` with `replace` or
+# `insert`) changes the next answer, and a trace as of an earlier sequence ID still gives the old one.
+
+# the transfers out of `sources` as of `sequence_id` and `time`, one row per transfer
+function _transfers_out_of(sources::AbstractVector{<:Integer},sequence_id::Integer,time::DateTime)
+    out=DataFrame(LedgerID=Int[],SequenceID=Int[],Source=Int[],Destination=Int[])
+    for chunk in Iterators.partition(sources,_id_chunk)
+        marks="("*join(fill("?",length(chunk)),",")*")"
+        rows=query_db("""
+            WITH ledger_subset (ID,SequenceID) AS (
+                SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID)
+            SELECT t.LedgerID, l.SequenceID, t.Source, t.Destination
+            FROM Transfers t INNER JOIN ledger_subset l ON t.LedgerID = l.ID
+            WHERE t.Source IN $marks
+            """,(db_time(time),sequence_id,chunk...))
+        append!(out,rows)
+    end
+    return out
+end
+
+# Spread from `seeds`, a dictionary from well ID to the sequence ID from which the well's material may
+# be passed on. A transfer out of a well at sequence `s` carries the material on only if `s` is no
+# earlier than the sequence from which the well has it (strictly later for a well that received it by
+# transfer). Each well is kept at the earliest sequence it can be reached, which is repeated until nothing
+# changes.
+function _spread_forward(seeds::AbstractDict{<:Integer,<:Integer},sequence_id::Integer,time::DateTime)
+    reached=Dict{Int,NamedTuple{(:sequence,:ledger,:depth,:via),Tuple{Int,Union{Int,Missing},Int,Union{Int,Missing}}}}()
+    frontier=Int[]
+    for (w,s) in seeds
+        reached[w]=(sequence=s,ledger=missing,depth=0,via=missing)
+        push!(frontier,w)
+    end
+    while !isempty(frontier)
+        transfers=_transfers_out_of(frontier,sequence_id,time)
+        changed=Set{Int}()
+        for r in eachrow(transfers)
+            from=reached[r.Source]
+            # material arrived by transfer at `from.sequence`, so only later transfers carry it on
+            usable = ismissing(from.ledger) ? r.SequenceID >= from.sequence : r.SequenceID > from.sequence
+            usable || continue
+            cur=get(reached,r.Destination,nothing)
+            (isnothing(cur) || r.SequenceID < cur.sequence) || continue
+            reached[r.Destination]=(sequence=r.SequenceID,ledger=r.LedgerID,depth=from.depth+1,via=r.Source)
+            push!(changed,r.Destination)
+        end
+        frontier=collect(changed)
+    end
+    return reached
+end
+
+function _forward_result(reached)
+    ids=sort!(collect(keys(reached));by=w->(reached[w].sequence,w))
+    containers=well_containers(ids)
+    return DataFrame(
+        WellID=ids,
+        ContainerID=Union{Int,Missing}[get(containers,w,missing) for w in ids],
+        FirstSequenceID=[reached[w].sequence for w in ids],
+        FirstLedgerID=Union{Int,Missing}[reached[w].ledger for w in ids],
+        Depth=[reached[w].depth for w in ids],
+        ViaWell=Union{Int,Missing}[reached[w].via for w in ids])
+end
+
+"""
+    trace_forward(location_id::Integer, sequence_id=get_last_sequence_id(), time=Dates.now(); from_sequence=0) -> DataFrame
+    trace_forward(lot::Lot, sequence_id=get_last_sequence_id(), time=Dates.now()) -> DataFrame
+
+Find every well that received material from a well, or from the labware received as a lot, as of
+`sequence_id` and `time`. This is the reverse of [`trace_contents`](@ref), which finds the lots a well's
+material came from. It is the list to check when a lot turns out to be bad, or when a transfer is
+corrected with [`update`](@ref).
+
+The result has one row for each well reached, including the starting wells, ordered by when they were
+first reached, with columns:
+
+- `WellID`: the well.
+- `ContainerID`: the labware the well belongs to (see [`well_container`](@ref)), or `missing` if it is not recorded.
+- `FirstSequenceID`: the sequence ID of the first transfer that brought material into the well, or of the start for a starting well.
+- `FirstLedgerID`: the ledger entry of that transfer, or `missing` for a starting well.
+- `Depth`: the number of transfers between the starting well and this one along that first path.
+- `ViaWell`: the well that transfer came from, or `missing` for a starting well. Following `ViaWell` rebuilds the path.
+
+The trace follows the transfers in the order they happened. A transfer out of a well carries the
+material on only if it comes after the material arrived, so a transfer out of a well before it received
+anything is not followed. `from_sequence` starts a well trace at a later point in the history. A lot
+starts from every well of the labware that has the lot as of `sequence_id`, from the beginning of the
+history.
+
+The trace follows transfers only. It is slightly larger than the exact set: a transfer carries the
+material on even if an observation has since overwritten that component in the well, and a
+discard is not a way out. Planned operations (encumbrances) are not followed. The trace is
+computed from the ledger each time and is not stored.
+
+See also: [`forward_containers`](@ref), [`forward_runs`](@ref).
+"""
+function trace_forward(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now();from_sequence::Integer=0)
+    name,build=get_location_info(location_id)
+    build(location_id,name) isa CHESSCore.Well || error("only a well can be traced forward, and location $location_id is not one")
+    return _forward_result(_spread_forward(Dict(Int(location_id)=>Int(from_sequence)),sequence_id,time))
+end
+
+function trace_forward(lot::Lot,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    candidates=query_db("""
+        WITH ledger_subset (ID,SequenceID) AS (
+            SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID)
+        SELECT DISTINCT o.LocationID
+        FROM ObservedLots o INNER JOIN ledger_subset l ON o.LedgerID = l.ID INNER JOIN Products p ON o.ProductID = p.ID
+        WHERE p.Supplier = ? AND p.CatalogNumber = ? AND o.Lot = ?
+        """,(db_time(time),sequence_id,lot.supplier,lot.catalog_number,lot.lot))
+    seeds=Dict{Int,Int}()
+    for labware_id in candidates.LocationID
+        current=reconstruct_lot(labware_id,sequence_id,time) # a later observation may have changed the labware's lot
+        isnothing(current) && continue
+        (current.supplier,current.catalog_number,current.lot)==(lot.supplier,lot.catalog_number,lot.lot) || continue
+        for w in container_wells(labware_id).WellID
+            seeds[w]=0
+        end
+    end
+    return _forward_result(_spread_forward(seeds,sequence_id,time))
+end
+
+"""
+    forward_containers(trace::DataFrame) -> DataFrame
+    forward_containers(source, args...; kwargs...) -> DataFrame
+
+The labware that holds the wells of a forward trace, with columns `ContainerID`, `WellCount` (the
+number of reached wells in it) and `FirstSequenceID` (the earliest sequence at which any of them was
+reached). Wells with no recorded labware are left out. The second form runs [`trace_forward`](@ref)
+on `source` first.
+"""
+function forward_containers(trace::DataFrame)
+    out=DataFrame(ContainerID=Int[],WellCount=Int[],FirstSequenceID=Int[])
+    seen=Dict{Int,Int}()
+    for r in eachrow(trace)
+        ismissing(r.ContainerID) && continue
+        i=get(seen,r.ContainerID,0)
+        if i==0
+            push!(out,(r.ContainerID,1,r.FirstSequenceID))
+            seen[r.ContainerID]=nrow(out)
+        else
+            out.WellCount[i]+=1
+            out.FirstSequenceID[i]=min(out.FirstSequenceID[i],r.FirstSequenceID)
+        end
+    end
+    return out
+end
+forward_containers(source,args...;kwargs...) = forward_containers(trace_forward(source,args...;kwargs...))
+
+"""
+    forward_runs(trace::DataFrame) -> DataFrame
+    forward_runs(source, args...; kwargs...) -> DataFrame
+
+The runs recorded on the wells or labware of a forward trace, with columns `RunID`, `ExperimentID` and
+`LocationID` (the well or labware the run is recorded on). The second form runs [`trace_forward`](@ref)
+on `source` first.
+"""
+function forward_runs(trace::DataFrame)
+    ids=unique(vcat(trace.WellID,collect(skipmissing(trace.ContainerID))))
+    out=DataFrame(RunID=Int[],ExperimentID=Int[],LocationID=Int[])
+    for chunk in Iterators.partition(ids,_id_chunk)
+        marks="("*join(fill("?",length(chunk)),",")*")"
+        rows=query_db("SELECT ID AS RunID, ExperimentID, LocationID FROM Runs WHERE LocationID IN $marks",Tuple(chunk))
+        append!(out,rows)
+    end
+    return sort!(out,:RunID)
+end
+forward_runs(source,args...;kwargs...) = forward_runs(trace_forward(source,args...;kwargs...))
+
+# ===================================================================== location_queries.jl
+# Queries over many locations at once: find locations by kind, name, parent, barcode or activity, and
+# list the locations inside one. They read the ledger the way the reconstructions do: each sequence slot
+# resolves to its newest revision no later than `time`, and the newest movement or activity entry at or
+# before `sequence_id` wins. Nothing is cached, so an amendment changes the next answer.
+
+# SQL for the ledger slots visible at (sequence_id, time), the parent of every location that has one, and
+# the activity of every location whose activity was ever stated. A well that never moved has the labware
+# in `Containment` as its parent.
+const _location_state_cte = """
+    ledger_subset (ID,SequenceID) AS (
+        SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID),
+    last_move (Child,Parent,SequenceID) AS (
+        SELECT m.Child, m.Parent, Max(l.SequenceID)
+        FROM $(movement_events) m INNER JOIN ledger_subset l ON m.LedgerID = l.ID GROUP BY m.Child),
+    last_activity (LocationID,IsActive,SequenceID) AS (
+        SELECT a.LocationID, a.IsActive, Max(l.SequenceID)
+        FROM (SELECT LedgerID,LocationID,IsActive FROM Activity UNION ALL
+              SELECT LedgerID,LocationID,IsActive FROM ObservedActivity) a
+        INNER JOIN ledger_subset l ON a.LedgerID = l.ID GROUP BY a.LocationID),
+    state (ID,Name,Kind,ParentID,IsActive) AS (
+        SELECT loc.ID, loc.Name, loc.Type,
+               CASE WHEN lm.Child IS NOT NULL THEN lm.Parent ELSE c.ContainerID END,
+               COALESCE(la.IsActive,1)
+        FROM Locations loc
+        LEFT JOIN last_move lm ON lm.Child = loc.ID
+        LEFT JOIN last_activity la ON la.LocationID = loc.ID
+        LEFT JOIN Containment c ON c.WellID = loc.ID)
+"""
+
+_kind_name(k::LocationKind) = string(k.name)
+_kind_name(k::Symbol) = string(k)
+_kind_name(k::AbstractString) = String(k)
+
+"""
+    find_locations(; kind=nothing, name=nothing, parent=missing, barcode=nothing, active=nothing,
+                   ignorecase=false, sequence_id=get_last_sequence_id(), time=Dates.now(),
+                   limit=nothing, offset=0) -> DataFrame
+
+Find locations that match every filter given, ordered by ID, with columns `ID`, `Name`, `Kind`,
+`ParentID` (`missing` for none) and `IsActive`, as of `sequence_id` and `time`.
+
+- `kind`: a [`LocationKind`](@ref), or its name as a `Symbol` or string.
+- `name`: the exact name, or any case when `ignorecase = true`.
+- `parent`: a location ID, or `nothing` for locations with no parent.
+- `barcode`: a barcode string that is attached to the location.
+- `active`: `true` or `false`.
+- `limit` and `offset` page through the result.
+
+The parent and activity are the ones in force at `sequence_id`. A well's parent is its labware. A
+location that has never moved has no parent, and one whose activity was never stated is active.
+"""
+function find_locations(;kind=nothing,name=nothing,parent=missing,barcode=nothing,active=nothing,ignorecase::Bool=false,
+        sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),limit::Union{Integer,Nothing}=nothing,offset::Integer=0)
+    conds=String[]; params=Any[db_time(time),sequence_id]
+    isnothing(kind) || (push!(conds,"Kind = ?"); push!(params,_kind_name(kind)))
+    if !isnothing(name)
+        push!(conds,ignorecase ? "lower(Name) = lower(?)" : "Name = ?"); push!(params,String(name))
+    end
+    if parent === nothing
+        push!(conds,"ParentID IS NULL")
+    elseif !ismissing(parent)
+        push!(conds,"ParentID = ?"); push!(params,Int(parent))
+    end
+    isnothing(barcode) || (push!(conds,"ID IN (SELECT LocationID FROM Barcodes WHERE Barcode = ?)"); push!(params,string(barcode)))
+    isnothing(active) || (push!(conds,"IsActive = ?"); push!(params,Int(active)))
+    where_clause=isempty(conds) ? "" : "WHERE "*join(conds," AND ")
+    page=isnothing(limit) ? "" : "LIMIT ? OFFSET ?"
+    isnothing(limit) || push!(params,Int(limit),Int(offset))
+    out=query_db("WITH $_location_state_cte SELECT * FROM state $where_clause ORDER BY ID $page",Tuple(params))
+    out.IsActive=Bool.(out.IsActive)
+    return out
+end
+
+"""
+    descendants(location_id::Integer; kinds=nothing, max_depth=nothing,
+                sequence_id=get_last_sequence_id(), time=Dates.now()) -> DataFrame
+
+Every location inside `location_id`, at any depth, as of `sequence_id` and `time`, with columns `ID`,
+`Name`, `Kind`, `ParentID`, `IsActive` and `Depth` (1 for a direct child). `kinds` keeps only locations
+of those kinds (a list of kind names or [`LocationKind`](@ref)s), though the search still passes through
+the others, and `max_depth` limits how far down the search goes. Wells are included as the children of
+their labware.
+"""
+function descendants(location_id::Integer;kinds=nothing,max_depth::Union{Integer,Nothing}=nothing,
+        sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    params=Any[db_time(time),sequence_id,Int(location_id),something(max_depth,typemax(Int32))]
+    kind_clause=""
+    if !isnothing(kinds)
+        names=_kind_name.(collect(kinds))
+        kind_clause="WHERE Kind IN ("*join(fill("?",length(names)),",")*")"
+        append!(params,names)
+    end
+    out=query_db("""
+        WITH $_location_state_cte,
+        tree (ID,Depth) AS (
+            SELECT ID, 1 FROM state WHERE ParentID = ?
+            UNION ALL
+            SELECT s.ID, t.Depth + 1 FROM state s INNER JOIN tree t ON s.ParentID = t.ID WHERE t.Depth < ?)
+        SELECT state.*, tree.Depth FROM tree INNER JOIN state ON state.ID = tree.ID $kind_clause
+        ORDER BY tree.Depth, state.ID
+        """,Tuple(params))
+    out.IsActive=Bool.(out.IsActive)
+    return out
+end
+
+"""
+    reconstruct_locations(location_ids, sequence_id=get_last_sequence_id(), time=Dates.now()) -> Vector{Location}
+
+Reconstruct each location in `location_ids` with [`reconstruct_location`](@ref). For a list of many
+locations where only the name, kind, parent or activity is needed, [`find_locations`](@ref) reads them
+in one query instead.
+"""
+reconstruct_locations(location_ids::AbstractVector{<:Integer},sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now()) =
+    Location[reconstruct_location(id,sequence_id,time) for id in location_ids]
 
 end # module Legacy

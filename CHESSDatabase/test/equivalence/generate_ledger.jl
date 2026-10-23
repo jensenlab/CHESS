@@ -23,7 +23,7 @@ const EQV_CLOCK_ORIGIN = 1.7e9    # Ledger.Time of row ID 0 on the synthetic clo
 # kind => relative weight
 const EQV_OP_WEIGHTS = [
     :setattr=>30, :envtick=>6, :move=>9, :remove=>3, :lock=>4, :activity=>4, :transfer=>20, :readtick=>9,
-    :setting=>2, :observe=>5, :cache=>3, :replace=>8, :insert=>4, :encumber=>3,
+    :setting=>2, :observe=>5, :discard=>4, :lot=>2, :unparent=>2, :cache=>3, :replace=>8, :insert=>4, :encumber=>3,
 ]
 
 """
@@ -73,8 +73,8 @@ function eqv_setup(rng_seed::Integer)
     for p in w.plates; upload(move_into!,w.rooms[3],p); end
     for b in w.bottles; upload(move_into!,w.rooms[1],b); end
     w.reservoirs = Well[b[1,1] for b in w.bottles]
-    deposit!(w.reservoirs[1],500u"mL"*rgt"water",1.0); deposit!(w.reservoirs[2],500u"mL"*rgt"water"+2u"g"*rgt"iron_nitrate",2.0)
-    deposit!(w.reservoirs[3],50u"g"*rgt"paba",20)
+    deposit!(w.reservoirs[1],500u"mL"*rgt"water"); deposit!(w.reservoirs[2],500u"mL"*rgt"water"+2u"g"*rgt"iron_nitrate")
+    deposit!(w.reservoirs[3],50u"g"*rgt"paba")
     for r in w.reservoirs; cache(r); end
     w.wells = Well[x for p in w.plates for x in children(p)]
     upload(set_attribute!,lab,Temperature(25u"°C"))
@@ -164,7 +164,7 @@ function eqv_run_op!(w::EqvWorld,op)
     elseif k === :observe
         form = op.i % 5
         if form == 0
-            return observe(pick_from(w.wells,op.j),:cost,round(10op.x;digits=2))
+            return observe(pick_from(w.bottles,op.j),Lot("EQV Supplier","EQV-1","LOT$(op.k % 4)"))
         elseif form == 1
             return observe(pick_from(vcat(w.rooms,w.shelves),op.j),Temperature(_eqv_temp(op.x)))
         elseif form == 2
@@ -174,6 +174,20 @@ function eqv_run_op!(w::EqvWorld,op)
         else
             return observe(pick_from(w.wells,op.j),rgt"water",round(5op.x;digits=2)*u"µL")
         end
+    elseif k === :lot
+        return observe(pick_from(vcat(w.bottles,w.plates),op.j),Lot("EQV Supplier","EQV-$(op.i % 2)","LOT$(op.k % 4)";received=Dates.Date(2026,1,1)+Dates.Day(op.i % 50)))
+    elseif k === :discard
+        holders = [x for x in w.wells if get(w.balance,location_id(x),0.0) >= 1.0]
+        isempty(holders) && return nothing
+        src = pick_from(holders,op.j)
+        lid = upload(discard!,src,0.2u"µL")
+        w.balance[location_id(src)] -= 0.2
+        push!(w.replaceable,(; op.n,kind=:discard,lid,src=location_id(src)))
+        return lid
+    elseif k === :unparent
+        plate = pick_from(w.plates,op.i)
+        isnothing(CHESSCore.parent(plate)) && return nothing
+        return upload(remove_from_parent!,plate)
     elseif k === :cache
         # cache what the database says now (not the in-memory object, which may lag after amendments)
         target = pick_from(vcat(w.wells,w.plates,w.rooms,w.shelves),op.i)
@@ -191,6 +205,8 @@ function eqv_run_op!(w::EqvWorld,op)
             return update(op.flag ? lock! : unlock!,reconstruct_location(r.loc);replace=slot)
         elseif r.kind === :activity
             return update(op.flag ? activate! : deactivate!,reconstruct_location(r.loc);replace=slot)
+        elseif r.kind === :discard
+            return update(discard!,reconstruct_location(r.src),0.2u"µL"*(0.9+0.2op.x);replace=slot)
         else
             src,dest = reconstruct_location(r.src),reconstruct_location(r.dest)
             return update(transfer!,src,dest,r.q*(0.9+0.2op.x)*u"µL";replace=slot)
