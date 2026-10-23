@@ -41,7 +41,7 @@ function validate_transfer(ledger_id::Integer;encumbrances=false)
     # force simulation for any entry after seq_id using the `max_cache` argument
     a=reconstruct_contents(src,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances) #this also checks all descendents because we are reconstructing up until current time
 
-    b=reconstruct_contents(src,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances)
+    b=reconstruct_contents(dest,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances)
     return nothing 
 end 
 

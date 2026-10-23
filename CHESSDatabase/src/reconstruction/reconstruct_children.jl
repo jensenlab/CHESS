@@ -215,8 +215,8 @@ end
 function get_child_movements(locs::Vector{<:Integer},current_children::Dict{Integer,Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
     ledger_time= db_time(time)
     loc_plus_children=unique(vcat(locs,collect(keys(current_children))))
-    a=get_last_movement_as_child(collect(keys(current_children)),starting,ending;encumbrances=encumbrances)
-    b=get_last_movements_as_parent(locs,starting,ending;encumbrances=encumbrances)
+    a=get_last_movement_as_child(collect(keys(current_children)),starting,ending,time;encumbrances=encumbrances)
+    b=get_last_movements_as_parent(locs,starting,ending,time;encumbrances=encumbrances)
 
     
     final_movements=vcat(a,b)

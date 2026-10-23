@@ -16,6 +16,7 @@ end
 println("building sample database...")
 
 include("build_test_database.jl")
+include("test_helpers.jl")
 
 println("sample database complete.")
 
@@ -31,6 +32,8 @@ include("test_reconstruct_encumbrances.jl")
 include("test_migrate_chemistry.jl")
 
 include("test_reconstruct_contents_ancestor_closure.jl")
+
+include("test_phase0_fixes.jl")
 
 # Fixtures used by testsets below that originally relied on core_runtests.jl's script-level bindings
 # (b = a Mixture stock; Cl⁻ = a test-local dissociation Species) -- now that CHESSCore and

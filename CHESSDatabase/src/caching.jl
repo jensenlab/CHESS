@@ -92,7 +92,7 @@ function cache_children_helper(c::Tuple{})
         execute_db("INSERT OR IGNORE INTO CachedChildSets(ChildSetHash) Values(?)",(hash_bytes(loc_ids),))
         id=get_child_set_id(c)
         for child in c
-            execute_db("INSERT OR IGNORE INTO CachedChildren(CachedhildSetID,ChildID) Values(?,?)",(id,location_id(child)))
+            execute_db("INSERT OR IGNORE INTO CachedChildren(CachedChildSetID,ChildID) Values(?,?)",(id,location_id(child)))
         end
     end
     return id

@@ -70,7 +70,7 @@ function reconstruct_parent!(locations::Vector{<:Location},sequence_id::Integer=
 end 
 
 function reconstruct_parent!(location::Location,sequence_id=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
-    parallel_loc=reconstrut_parent(location_id(location),sequence_id,time,max_cache;encumbrances=encumbrances)
+    parallel_loc=reconstruct_parent(location_id(location),sequence_id,time,max_cache;encumbrances=encumbrances)
     location.parent=CHESSCore.parent(parallel_loc)
     return nothing 
 end

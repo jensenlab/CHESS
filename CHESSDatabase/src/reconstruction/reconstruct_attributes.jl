@@ -61,7 +61,7 @@ function reconstruct_attributes!(locations::Vector{<:Location},sequence_id::Inte
 end 
 
 function reconstruct_attributes!(location::Location ,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
-    parallel_loc=reconstruct_attributes(locaton_id(location),sequence_id,time,max_cache;encumbrances=encumbrances)
+    parallel_loc=reconstruct_attributes(location_id(location),sequence_id,time,max_cache;encumbrances=encumbrances)
     location.attributes=CHESSCore.attributes(parallel_loc)
     return nothing 
 end 
