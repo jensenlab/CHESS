@@ -144,14 +144,20 @@ function run_queries(variant,lay)
         plan_lines = String[]
         for (sql,params) in unique(captured)
             occursin("SELECT",sql) || continue
-            append!(plan_lines,try plan_of(sql,params) catch e ["(plan unavailable: $(typeof(e)))"] end)
+            lines = try
+                plan_of(sql,params)
+            catch err
+                ["(plan unavailable: $(typeof(err)))"]
+            end
+            append!(plan_lines,lines)
         end
-        scan_ledger = any(occursin("SCAN Ledger",l) || occursin("SCAN ledger_subset",l) || occursin("MATERIALIZE ledger_subset",l) for l in plan_lines)
+        scan_ledger = any(occursin(r"\bSCAN Ledger\b",l) || occursin(r"\bSCAN l\b",l) for l in plan_lines)
+        materializes = any(occursin("MATERIALIZE ledger_subset",l) for l in plan_lines)
         n_chess = count(l->occursin("idx_chess",l),plan_lines)
         push!(rows,(; n=lay.N,variant,query=name,target=cls,targets=length(ids),runs,p50_ms=ms(q50(samples)),p95_ms=ms(q95(samples)),
-            plan_scans_ledger=scan_ledger,plan_chess_index_uses=n_chess,sql_statements=length(sqls)))
+            plan_scans_ledger=scan_ledger,plan_materializes_ledger_subset=materializes,plan_chess_index_uses=n_chess,sql_statements=length(sqls)))
         push!(plans,"=== $variant | $name | $cls\n" * join(plan_lines,"\n") * "\n")
-        @printf("%-6s %-32s %-10s p50 %9.3f ms  p95 %9.3f ms  scan-ledger=%s\n",variant,name,cls,ms(q50(samples)),ms(q95(samples)),scan_ledger)
+        @printf("%-6s %-32s %-10s p50 %9.3f ms  p95 %9.3f ms  scan-ledger=%s cte=%s\n",variant,name,cls,ms(q50(samples)),ms(q95(samples)),scan_ledger,materializes)
     end
     return DataFrame(rows),plans
 end
@@ -219,4 +225,4 @@ function main()
     println("\nwrote results to $BENCH_OUT")
 end
 
-abspath(PROGRAM_FILE) == @__FILE__ && main()
+abspath(PROGRAM_FILE) == (@__FILE__) && main()

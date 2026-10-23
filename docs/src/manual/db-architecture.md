@@ -66,6 +66,21 @@ does not always replay its entire history. The tables are `CachedAncestors`, `Ca
 `CachedChildSets`, `CachedAttributeSets`, and `CachedStocks` store each shared child set, attribute
 set, and stock once. See [Caching & Repair](caching-repair.md).
 
+## Indexes
+
+The ledger and the operation tables are indexed by the location an operation concerns and by its ledger
+entry, so that rebuilding one location does not have to read every row of the ledger. The indexes are
+named `idx_chess_<table>_<columns>`. [`create_db`](@ref) creates them. [`connect_SQLite`](@ref) adds
+them to an existing database that has fewer than 1,000,000 ledger rows, and only warns about a larger
+one, because building them there can take a long time; [`create_indexes!`](@ref) builds them on request.
+An index is not created when the database already has one with the same leading columns, whoever made
+it. [`drop_indexes!`](@ref) removes the `idx_chess_*` indexes and no others.
+
+The ledger records a time with each entry, and the time of a new entry is never earlier than the time
+of the entry before it, even if the computer's clock has been set back. Allocating the sequence ID of a
+new entry is a single statement, so two programs writing to the same database never receive the same
+sequence ID.
+
 ## Experiments, runs, protocols, and encumbrances
 
 The tables `Experiments`, `Runs`, `Protocols`, `ProtocolEnforcement`, `Encumbrances`, and

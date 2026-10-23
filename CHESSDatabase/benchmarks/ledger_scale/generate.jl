@@ -9,8 +9,8 @@
 #   locations   1-40 incubators; 41-240 shelves/rooms; 241-440 reservoirs; 441-740 plates (96 wells each:
 #               741 ... 741+300*96-1); then experiment wells, 96 per experiment
 #   environment one series per (location, attribute): 240 locations x {Temperature, Humidity}
-#   transfers   experiments of 96 wells: 8 reservoir -> well transfers, then 11 dilution steps in each of 8
-#               rows; the reservoir is drawn from 200 with Zipf(1) weights, so reservoir 1 is a hub
+#   transfers   experiments of 96 wells: 8 reservoir -> well transfers (100 µL), then 11 halving dilution steps in each
+#               of 8 rows (so a well never gives more than it holds); the reservoir is drawn from 200 with Zipf(1) weights, so reservoir 1 is a hub
 #   reads       one tick = 96 wells of one plate
 #   amendments  new revisions (same SequenceID, higher ID, later Time) of environment and transfer slots
 #
@@ -81,10 +81,9 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
 
     exec("""
     INSERT INTO EnvironmentAttributes(LedgerID,LocationID,Attribute,Value,Unit,Time)
-    SELECT i, 1 + CAST($(ls_rnd("i",2))*$(LS_INCUBATORS+LS_ROOMS) AS INTEGER),
-           CASE WHEN $(ls_rnd("i",3)) < 0.5 THEN 'Temperature' ELSE 'Humidity' END,
-           10 + 30*$(ls_rnd("i",4)), 'unit', $LS_ORIGIN + i*0.01
-    FROM ord WHERE k = 'e'""")
+    SELECT i, loc, attr, 10 + 30*$(ls_rnd("i",4)), CASE attr WHEN 'Temperature' THEN '°C' ELSE 'percent' END, $LS_ORIGIN + i*0.01
+    FROM (SELECT i, 1 + CAST($(ls_rnd("i",2))*$(LS_INCUBATORS+LS_ROOMS) AS INTEGER) AS loc,
+                 CASE WHEN $(ls_rnd("i",3)) < 0.5 THEN 'Temperature' ELSE 'Humidity' END AS attr FROM ord WHERE k = 'e')""")
 
     # transfers: ordinal n -> experiment e = (n-1)/96, position q = (n-1)%96
     exec("""
@@ -95,7 +94,7 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
            CASE WHEN q < 8 THEN $(LS_INCUBATORS+LS_ROOMS) + 1 + MIN($(LS_RESERVOIRS-1), CAST(POWER($LS_RESERVOIRS, $(ls_rnd("e",5))) AS INTEGER) - 1)
                 ELSE $exp_base + e*96 + row_*12 + col END,
            $exp_base + e*96 + row_*12 + CASE WHEN q < 8 THEN 0 ELSE col + 1 END,
-           1 + 9*$(ls_rnd("i",6)), 'µL', $LS_ORIGIN + i*0.01
+           CASE WHEN q < 8 THEN 100.0 ELSE 100.0 / (1 << (col + 1)) END, 'µL', $LS_ORIGIN + i*0.01
     FROM w""")
 
     # reads: ordinal b -> plate (b-1) % LS_PLATES, one row per well

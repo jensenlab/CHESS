@@ -181,6 +181,7 @@ const _warned_unindexed = Set{String}()
 # once per file, because building them can take a long time.
 function _ensure_indexes!()
     db = _require_db()
+    _db_table_exists(db,"Ledger") || return nothing   # not a CHESS database (yet): nothing to index
     try
         todo = _missing_indexes(db)
         isempty(todo) && return nothing

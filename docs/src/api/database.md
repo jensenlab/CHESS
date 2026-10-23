@@ -7,7 +7,8 @@ cover each part.
 
 The functions most code uses:
 
-- Setup: [`create_db`](@ref) and [`connect_SQLite`](@ref).
+- Setup: [`create_db`](@ref) and [`connect_SQLite`](@ref), and [`create_indexes!`](@ref) and
+  [`drop_indexes!`](@ref) for the indexes reconstruction relies on.
 - Committing locations: [`generate_location`](@ref), [`commit_location!`](@ref), and
   [`release_location`](@ref).
 - Recording operations: [`upload`](@ref), and [`update`](@ref) to amend history.
