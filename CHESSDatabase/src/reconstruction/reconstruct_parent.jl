@@ -102,7 +102,7 @@ end
 
 
 
-function get_parent_caches(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function _get_parent_caches_global(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
 
     ledger_time=db_time(time)
     if encumbrances
@@ -140,7 +140,7 @@ function get_parent_caches(location_id::Integer,starting::Integer=0,ending::Inte
 end
 
 
-function get_last_movement_as_child(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function _get_last_movement_as_child_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
     entry=query_join_vector(locs)
     ledger_time=db_time(time)
     x=""

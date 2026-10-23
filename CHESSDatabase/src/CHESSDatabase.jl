@@ -32,6 +32,7 @@ include("./encumbrances.jl")
 
 # reconstruction
 include("./reconstruction/visibility.jl")
+include("./reconstruction/latest_event.jl")
 include("./reconstruction/reconstruction_utils.jl")
 include("./reconstruction/reconstruct_contents.jl")
 include("./reconstruction/reconstruct_parent.jl")
@@ -42,6 +43,7 @@ include("./reconstruction/reconstruct_lock.jl")
 include("./reconstruction/reconstruct_activity.jl")
 include("./reconstruction/reconstruct_reads.jl")
 include("./reconstruction/reconstruct_location.jl")
+include("./reconstruction/local_queries.jl")
 # cache repair
 include("./validation_and_repair/repair_content_caches.jl")
 include("./validation_and_repair/repair_movement_caches.jl")
@@ -119,5 +121,11 @@ export get_run, get_all_runs
 export Run
 # CHESSExperiments interface (chess_experiments_interface.jl)
 export upload_design, get_design, commit_run_location!
+
+function __init__()
+    mode = Symbol(get(ENV,"CHESS_RECONSTRUCTION","local"))
+    mode in (:local,:legacy) || error("CHESS_RECONSTRUCTION must be \"local\" or \"legacy\", not \"$mode\"")
+    reconstruction_mode[] = mode
+end
 
 end # module CHESSDatabase

@@ -371,3 +371,46 @@ end
         n == 0 && @warn "mutation not caught" name
     end
 end
+
+
+@testset "latest_visible_event agrees with a brute-force search under every walk/scan schedule" begin
+    # (first window, growth, series factor): tiny windows that grow slowly; the walk only; the series scan after one failed walk
+    schedules = [(1,2,1),(3,3,0),(10^6,8,4),(1,2,10^9),(128,8,4)]
+    old = (CHESSDatabase._WALK_FIRST_WINDOW[],CHESSDatabase._WALK_GROWTH[],CHESSDatabase._SERIES_SCAN_FACTOR[])
+    checked = 0
+    try
+        for seed in (1,2)
+            with_scratch_db() do _
+                eqv_generate(seed;nops=120,clock = seed == 2 ? :backward : :monotone)
+                rng = Xoshiro(seed)
+                maxid = query_db("SELECT Max(ID) FROM Ledger")[1,1]; maxseq = query_db("SELECT Max(SequenceID) FROM Ledger")[1,1]
+                keys = Tuple[]
+                for (tbl,cols) in (("Movements",["Child"]),("ObservedParents",["Child"]),("Locks",["LocationID"]),("Activity",["LocationID"]),
+                        ("EnvironmentAttributes",["LocationID","Attribute"]),("InstrumentSettings",["InstrumentID","Setting"]),("Reads",["LocationID"]))
+                    for r in eachrow(query_db("SELECT DISTINCT $(join(cols,",")) FROM $tbl"))
+                        push!(keys,(tbl,cols,Tuple(r)))
+                    end
+                end
+                for _ in 1:150
+                    tbl,cols,vals = rand(rng,keys)
+                    from = rand(rng) < 0.5 ? 0 : rand(rng,0:maxseq); to = rand(rng) < 0.3 ? maxseq + 5 : rand(rng,from:maxseq+1)
+                    t = eqv_clock_time(rand(rng) < 0.5 ? Float64(rand(rng,0:maxid+1)) : rand(rng)*(maxid+2))
+                    conds = join(["e.$c = ?" for c in cols]," AND ")
+                    expected = query_db("""WITH ledger_subset (ID,SequenceID,Time) AS (SELECT Max(ID), SequenceID,Time FROM Ledger WHERE Time <= ? AND SequenceID BETWEEN ? AND ? GROUP BY SequenceID)
+                        SELECT l.ID AS ledger_id, l.SequenceID AS slot FROM $tbl e INNER JOIN ledger_subset l ON e.LedgerID = l.ID WHERE $conds ORDER BY l.SequenceID DESC LIMIT 1""",
+                        (db_time(t),from,to,vals...))
+                    expected = nrow(expected) == 0 ? nothing : (ledger_id=expected.ledger_id[1],slot=expected.slot[1])
+                    for (w,g,f) in schedules
+                        CHESSDatabase._WALK_FIRST_WINDOW[],CHESSDatabase._WALK_GROWTH[],CHESSDatabase._SERIES_SCAN_FACTOR[] = w,g,f
+                        got = CHESSDatabase.latest_visible_event(tbl,[c=>v for (c,v) in zip(cols,vals)],from,to,t)
+                        @test got == expected
+                        checked += 1
+                    end
+                end
+            end
+        end
+    finally
+        CHESSDatabase._WALK_FIRST_WINDOW[],CHESSDatabase._WALK_GROWTH[],CHESSDatabase._SERIES_SCAN_FACTOR[] = old
+    end
+    @test checked == 2 * 150 * length(schedules)
+end

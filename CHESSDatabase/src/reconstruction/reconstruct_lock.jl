@@ -98,7 +98,7 @@ end
 
 
 
-function get_lock_caches(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time=Dates.now();encumbrances=false)
+function _get_lock_caches_global(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time=Dates.now();encumbrances=false)
 
     ledger_time=db_time(time)
     if encumbrances
@@ -136,7 +136,7 @@ function get_lock_caches(location_id::Integer,starting::Integer=0,ending::Intege
 end 
 
 
-function get_locks(location_ids::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function _get_locks_global(location_ids::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
 
     entry=query_join_vector(location_ids)
     ledger_time=db_time(time)

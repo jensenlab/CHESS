@@ -98,7 +98,7 @@ end
 
 
 
-function get_attribute_caches(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function _get_attribute_caches_global(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
 
         ledger_time=db_time(time)
         if encumbrances

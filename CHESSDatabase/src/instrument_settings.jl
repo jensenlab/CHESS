@@ -1,14 +1,5 @@
 
-"""
-    get_instrument_settings(instrument_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
-
-Resolve `instrument_id`'s current value per `Setting` name as of `sequence_id`/`time`, as a
-`DataFrame` (columns `Setting`, `Value`, `SequenceID`). Unlike [`get_reads`](@ref), this *does*
-collapse to latest-wins per `Setting` -- instrument settings behave like [`Attribute`](@ref) (a single
-current value), not like [`Read`](@ref) (many coexisting values) -- mirroring
-`get_attribute_caches`'s `ledger_subset` idiom.
-"""
-function get_instrument_settings(instrument_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+function _get_instrument_settings_global(instrument_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
     ledger_time=db_time(time)
     return query_db("""
         WITH ledger_subset (ID,SequenceID,Time)

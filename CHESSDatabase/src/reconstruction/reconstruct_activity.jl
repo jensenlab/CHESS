@@ -91,7 +91,7 @@ end
 
 
 
-function get_activity_caches(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time=Dates.now();encumbrances=false)
+function _get_activity_caches_global(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time=Dates.now();encumbrances=false)
 
     ledger_time=db_time(time)
     if encumbrances
@@ -129,7 +129,7 @@ function get_activity_caches(location_id::Integer,starting::Integer=0,ending::In
 end 
 
 
-function get_activity(location_ids::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function _get_activity_global(location_ids::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
 
     entry=query_join_vector(location_ids)
     ledger_time=db_time(time)

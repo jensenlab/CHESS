@@ -126,7 +126,7 @@ end
 
 
 
-function get_child_caches(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function _get_child_caches_global(location_id::Integer,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
 
     ledger_time=db_time(time)
     if encumbrances
@@ -167,7 +167,7 @@ end
 
 
 
-function get_last_movements_as_parent(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all movements for a set of locations betweeen `starting` and `ending` ledger ids
+function _get_last_movements_as_parent_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all movements for a set of locations betweeen `starting` and `ending` ledger ids
     entry=query_join_vector(locs)
     ledger_time = db_time(time)
     x=""
