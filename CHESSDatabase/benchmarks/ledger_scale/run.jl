@@ -10,6 +10,7 @@
 #   noidx  the database as it was before the CHESS indexes (only the indexes create_db always made)
 #   idx    + the idx_chess_* set of src/indexes.jl (Ledger index = (SequenceID, ID))
 #   cover  the same with the Ledger index (SequenceID, ID, Time), for the comparison of decision D3
+#   ledgeronly  only Ledger(SequenceID, ID), to separate its cost from that of the other indexes
 #
 # For every query it records p50/p95 wall time over BENCH_TARGETS random targets and EXPLAIN QUERY PLAN of the
 # SQL the function ran, so a later phase can show that `SCAN Ledger` / `MATERIALIZE ledger_subset` are gone
@@ -29,6 +30,7 @@ const BENCH_DIR = get(ENV,"BENCH_DIR",joinpath(tempdir(),"chess_ledger_scale"))
 const BENCH_OUT = get(ENV,"BENCH_OUT",joinpath(@__DIR__,"results"))
 const BENCH_VARIANTS = split(get(ENV,"BENCH_VARIANTS","noidx,idx,cover"),",")
 const BENCH_TARGETS = parse(Int,get(ENV,"BENCH_TARGETS","8"))
+const BENCH_SKIP_QUERIES = get(ENV,"BENCH_SKIP_QUERIES","0") == "1"   # only the size and write costs
 
 # location kinds the generated database uses
 @location_kind Room Symbol[] nothing nothing nothing nothing nothing 0//1 0//1
@@ -186,9 +188,10 @@ end
 function prepare_variant(variant,base,path)
     cp(base,path;force=true)
     saved = CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[]
-    if variant == "noidx"
+    if variant in ("noidx","ledgeronly")
         CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = 0          # connect_SQLite must not add them
         with_logger(NullLogger()) do; connect_SQLite(path); end
+        variant == "ledgeronly" && execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id ON Ledger(SequenceID, ID)")
     else
         connect_SQLite(path)                                  # adds the idx_chess_* set below 1M rows
         if variant == "cover"
@@ -214,14 +217,16 @@ function main()
         prepare_variant(variant,base,path)
         stock_reservoirs!(lay)
         println("\n== $variant: $(round(filesize(path)/2^20;digits=1)) MB, $(length(String.(query_db("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx\\_chess\\_%' ESCAPE '\\'").name))) CHESS indexes")
-        df,plans = run_queries(variant,lay)
-        push!(all_rows,df); append!(all_plans,plans)
+        if !BENCH_SKIP_QUERIES
+            df,plans = run_queries(variant,lay)
+            push!(all_rows,df); append!(all_plans,plans)
+        end
         push!(costs,run_costs(variant,path,lay))   # last: it modifies the ledger
         println(costs[end])
     end
-    CSV.write(joinpath(BENCH_OUT,"baseline_$(BENCH_N).csv"),reduce(vcat,all_rows))
+    isempty(all_rows) || CSV.write(joinpath(BENCH_OUT,"baseline_$(BENCH_N).csv"),reduce(vcat,all_rows))
     CSV.write(joinpath(BENCH_OUT,"costs_$(BENCH_N).csv"),DataFrame(costs))
-    write(joinpath(BENCH_OUT,"plans_$(BENCH_N).txt"),join(all_plans,"\n"))
+    isempty(all_plans) || write(joinpath(BENCH_OUT,"plans_$(BENCH_N).txt"),join(all_plans,"\n"))
     println("\nwrote results to $BENCH_OUT")
 end
 
