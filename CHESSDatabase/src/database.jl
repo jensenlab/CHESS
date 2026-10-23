@@ -753,6 +753,8 @@ function create_db(path)
 
 
 
+    _create_indexes!(db) # the tables are empty, so this is instant
+
     init_time=db_time(Dates.now())
     DBInterface.execute(db,"""INSERT INTO Ledger(SequenceID, Time) Values(1,$init_time)""")
 end

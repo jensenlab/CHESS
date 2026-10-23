@@ -112,15 +112,15 @@ function observe(loc::Location,facet...;read_ledger_id::Union{Integer,Nothing}=n
     CHESSCore.assert_all_committed(loc,filter(x->x isa Location,facet)...)
     instrument_id = isnothing(instrument) ? nothing : location_id(instrument)
     appended = isnothing(ledger_id)
-    ledger_id = something(ledger_id,append_ledger())
     function observe_transaction()
+        ledger_id = appended ? append_ledger() : ledger_id # allocated inside the transaction, first in it
         CHESSCore.observe!(loc,facet...;instrument=instrument)
         upload_observation(loc,facet...;ledger_id=ledger_id,time=time,instrument_id=instrument_id,
             instrument_time=instrument_time,read_ledger_id=read_ledger_id)
         appended || process_update(ledger_id)
+        return ledger_id
     end
-    sql_transaction(observe_transaction)
-    return ledger_id
+    return sql_transaction(observe_transaction)
 end
 
 function observe(loc::Location;recursive::Bool=true,read_ledger_id::Union{Integer,Nothing}=nothing,ledger_id::Union{Integer,Nothing}=nothing,
@@ -131,8 +131,8 @@ function observe(loc::Location;recursive::Bool=true,read_ledger_id::Union{Intege
     CHESSCore._check_capability(instrument,observe!)
     instrument_id = isnothing(instrument) ? nothing : location_id(instrument)
     appended = isnothing(ledger_id)
-    ledger_id = something(ledger_id,append_ledger())
     function observe_transaction()
+        ledger_id = appended ? append_ledger() : ledger_id # allocated inside the transaction, first in it
         prior=get_sequence_id(ledger_id)-1
         ids=location_id.(nodes)
         predicted_attrs=Dict(zip(ids,CHESSCore.attributes.(reconstruct_attributes(ids,prior))))
@@ -145,9 +145,9 @@ function observe(loc::Location;recursive::Bool=true,read_ledger_id::Union{Intege
             end
         end
         appended || process_update(ledger_id)
+        return ledger_id
     end
-    sql_transaction(observe_transaction)
-    return ledger_id
+    return sql_transaction(observe_transaction)
 end
 
 # every component of a stock with its quantity

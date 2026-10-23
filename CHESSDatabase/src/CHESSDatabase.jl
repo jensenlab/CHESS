@@ -14,6 +14,7 @@ using
 
 include("./database.jl")
 include("./db_utils.jl")
+include("./indexes.jl")
 include("./ledger.jl")
 include("./barcodes/barcodes.jl")
 include("./runs/run.jl")
@@ -30,6 +31,7 @@ include("./chess_experiments_interface.jl")
 include("./encumbrances.jl")
 
 # reconstruction
+include("./reconstruction/visibility.jl")
 include("./reconstruction/reconstruction_utils.jl")
 include("./reconstruction/reconstruct_contents.jl")
 include("./reconstruction/reconstruct_parent.jl")
@@ -56,6 +58,8 @@ include("./observations.jl")
 
 #database
 export create_db, migrate_chemistry!
+#indexes.jl
+export create_indexes!, drop_indexes!
 #observations.jl
 export observe, upload_observation, observation_discrepancies, backfill_observations
 #ledger.jl

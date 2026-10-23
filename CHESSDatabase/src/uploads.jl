@@ -64,14 +64,16 @@ function upload(fun::Function,args...;ledger_id::Union{Integer,Nothing}=nothing,
         instrument::Union{Location,Nothing}=nothing,instrument_time::Union{DateTime,Nothing}=nothing)
     CHESSCore.assert_all_committed(args...)
     instrument_id = isnothing(instrument) ? nothing : location_id(instrument)
-    ledger_id = something(ledger_id, append_ledger())
     up_fun=upload_operation(fun)
     function upload_transaction()
+        # the ledger slot is allocated inside the transaction (and first in it), so a failure rolls it back
+        # and two writers cannot both take the same sequence ID
+        l_id = isnothing(ledger_id) ? append_ledger() : ledger_id
         fun(args...;instrument=instrument)
-        up_fun(args...;ledger_id=ledger_id,time=time,instrument_id=instrument_id,instrument_time=instrument_time)
+        up_fun(args...;ledger_id=l_id,time=time,instrument_id=instrument_id,instrument_time=instrument_time)
+        return l_id
     end
-    sql_transaction(upload_transaction)
-    return ledger_id
+    return sql_transaction(upload_transaction)
 end
 
 

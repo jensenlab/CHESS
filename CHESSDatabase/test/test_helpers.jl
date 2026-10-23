@@ -2,21 +2,22 @@
 # database `build_test_database.jl` sets up.
 
 """
-    with_scratch_db(f; path=tempname()*".db")
+    with_scratch_db(f; path=tempname()*".db", create=true, keep=false)
 
-Create a new CHESS database at `path`, connect to it, run `f(path)`, then reconnect to whichever database
-was connected before (if any) and delete the scratch file. The location kinds and attributes
-registered by `build_test_database.jl` are global, so `f` can use them.
+Connect to a CHESS database at `path` (created first unless `create=false`), run `f(path)`, then reconnect
+to whichever database was connected before (if any). The scratch file is deleted afterwards unless
+`keep=true`. The location kinds and attributes registered by `build_test_database.jl` are global, so `f`
+can use them.
 """
-function with_scratch_db(f::Function;path::AbstractString=tempname()*".db")
+function with_scratch_db(f::Function;path::AbstractString=tempname()*".db",create::Bool=true,keep::Bool=false)
     previous = CHESSDatabase._current_db[]
     previous_path = isnothing(previous) ? nothing : previous.file
-    create_db(path)
+    create && create_db(path)
     connect_SQLite(path)
     try
         return f(path)
     finally
         isnothing(previous_path) ? (CHESSDatabase._current_db[] = nothing) : connect_SQLite(previous_path)
-        rm(path;force=true)
+        keep || rm(path;force=true)
     end
 end

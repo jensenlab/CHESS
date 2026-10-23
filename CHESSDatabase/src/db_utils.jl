@@ -16,10 +16,18 @@ the CHESS tables in a new file. Calling it again switches to a different databas
 A database created before the `Chemicals` and `CompositionRules` tables became the `Species` and
 `Dissolutions` tables is still readable only
 after [`migrate_chemistry!`](@ref) is run on it; `connect_SQLite` warns when it finds one.
+
+It also adds the indexes reconstruction relies on (see [`create_indexes!`](@ref)) if they are missing:
+at once for a database with fewer than 1,000,000 ledger rows, otherwise only a warning, because
+building them on a large database takes a long time.
 """
 function connect_SQLite(path)
-    _current_db[] = SQLite.DB(path)
+    db = SQLite.DB(path)
+    # wait for another writer instead of failing at once with "database is locked"
+    SQLite.busy_timeout(db,10_000)
+    _current_db[] = db
     _warn_if_unmigrated()
+    _ensure_indexes!()
     return nothing
 end
 

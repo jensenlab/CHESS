@@ -35,6 +35,8 @@ include("test_reconstruct_contents_ancestor_closure.jl")
 
 include("test_phase0_fixes.jl")
 
+include("test_ledger_indexes.jl")
+
 # Fixtures used by testsets below that originally relied on core_runtests.jl's script-level bindings
 # (b = a Mixture stock; Cl⁻ = a test-local dissociation Species) -- now that CHESSCore and
 # CHESSDatabase are separate packages with independent test processes, these need their own copy here.

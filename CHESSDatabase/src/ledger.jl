@@ -32,14 +32,31 @@ bound a query), but not a substitute for "the current end of the story" once any
 replaced.
 =#
 
+# The time written to a new ledger row: the current time, but never earlier than the newest row's time.
+# `Ledger.Time` is the transaction time that decides which revision of a slot is current, so it must not go
+# backward when the system clock does (a step back would make a newer revision look older than the one it
+# replaces). The newest row is the one with the highest `ID` -- an O(1) rowid lookup, unlike `Max(Time)`.
+const _monotone_ledger_time = "MAX(?, COALESCE((SELECT Time FROM Ledger ORDER BY ID DESC LIMIT 1), ?))"
+
 """
     append_ledger()
 Add an entry to the end of ledger and return the ID of that entry.
+
+The next sequence ID is read and the row inserted by a single statement, so two writers cannot be given
+the same sequence ID (which would make the second look like an amendment of the first). Call it inside
+the transaction that writes the operation, as [`upload`](@ref) and [`update`](@ref) do: if the
+transaction fails, the row is rolled back with it.
 """
 function append_ledger()
-    seq_id=get_last_sequence_id()+1
-    return update_ledger(seq_id)
+    now_time=db_time(Dates.now())
+    execute_db("""
+    INSERT INTO Ledger(SequenceID,Time)
+    SELECT COALESCE(Max(SequenceID),0)+1, $_monotone_ledger_time FROM Ledger
+    """,(now_time,now_time))
+    return _last_inserted_ledger_id()
 end
+
+_last_inserted_ledger_id() = query_db("SELECT last_insert_rowid() AS id")[1,1]
 
 
 
@@ -49,10 +66,12 @@ end
 Increase the **SequenceID** value for all ledger entries whose **SequenceID** Value is greater than or equal to `sequence_id`, then insert a ledger new entry into the sequence at `sequence_id`
 """
 function insert_ledger(sequence_id::Integer)
-    execute_db("""
-    UPDATE Ledger SET SequenceID = SequenceID +1 WHERE SequenceID >= ?
-    """,(sequence_id,))
-    return update_ledger(sequence_id)
+    return sql_transaction() do
+        execute_db("""
+        UPDATE Ledger SET SequenceID = SequenceID +1 WHERE SequenceID >= ?
+        """,(sequence_id,))
+        update_ledger(sequence_id)
+    end
 end
 
 
@@ -62,20 +81,19 @@ end
 """
     update_ledger(sequenceID::Integer)
 
-Low-level primitive: insert a new `Ledger` row at `sequenceID`, stamped with the current time, and
-return its `ID`. Both [`append_ledger`](@ref) and [`insert_ledger`](@ref) funnel through this. Called
-directly on an *already-occupied* `sequenceID`, it's the ledger's "replace" operation -- prefer
+Low-level primitive: insert a new `Ledger` row at `sequenceID`, stamped with the current time (or the
+newest row's time if that is later, so ledger times never go backward), and return its `ID`.
+[`insert_ledger`](@ref) funnels through this. Called directly on an *already-occupied* `sequenceID`, it's the ledger's "replace" operation -- prefer
 [`replace_ledger`](@ref) for that, since it asserts the slot already exists instead of silently
 succeeding either way.
 """
 function update_ledger(sequenceID::Integer)
-    time=db_time(Dates.now())
+    now_time=db_time(Dates.now())
     execute_db("""
-    INSERT OR IGNORE INTO Ledger(SequenceID,Time)
-    Values(?,?)
-    """,(sequenceID,time))
-    out=query_db("SELECT Max(ID) FROM Ledger")[1,:]
-    return out["Max(ID)"]
+    INSERT INTO Ledger(SequenceID,Time)
+    SELECT ?, $_monotone_ledger_time
+    """,(sequenceID,now_time,now_time))
+    return _last_inserted_ledger_id()
 end
 
 
@@ -103,16 +121,14 @@ Return the most recent ledger id entry at or before a certain time
 """
 function get_last_ledger_id(time::DateTime=Dates.now())
     ledger_time = db_time(time)
-    x = "SELECT Max(ID) FROM Ledger WHERE TIME <= ?"
+    # newest row first by rowid: stops at the first row written by `time`
+    x = "SELECT ID FROM Ledger WHERE Time <= ? ORDER BY ID DESC LIMIT 1"
     current_id = query_db(x,(ledger_time,))
-    return current_id[1,1]
+    return nrow(current_id) == 0 ? missing : current_id[1,1]
 end
 
 function get_last_ledger_id(sequence_id::Integer,time::DateTime=Dates.now())
-    ledger_time=db_time(time)
-    x="SELECT Max(ID) FROM LEDGER WHERE SequenceID = ? AND TIME <= ?"
-    current_id=query_db(x,(sequence_id,ledger_time))
-    return current_id[1,1]
+    return visible_ledger_id(sequence_id,time)
 end
 
 """
@@ -122,9 +138,10 @@ The newest sequence ID in the ledger as of `time`: the current end of the histor
 """
 function get_last_sequence_id(time::DateTime=Dates.now())
     ledger_time = db_time(time)
-    x= "SELECT Max(SequenceID) FROM Ledger WHERE Time <= ?"
+    # walks `Ledger(SequenceID, ID)` from the top and stops at the first row written by `time`
+    x= "SELECT SequenceID FROM Ledger WHERE Time <= ? ORDER BY SequenceID DESC LIMIT 1"
     current_id = query_db(x,(ledger_time,))
-    return current_id[1,1]
+    return nrow(current_id) == 0 ? missing : current_id[1,1]
 end
 
 
@@ -142,7 +159,7 @@ end
 
 function get_all_ledger_ids(sequence_id::Integer,time::DateTime=Dates.now())
     ledger_time=db_time(time)
-    x="SELECT ID FROM LEDGER WHERE SequenceID = ? AND TIME <= ?"
+    x="SELECT ID FROM Ledger WHERE SequenceID = ? AND Time <= ? ORDER BY ID"
     current_id=query_db(x,(sequence_id,ledger_time))
     return current_id[:,"ID"]
 end
