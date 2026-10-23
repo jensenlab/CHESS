@@ -683,4 +683,7 @@ end
 # last: backfill_observations inserts ledger entries, shifting the sequence ids earlier tests hard-code
 include("test_observations.jl")
 
+# the reconstruction code against its frozen original on generated ledgers (uses its own databases)
+include("equivalence/test_equivalence.jl")
+
 rm(file)

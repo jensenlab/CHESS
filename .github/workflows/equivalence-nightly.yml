@@ -1,0 +1,39 @@
+name: Equivalence (nightly deep run)
+
+# The CHESSDatabase test suite already runs the equivalence tests on 12 seeds of 250 operations on every push
+# (CI.yml). Every night the same tests run on 500 seeds of 3000 operations, split over 10 shards, so a rare
+# disagreement between the reconstruction code and its frozen original has many more chances to show up.
+# A failing shard prints its seed, query point and a reduced ledger; rerun it with
+#   CHESS_EQUIV_SEED_START=<seed> CHESS_EQUIV_SEEDS=1 CHESS_EQUIV_OPS=3000
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  deep:
+    name: 50 seeds from ${{ matrix.start }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        start: [1, 51, 101, 151, 201, 251, 301, 351, 401, 451]
+    env:
+      CHESS_EQUIV_SEEDS: 50
+      CHESS_EQUIV_SEED_START: ${{ matrix.start }}
+      CHESS_EQUIV_OPS: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+          project: CHESSDatabase
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+        with:
+          project: CHESSDatabase
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: CHESSDatabase
