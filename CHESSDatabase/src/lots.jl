@@ -101,18 +101,32 @@ when none was observed.
 See also: [`reconstruct_lot!`](@ref).
 """
 function reconstruct_lot(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
-    rows=query_db("""
+    rows = if reconstruction_mode[] === :legacy
+        _reconstruct_lot_rows_global(location_id,sequence_id,time)
+    else
+        # the location's own observations first, then the visibility rule on those rows
+        query_db("""
+            SELECT p.Supplier, p.CatalogNumber, o.Lot, o.GTIN, o.Quantity, o.Unit, o.Cost, o.Received, o.Notes
+            FROM ObservedLots o CROSS JOIN Ledger vl ON vl.ID = o.LedgerID AND $(_visible_predicate("vl","?","?","?"))
+            INNER JOIN Products p ON o.ProductID = p.ID
+            WHERE o.LocationID = ? ORDER BY vl.SequenceID DESC, o.ID DESC LIMIT 1
+            """,(typemin(Int64),sequence_id,db_time(time),db_time(time),location_id))
+    end
+    nrow(rows)==0 && return nothing
+    r=rows[1,:]
+    quantity = ismissing(r.Quantity) ? missing : r.Quantity*_parse_unit(r.Unit)
+    received = ismissing(r.Received) ? missing : Date(r.Received)
+    return Lot(r.Supplier,r.CatalogNumber,r.Lot;gtin=r.GTIN,quantity,cost=r.Cost,received,notes=r.Notes)
+end
+
+function _reconstruct_lot_rows_global(location_id::Integer,sequence_id::Integer,time::DateTime)
+    return query_db("""
         WITH ledger_subset (ID,SequenceID) AS (
             SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID)
         SELECT p.Supplier, p.CatalogNumber, o.Lot, o.GTIN, o.Quantity, o.Unit, o.Cost, o.Received, o.Notes
         FROM ObservedLots o INNER JOIN ledger_subset l ON o.LedgerID = l.ID INNER JOIN Products p ON o.ProductID = p.ID
         WHERE o.LocationID = ? ORDER BY l.SequenceID DESC, o.ID DESC LIMIT 1
         """,(db_time(time),sequence_id,location_id))
-    nrow(rows)==0 && return nothing
-    r=rows[1,:]
-    quantity = ismissing(r.Quantity) ? missing : r.Quantity*_parse_unit(r.Unit)
-    received = ismissing(r.Received) ? missing : Date(r.Received)
-    return Lot(r.Supplier,r.CatalogNumber,r.Lot;gtin=r.GTIN,quantity,cost=r.Cost,received,notes=r.Notes)
 end
 
 """

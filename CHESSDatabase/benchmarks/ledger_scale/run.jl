@@ -30,6 +30,7 @@ const BENCH_DIR = get(ENV,"BENCH_DIR",joinpath(tempdir(),"chess_ledger_scale"))
 const BENCH_OUT = get(ENV,"BENCH_OUT",joinpath(@__DIR__,"results"))
 const BENCH_VARIANTS = split(get(ENV,"BENCH_VARIANTS","noidx,idx,cover"),",")
 const BENCH_TARGETS = parse(Int,get(ENV,"BENCH_TARGETS","8"))
+const BENCH_ONLY = Regex(get(ENV,"BENCH_ONLY",".*"))                     # run only the queries whose name matches
 const BENCH_SKIP_QUERIES = get(ENV,"BENCH_SKIP_QUERIES","0") == "1"   # only the size and write costs
 
 # location kinds the generated database uses
@@ -99,6 +100,7 @@ function query_list(seq)
         ("get_transfer_ancestors","chain12",true,id->CHESSDatabase.get_transfer_ancestors(vec(id),0,seq,now_)),
         ("get_transfer_descendents","chain6",true,id->CHESSDatabase.get_transfer_descendents(vec(id),0,seq,now_)),
         ("get_transfer_descendents","reservoir",true,id->CHESSDatabase.get_transfer_descendents(vec(id),0,seq,now_)),
+        ("get_instrument_settings","instrument",false,id->CHESSDatabase.get_instrument_settings(id,seq,now_)),
         ("get_reads","plate_well",false,id->CHESSDatabase.get_reads(id,seq,now_)),
         ("get_content_observations","chain6",false,id->CHESSDatabase.get_content_observations(vec(id),0,seq,now_)),
         ("reconstruct_environment","room",false,id->CHESSDatabase.reconstruct_environment(id,seq,now_)),
@@ -136,6 +138,7 @@ function run_queries(variant,lay)
     rows = NamedTuple[]
     plans = String[]
     for (name,cls,heavy,call) in query_list(seq)
+        occursin(BENCH_ONLY,name) || continue
         ids = getproperty(t,Symbol(cls))
         runs = heavy ? 2 : 3
         samples = Float64[]
@@ -157,7 +160,9 @@ function run_queries(variant,lay)
             end
             append!(plan_lines,lines)
         end
-        scan_ledger = any(occursin(r"\bSCAN Ledger\b",l) || occursin(r"\bSCAN l\b",l) for l in plan_lines)
+        # a scan of the whole Ledger table (or of its copy ledger_subset) that no index orders or bounds. The tick walk of
+        # latest_visible_event scans Ledger through its index and stops at the first hit, which is not counted.
+        scan_ledger = any((occursin(r"^SCAN (Ledger|vl|l|ledger_subset)\b",l) && !occursin("INDEX",l)) for l in plan_lines)
         materializes = any(occursin("MATERIALIZE ledger_subset",l) for l in plan_lines)
         n_chess = count(l->occursin("idx_chess",l),plan_lines)
         push!(rows,(; n=lay.N,variant,query=name,target=cls,targets=length(ids),runs,p50_ms=ms(q50(samples)),p95_ms=ms(q95(samples)),

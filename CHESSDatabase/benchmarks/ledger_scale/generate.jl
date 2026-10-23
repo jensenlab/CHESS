@@ -12,6 +12,7 @@
 #   transfers   experiments of 96 wells: 8 reservoir -> well transfers (100 µL), then 11 halving dilution steps in each
 #               of 8 rows (so a well never gives more than it holds); the reservoir is drawn from 200 with Zipf(1) weights, so reservoir 1 is a hub
 #   reads       one tick = 96 wells of one plate
+#   settings    about 1% of the slots set one of three settings of instruments 1-3
 #   amendments  new revisions (same SequenceID, higher ID, later Time) of environment and transfer slots
 #
 # generate_ledger_scale(path, N) -> NamedTuple of row counts
@@ -72,7 +73,7 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
     CREATE TEMP TABLE slots AS
     WITH RECURSIVE s(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM s WHERE i < $B)
     SELECT i, CASE WHEN r < 0.788 THEN 'e' WHEN r < 0.960 THEN 't' WHEN r < 0.9642 THEN 'r'
-                   WHEN r < 0.9785 THEN 'm' WHEN r < 0.9857 THEN 'l' ELSE 'a' END AS k
+                   WHEN r < 0.9785 THEN 'm' WHEN r < 0.9857 THEN 'l' WHEN r < 0.9885 THEN 'a' ELSE 's' END AS k
     FROM (SELECT i, $(ls_rnd("i",1)) AS r FROM s)""")
     exec("CREATE TEMP TABLE ord AS SELECT i, k, ROW_NUMBER() OVER (PARTITION BY k ORDER BY i) AS n FROM slots")
     exec("CREATE INDEX temp_ord_k ON ord(k,n)")
@@ -115,6 +116,11 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
     INSERT INTO Activity(LedgerID,LocationID,IsActive,Time)
     SELECT i, $plate_base + CAST($(ls_rnd("i",11))*$LS_PLATES AS INTEGER), n % 2, $LS_ORIGIN + i*0.01 FROM ord WHERE k = 'a'""")
 
+    exec("""
+    INSERT INTO InstrumentSettings(LedgerID,InstrumentID,Setting,Value,Time)
+    SELECT i, 1 + CAST($(ls_rnd("i",15))*3 AS INTEGER), CASE n % 3 WHEN 0 THEN 'Gain' WHEN 1 THEN 'Filter' ELSE 'Mode' END,
+           CAST(n AS TEXT), $LS_ORIGIN + i*0.01 FROM ord WHERE k = 's'""")
+
     # amendments: the j-th amendment row has ID B+j and revises a hash-chosen environment or transfer slot
     exec("""
     CREATE TEMP TABLE amend AS
@@ -138,7 +144,7 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
     SELECT i, 1, 1 + CAST($(ls_rnd("i",13))*$B AS INTEGER), $LS_ORIGIN FROM s WHERE $(ls_rnd("i",14)) < 0.01""")
 
     counts = NamedTuple(Symbol(t) => DataFrame(exec("SELECT COUNT(*) AS n FROM $t")).n[1] for t in
-        ("Ledger","EnvironmentAttributes","Reads","Transfers","Movements","Locks","Activity","CachedContents","Locations"))
+        ("Ledger","EnvironmentAttributes","Reads","Transfers","Movements","Locks","Activity","InstrumentSettings","CachedContents","Locations"))
     exec("ANALYZE")   # stats on the unindexed tables, as a database in use would have
     DBInterface.close!(db)
     return counts

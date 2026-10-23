@@ -166,6 +166,10 @@ const EQV_FUNCTION_CHECKS = Tuple{String,Function,Function}[
     ("find_locations(parent)",eqv_canon,(M,p)->M.find_locations(;parent=p.loc,sequence_id=p.seq,time=eqv_time(p))),
     ("find_locations(kind, active)",eqv_canon,(M,p)->M.find_locations(;kind=p.enc ? :WP96 : :Well200,active=p.loc2 % 2 == 0,sequence_id=p.seq,time=eqv_time(p))),
     ("find_locations(no parent)",eqv_canon,(M,p)->M.find_locations(;parent=nothing,kind=:WP96,sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(name)",eqv_canon,(M,p)->M.find_locations(;name=query_db("SELECT Name FROM Locations WHERE ID = ?",(p.loc,)).Name[1],sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(name, ignorecase)",eqv_canon,(M,p)->M.find_locations(;name=uppercase(query_db("SELECT Name FROM Locations WHERE ID = ?",(p.loc,)).Name[1]),ignorecase=true,sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(barcode)",eqv_canon,(M,p)->M.find_locations(;barcode=get(query_db("SELECT Barcode FROM Barcodes WHERE LocationID = ?",(p.loc,)).Barcode,1,"none"),sequence_id=p.seq,time=eqv_time(p))),
+    ("find_locations(parent, limit)",eqv_canon,(M,p)->M.find_locations(;parent=p.loc,limit=3,offset=1,sequence_id=p.seq,time=eqv_time(p))),
     ("descendants",eqv_canon,(M,p)->M.descendants(p.loc;sequence_id=p.seq,time=eqv_time(p))),
     ("descendants(kinds, depth)",eqv_canon,(M,p)->M.descendants(p.loc;kinds=[:Well200],max_depth=2,sequence_id=p.seq,time=eqv_time(p))),
     ("get_last_sequence_id",eqv_canon,(M,p)->M.get_last_sequence_id(eqv_time(p))),
@@ -307,9 +311,11 @@ end
     for seed in EQV_SEED_START:EQV_SEED_START+EQV_SEEDS-1
         clock = seed % 3 == 0 ? :backward : :monotone
         @testset "seed $seed ($clock clock)" begin
+            t_seed = time()
             with_scratch_db() do _
                 recipe = eqv_recipe(seed,EQV_OPS)
                 w = eqv_generate(seed;recipe=recipe,clock=clock)
+                haskey(ENV,"CHESS_EQUIV_PROGRESS") && (println(stderr,"seed $seed generated ",round(time()-t_seed;digits=1)," s"); flush(stderr))
                 rng = Xoshiro(10_000 + seed)
                 # the generator must produce a ledger worth testing
                 n_amended = query_db("SELECT COUNT(*) FROM (SELECT SequenceID FROM Ledger GROUP BY SequenceID HAVING COUNT(*) > 1)")[1,1]
@@ -319,6 +325,7 @@ end
                 points = eqv_points(rng,w,EQV_POINTS)
                 mismatches = EqvMismatch[]
                 for (i,p) in enumerate(points)
+                    haskey(ENV,"CHESS_EQUIV_PROGRESS") && (println(stderr,"seed $seed point $i ",round(time()-t_seed;digits=1)," s"); flush(stderr))
                     append!(mismatches,eqv_check_point(p;end_to_end=i % 2 == 1)) # the end-to-end functions on every other point
                 end
                 total_points[] += length(points)
@@ -336,6 +343,7 @@ end
                     println(stderr,reduced)
                 end
                 @test isempty(mismatches)
+                haskey(ENV,"CHESS_EQUIV_PROGRESS") && @info "seed $seed: $(round(time()-t_seed;digits=1)) s, $(length(points)) points"
             end
         end
     end

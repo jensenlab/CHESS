@@ -78,6 +78,10 @@ function eqv_setup(rng_seed::Integer)
     for r in w.reservoirs; cache(r); end
     w.wells = Well[x for p in w.plates for x in children(p)]
     upload(set_attribute!,lab,Temperature(25u"°C"))
+    for (i,loc) in enumerate((w.plates[1],w.bottles[1],w.reader))
+        bc = Barcode("eqv-$(rng_seed)-$i","eqv barcode $i")
+        upload_barcode(bc); upload(assign_barcode!,bc,loc)
+    end
     exp_id = upload_experiment("eqv experiment $rng_seed","eqv")
     w.protocol_id = upload_protocol(exp_id,"eqv protocol")
     w.locations = vcat(location_id.(w.rooms),location_id.(w.incubators),location_id.(w.shelves),location_id.(w.plates),

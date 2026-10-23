@@ -101,14 +101,28 @@ function trace_forward(location_id::Integer,sequence_id::Integer=get_last_sequen
     return _forward_result(_spread_forward(Dict(Int(location_id)=>Int(from_sequence)),sequence_id,time))
 end
 
-function trace_forward(lot::Lot,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
-    candidates=query_db("""
-        WITH ledger_subset (ID,SequenceID) AS (
-            SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID)
+# the labware that had `lot` observed on it at some point up to `sequence_id` and `time`
+function _lot_candidates(lot::Lot,sequence_id::Integer,time::DateTime)
+    if reconstruction_mode[] === :legacy
+        return query_db("""
+            WITH ledger_subset (ID,SequenceID) AS (
+                SELECT Max(ID), SequenceID FROM Ledger WHERE Time <= ? AND SequenceID <= ? GROUP BY SequenceID)
+            SELECT DISTINCT o.LocationID
+            FROM ObservedLots o INNER JOIN ledger_subset l ON o.LedgerID = l.ID INNER JOIN Products p ON o.ProductID = p.ID
+            WHERE p.Supplier = ? AND p.CatalogNumber = ? AND o.Lot = ?
+            """,(db_time(time),sequence_id,lot.supplier,lot.catalog_number,lot.lot))
+    end
+    # the product and lot first (ObservedLots(ProductID, Lot)), then the visibility rule on those rows
+    return query_db("""
         SELECT DISTINCT o.LocationID
-        FROM ObservedLots o INNER JOIN ledger_subset l ON o.LedgerID = l.ID INNER JOIN Products p ON o.ProductID = p.ID
+        FROM Products p CROSS JOIN ObservedLots o ON o.ProductID = p.ID
+        CROSS JOIN Ledger vl ON vl.ID = o.LedgerID AND $(_visible_predicate("vl","?","?","?"))
         WHERE p.Supplier = ? AND p.CatalogNumber = ? AND o.Lot = ?
-        """,(db_time(time),sequence_id,lot.supplier,lot.catalog_number,lot.lot))
+        """,(typemin(Int64),sequence_id,db_time(time),db_time(time),lot.supplier,lot.catalog_number,lot.lot))
+end
+
+function trace_forward(lot::Lot,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+    candidates=_lot_candidates(lot,sequence_id,time)
     seeds=Dict{Int,Int}()
     for labware_id in candidates.LocationID
         current=reconstruct_lot(labware_id,sequence_id,time) # a later observation may have changed the labware's lot
