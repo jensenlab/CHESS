@@ -72,7 +72,7 @@ function targets(lay,rng)
     pick(r,n=BENCH_TARGETS) = rand(rng,r,n)
     chain(col) = [lay.exp_base + rand(rng,0:lay.n_exp-2)*96 + rand(rng,0:7)*12 + col for _ in 1:BENCH_TARGETS]
     return (
-        incubator = pick(lay.incubators), room = pick(lay.rooms), reservoir = pick(lay.reservoirs[1:5]),
+        incubator = pick(lay.incubators), room = pick(lay.rooms), reservoir = pick(lay.reservoirs[1:5]), instrument = pick(1:3),
         plate = pick(lay.plates), plate_well = pick(lay.plate_wells),
         chain1 = chain(1), chain6 = chain(6), chain12 = chain(11),
     )
