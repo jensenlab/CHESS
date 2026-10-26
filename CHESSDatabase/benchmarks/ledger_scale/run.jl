@@ -30,6 +30,7 @@ const BENCH_DIR = get(ENV,"BENCH_DIR",joinpath(tempdir(),"chess_ledger_scale"))
 const BENCH_OUT = get(ENV,"BENCH_OUT",joinpath(@__DIR__,"results"))
 const BENCH_VARIANTS = split(get(ENV,"BENCH_VARIANTS","noidx,idx,cover"),",")
 const BENCH_TARGETS = parse(Int,get(ENV,"BENCH_TARGETS","8"))
+const BENCH_RUNS = parse(Int,get(ENV,"BENCH_RUNS","0"))               # repeats per target (0: 3, heavy queries 2)
 const BENCH_ONLY = Regex(get(ENV,"BENCH_ONLY",".*"))                     # run only the queries whose name matches
 const BENCH_SKIP_QUERIES = get(ENV,"BENCH_SKIP_QUERIES","0") == "1"   # only the size and write costs
 
@@ -140,10 +141,11 @@ function run_queries(variant,lay)
     for (name,cls,heavy,call) in query_list(seq)
         occursin(BENCH_ONLY,name) || continue
         ids = getproperty(t,Symbol(cls))
-        runs = heavy ? 2 : 3
-        samples = Float64[]
+        runs = BENCH_RUNS > 0 ? BENCH_RUNS : (heavy ? 2 : 3)
+        samples = Float64[]; mins = Float64[]
         for id in ids
-            append!(samples,timeit(()->call(id),runs))
+            s_id = timeit(()->call(id),runs)
+            append!(samples,s_id); push!(mins,minimum(s_id))
         end
         # the SQL this function ran
         CAPTURE[] = Tuple{String,Any}[]
@@ -165,7 +167,7 @@ function run_queries(variant,lay)
         scan_ledger = any((occursin(r"^SCAN (Ledger|vl|l|ledger_subset)\b",l) && !occursin("INDEX",l)) for l in plan_lines)
         materializes = any(occursin("MATERIALIZE ledger_subset",l) for l in plan_lines)
         n_chess = count(l->occursin("idx_chess",l),plan_lines)
-        push!(rows,(; n=lay.N,variant,query=name,target=cls,targets=length(ids),runs,p50_ms=ms(q50(samples)),p95_ms=ms(q95(samples)),
+        push!(rows,(; n=lay.N,variant,query=name,target=cls,targets=length(ids),runs,p50_ms=ms(q50(samples)),p95_ms=ms(q95(samples)),p50_of_min_ms=ms(q50(mins)),
             plan_scans_ledger=scan_ledger,plan_materializes_ledger_subset=materializes,plan_chess_index_uses=n_chess,sql_statements=length(sqls)))
         push!(plans,"=== $variant | $name | $cls\n" * join(plan_lines,"\n") * "\n")
         @printf("%-6s %-32s %-10s p50 %9.3f ms  p95 %9.3f ms  scan-ledger=%s cte=%s\n",variant,name,cls,ms(q50(samples)),ms(q95(samples)),scan_ledger,materializes)
