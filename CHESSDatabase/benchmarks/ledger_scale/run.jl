@@ -158,6 +158,7 @@ function run_queries(variant,lay)
     for (name,cls,heavy,call) in query_list(seq)
         occursin(BENCH_ONLY,name) || continue
         ids = getproperty(t,Symbol(cls))
+        isempty(ids) && continue                                       # e.g. BENCH_DEEP=0 has no deep targets
         runs = BENCH_RUNS > 0 ? BENCH_RUNS : (heavy ? 2 : 3)
         samples = Float64[]; mins = Float64[]
         for id in ids
