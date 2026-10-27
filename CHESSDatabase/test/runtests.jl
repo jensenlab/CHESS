@@ -721,5 +721,6 @@ include("test_location_queries.jl")
 # the reconstruction code against its frozen original on generated ledgers (uses its own databases)
 include("equivalence/test_equivalence.jl")
 include("test_local_queries.jl")
+include("test_transfer_closure.jl")
 
 rm(file)

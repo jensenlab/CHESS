@@ -57,6 +57,25 @@ function eqv_same(a,b;canon=eqv_canon)
     return canon(a[2]) == canon(b[2])
 end
 
+# what the closure comparisons covered, counted on the current implementation's results: results with rows,
+# with collateral rows, with a discard, with a chain of at least three sources, with collateral from the hub
+const EQV_CLOSURE_STATS = Dict(:ancestors=>0,:collateral=>0,:discard=>0,:chain=>0,:hub_collateral=>0,:descendants=>0)
+const EQV_HUB = Ref(0)
+function eqv_tally(M,df,kind)
+    (M === CHESSDatabase && df isa DataFrame && nrow(df) > 0) || return df
+    if kind === :ancestors
+        EQV_CLOSURE_STATS[:ancestors] += 1
+        coll = df[df.Core .== 0,:]
+        nrow(coll) > 0 && (EQV_CLOSURE_STATS[:collateral] += 1)
+        any(ismissing,df.Destination) && (EQV_CLOSURE_STATS[:discard] += 1)
+        length(unique(df[df.Core .== 1,:Source])) >= 3 && (EQV_CLOSURE_STATS[:chain] += 1)
+        any(coll.Source .== EQV_HUB[]) && (EQV_CLOSURE_STATS[:hub_collateral] += 1)
+    else
+        EQV_CLOSURE_STATS[:descendants] += 1
+    end
+    return df
+end
+
 # caches also have to come back in the same SequenceID order: callers take `caches[end,:]`
 eqv_cache_canon(x::DataFrame) = (eqv_canon(x),x.SequenceID)
 
@@ -111,10 +130,19 @@ function eqv_hotspots()
     return (slots=Int.(amended),times=Float64.(ids.Time .- EQV_CLOCK_ORIGIN),locations=unique(locs))
 end
 
+# Wells that take part in transfers and discards (most queries about a random location find nothing to follow), the
+# hub reservoir that feeds most of them, and the wells the hub fed, which are downstream of a large closure.
+function eqv_transfer_wells(w::EqvWorld)
+    ends = query_db("SELECT DISTINCT Source AS id FROM Transfers UNION SELECT DISTINCT Destination FROM Transfers UNION SELECT DISTINCT Source FROM Discards").id
+    return Int.(collect(skipmissing(ends)))
+end
+
 function eqv_points(rng,w::EqvWorld,n)
     maxid = query_db("SELECT Max(ID) FROM Ledger")[1,1]
     maxseq = query_db("SELECT Max(SequenceID) FROM Ledger")[1,1]
     hot = eqv_hotspots()
+    twells = eqv_transfer_wells(w)
+    hub = location_id(w.reservoirs[1])
     pts = EqvPoint[]
     for k in 1:n
         seq = rand(rng) < 0.25 ? maxseq : rand(rng,1:maxseq+2)
@@ -125,6 +153,10 @@ function eqv_points(rng,w::EqvWorld,n)
             seq = rand(rng,hot.slots) + rand(rng,-1:3)
             tsec = rand(rng,hot.times) + rand(rng,(-1.0,-0.5,0.0,0.5,1.0))
             loc = rand(rng,hot.locations); loc2 = rand(rng,hot.locations)
+        end
+        if !isempty(twells) && k % 3 == 1             # a third of the points follow transfers, some of them from the hub
+            loc = rand(rng) < 0.15 ? hub : rand(rng,twells); loc2 = rand(rng,twells)
+            rand(rng) < 0.5 && (seq = rand(rng) < 0.5 ? maxseq : seq)
         end
         seq = clamp(seq,1,maxseq+2)
         push!(pts,EqvPoint(loc,loc2,rand(rng) < 0.5 ? 0 : rand(rng,0:seq),seq,tsec,rand(rng,0:seq),rand(rng) < 0.25))
@@ -148,8 +180,8 @@ const EQV_FUNCTION_CHECKS = Tuple{String,Function,Function}[
     ("get_locks",eqv_canon,(M,p)->M.get_locks([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
     ("get_activity",eqv_canon,(M,p)->M.get_activity([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
     ("get_environment_attributes",eqv_canon,(M,p)->M.get_environment_attributes([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
-    ("get_transfer_ancestors",eqv_canon,(M,p)->M.get_transfer_ancestors([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
-    ("get_transfer_descendents",eqv_canon,(M,p)->M.get_transfer_descendents([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
+    ("get_transfer_ancestors",eqv_canon,(M,p)->eqv_tally(M,M.get_transfer_ancestors([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc),:ancestors)),
+    ("get_transfer_descendents",eqv_canon,(M,p)->eqv_tally(M,M.get_transfer_descendents([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc),:descendants)),
     ("transfers_touch",eqv_canon,(M,p)->M.transfers_touch(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
     ("transfers_touched_by",eqv_canon,(M,p)->M.transfers_touched_by(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
     ("get_content_observations",eqv_canon,(M,p)->M.get_content_observations([p.loc,p.loc2],p.start,p.seq,eqv_time(p))),
@@ -315,6 +347,7 @@ end
             with_scratch_db() do _
                 recipe = eqv_recipe(seed,EQV_OPS)
                 w = eqv_generate(seed;recipe=recipe,clock=clock)
+                EQV_HUB[] = location_id(w.reservoirs[1])
                 haskey(ENV,"CHESS_EQUIV_PROGRESS") && (println(stderr,"seed $seed generated ",round(time()-t_seed;digits=1)," s"); flush(stderr))
                 rng = Xoshiro(10_000 + seed)
                 # the generator must produce a ledger worth testing
@@ -347,6 +380,13 @@ end
             end
         end
     end
+    if total_points[] >= 200      # the comparisons must have reached the interesting corners of the closure
+        for (k,v) in EQV_CLOSURE_STATS
+            @test v > 0
+            v == 0 && @warn "closure comparisons never covered" k
+        end
+    end
+    @info "equivalence closure coverage: $(EQV_CLOSURE_STATS)"
     @info "equivalence: $(total_points[]) query points, about $(total_checks[]) function comparisons; results with rows: $(EQV_STATS[:nonempty]), empty: $(EQV_STATS[:empty]), both threw: $(EQV_STATS[:both_err])"
 end
 

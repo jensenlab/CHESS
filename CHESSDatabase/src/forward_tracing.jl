@@ -4,8 +4,25 @@
 # computed from the ledger each time and nothing is stored, so an amendment (`update` with `replace` or
 # `insert`) changes the next answer, and a trace as of an earlier sequence ID still gives the old one.
 
-# the transfers out of `sources` as of `sequence_id` and `time`, one row per transfer
+# the transfers out of `sources` as of `sequence_id` and `time`, one row per transfer, oldest first
 function _transfers_out_of(sources::AbstractVector{<:Integer},sequence_id::Integer,time::DateTime)
+    reconstruction_mode[] === :legacy && return _transfers_out_of_global(sources,sequence_id,time)
+    out=DataFrame(LedgerID=Int[],SequenceID=Int[],Source=Int[],Destination=Int[])
+    pred=_visible_predicate("vl","?","?","?")
+    t=db_time(time)
+    for chunk in Iterators.partition(sources,_id_chunk)
+        rows=query_db("""
+            SELECT x.LedgerID AS LedgerID, vl.SequenceID AS SequenceID, x.Source AS Source, x.Destination AS Destination
+            FROM Transfers x CROSS JOIN Ledger vl ON vl.ID = x.LedgerID AND $pred
+            WHERE x.Source IN $(_marks(length(chunk)))
+            """,(typemin(Int64),sequence_id,t,t,chunk...))
+        append!(out,rows)
+    end
+    return out[sortperm(out.SequenceID;alg=MergeSort),:]
+end
+
+# the same through a `ledger_subset` over the whole ledger
+function _transfers_out_of_global(sources::AbstractVector{<:Integer},sequence_id::Integer,time::DateTime)
     out=DataFrame(LedgerID=Int[],SequenceID=Int[],Source=Int[],Destination=Int[])
     for chunk in Iterators.partition(sources,_id_chunk)
         marks="("*join(fill("?",length(chunk)),",")*")"

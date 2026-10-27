@@ -169,7 +169,7 @@ whole ledger's history: the *query* still has to look at every collateral edge (
 correctly zeroing out a core well's balance), but no collateral destination ever triggers its own
 expensive reconstruction.
 """
-function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
+function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
@@ -260,7 +260,7 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
 return query_db(x)
 end
 
-function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
+function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
