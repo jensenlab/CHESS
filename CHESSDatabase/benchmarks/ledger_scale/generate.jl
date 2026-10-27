@@ -14,6 +14,7 @@
 #   reads       one tick = 96 wells of one plate
 #   settings    about 1% of the slots set one of three settings of instruments 1-3
 #   amendments  new revisions (same SequenceID, higher ID, later Time) of environment and transfer slots
+#   deep chain  BENCH_DEEP (default 5000) transfers in a line: source -> w1 -> w2 -> ... , each well passing on all it received
 #
 # generate_ledger_scale(path, N) -> NamedTuple of row counts
 
@@ -21,6 +22,9 @@ using SQLite, DBInterface, DataFrames, CHESSDatabase
 
 const LS_ORIGIN = 1.7e9          # Ledger.Time of ID 0; each row is 0.01 s after the previous one
 const LS_INCUBATORS, LS_ROOMS, LS_RESERVOIRS, LS_PLATES = 40, 200, 200, 300
+# steps of the deep chain: a source reservoir followed by wells w1, w2, ... each of which hands its whole contents to the
+# next (0 leaves it out). Its ledger rows come after the N rows of the mix, so N counts the mix only.
+const LS_DEEP = parse(Int,get(ENV,"BENCH_DEEP","5000"))
 
 # integer hash of expression `i` and `salt` as a uniform number in [0, 1); no SQLite random() so runs repeat
 ls_rnd(i,salt) = "(((((($i)*2654435761+$(salt)*1000003+12345) % 4294967296)*1664525+1013904223) % 4294967296)/4294967296.0)"
@@ -37,9 +41,10 @@ function ls_layout(N::Integer)
     plate_base = LS_INCUBATORS + LS_ROOMS + LS_RESERVOIRS + 1
     well_base = plate_base + LS_PLATES
     exp_base = well_base + LS_PLATES*96
+    n_loc = exp_base + n_exp*96 - 1
     return (; N, amendments=A, slots=B, n_exp, incubators=1:LS_INCUBATORS, rooms=LS_INCUBATORS+1:LS_INCUBATORS+LS_ROOMS,
         reservoirs=LS_INCUBATORS+LS_ROOMS+1:LS_INCUBATORS+LS_ROOMS+LS_RESERVOIRS, plates=plate_base:plate_base+LS_PLATES-1,
-        plate_wells=well_base:exp_base-1, exp_base, n_loc=exp_base + n_exp*96 - 1)
+        plate_wells=well_base:exp_base-1, exp_base, n_loc, deep=LS_DEEP, chain_source=n_loc+1, chain_head=n_loc+2, chain_tail=n_loc+1+LS_DEEP)
 end
 
 function generate_ledger_scale(path::AbstractString,N::Integer)
@@ -135,6 +140,22 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
     INSERT INTO Transfers(LedgerID,Source,Destination,Quantity,Unit,Time)
     SELECT a.id, t.Source, t.Destination, t.Quantity*1.1, t.Unit, $LS_ORIGIN + a.id*0.01
     FROM amend a INNER JOIN Transfers t ON t.LedgerID = a.i WHERE a.k = 't'""")
+
+    # the deep chain: slots B+1 ... B+D, written after the amendments (so their ledger IDs are B+A+1 ...)
+    if LS_DEEP > 0
+        D, src = LS_DEEP, lay.chain_source
+        exec("""
+        WITH RECURSIVE s(k) AS (SELECT 1 UNION ALL SELECT k+1 FROM s WHERE k < $D)
+        INSERT INTO Locations(ID,Name,Type) SELECT $src + k - 1, 'chain'||k, CASE WHEN k = 1 THEN 'Reservoir' ELSE 'Well200' END FROM s""")
+        exec("INSERT INTO Locations(ID,Name,Type) VALUES ($(src+D),'chain end','Well200')")
+        exec("""
+        WITH RECURSIVE s(k) AS (SELECT 1 UNION ALL SELECT k+1 FROM s WHERE k < $D)
+        INSERT INTO Ledger(ID,SequenceID,Time) SELECT $B + $A + k, $B + k, $LS_ORIGIN + ($B + $A + k)*0.01 FROM s""")
+        exec("""
+        WITH RECURSIVE s(k) AS (SELECT 1 UNION ALL SELECT k+1 FROM s WHERE k < $D)
+        INSERT INTO Transfers(LedgerID,Source,Destination,Quantity,Unit,Time)
+        SELECT $B + $A + k, $src + k - 1, $src + k, 100.0, 'µL', $LS_ORIGIN + ($B + $A + k)*0.01 FROM s""")
+    end
 
     # caches on 1% of the wells, taken at a random slot
     exec("INSERT INTO CachedStocks(ID,StockHash) VALUES (1, x'0000000000000000')")

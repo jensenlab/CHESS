@@ -4,7 +4,9 @@
 #
 # Environment: BENCH_N (ledger rows, default 200000), BENCH_DIR (where the databases go, default a folder in
 # the temp directory; never inside the repository), BENCH_OUT (results folder, default ./results),
-# BENCH_VARIANTS (default "noidx,idx,cover"), BENCH_TARGETS (targets per query class, default 8).
+# BENCH_VARIANTS (default "noidx,idx,cover"), BENCH_TARGETS (targets per query class, default 8), BENCH_RUNS (repeats
+# per target), BENCH_ONLY (regex on the query name), BENCH_MODE (local, or legacy for the original whole-ledger queries),
+# BENCH_DEEP (steps of the deep transfer chain, default 5000, 0 for none).
 #
 # Variants of the same database:
 #   noidx  the database as it was before the CHESS indexes (only the indexes create_db always made)
@@ -33,6 +35,7 @@ const BENCH_TARGETS = parse(Int,get(ENV,"BENCH_TARGETS","8"))
 const BENCH_RUNS = parse(Int,get(ENV,"BENCH_RUNS","0"))               # repeats per target (0: 3, heavy queries 2)
 const BENCH_ONLY = Regex(get(ENV,"BENCH_ONLY",".*"))                     # run only the queries whose name matches
 const BENCH_SKIP_QUERIES = get(ENV,"BENCH_SKIP_QUERIES","0") == "1"   # only the size and write costs
+const BENCH_MODE = Symbol(get(ENV,"BENCH_MODE","local"))                 # local, or legacy to time the original whole-ledger queries
 
 # location kinds the generated database uses
 @location_kind Room Symbol[] nothing nothing nothing nothing nothing 0//1 0//1
@@ -76,6 +79,9 @@ function targets(lay,rng)
         incubator = pick(lay.incubators), room = pick(lay.rooms), reservoir = pick(lay.reservoirs[1:5]), instrument = pick(1:3),
         plate = pick(lay.plates), plate_well = pick(lay.plate_wells),
         chain1 = chain(1), chain6 = chain(6), chain12 = chain(11),
+        # the deep chain: its tail, then the wells a half, a fifth and a fiftieth of the way along; and its first well
+        deep = LS_DEEP > 0 ? [lay.chain_source + max(1,LS_DEEP ÷ d) for d in (1,2,5,50)] : Int[],
+        deep_head = LS_DEEP > 0 ? [lay.chain_head] : Int[],
     )
 end
 
@@ -112,17 +118,27 @@ function query_list(seq)
         ("find_locations(parent)","incubator",false,id->CHESSDatabase.find_locations(;parent=id,sequence_id=seq,time=now_)),
         ("descendants","incubator",false,id->CHESSDatabase.descendants(id;sequence_id=seq,time=now_)),
         ("trace_forward(well)","chain6",true,id->CHESSDatabase.trace_forward(id,seq,now_)),
+        ("trace_contents","chain6",true,id->CHESSDatabase.trace_contents(id,seq,now_)),
+        ("trace_contents","chain12",true,id->CHESSDatabase.trace_contents(id,seq,now_)),
         ("reconstruct_contents","chain12",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
         ("reconstruct_contents","chain1",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
+        ("get_transfer_ancestors","deep",true,id->CHESSDatabase.get_transfer_ancestors(vec(id),0,seq,now_)),
+        ("get_transfer_descendents","deep_head",true,id->CHESSDatabase.get_transfer_descendents(vec(id),0,seq,now_)),
+        ("trace_forward(well)","deep_head",true,id->CHESSDatabase.trace_forward(id,seq,now_)),
+        ("trace_contents","deep",true,id->CHESSDatabase.trace_contents(id,seq,now_)),
+        ("reconstruct_contents","deep",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
     ]
 end
 
-# reservoirs need real contents for reconstruct_contents to replay transfers out of them
+# reservoirs need real contents: a cache for reconstruct_contents to start from, and an observation for trace_contents,
+# which replays observations and transfers and does not read caches
 function stock_reservoirs!(lay)
     water = Liquid("bench water",18.015u"g/mol",1.0u"g/mL")
     sid = CHESSDatabase.cache(5.0e8u"µL"*water)
-    for r in lay.reservoirs
+    component = CHESSDatabase.get_component_id(water)
+    for r in (LS_DEEP > 0 ? vcat(collect(lay.reservoirs),lay.chain_source) : lay.reservoirs)
         execute_db("INSERT INTO CachedContents(LocationID,StockID,LedgerID,Time) Values(?,?,?,?)",(r,sid,1,LS_ORIGIN))
+        execute_db("INSERT INTO ObservedComponents(LedgerID,LocationID,ComponentID,Quantity,Unit,Time) Values(?,?,?,?,?,?)",(1,r,component,5.0e8,"µL",LS_ORIGIN))
     end
 end
 
@@ -133,6 +149,7 @@ function plan_of(sql,params)
 end
 
 function run_queries(variant,lay)
+    CHESSDatabase.reconstruction_mode[] = BENCH_MODE
     rng = Xoshiro(2026)
     t = targets(lay,rng)
     seq = get_last_sequence_id()
@@ -167,7 +184,7 @@ function run_queries(variant,lay)
         scan_ledger = any((occursin(r"^SCAN (Ledger|vl|l|ledger_subset)\b",l) && !occursin("INDEX",l)) for l in plan_lines)
         materializes = any(occursin("MATERIALIZE ledger_subset",l) for l in plan_lines)
         n_chess = count(l->occursin("idx_chess",l),plan_lines)
-        push!(rows,(; n=lay.N,variant,query=name,target=cls,targets=length(ids),runs,p50_ms=ms(q50(samples)),p95_ms=ms(q95(samples)),p50_of_min_ms=ms(q50(mins)),
+        push!(rows,(; n=lay.N,variant,mode=BENCH_MODE,query=name,target=cls,targets=length(ids),runs,p50_ms=ms(q50(samples)),p95_ms=ms(q95(samples)),p50_of_min_ms=ms(q50(mins)),
             plan_scans_ledger=scan_ledger,plan_materializes_ledger_subset=materializes,plan_chess_index_uses=n_chess,sql_statements=length(sqls)))
         push!(plans,"=== $variant | $name | $cls\n" * join(plan_lines,"\n") * "\n")
         @printf("%-6s %-32s %-10s p50 %9.3f ms  p95 %9.3f ms  scan-ledger=%s cte=%s\n",variant,name,cls,ms(q50(samples)),ms(q95(samples)),scan_ledger,materializes)
@@ -216,7 +233,7 @@ end
 
 function main()
     mkpath(BENCH_DIR); mkpath(BENCH_OUT)
-    base = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_base.db")
+    base = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_d$(LS_DEEP)_base.db")
     lay = ls_layout(BENCH_N)
     if !isfile(base)
         t = @elapsed counts = generate_ledger_scale(base,BENCH_N)
@@ -224,7 +241,7 @@ function main()
     end
     all_rows = DataFrame[]; all_plans = String[]; costs = NamedTuple[]
     for variant in BENCH_VARIANTS
-        path = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_$variant.db")
+        path = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_d$(LS_DEEP)_$variant.db")
         prepare_variant(variant,base,path)
         stock_reservoirs!(lay)
         println("\n== $variant: $(round(filesize(path)/2^20;digits=1)) MB, $(length(String.(query_db("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx\\_chess\\_%' ESCAPE '\\'").name))) CHESS indexes")
