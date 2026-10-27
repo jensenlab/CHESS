@@ -344,9 +344,8 @@ end
 The generalized electroneutrality condition `pH` is root-found against: `[H⁺] - [OH⁻] +
 Σ_families Σⱼ [speciesⱼ](pH)·chargeⱼ + strong_net`, all as dimensionless mol/L values -- computed via
 [`_species_concentrations`](@ref), so this works identically for a fixed-total [`AnalyticalSpecies`](@ref)
-family and a fixed-free-species [`OpenSystemSpecies`](@ref) one. Reduces algebraically to CHESSCore's
-original strong-electrolyte-only `net_hydrogen_ion_concentration` when `families` is empty (see
-[`pH`](@ref)'s fast path, which uses that exact original formula directly rather than this general one).
+family and a fixed-free-species [`OpenSystemSpecies`](@ref) one. With `families` empty and `Kw_eff == Kw`
+its root is the closed form used by [`pH`](@ref)'s fast path (see `_pH_strong_electrolyte_only`).
 """
 function _charge_balance_residual(pH::Real,families::Vector{<:AbstractAnalyticalSpecies},pKa_eff::Dict{AcidBaseSystem,Vector{Float64}},strong_net::Float64,Kw_eff::Float64)
     Hp = exp10(-pH)
@@ -525,7 +524,8 @@ so per-species activity parameters can be looked up; see [`_activity_coefficient
 correction).
 """
 function pH(families::Vector{<:AbstractAnalyticalSpecies},strong_ions::Vector{<:Tuple{Species,<:Unitful.Molarity}};ionic_strength_correction::Bool=true)
-    isempty(families) && return _pH_strong_electrolyte_only(sum((charge(chem)*c for (chem,c) in strong_ions);init=0.0u"mol/L"))
+    # electroneutrality gives [H⁺]-[OH⁻] = -Σ zc, and the closed form takes the net H⁺-minus-OH⁻ concentration
+    isempty(families) && return _pH_strong_electrolyte_only(-sum((charge(chem)*c for (chem,c) in strong_ions);init=0.0u"mol/L"))
     p,_ = _solve_ph(families,convert(Vector{Tuple{Species,Unitful.Molarity}},strong_ions);ionic_strength_correction)
     return p
 end
@@ -533,17 +533,20 @@ end
 """
     _pH_strong_electrolyte_only(net_conc)
 
-CHESSCore's original strong-electrolyte-only pH formula (`net_conc` = net H⁺-minus-OH⁻ molar
-concentration): `7.0` if zero, `-log10(net_conc)` if net H⁺, `14 - (-log10(-net_conc))` if net OH⁻.
-[`pH(::Stock)`](@ref)'s dedicated fast path when no acid/base family is present, so the common
-strong-electrolyte case is guaranteed bit-identical to the pre-equilibrium-solver behavior rather than
-merely "solved and hoped to land in the same place."
+Closed-form pH for a strong-electrolyte-only solution (`n` = net H⁺-minus-OH⁻ molar concentration from
+the dissolved strong acids and bases), including water autoionization. Electroneutrality reads
+`[H⁺] - Kw/[H⁺] = n`, so `[H⁺] = (n + √(n² + 4Kw))/2`; for `n < 0` the equivalent form
+`2Kw/(√(n² + 4Kw) - n)` is used to avoid cancellation. `7.0` is returned exactly for `n == 0`.
+[`pH(::Stock)`](@ref)'s dedicated fast path when no acid/base family is present. No activity correction
+is applied. Away from neutrality this agrees with the simple `-log10(n)` / `14 + log10(-n)` estimate to
+within the `Kw/n²` term; near neutrality (`|n|` approaching `1e-7`) it differs, correctly.
 """
 function _pH_strong_electrolyte_only(net_conc::Unitful.Molarity)
-    conc = ustrip(uconvert(u"mol/L",net_conc))
-    iszero(conc) && return 7.0
-    conc>0 && return -log10(conc)
-    return 14-(-log10(-conc))
+    n = ustrip(uconvert(u"mol/L",net_conc))
+    iszero(n) && return 7.0
+    root = sqrt(n^2+4*Kw)
+    h = n>0 ? (n+root)/2 : 2*Kw/(root-n)
+    return -log10(h)
 end
 
 """
