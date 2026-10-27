@@ -367,7 +367,7 @@ end
     @test CHESSCore.pH(nacl_stock;water_correction=true) ≈ 5.93 atol=1e-3
 end
 
-@testset "Truesdell-Jones ion parameters registered from wateq4f.dat" begin
+@testset "Truesdell-Jones ion parameters registered from wateq4f.dat / phreeqc.dat" begin
     expected = Dict(
         CHESSLabConstants.Na⁺=>(4.0,0.075), CHESSLabConstants.K⁺=>(3.5,0.015),
         CHESSLabConstants.Ca²⁺=>(5.0,0.165), CHESSLabConstants.Mg²⁺=>(5.5,0.2),
@@ -375,13 +375,21 @@ end
         CHESSLabConstants.Cl⁻=>(3.5,0.015), CHESSLabConstants.NO3⁻=>(3.0,0.0),
         CHESSLabConstants.SO4²⁻=>(5.0,-0.04), CHESSLabConstants.CO3²⁻=>(5.4,0.0),
         CHESSLabConstants.HCO3⁻=>(5.4,0.0),
+        CHESSLabConstants.PO4³⁻=>(5.0,0.0), CHESSLabConstants.HPO4²⁻=>(5.0,0.0),
+        CHESSLabConstants.H2PO4⁻=>(5.4,0.0), CHESSLabConstants.HSO4⁻=>(4.5,0.0),
+        CHESSLabConstants.F⁻=>(3.5,0.0), CHESSLabConstants.Al³⁺=>(9.0,0.0),
+        CHESSLabConstants.Mn²⁺=>(6.0,0.0), CHESSLabConstants.Cu²⁺=>(6.0,0.0),
+        CHESSLabConstants.Zn²⁺=>(6.0,0.0), # wateq4f.dat; phreeqc.dat has 5.0
+        CHESSLabConstants.NH4⁺=>(2.5,0.0), # no wateq4f.dat line; phreeqc.dat / minteq.v4.dat
     )
     for (chem,params) in expected
         @test get(CHESSCore.ion_parameters,chem,nothing) == params
     end
-    # NH4+ has no -gamma line in wateq4f.dat -- deliberately left unregistered (Davies fallback),
-    # not guessed
-    @test !haskey(CHESSCore.ion_parameters,CHESSLabConstants.NH4⁺)
+    # species with no citable parameter in these databases are deliberately left unregistered (Davies
+    # fallback), not guessed: organic ions, and metals with no free-ion entry (Co2+, Ni2+)
+    for chem in (CHESSLabConstants.OAc⁻,CHESSLabConstants.Citrate³⁻,CHESSLabConstants.Co²⁺,CHESSLabConstants.Ni²⁺)
+        @test !haskey(CHESSCore.ion_parameters,chem)
+    end
 
     # the Davies-reliability warning no longer fires for bicarbonate_10x: CO3²⁻/HCO3⁻ now have real
     # Truesdell-Jones parameters, so they're exempt from the "no citable parameter" check
