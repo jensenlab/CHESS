@@ -133,11 +133,15 @@ end
     touching = outcome(()->CHESSDatabase.transfers_touch(tc_id(tc_src),0,last_,now_))
     @test touching[1] === :ok
     @test tc_id(tc_A) in first.(touching[2]) && tc_id(tc_D) in first.(touching[2])
-    # `transfers_touched_by` reads an EncumbranceID column that the ancestors query only has with encumbrances=true,
-    # so without encumbrances it throws whenever there is a row to read, as it always did
+    # the ancestors query has an EncumbranceID column only with encumbrances=true; `transfers_touched_by` used to
+    # throw without it whenever there was a row to read. It now reports EncumbranceID 0 for those rows.
     touched = outcome(()->CHESSDatabase.transfers_touched_by(tc_id(tc_F),0,last_,now_))
     touched_enc = outcome(()->CHESSDatabase.transfers_touched_by(tc_id(tc_F),0,last_,now_;encumbrances=true))
+    @test touched[1] === :ok
+    @test tc_id(tc_A) in first.(touched[2])
+    @test all(t->t[3] == 0,touched[2])
     @test touched_enc[1] === :ok && tc_id(tc_A) in first.(touched_enc[2])
+    @test touched[2] == touched_enc[2]       # no encumbrance is planned in this ledger
     old_mode = CHESSDatabase.reconstruction_mode[]
     try
         CHESSDatabase.reconstruction_mode[] = :legacy

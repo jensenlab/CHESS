@@ -99,6 +99,7 @@ order of the history. The trace of reached wells and sequence IDs is the same fo
 
 `encumbrances=true`, `reconstruction_mode[] === :legacy` and more than `LOCAL_KEY_LIMIT` seeds use the original
 queries. `repair_content_caches` calls `get_transfer_descendents` and so uses the rewrite for its closure.
-`transfers_touch` and `transfers_touched_by` call the two functions; without encumbrances
-`transfers_touched_by` reads an `EncumbranceID` column that the ancestors query has only with
-`encumbrances=true`, so it fails whenever there is a row to read, as before.
+`transfers_touch` and `transfers_touched_by` call the two functions. The ancestors have an `EncumbranceID` column only
+with `encumbrances=true`; without it `transfers_touched_by` reports `EncumbranceID` 0 (the original threw an
+`ArgumentError` whenever there was a row to read). This is the one intended difference from the frozen original and the
+equivalence suite compares against the original's rows with 0 added (`eqv_touched_by`).

@@ -9,9 +9,13 @@
 # (src/reconstruction/visibility.jl) is checked against the `ledger_subset` CTE for every operation table,
 # and a mutation test plants wrong rules and requires the check to catch each of them.
 #
-# Size: CHESS_EQUIV_SEEDS (default 12) seeds, starting at CHESS_EQUIV_SEED_START (default 1), of
-# CHESS_EQUIV_OPS (default 250) operations and CHESS_EQUIV_POINTS (default 40) query points each. The
-# nightly workflow (.github/workflows/equivalence-nightly.yml) runs 500 seeds of 3000 operations in shards.
+# Size: CHESS_EQUIV_SEEDS (default 3) seeds, starting at CHESS_EQUIV_SEED_START (default 1), of
+# CHESS_EQUIV_OPS (default 250) operations and CHESS_EQUIV_POINTS (default 40) query points each, so seed 3 is the
+# one with a backward clock. A seed costs about 15 s to generate and 15 s to check, so the default run takes
+# about 100 s. `find_locations(kind, active)` walks every location of a kind one by one and costs as much as all
+# other checks together; the default run does it at every CHESS_EQUIV_KIND_EVERY-th (default 4) point. The
+# nightly workflow (.github/workflows/equivalence-nightly.yml) runs 500 seeds of 3000 operations in shards, with
+# every point, and sets CHESS_EQUIV_KIND_EVERY=1.
 # On a mismatch the failing seed, query point and a reduced recipe are printed.
 
 using Random, Test
@@ -19,10 +23,12 @@ using Random, Test
 include("legacy_reconstruction.jl")
 include("generate_ledger.jl")
 
-const EQV_SEEDS = parse(Int,get(ENV,"CHESS_EQUIV_SEEDS","12"))
+const EQV_SEEDS = parse(Int,get(ENV,"CHESS_EQUIV_SEEDS","3"))
 const EQV_SEED_START = parse(Int,get(ENV,"CHESS_EQUIV_SEED_START","1"))   # the nightly job splits the seeds over shards
 const EQV_OPS = parse(Int,get(ENV,"CHESS_EQUIV_OPS","250"))
 const EQV_POINTS = parse(Int,get(ENV,"CHESS_EQUIV_POINTS","40"))
+const EQV_KIND_EVERY = parse(Int,get(ENV,"CHESS_EQUIV_KIND_EVERY","4"))   # the costly find_locations(kind, active) check on every n-th point
+const EQV_COSTLY = ["find_locations(kind, active)"]
 const EQV_REDUCE_TRIALS = parse(Int,get(ENV,"CHESS_EQUIV_REDUCE_TRIALS","120"))
 
 # ---------------------------------------------------------------------------------------------- comparison
@@ -167,6 +173,19 @@ end
 # --------------------------------------------------------------------------------------- the comparisons
 
 # (name, canon, call) where call(M, p) runs the function from module M (CHESSDatabase or Legacy) at point p
+# Intended differences from `Legacy` (decision D5). Each entry is checked by its own test; here the oracle side is
+# rebuilt from the frozen `Legacy` function it differs from, so the comparison still covers everything else.
+#   transfers_touched_by without encumbrances: Legacy reads an EncumbranceID column that its ancestors query only
+#   has with encumbrances=true and throws (ArgumentError) whenever there is a row to read. The intended result is
+#   the same list with EncumbranceID 0 (test: "transfers_touch and transfers_touched_by" in test_transfer_closure.jl).
+function eqv_touched_by(M,p)
+    if M === Legacy && !p.enc
+        out = Legacy.get_transfer_ancestors([p.loc],p.start,p.seq,eqv_time(p);encumbrances=false)
+        return Tuple{Integer,Integer,Integer}[(r.Destination,r.LedgerID,0) for r in eachrow(out) if !ismissing(r.Destination)]
+    end
+    return M.transfers_touched_by(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)
+end
+
 const EQV_FUNCTION_CHECKS = Tuple{String,Function,Function}[
     ("get_parent_caches",eqv_cache_canon,(M,p)->M.get_parent_caches(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
     ("get_child_caches",eqv_cache_canon,(M,p)->M.get_child_caches(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
@@ -183,7 +202,7 @@ const EQV_FUNCTION_CHECKS = Tuple{String,Function,Function}[
     ("get_transfer_ancestors",eqv_canon,(M,p)->eqv_tally(M,M.get_transfer_ancestors([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc),:ancestors)),
     ("get_transfer_descendents",eqv_canon,(M,p)->eqv_tally(M,M.get_transfer_descendents([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc),:descendants)),
     ("transfers_touch",eqv_canon,(M,p)->M.transfers_touch(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
-    ("transfers_touched_by",eqv_canon,(M,p)->M.transfers_touched_by(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
+    ("transfers_touched_by",eqv_canon,(M,p)->eqv_touched_by(M,p)),
     ("get_content_observations",eqv_canon,(M,p)->M.get_content_observations([p.loc,p.loc2],p.start,p.seq,eqv_time(p))),
     ("observation_discrepancies",eqv_canon,(M,p)->M.observation_discrepancies([p.loc,p.loc2];sequence_id=p.seq,time=eqv_time(p))),
     ("get_instrument_settings",eqv_canon,(M,p)->M.get_instrument_settings(p.loc,p.seq,eqv_time(p))),
@@ -232,10 +251,11 @@ end
 
 Every disagreement between the current functions and `Legacy` at query point `p`.
 """
-function eqv_check_point(p::EqvPoint;end_to_end::Bool=true,only::Union{Nothing,String}=nothing)
+function eqv_check_point(p::EqvPoint;end_to_end::Bool=true,only::Union{Nothing,String}=nothing,skip::Vector{String}=String[])
     out = EqvMismatch[]
     for (name,canon,call) in EQV_FUNCTION_CHECKS
         isnothing(only) || name == only || continue
+        name in skip && continue
         new = eqv_try(()->call(CHESSDatabase,p)); old = eqv_try(()->call(Legacy,p))
         eqv_same(new,old;canon=canon) || push!(out,EqvMismatch(name,p))
     end
@@ -359,7 +379,7 @@ end
                 mismatches = EqvMismatch[]
                 for (i,p) in enumerate(points)
                     haskey(ENV,"CHESS_EQUIV_PROGRESS") && (println(stderr,"seed $seed point $i ",round(time()-t_seed;digits=1)," s"); flush(stderr))
-                    append!(mismatches,eqv_check_point(p;end_to_end=i % 2 == 1)) # the end-to-end functions on every other point
+                    append!(mismatches,eqv_check_point(p;end_to_end=i % 2 == 1,skip = i % EQV_KIND_EVERY == 0 ? String[] : EQV_COSTLY)) # the end-to-end functions on every other point
                 end
                 total_points[] += length(points)
                 total_checks[] += length(points) * length(EQV_FUNCTION_CHECKS) + cld(length(points),2) * length(EQV_END_TO_END)
@@ -380,8 +400,9 @@ end
             end
         end
     end
-    if total_points[] >= 200      # the comparisons must have reached the interesting corners of the closure
+    if total_points[] >= 100      # the comparisons must have reached the interesting corners of the closure
         for (k,v) in EQV_CLOSURE_STATS
+            k === :chain && total_points[] < 200 && continue     # a chain of three sources is rare; the nightly run and test_transfer_closure.jl cover it
             @test v > 0
             v == 0 && @warn "closure comparisons never covered" k
         end

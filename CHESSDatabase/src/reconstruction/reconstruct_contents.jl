@@ -334,9 +334,11 @@ end
 function transfers_touched_by(location_id,starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
     out=get_transfer_ancestors([location_id],starting,ending,time;encumbrances=encumbrances) 
     out_set=Tuple{Integer,Integer,Integer}[]
+    # the ancestors have an EncumbranceID column only with encumbrances=true; without them every transfer is a recorded one
+    has_encumbrance = hasproperty(out,:EncumbranceID)
     for row in eachrow(out)
         ismissing(row.Destination) && continue # a discard reaches no other well
-        push!(out_set,(row.Destination,row.LedgerID,row.EncumbranceID))
+        push!(out_set,(row.Destination,row.LedgerID,has_encumbrance ? row.EncumbranceID : 0))
     end
     return out_set
 end 
