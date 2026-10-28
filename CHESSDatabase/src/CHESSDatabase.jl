@@ -97,7 +97,7 @@ export commit_location!, release_location
 #caching and fetching
 export cache , get_location_info
 #reconstruct_location.jl
-export reconstruct_location,reconstruct_location!
+export reconstruct_location,reconstruct_location!,ReconstructionReport
 #reconstruct_contents.jl
 export reconstruct_contents, reconstruct_contents!
 #reconstruct_parent.jl

@@ -28,14 +28,29 @@ have no cache/encumbrance layer (see [`get_reads`](@ref)).
 function reconstruct_reads!(loc::Location,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id;encumbrances=false)
     rows=get_reads(CHESSCore.location_id(loc),sequence_id,time)
     for row in sort(collect(eachrow(rows));by=_reads_sort_key)
-        rk=read_kinds[Symbol(row.Type)]
-        val = ismissing(row.Value) ? missing :
-              ismissing(row.Unit)  ? row.Value :
-              parse(Float64,row.Value)*_parse_unit(row.Unit)
-        rd_time = ismissing(row.InstrumentTime) ? nothing : julia_time(row.InstrumentTime)
-        record_read!(loc,rk(val,rd_time))
+        record_read!(loc,_read_from_row(row))
     end
     return nothing
+end
+
+function _read_from_row(row)
+    rk=read_kinds[Symbol(row.Type)]
+    val = ismissing(row.Value) ? missing :
+          ismissing(row.Unit)  ? row.Value :
+          parse(Float64,row.Value)*_parse_unit(row.Unit)
+    rd_time = ismissing(row.InstrumentTime) ? nothing : julia_time(row.InstrumentTime)
+    return rk(val,rd_time)
+end
+
+# The newest `limit` reads of `loc`, recorded oldest first. Returns `true` when older reads were left out.
+function _reconstruct_newest_reads!(loc::Location,limit::Integer,sequence_id::Integer,time::DateTime)
+    rows=get_reads(CHESSCore.location_id(loc),sequence_id,time;limit=limit+1,newest_first=true)
+    cut = nrow(rows) > limit
+    rows = rows[1:min(limit,nrow(rows)),:]
+    for row in reverse(collect(eachrow(rows)))
+        record_read!(loc,_read_from_row(row))
+    end
+    return cut
 end
 
 """

@@ -723,5 +723,6 @@ include("equivalence/test_equivalence.jl")
 include("test_local_queries.jl")
 include("test_transfer_closure.jl")
 include("test_local_series.jl")
+include("test_depth.jl")
 
 rm(file)

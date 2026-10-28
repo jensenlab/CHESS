@@ -110,6 +110,55 @@ function eqv_snapshot(loc)
     return parts
 end
 
+
+# What a depth fills (section 5 of the plan), as a value to compare with the same fields of the full reconstruction.
+function eqv_depth_view(loc,d::Int)
+    parts = Any[(:id,location_id(loc),string(typeof(loc)),CHESSCore.name(loc))]
+    if d >= 1
+        prt = CHESSCore.parent(loc)
+        push!(parts,(:parent,isnothing(prt) ? nothing : location_id(prt)),(:active,CHESSCore.is_active(loc)))
+        hasproperty(loc,:is_locked) && push!(parts,(:locked,CHESSCore.is_locked(loc)))
+        hasproperty(loc,:lot) && push!(parts,(:lot,string(loc.lot)))
+    end
+    if d >= 2
+        x = loc; n = 0
+        while !isnothing(x) && n < 12
+            push!(parts,(:node,location_id(x),sort!([(string(k),string(CHESSCore.value(a))) for (k,a) in CHESSCore.attributes(x)])))
+            x = CHESSCore.parent(x); n += 1
+        end
+    end
+    if d >= 3
+        c = children(loc)
+        push!(parts,(:children,c isa AbstractMatrix ? [isassigned(c,i) ? location_id(c[i]) : nothing for i in eachindex(c)] : sort!(location_id.(collect(c)))))
+        loc isa CHESSCore.Well && push!(parts,(:stock,eqv_stock_summary(CHESSCore.stock(loc))))
+    end
+    d >= 5 && push!(parts,(:reads,sort!(string.(collect(CHESSCore.reads(loc))))))
+    return parts
+end
+
+
+# The location a depth below 3 should return, put together from the frozen per-field functions (each of which is
+# compared with the current one by the other checks): the full reconstruction can throw in its contents, which
+# says nothing about the fields of the lower depths.
+function eqv_legacy_pieces(p,d::Int)
+    n,t = CHESSDatabase.get_location_info(p.loc)
+    loc = d >= 2 ? Legacy.reconstruct_environment(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=p.enc) : t(p.loc,n)
+    if d == 1
+        loc.parent = CHESSCore.parent(Legacy.reconstruct_parent(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=p.enc))
+    end
+    if d >= 1
+        loc.is_active = CHESSCore.is_active(Legacy.reconstruct_activity(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=p.enc))
+        hasproperty(loc,:is_locked) && (loc.is_locked = CHESSCore.is_locked(Legacy.reconstruct_lock(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=p.enc)))
+        hasproperty(loc,:lot) && (loc.lot = Legacy.reconstruct_lot(p.loc,p.seq,eqv_time(p)))
+    end
+    return loc
+end
+
+# the depths whose fields must equal those of the full reconstruction at the same point
+const EQV_DEPTHS = (0,1,2,5)
+# depth 5 costs as much as the full reconstruction, so it is checked at one point in four
+eqv_depths(p) = p.loc % 4 == 0 ? EQV_DEPTHS : EQV_DEPTHS[1:3]
+
 # ------------------------------------------------------------------------------------------ query points
 
 struct EqvPoint
@@ -301,6 +350,22 @@ function eqv_check_point(p::EqvPoint;end_to_end::Bool=true,only::Union{Nothing,S
             isnothing(only) || name == only || continue
             new = eqv_try(()->call(CHESSDatabase,p)); old = eqv_try(()->call(Legacy,p))
             eqv_same(new,old;canon=identity) || push!(out,EqvMismatch(name,p))
+        end
+        if isnothing(only) || startswith(only,"reconstruct_location(depth")
+            full = nothing   # the full reconstruction, made once and only when a depth is compared with it
+            for d in eqv_depths(p)
+                name = "reconstruct_location(depth=$d)"
+                (isnothing(only) || only == name) || continue
+                new = eqv_try(()->eqv_depth_view(CHESSDatabase.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=p.enc,depth=d),d))
+                if d <= 2
+                    # the fields of a depth below 3 do not depend on the contents, which can make the full reconstruction throw
+                    old = eqv_try(()->eqv_depth_view(eqv_legacy_pieces(p,d),d))
+                else
+                    isnothing(full) && (full = eqv_try(()->Legacy.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=p.enc)))
+                    old = full[1] === :err ? full : eqv_try(()->eqv_depth_view(full[2],d))
+                end
+                eqv_same(new,old;canon=identity) || push!(out,EqvMismatch(name,p))
+            end
         end
     end
     return out
@@ -519,4 +584,35 @@ end
         CHESSDatabase._WALK_FIRST_WINDOW[],CHESSDatabase._WALK_GROWTH[],CHESSDatabase._SERIES_SCAN_FACTOR[] = old
     end
     @test checked == 2 * 150 * length(schedules)
+end
+
+# The two reduced recipes of the first deep run with the depth checks (seeds 401 and 402). At these points the full
+# reconstruction throws a MethodError in reconstruct_contents (a transfer whose destination was bootstrapped away; the
+# frozen original throws the same), while the fields of depth 0 to 2 do not read contents and are returned. The depth
+# checks compared them with the throwing full reconstruction and reported a difference that was not one.
+@testset "equivalence: depth 0 to 2 do not depend on a full reconstruction that throws" begin
+    recipes = [
+        (401,:monotone,EqvPoint(30,172,0,2432,1160.0378254879452,1795,false),[
+            (n = 316, kind = :transfer, i = 3821, j = 5407, k = 8027, x = 0.7120814260067496, y = 0.02221964433860557, flag = false),
+            (n = 392, kind = :cache, i = 3234, j = 8891, k = 681, x = 0.9715930409513767, y = 0.7278129169399845, flag = false),
+            (n = 564, kind = :transfer, i = 8163, j = 978, k = 6622, x = 0.7870249580900325, y = 0.38423396913829877, flag = false),
+            (n = 723, kind = :transfer, i = 6665, j = 2143, k = 3233, x = 0.6008021060675547, y = 0.08145263447133844, flag = false)]),
+        (402,:backward,EqvPoint(185,86,152,1779,871.1436693162698,1651,false),[
+            (n = 862, kind = :transfer, i = 8319, j = 9990, k = 7442, x = 0.011703510067311407, y = 0.8518725811529935, flag = false),
+            (n = 866, kind = :cache, i = 8614, j = 3267, k = 8868, x = 0.4370251404644022, y = 0.11942053268852837, flag = true),
+            (n = 870, kind = :transfer, i = 5293, j = 4998, k = 1895, x = 0.489486926084301, y = 0.060590208988375194, flag = false),
+            (n = 1087, kind = :transfer, i = 8343, j = 8428, k = 4535, x = 0.36989489866333736, y = 0.02395058718928278, flag = true)]),
+    ]
+    for (seed,clock,p,recipe) in recipes
+        with_scratch_db() do _
+            eqv_generate(seed;recipe=recipe,clock=clock)
+            full = eqv_try(()->CHESSDatabase.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=false))
+            full_old = eqv_try(()->Legacy.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=false))
+            @test full[1] === :err && full_old[1] === :err && full[2] == full_old[2]   # the premise: both throw
+            for d in 0:2
+                @test CHESSDatabase.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;depth=d) isa Location
+                @test isempty(eqv_check_point(p;only="reconstruct_location(depth=$d)"))
+            end
+        end
+    end
 end
