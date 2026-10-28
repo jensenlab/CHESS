@@ -101,5 +101,19 @@ order of the history. The trace of reached wells and sequence IDs is the same fo
 queries. `repair_content_caches` calls `get_transfer_descendents` and so uses the rewrite for its closure.
 `transfers_touch` and `transfers_touched_by` call the two functions. The ancestors have an `EncumbranceID` column only
 with `encumbrances=true`; without it `transfers_touched_by` reports `EncumbranceID` 0 (the original threw an
-`ArgumentError` whenever there was a row to read). This is the one intended difference from the frozen original and the
+`ArgumentError` whenever there was a row to read). This is an intended difference from the frozen original and the
 equivalence suite compares against the original's rows with 0 added (`eqv_touched_by`).
+
+## Intended difference: the order of a location's history in `reconstruct_contents`
+
+`reconstruct_contents` keeps for each location a list of `(SequenceID, snapshot)` entries that
+`find_most_recent_location` binary-searches, so the list must stay sorted. When a core well has no cache in the range a
+call reads, the call recurses and bootstraps that well from an older cache, after the caller already recorded a stub for
+it at the caller's own sequence point. The older entry was appended behind the newer one, the search then found nothing
+and a transfer was applied to a missing destination (`MethodError` in `_reconstruction_transfer`). The ledger that
+triggers it is valid: a cache of the target well exactly at the slot before a transfer, with the source's newest cache
+older. `push_location!` now inserts an entry that is older than the last one at its place (after equal ones); the usual
+append is unchanged. The frozen original has the bug, so the equivalence suite redefines `Legacy.push_location!` with the
+same insertion (the frozen file is not edited). Tests: "push_location! keeps each history sorted"
+(`test_reconstruct_contents_order.jl`) and "reconstruct_contents with a cache at the slot before a transfer"
+(two reduced recipes from deep runs; the stock must be the same for `max_cache` 0, the point's and the slot).

@@ -35,13 +35,12 @@ in the SQL query that finds the transfers in the first place). Keying by `Locati
 each lookup scan only that *one* location's own (typically small) history instead of everything ever
 touched in the whole reconstruction.
 
-**Invariant: each location's entry vector is always appended in non-decreasing `SequenceID` order.**
-Every `push_location!` call site in `reconstruct_contents.jl` is either a pre-replay-loop bootstrap
-entry (`seq <= foot`) or a replay-loop entry (`seq == row.SequenceID`, with `transfers` fetched at
-`SequenceID >= foot+1` and iterated in ascending `SequenceID` order). `find_most_recent_location`
-relies on this invariant to binary-search each location's vector instead of scanning it -- see its
-docstring. Any future `push_location!` call site must preserve non-decreasing order per location, or
-that binary search silently returns wrong results instead of erroring.
+**Invariant: each location's entry vector is always in non-decreasing `SequenceID` order.**
+`find_most_recent_location` relies on this invariant to binary-search each location's vector instead of
+scanning it -- see its docstring. `push_location!` keeps the invariant itself: an entry older than the last one
+(a bootstrap of a location at an earlier sequence point, made by a recursive `reconstruct_contents` after the caller
+had already recorded a stub for it at its own foot) is inserted at its place, after the entries with the same
+`SequenceID`. The usual case, an entry not older than the last, is a plain append.
 """
 const location_reconstruction_index=Dict{Integer,Vector{Tuple{Integer,Location}}}()
 
@@ -54,7 +53,11 @@ old `DataFrame`-based accumulator.
 """
 function push_location!(index::Dict{<:Integer,<:Vector},location_id::Integer,sequence_id::Integer,loc::Location)
     entries = get!(() -> Tuple{Integer,Location}[], index, location_id)
-    push!(entries, (sequence_id, loc))
+    if isempty(entries) || entries[end][1] <= sequence_id
+        push!(entries, (sequence_id, loc))
+    else # keep the entries sorted: find_most_recent_location binary-searches them
+        insert!(entries, searchsortedlast(entries, (sequence_id, nothing); by=first) + 1, (sequence_id, loc))
+    end
     return nothing
 end
 

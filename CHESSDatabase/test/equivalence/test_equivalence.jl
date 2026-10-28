@@ -232,6 +232,21 @@ end
 #   below adds that rule to `Legacy` for the Int/Int/DateTime call every comparison and `Legacy.reconstruct_reads!` make,
 #   written as the original `ledger_subset` query so that it does not depend on `visible_join` (test: "get_reads hides
 #   superseded reads" in test_local_series.jl). The frozen file is not edited.
+#   push_location! out of order (found by the first deep run with the depth checks): Legacy appends an entry older than
+#   the last one of a location, which breaks the sort order its binary search needs, and reconstruct_contents then throws a
+#   MethodError (transfer with a missing destination) or reads a wrong snapshot. The intended result is the one the
+#   method below gives: the entry is inserted in order. Tests: "push_location! keeps each history sorted" in
+#   test_reconstruct_contents_order.jl and "reconstruct_contents with a cache at the slot before a transfer" below.
+function Legacy.push_location!(index::Dict{<:Integer,<:Vector},location_id::Integer,sequence_id::Integer,loc::Location)
+    entries = get!(() -> Tuple{Integer,Location}[], index, location_id)
+    if isempty(entries) || entries[end][1] <= sequence_id
+        push!(entries, (sequence_id, loc))
+    else
+        insert!(entries, searchsortedlast(entries, (sequence_id, nothing); by=first) + 1, (sequence_id, loc))
+    end
+    return nothing
+end
+
 function Legacy.get_reads(location_id::Int,sequence_id::Int,time::DateTime)
     lt = db_time(time)
     return query_db("""
@@ -587,9 +602,9 @@ end
 end
 
 # The two reduced recipes of the first deep run with the depth checks (seeds 401 and 402). At these points the full
-# reconstruction throws a MethodError in reconstruct_contents (a transfer whose destination was bootstrapped away; the
-# frozen original throws the same), while the fields of depth 0 to 2 do not read contents and are returned. The depth
-# checks compared them with the throwing full reconstruction and reported a difference that was not one.
+# reconstruction used to throw a MethodError in reconstruct_contents (see push_location!; fixed since), while the fields of
+# depth 0 to 2 do not read contents and were returned. The depth checks compared them with the throwing full reconstruction
+# and reported a difference that was not one; they now use the per-field reference of eqv_legacy_pieces.
 @testset "equivalence: depth 0 to 2 do not depend on a full reconstruction that throws" begin
     recipes = [
         (401,:monotone,EqvPoint(30,172,0,2432,1160.0378254879452,1795,false),[
@@ -606,13 +621,39 @@ end
     for (seed,clock,p,recipe) in recipes
         with_scratch_db() do _
             eqv_generate(seed;recipe=recipe,clock=clock)
-            full = eqv_try(()->CHESSDatabase.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=false))
-            full_old = eqv_try(()->Legacy.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;encumbrances=false))
-            @test full[1] === :err && full_old[1] === :err && full[2] == full_old[2]   # the premise: both throw
             for d in 0:2
                 @test CHESSDatabase.reconstruct_location(p.loc,p.seq,eqv_time(p),p.max_cache;depth=d) isa Location
                 @test isempty(eqv_check_point(p;only="reconstruct_location(depth=$d)"))
             end
         end
+    end
+end
+
+# The first recipe above, at its point: a cache of the target well exactly at the slot before a transfer, and a source
+# whose newest cache is older. reconstruct_contents threw a MethodError there; the stock must be the one a replay from the
+# earliest caches gives, whatever caches the call may use.
+@testset "equivalence: reconstruct_contents with a cache at the slot before a transfer" begin
+    recipe1 = [
+        (n = 316, kind = :transfer, i = 3821, j = 5407, k = 8027, x = 0.7120814260067496, y = 0.02221964433860557, flag = false),
+        (n = 392, kind = :cache, i = 3234, j = 8891, k = 681, x = 0.9715930409513767, y = 0.7278129169399845, flag = false),
+        (n = 564, kind = :transfer, i = 8163, j = 978, k = 6622, x = 0.7870249580900325, y = 0.38423396913829877, flag = false),
+        (n = 723, kind = :transfer, i = 6665, j = 2143, k = 3233, x = 0.6008021060675547, y = 0.08145263447133844, flag = false)]
+    recipe2 = [
+        (n = 862, kind = :transfer, i = 8319, j = 9990, k = 7442, x = 0.011703510067311407, y = 0.8518725811529935, flag = false),
+        (n = 866, kind = :cache, i = 8614, j = 3267, k = 8868, x = 0.4370251404644022, y = 0.11942053268852837, flag = true),
+        (n = 870, kind = :transfer, i = 5293, j = 4998, k = 1895, x = 0.489486926084301, y = 0.060590208988375194, flag = false),
+        (n = 1087, kind = :transfer, i = 8343, j = 8428, k = 4535, x = 0.36989489866333736, y = 0.02395058718928278, flag = true)]
+    for (seed,clock,recipe,p) in ((401,:monotone,recipe1,EqvPoint(30,172,0,2432,1160.0378254879452,1795,false)),
+                                  (402,:backward,recipe2,EqvPoint(185,86,152,1779,871.1436693162698,1651,false)))
+      with_scratch_db() do _
+        eqv_generate(seed;recipe=recipe,clock=clock)
+        t = eqv_time(p)
+        stocks = [eqv_stock_summary(CHESSCore.stock(CHESSDatabase.reconstruct_contents(30,p.seq,t,mc))) for mc in (0,p.max_cache,p.seq)]
+        @test stocks[1] == stocks[2] == stocks[3]
+        seed == 401 && @test !isempty(stocks[1])
+        @test eqv_try(()->eqv_snapshot(CHESSDatabase.reconstruct_location(p.loc,p.seq,t,p.max_cache))) ==
+              eqv_try(()->eqv_snapshot(Legacy.reconstruct_location(p.loc,p.seq,t,p.max_cache)))
+        @test isempty(eqv_check_point(p))
+      end
     end
 end
