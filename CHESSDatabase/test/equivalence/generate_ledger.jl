@@ -152,6 +152,12 @@ function eqv_run_op!(w::EqvWorld,op)
         w.sent[did] = get(w.sent,did,0) + 1
         push!(w.replaceable,(; op.n,kind=:transfer,lid,src=location_id(src),dest=did,q=amt))
         return lid
+    elseif k === :readtick && op.y > 0.7     # a single read, which a later amendment can replace
+        well = pick_from(w.wells,op.j)
+        rd = Absorbance((10+round(80op.x;digits=1))*u"percent",Dates.DateTime(2026,1,1) + Dates.Minute(op.k))
+        lid = upload(record_read!,well,rd;instrument=w.reader)
+        push!(w.replaceable,(; op.n,kind=:read,lid,loc=location_id(well)))
+        return lid
     elseif k === :readtick      # several reads on one tick: the wells of a plate
         lid = append_ledger()
         plate = pick_from(w.plates,op.i)
@@ -169,6 +175,8 @@ function eqv_run_op!(w::EqvWorld,op)
         form = op.i % 5
         if form == 0
             return observe(pick_from(w.bottles,op.j),Lot("EQV Supplier","EQV-1","LOT$(op.k % 4)"))
+        elseif form == 1 && !op.flag    # component observations are the ones `get_content_observations` lists
+            return observe(pick_from(w.wells,op.j),rgt"water",round(5op.x;digits=2)*u"µL")
         elseif form == 1
             return observe(pick_from(vcat(w.rooms,w.shelves),op.j),Temperature(_eqv_temp(op.x)))
         elseif form == 2
@@ -209,6 +217,15 @@ function eqv_run_op!(w::EqvWorld,op)
             return update(op.flag ? lock! : unlock!,reconstruct_location(r.loc);replace=slot)
         elseif r.kind === :activity
             return update(op.flag ? activate! : deactivate!,reconstruct_location(r.loc);replace=slot)
+        elseif r.kind === :read
+            # `update` has no validation for reads yet, so the new revision is written at the level below it
+            well = reconstruct_location(r.loc)
+            rd = Absorbance((10+round(80op.x;digits=1))*u"percent",Dates.DateTime(2026,1,1) + Dates.Minute(op.k))
+            return CHESSDatabase.sql_transaction() do
+                l = CHESSDatabase.replace_ledger(slot)
+                CHESSDatabase.upload_read(well,rd;ledger_id=l,instrument_id=location_id(w.reader))
+                l
+            end
         elseif r.kind === :discard
             return update(discard!,reconstruct_location(r.src),0.2u"µL"*(0.9+0.2op.x);replace=slot)
         else

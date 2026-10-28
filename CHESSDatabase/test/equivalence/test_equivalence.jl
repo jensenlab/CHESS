@@ -178,6 +178,41 @@ end
 #   transfers_touched_by without encumbrances: Legacy reads an EncumbranceID column that its ancestors query only
 #   has with encumbrances=true and throws (ArgumentError) whenever there is a row to read. The intended result is
 #   the same list with EncumbranceID 0 (test: "transfers_touch and transfers_touched_by" in test_transfer_closure.jl).
+#   get_reads, superseded reads (D5): Legacy returns the reads of every revision of a slot, including those of a
+#   revision a later amendment replaced. The intended result is the reads of the visible revisions only. The method
+#   below adds that rule to `Legacy` for the Int/Int/DateTime call every comparison and `Legacy.reconstruct_reads!` make,
+#   written as the original `ledger_subset` query so that it does not depend on `visible_join` (test: "get_reads hides
+#   superseded reads" in test_local_series.jl). The frozen file is not edited.
+function Legacy.get_reads(location_id::Int,sequence_id::Int,time::DateTime)
+    lt = db_time(time)
+    return query_db("""
+        WITH ledger_subset (ID,SequenceID,Time) AS (SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $lt AND SequenceID BETWEEN 0 AND $sequence_id GROUP BY SequenceID)
+        SELECT r.* FROM Reads r INNER JOIN ledger_subset l ON r.LedgerID = l.ID WHERE r.LocationID = $location_id ORDER BY r.ID""")
+end
+
+# the middle third of the times of the reads of the location, from the oracle's rows (the same for both sides)
+function eqv_reads_window(p)
+    df = Legacy.get_reads(p.loc,p.seq,eqv_time(p))
+    nrow(df) < 3 && return (since=nothing,until=nothing)
+    keys = sort!([Float64(something(r.InstrumentTime,r.Time)) for r in eachrow(df)])
+    return (since=CHESSDatabase.julia_time(keys[cld(length(keys),3)]),until=CHESSDatabase.julia_time(keys[cld(2length(keys),3)]))
+end
+
+# a page of reads: the oracle side sorts and slices what `Legacy.get_reads` returns
+function eqv_reads_page(M,p;limit,offset,newest_first,since=nothing,until=nothing)
+    if M === Legacy
+        df = Legacy.get_reads(p.loc,p.seq,eqv_time(p))
+        key(r) = something(r.InstrumentTime,r.Time)
+        rows = collect(eachrow(df))
+        isnothing(since) || filter!(r->key(r) >= db_time(since),rows)
+        isnothing(until) || filter!(r->key(r) <= db_time(until),rows)
+        sort!(rows;by=r->(key(r),r.ID),rev=newest_first)
+        rows = rows[min(offset+1,end+1):min(offset+limit,end)]
+        return isempty(rows) ? df[1:0,:] : DataFrame(rows)
+    end
+    return M.get_reads(p.loc,p.seq,eqv_time(p);limit=limit,offset=offset,newest_first=newest_first,since=since,until=until)
+end
+
 function eqv_touched_by(M,p)
     if M === Legacy && !p.enc
         out = Legacy.get_transfer_ancestors([p.loc],p.start,p.seq,eqv_time(p);encumbrances=false)
@@ -203,6 +238,8 @@ const EQV_FUNCTION_CHECKS = Tuple{String,Function,Function}[
     ("get_transfer_descendents",eqv_canon,(M,p)->eqv_tally(M,M.get_transfer_descendents([p.loc,p.loc2],p.start,p.seq,eqv_time(p);encumbrances=p.enc),:descendants)),
     ("transfers_touch",eqv_canon,(M,p)->M.transfers_touch(p.loc,p.start,p.seq,eqv_time(p);encumbrances=p.enc)),
     ("transfers_touched_by",eqv_canon,(M,p)->eqv_touched_by(M,p)),
+    ("get_reads(page, newest first)",eqv_canon,(M,p)->eqv_reads_page(M,p;limit=3,offset=1,newest_first=true)),
+    ("get_reads(since, until)",eqv_canon,(M,p)->eqv_reads_page(M,p;limit=1000,offset=0,newest_first=false,eqv_reads_window(p)...)),
     ("get_content_observations",eqv_canon,(M,p)->M.get_content_observations([p.loc,p.loc2],p.start,p.seq,eqv_time(p))),
     ("observation_discrepancies",eqv_canon,(M,p)->M.observation_discrepancies([p.loc,p.loc2];sequence_id=p.seq,time=eqv_time(p))),
     ("get_instrument_settings",eqv_canon,(M,p)->M.get_instrument_settings(p.loc,p.seq,eqv_time(p))),

@@ -45,6 +45,7 @@ include("./reconstruction/reconstruct_reads.jl")
 include("./reconstruction/reconstruct_location.jl")
 include("./reconstruction/local_queries.jl")
 include("./reconstruction/local_closure.jl")
+include("./reconstruction/local_series.jl")
 # cache repair
 include("./validation_and_repair/repair_content_caches.jl")
 include("./validation_and_repair/repair_movement_caches.jl")

@@ -6,7 +6,7 @@ Return every `Reads` row for `location_id` up to `sequence_id`/`time`, as a `Dat
 `get_*_caches` (e.g. `get_attribute_caches`), there is no latest-wins collapsing here -- reads
 never supersede each other, only accumulate (see [`Read`](@ref)'s docstring).
 """
-function get_reads(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+function _get_reads_global(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
     ledger_time=db_time(time)
     return query_db("""
         SELECT r.* FROM Reads r INNER JOIN Ledger l ON r.LedgerID = l.ID

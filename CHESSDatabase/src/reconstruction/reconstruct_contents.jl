@@ -574,7 +574,7 @@ end
 Every component observation on `locs` between `starting` and `ending` sequence points,
 ordered by `SequenceID`.
 """
-function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+function _get_content_observations_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
     isempty(locs) && return DataFrame(LedgerID=Int[],SequenceID=Int[],LocationID=Int[],ComponentID=Union{Int,Missing}[],
         Quantity=Union{Float64,Missing}[],Unit=Union{String,Missing}[])
     ledger_time=db_time(time)

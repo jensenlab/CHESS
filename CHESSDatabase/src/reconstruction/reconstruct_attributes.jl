@@ -140,7 +140,7 @@ end
 
 
 
-function get_environment_attributes(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(), time::DateTime=Dates.now();encumbrances=false)
+function _get_environment_attributes_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(), time::DateTime=Dates.now();encumbrances=false)
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
