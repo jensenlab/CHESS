@@ -14,6 +14,8 @@
 #   reads       one tick = 96 wells of one plate
 #   settings    about 1% of the slots set one of three settings of instruments 1-3
 #   amendments  new revisions (same SequenceID, higher ID, later Time) of environment and transfer slots
+#   retired     BENCH_RETIRED (default 0.10): the last incubator gets that share of the environment samples, all early (a dense
+#               Temperature series), and none after; the samples it would have had later go to incubator 1
 #   deep chain  BENCH_DEEP (default 5000) transfers in a line: source -> w1 -> w2 -> ... , each well passing on all it received
 #
 # generate_ledger_scale(path, N) -> NamedTuple of row counts
@@ -25,6 +27,9 @@ const LS_INCUBATORS, LS_ROOMS, LS_RESERVOIRS, LS_PLATES = 40, 200, 200, 300
 # steps of the deep chain: a source reservoir followed by wells w1, w2, ... each of which hands its whole contents to the
 # next (0 leaves it out). Its ledger rows come after the N rows of the mix, so N counts the mix only.
 const LS_DEEP = parse(Int,get(ENV,"BENCH_DEEP","5000"))
+# the retired incubator (the last incubator): this share of all environment samples are Temperature samples of it, taken
+# in the first part of the ledger, and it has none afterwards -- a dense series with a long silence (0 for none)
+const LS_RETIRED = parse(Float64,get(ENV,"BENCH_RETIRED","0.10"))
 
 # integer hash of expression `i` and `salt` as a uniform number in [0, 1); no SQLite random() so runs repeat
 ls_rnd(i,salt) = "(((((($i)*2654435761+$(salt)*1000003+12345) % 4294967296)*1664525+1013904223) % 4294967296)/4294967296.0)"
@@ -44,7 +49,7 @@ function ls_layout(N::Integer)
     n_loc = exp_base + n_exp*96 - 1
     return (; N, amendments=A, slots=B, n_exp, incubators=1:LS_INCUBATORS, rooms=LS_INCUBATORS+1:LS_INCUBATORS+LS_ROOMS,
         reservoirs=LS_INCUBATORS+LS_ROOMS+1:LS_INCUBATORS+LS_ROOMS+LS_RESERVOIRS, plates=plate_base:plate_base+LS_PLATES-1,
-        plate_wells=well_base:exp_base-1, exp_base, n_loc, deep=LS_DEEP, chain_source=n_loc+1, chain_head=n_loc+2, chain_tail=n_loc+1+LS_DEEP)
+        plate_wells=well_base:exp_base-1, exp_base, n_loc, retired=LS_INCUBATORS, deep=LS_DEEP, chain_source=n_loc+1, chain_head=n_loc+2, chain_tail=n_loc+1+LS_DEEP)
 end
 
 function generate_ledger_scale(path::AbstractString,N::Integer)
@@ -90,6 +95,15 @@ function generate_ledger_scale(path::AbstractString,N::Integer)
     SELECT i, loc, attr, 10 + 30*$(ls_rnd("i",4)), CASE attr WHEN 'Temperature' THEN '°C' ELSE 'percent' END, $LS_ORIGIN + i*0.01
     FROM (SELECT i, 1 + CAST($(ls_rnd("i",2))*$(LS_INCUBATORS+LS_ROOMS) AS INTEGER) AS loc,
                  CASE WHEN $(ls_rnd("i",3)) < 0.5 THEN 'Temperature' ELSE 'Humidity' END AS attr FROM ord WHERE k = 'e')""")
+
+    if LS_RETIRED > 0
+        ne = DataFrame(exec("SELECT COUNT(*) AS n FROM ord WHERE k = 'e'")).n[1]
+        cut = round(Int,LS_RETIRED*ne)
+        retired = LS_INCUBATORS
+        exec("""UPDATE EnvironmentAttributes SET LocationID = 1 WHERE LocationID = $retired""")
+        exec("""UPDATE EnvironmentAttributes SET LocationID = $retired, Attribute = 'Temperature', Unit = '°C'
+                WHERE LedgerID IN (SELECT i FROM ord WHERE k = 'e' AND n <= $cut)""")
+    end
 
     # transfers: ordinal n -> experiment e = (n-1)/96, position q = (n-1)%96
     exec("""

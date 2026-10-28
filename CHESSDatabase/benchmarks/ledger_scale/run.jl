@@ -6,7 +6,8 @@
 # the temp directory; never inside the repository), BENCH_OUT (results folder, default ./results),
 # BENCH_VARIANTS (default "noidx,idx,cover"), BENCH_TARGETS (targets per query class, default 8), BENCH_RUNS (repeats
 # per target), BENCH_ONLY (regex on the query name), BENCH_MODE (local, or legacy for the original whole-ledger queries),
-# BENCH_DEEP (steps of the deep transfer chain, default 5000, 0 for none).
+# BENCH_DEEP (steps of the deep transfer chain, default 5000, 0 for none), BENCH_RETIRED (share of the environment samples
+# that belong to the retired incubator's early dense series, default 0.10, 0 for none).
 #
 # Variants of the same database:
 #   noidx  the database as it was before the CHESS indexes (only the indexes create_db always made)
@@ -82,6 +83,9 @@ function targets(lay,rng)
         # the deep chain: its tail, then the wells a half, a fifth and a fiftieth of the way along; and its first well
         deep = LS_DEEP > 0 ? [lay.chain_source + max(1,LS_DEEP ÷ d) for d in (1,2,5,50)] : Int[],
         deep_head = LS_DEEP > 0 ? [lay.chain_head] : Int[],
+        retired = LS_RETIRED > 0 ? [lay.retired] : Int[],
+        # the three locations with most reads, for the paged reads
+        read_heavy = Int.(query_db("SELECT LocationID FROM Reads GROUP BY LocationID ORDER BY COUNT(*) DESC, LocationID LIMIT 3").LocationID),
     )
 end
 
@@ -122,6 +126,10 @@ function query_list(seq)
         ("trace_contents","chain12",true,id->CHESSDatabase.trace_contents(id,seq,now_)),
         ("reconstruct_contents","chain12",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
         ("reconstruct_contents","chain1",true,id->CHESSDatabase.reconstruct_contents(id,seq,now_)),
+        ("get_environment_attributes","retired",false,id->CHESSDatabase.get_environment_attributes(vec(id),0,seq,now_)),
+        ("reconstruct_environment","retired",false,id->CHESSDatabase.reconstruct_environment(id,seq,now_)),
+        ("get_reads(newest 20)","read_heavy",false,id->CHESSDatabase.get_reads(id,seq,now_;limit=20,newest_first=true)),
+        ("get_reads(all)","read_heavy",false,id->CHESSDatabase.get_reads(id,seq,now_)),
         ("get_transfer_ancestors","deep",true,id->CHESSDatabase.get_transfer_ancestors(vec(id),0,seq,now_)),
         ("get_transfer_descendents","deep_head",true,id->CHESSDatabase.get_transfer_descendents(vec(id),0,seq,now_)),
         ("trace_forward(well)","deep_head",true,id->CHESSDatabase.trace_forward(id,seq,now_)),
@@ -193,6 +201,29 @@ function run_queries(variant,lay)
     return DataFrame(rows),plans
 end
 
+# ------------------------------------------------------------------------------------------- min(D, k)
+
+# The cost of the exact seek for a series is min(D, k): D the ticks between the end of the window and the series' last
+# event, k its number of events. For every (location, attribute) series at the last sequence point: the distribution of
+# k, D and min(D, k) (revisions of an amended slot count as events, which overstates k slightly), and the retired incubator.
+function run_mindk(variant,lay)
+    seq = get_last_sequence_id()
+    df = query_db("""SELECT e.LocationID AS loc, e.Attribute AS attr, COUNT(*) AS k, MAX(l.SequenceID) AS last_slot
+        FROM EnvironmentAttributes e JOIN Ledger l ON l.ID = e.LedgerID GROUP BY e.LocationID, e.Attribute""")
+    df.D = seq .- df.last_slot
+    df.mindk = min.(df.D,df.k)
+    q(x,p) = quantile(Float64.(x),p)
+    ret = LS_RETIRED > 0 ? df[(df.loc .== lay.retired) .& (df.attr .== "Temperature"),:] : df[1:0,:]
+    row = (; n=lay.N,variant,series=nrow(df),
+        k_p50=q(df.k,0.5),k_p99=q(df.k,0.99),k_max=maximum(df.k),
+        D_p50=q(df.D,0.5),D_p99=q(df.D,0.99),D_max=maximum(df.D),
+        mindk_p50=q(df.mindk,0.5),mindk_p90=q(df.mindk,0.9),mindk_p99=q(df.mindk,0.99),mindk_max=maximum(df.mindk),
+        retired_k=isempty(ret) ? missing : ret.k[1],retired_D=isempty(ret) ? missing : ret.D[1],retired_mindk=isempty(ret) ? missing : ret.mindk[1])
+    println("min(D,k) over ",nrow(df)," series: p50 ",row.mindk_p50,"  p90 ",row.mindk_p90,"  p99 ",row.mindk_p99,"  max ",row.mindk_max,
+        "; retired incubator k=",row.retired_k," D=",row.retired_D)
+    return row
+end
+
 # ------------------------------------------------------------------------------------------------ costs
 
 function run_costs(variant,path,lay)
@@ -234,27 +265,29 @@ end
 
 function main()
     mkpath(BENCH_DIR); mkpath(BENCH_OUT)
-    base = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_d$(LS_DEEP)_base.db")
+    base = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_d$(LS_DEEP)_r$(LS_RETIRED)_base.db")
     lay = ls_layout(BENCH_N)
     if !isfile(base)
         t = @elapsed counts = generate_ledger_scale(base,BENCH_N)
         println("generated $base in $(round(t;digits=1)) s: $counts")
     end
-    all_rows = DataFrame[]; all_plans = String[]; costs = NamedTuple[]
+    all_rows = DataFrame[]; all_plans = String[]; costs = NamedTuple[]; mindk = NamedTuple[]
     for variant in BENCH_VARIANTS
-        path = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_d$(LS_DEEP)_$variant.db")
+        path = joinpath(BENCH_DIR,"ledger_$(BENCH_N)_d$(LS_DEEP)_r$(LS_RETIRED)_$variant.db")
         prepare_variant(variant,base,path)
         stock_reservoirs!(lay)
         println("\n== $variant: $(round(filesize(path)/2^20;digits=1)) MB, $(length(String.(query_db("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx\\_chess\\_%' ESCAPE '\\'").name))) CHESS indexes")
         if !BENCH_SKIP_QUERIES
             df,plans = run_queries(variant,lay)
             push!(all_rows,df); append!(all_plans,plans)
+            push!(mindk,run_mindk(variant,lay))
         end
         push!(costs,run_costs(variant,path,lay))   # last: it modifies the ledger
         println(costs[end])
     end
     isempty(all_rows) || CSV.write(joinpath(BENCH_OUT,"baseline_$(BENCH_N).csv"),reduce(vcat,all_rows))
     CSV.write(joinpath(BENCH_OUT,"costs_$(BENCH_N).csv"),DataFrame(costs))
+    isempty(mindk) || CSV.write(joinpath(BENCH_OUT,"mindk_$(BENCH_N).csv"),DataFrame(mindk))
     isempty(all_plans) || write(joinpath(BENCH_OUT,"plans_$(BENCH_N).txt"),join(all_plans,"\n"))
     println("\nwrote results to $BENCH_OUT")
 end
