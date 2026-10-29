@@ -39,6 +39,10 @@ end
 # from CHESSCore.JensenLabUnits) have to be listed explicitly.
 _parse_unit(str::AbstractString) = Unitful.uparse(str;unit_context=[Unitful,CHESSCore.JensenLabUnits])
 
+# The attribute of kind `kind` stored with `value` and `unit`. A stored attribute without a value has no unit to parse
+# (caches written before the unit was fixed hold the text "missing" there).
+_attribute_from_row(kind,value,unit) = ismissing(value) ? kind(missing) : kind(value*_parse_unit(unit))
+
 """
     execute_db(query::String)
     execute_db(query::String, params)

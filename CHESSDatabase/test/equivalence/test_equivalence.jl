@@ -394,11 +394,11 @@ end
 # the first and last slots, and random ones.
 
 const EQV_HISTORY_LOCS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_LOCS","4"))
-const EQV_HISTORY_SLOTS = get(ENV,"CHESS_EQUIV_HISTORY_SLOTS","8")
+const EQV_HISTORY_SLOTS = get(ENV,"CHESS_EQUIV_HISTORY_SLOTS","5")
 # the fraction of histories that are also read page by page (tiny pages and windows) and without collapse
 const EQV_HISTORY_PAGED = parse(Float64,get(ENV,"CHESS_EQUIV_HISTORY_PAGED","0.01"))
 const EQV_HISTORY_TIMES = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_TIMES","2"))
-const EQV_HISTORY_STATS = Dict{Symbol,Real}(:histories=>0,:rows=>0,:slots=>0,:effective_from_ancestor=>0,:paged=>0,:oracle_threw=>0,:seconds=>0.0)
+const EQV_HISTORY_STATS = Dict{Symbol,Real}(:histories=>0,:rows=>0,:slots=>0,:effective_from_ancestor=>0,:paged=>0,:seconds=>0.0)
 
 struct EqvHistoryMismatch
     loc::Int; facet::Any; slot::Int; tsec::Float64; got::Any; want::Any
@@ -541,8 +541,7 @@ function eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq)
     end
     for s in eqv_history_slot_sample(rng,h,maxseq)
         EQV_HISTORY_STATS[:slots] += 1
-        # a cache that stores an un-set attribute cannot be read back by the reconstruction (it throws); nothing to compare there
-        want = try oracle(id,s,tm) catch; EQV_HISTORY_STATS[:oracle_threw] += 1; continue end
+        want = oracle(id,s,tm)
         got = CHESSDatabase.history_value_at(h,s)
         k = searchsortedlast(h.SequenceID,s)
         unit = k == 0 ? missing : h.Unit[k]

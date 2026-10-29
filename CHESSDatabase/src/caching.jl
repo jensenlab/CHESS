@@ -185,10 +185,17 @@ function cache(a::AttributeDict)
         id=get_attribute_set_id(a)
         attrs=collect(keys(a))
         for attr in attrs
-            val=quantity(a[attr])
             upload_attribute(a[attr])
-            execute_db("INSERT OR IGNORE INTO CachedAttributes(AttributeSetID,AttributeID,Value,Unit) Values(?,?,?,?)",
-                (id,string(attr),ustrip(val),string(unit(val))))
+            # an attribute without a value is stored as the events store it: no value, the unit of the attribute
+            raw=CHESSCore.value(a[attr])
+            if ismissing(raw) || isunknown(raw)
+                execute_db("INSERT OR IGNORE INTO CachedAttributes(AttributeSetID,AttributeID,Value,Unit) Values(?,?,?,?)",
+                    (id,string(attr),missing,string(attribute_unit(a[attr]))))
+            else
+                val=quantity(a[attr])
+                execute_db("INSERT OR IGNORE INTO CachedAttributes(AttributeSetID,AttributeID,Value,Unit) Values(?,?,?,?)",
+                    (id,string(attr),ustrip(val),string(unit(val))))
+            end
         end
     end
     return id

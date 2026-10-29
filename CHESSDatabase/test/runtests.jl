@@ -726,5 +726,6 @@ include("test_local_series.jl")
 include("test_depth.jl")
 include("test_reconstruct_contents_order.jl")
 include("test_history.jl")
+include("test_unset_cache.jl")
 
 rm(file)
