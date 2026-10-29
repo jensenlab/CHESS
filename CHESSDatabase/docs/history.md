@@ -1,6 +1,6 @@
 # `reconstruct_history`
 
-`reconstruct_history(location_id, facet; from, to, time, effective, order, limit, after, collapse)` returns how one
+`reconstruct_history(location_id, facet; from, to, time, effective, order, limit, after, collapse, max_closure)` returns how one
 facet of a location changed between two ledger slots, as a `DataFrame`. The value at a slot `s` is the `Value` of the
 last row with `SequenceID <= s`; `history_value_at(history, s)` does this lookup. For every facet, slot and `time`
 that value equals the one the matching `reconstruct_*` function gives at that slot and time.
@@ -15,8 +15,9 @@ that value equals the one the matching `reconstruct_*` function gives at that sl
 | `:lot` | supplier, catalog number and lot of the observed lot | `false` only |
 | `(:setting, name)` | value of an instrument setting (`location_id` is the instrument) | `false` only |
 | a read kind | the reads of that kind, by time of the read | `false` only |
+| `:contents` | the `Stock` of a well | `false` only |
 
-`:contents` is not available (contents history is a later phase). `encumbrances=true` throws an `ArgumentError`.
+`encumbrances=true` throws an `ArgumentError`.
 
 ## Columns
 
@@ -45,6 +46,21 @@ for a read kind); the next page holds the rows after it in the chosen `order` (`
 a page needs are read: the window starts small and grows until the page is full. Concatenated pages equal the
 whole history in either order.
 
+## Contents
+
+The rows of `:contents` are the snapshots of the stock of a well that `reconstruct_contents` records while it replays
+the transfers, observations and discards on the well and on the wells it was filled from. `Value` is the `Stock`
+(`Empty()` for an empty well) and `Unit` is `missing`. `Event` is `transfer in`, `transfer out`, `discard`,
+`observe_components` or `cache`. The stock at a slot equals `reconstruct_contents` at that slot and `time`.
+
+The replay starts at the newest cache of the well at or before `from`, and starts again at every cache of the well in
+`(from, to]`, because `reconstruct_contents` does the same for the slots after a cache. A location that is not a well has
+no rows. With `collapse=true` a row whose stock equals the one before it is left out.
+
+The cost is that of `reconstruct_contents` at `to`: it grows with the transfer ancestry of the well since its newest
+cache. `max_closure=n` throws an `ArgumentError` when the ancestry has more than `n` rows. An ancestry too large for the
+indexed queries falls back to the whole-ledger queries, as `reconstruct_contents` does.
+
 ## Cost
 
 Every query goes through the indexes; none scans `Ledger` or builds the `ledger_subset` copy. The window is read by
@@ -55,7 +71,7 @@ the benchmark) therefore costs time proportional to its series length, as `lates
 
 ## Not covered
 
-- Contents history, planned operations (`encumbrances`).
+- Planned operations (`encumbrances`).
 - Effective forms of the facets other than attributes.
 - Ties between two events at the same slot are ordered by row id; the reconstruction functions do not define a
   winner there either.

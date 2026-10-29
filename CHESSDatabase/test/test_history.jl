@@ -195,7 +195,7 @@ end
 end
 
 @testset "history: arguments that are refused" begin
-    @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:contents)
+    @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:contents;effective=true)
     @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:Temperature;encumbrances=true)
     @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:NoSuchFacet)
     @test_throws ArgumentError reconstruct_history(hx_id(hx_plate),:locked;effective=true)

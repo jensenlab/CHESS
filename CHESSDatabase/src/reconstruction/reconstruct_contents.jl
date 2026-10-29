@@ -391,6 +391,13 @@ point in history, `max_cache` limits which caches may be used, and `encumbrances
 planned future operations.
 """
 function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false)
+    all_locs=_reconstruct_contents_index(location_ids,sequence_id,time,max_cache,loc_index;encumbrances=encumbrances)
+    return find_most_recent_location.((all_locs,), location_ids)
+end
+
+# The replay behind `reconstruct_contents`: the index of every location it reconstructed, each with one entry per slot at
+# which its state changed. `trace`, when given, receives `(location id, slot) => (event, LedgerID)` for each change to a location.
+function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_id::Integer, time::DateTime, max_cache::Integer, loc_index::Dict{<:Integer,<:Vector};encumbrances=false,trace=nothing)
     all_locs=deepcopy(loc_index)
     cache_feet=[]
     for loc_id in location_ids
@@ -492,6 +499,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
 
     for (_,row) in events
         if !(row isa DataFrameRow)
+            isnothing(trace) || (trace[(Int(row[1,:LocationID]),Int(row[1,:SequenceID]))] = ("observe_components",Int(row[1,:LedgerID])))
             _apply_content_observations!(all_locs,row)
             continue
         end
@@ -507,6 +515,7 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
             new_src = deepcopy(src)
             withdraw!(new_src,quant)
             push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
+            isnothing(trace) || (trace[(Int(row.Source),Int(row.SequenceID))] = (ismissing(row.Destination) ? "discard" : "transfer out",Int(row.LedgerID)))
             continue
         end
 
@@ -514,12 +523,13 @@ function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Inte
         new_src,new_dest=_reconstruction_transfer(src,dest,quant)
         push_location!(all_locs,CHESSCore.location_id(dest),seq_id+1,new_dest)
         push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
+        if !isnothing(trace)
+            trace[(Int(row.Destination),Int(row.SequenceID))] = ("transfer in",Int(row.LedgerID))
+            trace[(Int(row.Source),Int(row.SequenceID))] = ("transfer out",Int(row.LedgerID))
+        end
     end
 
-    final_out = find_most_recent_location.((all_locs,), location_ids)
-
-
-    return final_out
+    return all_locs
 end 
 
 function reconstruct_contents(location_id::Integer,sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(),max_cache::Integer=sequence_id,loc_index::Dict{<:Integer,<:Vector}=location_reconstruction_index;encumbrances=false)

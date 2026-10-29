@@ -296,6 +296,47 @@ function _effective_timeline(name::String,loc::Integer,lo::Integer,hi::Integer,t
     return _blank_start(out,loc)
 end
 
+# ------------------------------------------------------------------------------------------ contents
+
+# The timeline of the stock of the well `loc` over `lo..hi`. The stock is replayed as `reconstruct_contents` replays it,
+# once for each stretch that starts at a cache of the well (the newest cache at or before `lo`, then every cache in
+# `(lo, hi]`), because a replay from a cache is what `reconstruct_contents` does for the slots after it. The snapshots the
+# replay records for the well are the rows. A location that is not a well has no contents and no rows.
+function _contents_timeline(loc::Integer,lo::Integer,hi::Integer,time::DateTime;collapse::Bool=true,max_closure=nothing)
+    name,t = get_location_info(loc)
+    t(loc,name) isa CHESSCore.Well || return _HRow[_hvirtual(loc)]
+    if !isnothing(max_closure)
+        rows = nrow(get_transfer_ancestors([Int(loc)],0,hi,time))
+        rows > max_closure && throw(ArgumentError("the transfer ancestry of location $loc has $rows rows, more than max_closure=$max_closure"))
+    end
+    caches = get_content_caches(loc,0,hi,time)
+    cache_slots = Int.(caches.SequenceID)
+    cache_ledger = Dict(Int(r.SequenceID) => Int(r.LedgerID) for r in eachrow(caches))
+    k0 = searchsortedlast(cache_slots,lo)
+    starts = vcat(k0 == 0 ? Int[0] : [cache_slots[k0]],cache_slots[k0 + 1:end])
+    out = _HRow[]
+    for (i,f) in enumerate(starts)
+        stop = i < length(starts) ? starts[i + 1] - 1 : hi
+        trace = Dict{Tuple{Int,Int},Tuple{String,Int}}()
+        index = _reconstruct_contents_index([Int(loc)],stop,time,f,location_reconstruction_index;trace=trace)
+        for (slot,l) in get(index,Int(loc),Tuple{Integer,Location}[])
+            slot = Int(slot)
+            ev = slot == f && haskey(cache_ledger,slot) ? ("cache",cache_ledger[slot]) : get(trace,(Int(loc),slot),nothing)
+            row = ev === nothing ? _hvirtual(Int(loc)) : _HRow(slot,ev[2],0,CHESSCore.stock(l),missing,ev[1],ev[1] == "cache" ? :cache : :event,Int(loc))
+            if i == 1 && slot <= lo
+                isempty(out) ? push!(out,row) : (out[1] = row)      # the state in force at lo
+            elseif !isempty(out) && out[end].slot == slot
+                out[end] = row                                       # two rows in one slot: the last one stands
+            else
+                push!(out,row)
+            end
+        end
+    end
+    isempty(out) && push!(out,_hvirtual(Int(loc)))
+    collapse && (out = _collapsed(out))
+    return out
+end
+
 # ------------------------------------------------------------------------------------------ the public function
 
 _history_frame() = DataFrame(SequenceID=Int[],LedgerID=Int[],Time=DateTime[],Value=Any[],Unit=Union{Missing,String}[],Origin=Int[],Event=String[])
@@ -345,7 +386,8 @@ recorded by the ledger as of `time`.
 `facet` is an attribute kind or its name (`attr"Temperature"`, `:Temperature`), `:parent` (the id of the parent,
 `missing` for none), `:locked`, `:active`, `:lot` (supplier, catalog number and lot of the lot observed on the
 labware), `(:setting, name)` (an instrument setting, `location_id` being the instrument) or a read kind (the reads
-of that kind, by the time of the read). `:contents` is not available yet.
+of that kind, by the time of the read) or `:contents` (the stock of a well; `Value` is the `Stock`, `Unit` is `missing`, `Origin`
+the well, and `Event` is `transfer in`, `transfer out`, `discard`, `observe_components` or `cache`).
 
 The columns are `SequenceID`, `LedgerID`, `Time` (of the ledger row; of the read for a read kind), `Value`, `Unit`,
 `Origin` and `Event`. `Origin` is the location whose value this is: the location itself, or for an effective
@@ -372,25 +414,34 @@ time of the read.
 6) `collapse`: with `true` (the default) a row is kept only if its `Value`, `Unit` or `Origin` differs from the row
    before it. `false` keeps every event and cache row of an own facet (an effective history is always collapsed).
 7) `encumbrances`: planned operations are not included yet; `true` throws an `ArgumentError`.
+8) `max_closure`: for `:contents`, throw an `ArgumentError` when the transfer ancestry of the well has more rows than this.
 
 The value at every slot equals the value of the matching `reconstruct_*` at that slot and `time`.
 """
 function reconstruct_history(location_id::Integer,facet;from::Integer=0,to::Union{Integer,Nothing}=nothing,time::DateTime=Dates.now(),
         effective::Union{Bool,Nothing}=nothing,order::Symbol=:asc,limit::Union{Integer,Nothing}=nothing,after=nothing,
-        collapse::Bool=true,encumbrances::Bool=false)
+        collapse::Bool=true,encumbrances::Bool=false,max_closure::Union{Integer,Nothing}=nothing)
     encumbrances && throw(ArgumentError("reconstruct_history does not include planned (encumbered) operations yet"))
     order in (:asc,:desc) || throw(ArgumentError("order must be :asc or :desc, got $(repr(order))"))
     isnothing(limit) || limit >= 1 || throw(ArgumentError("limit must be at least 1"))
     kind,name = _resolve_facet(facet)
-    kind === :contents && throw(ArgumentError("the history of :contents is not available yet"))
     to = something(to,get_last_sequence_id())
     from = max(from,0)
     kind === :read && return _read_history(location_id,name,from,to,time,order,limit,after)
     isnothing(after) || after isa Integer || throw(ArgumentError("after must be a SequenceID"))
+    if kind === :contents
+        something(effective,false) && throw(ArgumentError("only an attribute has an effective history (effective=false for :contents)"))
+        timeline = (lo,hi) -> _contents_timeline(location_id,lo,hi,time;collapse=collapse,max_closure=max_closure)
+        return _history_frame(_history_pages(timeline,from,to,order,limit,after),kind)
+    end
     eff = something(effective,kind === :attribute)
     eff && kind !== :attribute && throw(ArgumentError("only an attribute has an effective history (effective=false for :$kind)"))
     timeline = (lo,hi) -> eff ? _effective_timeline(name,location_id,lo,hi,time,0) : _own_timeline(kind,name,location_id,lo,hi,time;collapse=collapse)
-    rows = _history_pages(timeline,from,to,order,limit,after)
+    return _history_frame(_history_pages(timeline,from,to,order,limit,after),kind)
+end
+
+# the frame of the rows of a page
+function _history_frame(rows::Vector{_HRow},kind::Symbol)
     isempty(rows) && return _history_frame()
     times = _ledger_times([r.ledger for r in rows])
     return DataFrame(SequenceID=[r.slot for r in rows],LedgerID=[r.ledger for r in rows],Time=[times[r.ledger] for r in rows],

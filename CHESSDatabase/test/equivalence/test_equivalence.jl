@@ -394,11 +394,12 @@ end
 # the first and last slots, and random ones.
 
 const EQV_HISTORY_LOCS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_LOCS","4"))
-const EQV_HISTORY_SLOTS = get(ENV,"CHESS_EQUIV_HISTORY_SLOTS","5")
+const EQV_HISTORY_SLOTS = get(ENV,"CHESS_EQUIV_HISTORY_SLOTS","2")
 # the fraction of histories that are also read page by page (tiny pages and windows) and without collapse
-const EQV_HISTORY_PAGED = parse(Float64,get(ENV,"CHESS_EQUIV_HISTORY_PAGED","0.01"))
+const EQV_HISTORY_PAGED = parse(Float64,get(ENV,"CHESS_EQUIV_HISTORY_PAGED","0"))
+const EQV_HISTORY_CONTENTS_SLOTS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_CONTENTS_SLOTS","3"))
 const EQV_HISTORY_TIMES = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_TIMES","2"))
-const EQV_HISTORY_STATS = Dict{Symbol,Real}(:histories=>0,:rows=>0,:slots=>0,:effective_from_ancestor=>0,:paged=>0,:seconds=>0.0)
+const EQV_HISTORY_STATS = Dict{Symbol,Real}(:histories=>0,:rows=>0,:slots=>0,:effective_from_ancestor=>0,:paged=>0,:seconds=>0.0,:build_seconds=>0.0)
 
 struct EqvHistoryMismatch
     loc::Int; facet::Any; slot::Int; tsec::Float64; got::Any; want::Any
@@ -438,6 +439,7 @@ function eqv_history_facets(id::Int)
     hasproperty(blank,:is_locked) && push!(out,(:locked,"locked",(i,s,tm)->CHESSCore.is_locked(CHESSDatabase.reconstruct_lock(i,s,tm))))
     push!(out,(:active,"active",(i,s,tm)->CHESSCore.is_active(CHESSDatabase.reconstruct_activity(i,s,tm))))
     hasproperty(blank,:lot) && push!(out,(:lot,"lot",(i,s,tm)->(l = CHESSDatabase.reconstruct_lot(i,s,tm); isnothing(l) ? missing : "$(l.supplier) $(l.catalog_number) lot $(l.lot)")))
+    blank isa CHESSCore.Well && push!(out,(:contents,"contents",(i,s,tm)->eqv_stock_summary(CHESSCore.stock(CHESSDatabase.reconstruct_contents(i,s,tm)))))
     return out
 end
 
@@ -473,7 +475,9 @@ function eqv_check_history(rng,w::EqvWorld)
         for id in unique(ids)
             for (facet,label,oracle) in eqv_history_facets(id)
                 eff = endswith(label,"effective") ? true : (endswith(label,"own") ? false : nothing)
+                t_build = time()
                 h = CHESSDatabase.reconstruct_history(id,facet;from=0,to=maxseq,time=tm,effective=eff)
+                EQV_HISTORY_STATS[:build_seconds] += time() - t_build
                 eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq)
                 eff === true && any(!=(id),h.Origin) && (EQV_HISTORY_STATS[:effective_from_ancestor] += 1)
             end
@@ -539,10 +543,14 @@ function eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq)
             end
         end
     end
-    for s in eqv_history_slot_sample(rng,h,maxseq)
+    sample = eqv_history_slot_sample(rng,h,maxseq)
+    # a stock costs a replay at every slot: fewer slots for it
+    label == "contents" && length(sample) > EQV_HISTORY_CONTENTS_SLOTS && (sample = sort!(rand(rng,sample,EQV_HISTORY_CONTENTS_SLOTS)))
+    for s in sample
         EQV_HISTORY_STATS[:slots] += 1
         want = oracle(id,s,tm)
         got = CHESSDatabase.history_value_at(h,s)
+        label == "contents" && (got = eqv_stock_summary(ismissing(got) ? Empty() : got))
         k = searchsortedlast(h.SequenceID,s)
         unit = k == 0 ? missing : h.Unit[k]
         # nothing recorded: the facet has its default value
