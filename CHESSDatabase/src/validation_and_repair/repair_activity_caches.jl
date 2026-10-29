@@ -27,7 +27,7 @@ function repair_activity_caches(participants::Vector{<:Integer},sequence_id::Int
     end 
    
 
-    println("caches updated: $cache_update_counter")
+    return cache_update_counter
 
 
 

@@ -5,8 +5,8 @@ an index and applies the visibility rule of `visibility.jl` to those rows only, 
 history of the key, not on the size of the ledger. Results have the columns, types and order of the originals.
 
 The original is used instead when `encumbrances=true` (the planned operations are merged in SQL there), when
-`reconstruction_mode[]` is `:legacy`, and for a request naming more than `LOCAL_KEY_LIMIT` keys, where one pass
-over the ledger is cheaper than a lookup per key.
+`reconstruction_mode[]` is `:legacy`, and for a request naming more than `LOCAL_KEY_LIMIT` keys that own a
+large part of the ledger (`plan_reconstruction`), where one pass over the ledger is cheaper than a lookup per key.
 =#
 
 """
@@ -21,6 +21,14 @@ const reconstruction_mode = Ref(:local)
 const LOCAL_KEY_LIMIT = Ref(200)
 
 _use_global(encumbrances,nkeys=0) = encumbrances || reconstruction_mode[] === :legacy || nkeys > LOCAL_KEY_LIMIT[]
+
+# The same for a request naming `locs`: up to `LOCAL_KEY_LIMIT` keys are read key first; more are read key first in
+# chunks unless `plan_reconstruction` finds that they own a large part of the ledger.
+function _use_global(encumbrances,locs::AbstractVector;kind::Symbol)
+    (encumbrances || reconstruction_mode[] === :legacy) && return true
+    length(locs) > LOCAL_KEY_LIMIT[] || return false
+    return plan_reconstruction(locs;kind=kind).path === :global
+end
 
 # ------------------------------------------------------------------------------------------ cache getters
 
@@ -98,13 +106,13 @@ _event_value(tables,column,keycolumn) = (source,key,ledger_id) ->
 _movement_frame() = DataFrame(LedgerID=Int[],SequenceID=Int[],EncumbranceID=Int[],Parent=Union{Missing,Int}[],Child=Int[])
 
 function get_last_movement_as_child(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(locs)) && return _get_last_movement_as_child_global(locs,starting,ending,time;encumbrances=encumbrances)
+    _use_global(encumbrances,locs;kind=:movements) && return _get_last_movement_as_child_global(locs,starting,ending,time;encumbrances=encumbrances)
     return _latest_rows(_movement_frame(),unique(locs),_movement_sources,_event_value(_MOVEMENT_TABLES,"Parent","Child"),
         (child,ev,parent)->(ev.ledger_id,ev.slot,0,parent,child),starting,ending,time)
 end
 
 function get_last_movements_as_parent(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(locs)) && return _get_last_movements_as_parent_global(locs,starting,ending,time;encumbrances=encumbrances)
+    _use_global(encumbrances,locs;kind=:movements) && return _get_last_movements_as_parent_global(locs,starting,ending,time;encumbrances=encumbrances)
     # children that were ever placed in one of `locs`; whether it is still where each one is comes from its latest movement
     wanted = Set(locs)
     candidates = Int[]
@@ -118,13 +126,13 @@ function get_last_movements_as_parent(locs::Vector{<:Integer},starting::Integer=
 end
 
 function get_locks(location_ids::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(location_ids)) && return _get_locks_global(location_ids,starting,ending,time;encumbrances=encumbrances)
+    _use_global(encumbrances,location_ids;kind=:locks) && return _get_locks_global(location_ids,starting,ending,time;encumbrances=encumbrances)
     return _latest_rows(DataFrame(LedgerID=Int[],SequenceID=Int[],EncumbranceID=Int[],LocationID=Int[],IsLocked=Int[]),unique(location_ids),
         _lock_sources,_event_value(_LOCK_TABLES,"IsLocked","LocationID"),(loc,ev,v)->(ev.ledger_id,ev.slot,0,loc,v),starting,ending,time)
 end
 
 function get_activity(location_ids::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(location_ids)) && return _get_activity_global(location_ids,starting,ending,time;encumbrances=encumbrances)
+    _use_global(encumbrances,location_ids;kind=:activity) && return _get_activity_global(location_ids,starting,ending,time;encumbrances=encumbrances)
     return _latest_rows(DataFrame(LedgerID=Int[],SequenceID=Int[],EncumbranceID=Int[],LocationID=Int[],IsActive=Int[]),unique(location_ids),
         _activity_sources,_event_value(_ACTIVITY_TABLES,"IsActive","LocationID"),(loc,ev,v)->(ev.ledger_id,ev.slot,0,loc,v),starting,ending,time)
 end

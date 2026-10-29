@@ -33,7 +33,8 @@ merged with another. The rows come back ordered by slot, then ledger entry, then
 For an entry with one transfer this is the original result.
 
 The original is used instead when `encumbrances=true` (the planned transfers are merged in SQL there), when
-`reconstruction_mode[]` is `:legacy`, and for more than `LOCAL_KEY_LIMIT` seeds.
+`reconstruction_mode[]` is `:legacy`. For more than `LOCAL_KEY_LIMIT` seeds that own a large part of the ledger (`plan_reconstruction`)
+the bulk path of bulk.jl runs the same closure over rows read in one pass.
 =#
 
 # the rows of an edge query, one frame per call, with the columns of the closure
@@ -105,15 +106,23 @@ The columns are `LedgerID`, `Source`, `Destination` (`missing` for a discard), `
 The closure is walked well by well through the indexes on `Transfers` and `Discards`, so the time depends on
 the transfers of the wells in the closure and not on the length of the ledger. A well that fed many others
 (a shared reservoir) contributes all of its transfers as collateral. The original whole-ledger query is used for
-`encumbrances=true`, for more than `LOCAL_KEY_LIMIT` locations, and when `reconstruction_mode[]` is `:legacy`.
+`encumbrances=true`, and when `reconstruction_mode[]` is `:legacy`. For more than `LOCAL_KEY_LIMIT` locations that own a large part of the ledger the bulk path of `plan_reconstruction` is used.
 """
 function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(locs)) && return _get_transfer_ancestors_global(locs,starting,ending,time;encumbrances=encumbrances)
+    if _use_global(encumbrances,locs;kind=:transfers)
+        (encumbrances || reconstruction_mode[] === :legacy) && return _get_transfer_ancestors_global(locs,starting,ending,time;encumbrances=encumbrances)
+        return _ancestors_from(_bulk_edges(starting,ending,time),locs)
+    end
     t = db_time(time)
+    return _ancestors_from((wells,side)->_closure_edges(wells,side,starting,ending,t),locs)
+end
+
+# the ancestor closure of `locs` over the edges supplied by `edges(wells, side)` (`side` is `:in` or `:out`)
+function _ancestors_from(edges,locs::Vector{<:Integer})
     seeds = unique(locs)
     seen = Set{Any}()
     core = DataFrame[]
-    first_rows = _unseen!(seen,vcat(_closure_edges(seeds,:in,starting,ending,t),_closure_edges(seeds,:out,starting,ending,t)))
+    first_rows = _unseen!(seen,vcat(edges(seeds,:in),edges(seeds,:out)))
     push!(core,first_rows)
     expanded = Set{Int}()
     frontier = Set{Int}(first_rows.Source)
@@ -121,14 +130,14 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
         todo = collect(setdiff(frontier,expanded))
         union!(expanded,todo)
         isempty(todo) && break
-        added = _unseen!(seen,_closure_edges(todo,:in,starting,ending,t))
+        added = _unseen!(seen,edges(todo,:in))
         push!(core,added)
         frontier = Set{Int}(added.Source)
     end
     x = reduce(vcat,core)
     wells = unique!(Int[x.Source; collect(skipmissing(x.Destination))])
     in_core = Set{Tuple{Int,Int}}(zip(x.Kind,x.RowID))
-    collateral = _closure_edges(wells,:out,starting,ending,t)
+    collateral = edges(wells,:out)
     collateral = collateral[[!((k,r) in in_core) for (k,r) in zip(collateral.Kind,collateral.RowID)],:]
     x[!,:Core] .= 1
     collateral[!,:Core] .= 0
@@ -152,11 +161,23 @@ The columns are `LedgerID`, `EncumbranceID` (`0`), `Source`, `Destination`, `Qua
 `Time`, ordered by `SequenceID`. Discards are not followed.
 """
 function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(locs)) && return _get_transfer_descendents_global(locs,starting,ending,time;encumbrances=encumbrances)
+    if _use_global(encumbrances,locs;kind=:transfers)
+        (encumbrances || reconstruction_mode[] === :legacy) && return _get_transfer_descendents_global(locs,starting,ending,time;encumbrances=encumbrances)
+        return _descendents_from(_bulk_raw(),locs,starting,ending,time)
+    end
+    return _descendents_from(_local_raw,locs,starting,ending,time)
+end
+
+_empty_raw() = DataFrame(LedgerID=Int[],Source=Int[],Destination=Int[],Quantity=Float64[],Unit=String[],RowID=Int[],Kind=Int[])
+
+# the raw rows of Transfers whose `column` is in `wells`, through the index
+_local_raw(column,wells) = _vcat_or(DataFrame[query_db("""
+        SELECT LedgerID, Source, Destination, Quantity, Unit, ID AS RowID, 0 AS Kind FROM Transfers WHERE $column IN $(_marks(length(chunk)))""",Tuple(chunk))
+    for chunk in Iterators.partition(wells,_id_chunk)],_empty_raw())
+
+# the descendants of `locs` over the raw rows supplied by `raw(column, wells)`; only the rows found are tested for visibility
+function _descendents_from(raw,locs::Vector{<:Integer},starting::Integer,ending::Integer,time::DateTime)
     t = db_time(time)
-    raw(column,wells) = _vcat_or(DataFrame[query_db("""
-            SELECT LedgerID, Source, Destination, Quantity, Unit, ID AS RowID, 0 AS Kind FROM Transfers WHERE $column IN $(_marks(length(chunk)))""",Tuple(chunk))
-        for chunk in Iterators.partition(wells,_id_chunk)],DataFrame(LedgerID=Int[],Source=Int[],Destination=Int[],Quantity=Float64[],Unit=String[],RowID=Int[],Kind=Int[]))
     seeds = unique(locs)
     seen = Set{Any}()
     found = DataFrame[]

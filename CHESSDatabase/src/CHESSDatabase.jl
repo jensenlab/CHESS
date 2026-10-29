@@ -46,6 +46,7 @@ include("./reconstruction/reconstruct_location.jl")
 include("./reconstruction/reconstruct_history.jl")
 include("./reconstruction/local_queries.jl")
 include("./reconstruction/local_closure.jl")
+include("./reconstruction/bulk.jl")
 include("./reconstruction/local_series.jl")
 # cache repair
 include("./validation_and_repair/repair_content_caches.jl")
@@ -101,6 +102,7 @@ export cache , get_location_info
 #reconstruct_location.jl
 export reconstruct_location,reconstruct_location!,ReconstructionReport
 export reconstruct_history, history_value_at
+export plan_reconstruction
 export upload_tick, update_tick, audit_ticks, check_tick, tick_rule_enforcement!, operation_classes, tick_operations
 #reconstruct_contents.jl
 export reconstruct_contents, reconstruct_contents!

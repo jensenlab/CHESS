@@ -26,7 +26,7 @@ function repair_lock_caches(participants::Vector{<:Integer},sequence_id::Integer
         end
     
     end
-    println("caches updated: $cache_update_counter")
+    return cache_update_counter
 
 
 

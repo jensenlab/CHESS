@@ -26,7 +26,7 @@ function repair_environment_attribute_caches(participants::Vector{<:Integer},seq
         end
     end
 
-    println("caches updated: $cache_update_counter")
+    return cache_update_counter
 
 
 

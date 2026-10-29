@@ -11,7 +11,7 @@ through an index, applying the visibility rule of `visibility.jl` to them.
     index when paged, so a page costs the rows it returns plus the rows hidden among them.
 
 The original is used instead when `encumbrances=true`, when `reconstruction_mode[]` is `:legacy`, and for a request
-naming more than `LOCAL_KEY_LIMIT` locations.
+naming more than `LOCAL_KEY_LIMIT` locations that own a large part of the ledger (`plan_reconstruction`).
 =#
 
 # the (location, attribute) pairs a location has ever had an event for, from either table
@@ -42,7 +42,7 @@ Each series is searched from its end (see `latest_visible_event`), so the time d
 last one in the window or on the length of the series, whichever is less, and not on the length of the ledger.
 """
 function get_environment_attributes(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
-    _use_global(encumbrances,length(locs)) && return _get_environment_attributes_global(locs,starting,ending,time;encumbrances=encumbrances)
+    _use_global(encumbrances,locs;kind=:environment) && return _get_environment_attributes_global(locs,starting,ending,time;encumbrances=encumbrances)
     rows = DataFrame[]
     for (loc,attr) in _attribute_keys(unique(locs))
         ev = latest_visible_event(_attribute_sources(loc,attr),starting,ending,time)
@@ -68,7 +68,7 @@ Every component observation on `locs` between `starting` and `ending` sequence p
 """
 function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
     isempty(locs) && return _get_content_observations_global(locs,starting,ending,time)
-    _use_global(false,length(locs)) && return _get_content_observations_global(locs,starting,ending,time)
+    _use_global(false,locs;kind=:observations) && return _get_content_observations_global(locs,starting,ending,time)
     t = db_time(time)
     pred = _visible_predicate("vl","?","?","?")
     pieces = DataFrame[]

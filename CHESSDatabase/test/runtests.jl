@@ -729,5 +729,6 @@ include("test_history.jl")
 include("test_unset_cache.jl")
 include("test_history_contents.jl")
 include("test_ticks.jl")
+include("test_bulk.jl")
 
 rm(file)

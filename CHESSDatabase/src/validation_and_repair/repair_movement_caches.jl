@@ -53,7 +53,7 @@ function repair_movement_caches(unique_parents::Vector,unique_children::Vector{<
     end
    
 
-    println("caches updated: $cache_update_counter")
+    return cache_update_counter
 
 
 end 

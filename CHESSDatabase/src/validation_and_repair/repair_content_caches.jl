@@ -8,14 +8,24 @@ function repair_content_caches(ledger_id::Integer)
     repair_content_caches(locs,sequence_id)
 end
 
-# repair the content caches of `locs`, and of every well downstream of them, at or after `sequence_id`
-function repair_content_caches(locs::Vector{<:Integer},sequence_id::Integer)
+# The wells whose contents can change when the contents of `locs` change from `sequence_id` on: `locs` and the wells
+# reached by transfers that follow the change in time (`_spread_forward`, the set `trace_forward` reports). It is a
+# subset of the structural closure `get_transfer_descendents` returns, which also follows transfers that happened
+# before the material arrived. A transfer out of a well at a slot before the change moved material the change did not
+# touch, so the wells behind it keep their caches.
+function _repair_set(locs::Vector{<:Integer},sequence_id::Integer;time_respecting::Bool=true)
+    if time_respecting
+        reached=_spread_forward(Dict{Int,Int}(Int(l)=>Int(sequence_id) for l in locs),get_last_sequence_id(),Dates.now())
+        return collect(keys(reached))
+    end
     trfs=get_transfer_descendents(locs,sequence_id)
+    return unique(vcat(locs,trfs.Source,trfs.Destination))
+end
 
-    srcs=trfs.Source
-    dests=trfs.Destination
-
-    all_locs=unique(vcat(locs,srcs,dests))
+# repair the content caches of `locs`, and of every well downstream of them, at or after `sequence_id`;
+# returns the number of caches rewritten. `time_respecting=false` repairs the structural closure instead.
+function repair_content_caches(locs::Vector{<:Integer},sequence_id::Integer;time_respecting::Bool=true)
+    all_locs=_repair_set(locs,sequence_id;time_respecting=time_respecting)
     cache_update_counter=0
     for loc_id in all_locs
 
@@ -35,7 +45,7 @@ function repair_content_caches(locs::Vector{<:Integer},sequence_id::Integer)
         end
     end 
 
-    println("caches updated: $cache_update_counter")
+    return cache_update_counter
 end 
 
 
