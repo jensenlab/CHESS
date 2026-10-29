@@ -175,56 +175,11 @@ end
 
 
 
+# `true` if ledger entry `ledger_id` holds at least one row of `table` (an entry may hold several: see ticks.jl)
+_has_rows(table::AbstractString,ledger_id::Integer) = nrow(query_db("SELECT 1 FROM $table WHERE LedgerID = ? LIMIT 1",(ledger_id,))) > 0
 
-function isa_transfer(ledger_id::Integer)
-
-    x=" SELECT  LedgerID FROM Transfers WHERE LedgerID = ?"
-    out=query_db(x,(ledger_id,))
-    if nrow(out) == 1
-        return true
-    else
-        return false
-    end
-end
-
-
-function isa_movement(ledger_id::Integer)
-    x=" SELECT LedgerID FROM Movements WHERE LedgerID = ?"
-    out=query_db(x,(ledger_id,))
-    if nrow(out) == 1
-        return true
-    else
-        return false
-    end
-end
-
-function isa_environment_attribute(ledger_id::Integer)
-    x= "SELECT LedgerID FROM EnvironmentAttributes WHERE LedgerID = ?"
-    out=query_db(x,(ledger_id,))
-    if nrow(out) == 1
-        return true
-    else
-        return false
-    end
-end
-
-
-function isa_lock(ledger_id::Integer)
-    x= "SELECT LedgerID FROM Locks WHERE LedgerID = ?"
-    out=query_db(x,(ledger_id,))
-    if nrow(out) == 1
-        return true
-    else
-        return false
-    end
-end
-
-function isa_activity(ledger_id::Integer)
-    x= "SELECT LedgerID FROM Activity WHERE LedgerID = ?"
-    out=query_db(x,(ledger_id,))
-    if nrow(out) == 1
-        return true
-    else
-        return false
-    end
-end
+isa_transfer(ledger_id::Integer) = _has_rows("Transfers",ledger_id)
+isa_movement(ledger_id::Integer) = _has_rows("Movements",ledger_id)
+isa_environment_attribute(ledger_id::Integer) = _has_rows("EnvironmentAttributes",ledger_id)
+isa_lock(ledger_id::Integer) = _has_rows("Locks",ledger_id)
+isa_activity(ledger_id::Integer) = _has_rows("Activity",ledger_id)

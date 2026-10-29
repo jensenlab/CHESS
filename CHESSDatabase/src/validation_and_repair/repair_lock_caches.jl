@@ -33,15 +33,7 @@ function repair_lock_caches(participants::Vector{<:Integer},sequence_id::Integer
 end
 
 
+# the location of every row of Locks recorded under `ledger_id`
 function get_lock_participant(ledger_id::Integer)
-        x="SELECT LedgerID,LocationID FROM Locks WHERE LedgerID = $ledger_id"
-        out=query_db(x) 
-
-        if nrow(out)==1 
-            return out[1,"LocationID"]
-        elseif nrow(out)==0 
-            error("found no lock entries for ledger id $ledger_id ")
-        elseif nrow(out)> 1 
-            error("found multiple lock entries for ledger id $ledger_id")
-        end 
-end 
+    return Vector{Int}(query_db("SELECT LocationID FROM Locks WHERE LedgerID = ? ORDER BY ID",(ledger_id,)).LocationID)
+end

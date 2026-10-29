@@ -115,6 +115,7 @@ function observe(loc::Location,facet...;read_ledger_id::Union{Integer,Nothing}=n
         CHESSCore.observe!(loc,facet...;instrument=instrument)
         upload_observation(loc,facet...;ledger_id=ledger_id,time=time,instrument_id=instrument_id,
             instrument_time=instrument_time,read_ledger_id=read_ledger_id)
+        check_tick(ledger_id)
         appended || process_update(ledger_id)
         return ledger_id
     end
@@ -142,6 +143,7 @@ function observe(loc::Location;recursive::Bool=true,read_ledger_id::Union{Intege
                     instrument_time=instrument_time,read_ledger_id=read_ledger_id)
             end
         end
+        check_tick(ledger_id)
         appended || process_update(ledger_id)
         return ledger_id
     end

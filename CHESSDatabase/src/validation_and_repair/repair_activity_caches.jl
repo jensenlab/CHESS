@@ -34,15 +34,7 @@ function repair_activity_caches(participants::Vector{<:Integer},sequence_id::Int
 end
 
 
+# the location of every row of Activity recorded under `ledger_id`
 function get_activity_participant(ledger_id::Integer)
-        x="SELECT LedgerID,LocationID FROM Activity WHERE LedgerID = $ledger_id"
-        out=query_db(x) 
-
-        if nrow(out)==1 
-            return out[1,"LocationID"]
-        elseif nrow(out)==0 
-            error("found no activity entries for ledger id $ledger_id ")
-        elseif nrow(out)> 1 
-            error("found multiple activity entries for ledger id $ledger_id")
-        end 
-    end 
+    return Vector{Int}(query_db("SELECT LocationID FROM Activity WHERE LedgerID = ? ORDER BY ID",(ledger_id,)).LocationID)
+end

@@ -728,5 +728,6 @@ include("test_reconstruct_contents_order.jl")
 include("test_history.jl")
 include("test_unset_cache.jl")
 include("test_history_contents.jl")
+include("test_ticks.jl")
 
 rm(file)

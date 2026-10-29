@@ -26,15 +26,19 @@ point has a test in test/test_transfer_closure.jl):
       rows are joined to `ledger_subset`. The same is done here: the frontier reads raw rows through the Source
       index, and the rows found are filtered for visibility at the end.
 
-Ledger entries with more than one transfer are outside T5; that case belongs to the simultaneous ticks of
-section 6 of the plan.
+T5 changes for an entry with several transfers or discards (simultaneous ticks, section 6 of the plan): the rows are
+identified by their table and row ID, not by the ledger entry. Every row of an entry that is in the closure is
+core, every other row of the entry whose Source is a well of the closure is collateral, and none is dropped or
+merged with another. The rows come back ordered by slot, then ledger entry, then the order they were recorded in.
+For an entry with one transfer this is the original result.
 
 The original is used instead when `encumbrances=true` (the planned transfers are merged in SQL there), when
 `reconstruction_mode[]` is `:legacy`, and for more than `LOCAL_KEY_LIMIT` seeds.
 =#
 
 # the rows of an edge query, one frame per call, with the columns of the closure
-const _EDGE_COLUMNS = "x.LedgerID AS LedgerID, x.Source AS Source, %DEST% AS Destination, x.Quantity AS Quantity, x.Unit AS Unit"
+# `RowID` and `Kind` (0 a transfer, 1 a discard) identify the row itself: a ledger entry can hold several transfers
+const _EDGE_COLUMNS = "x.LedgerID AS LedgerID, x.Source AS Source, %DEST% AS Destination, x.Quantity AS Quantity, x.Unit AS Unit, x.ID AS RowID, %KIND% AS Kind"
 
 _marks(n) = "(" * join(fill("?",n),",") * ")"
 
@@ -47,8 +51,9 @@ function _closure_edges(wells::AbstractVector{<:Integer},side::Symbol,starting::
         sources = side === :in ? (("Transfers","Destination"),) : (("Transfers","Source"),("Discards","Source"))
         for (table,column) in sources
             dest = table == "Discards" ? "NULL" : "x.Destination"
+            kind = table == "Discards" ? "1" : "0"
             push!(pieces,query_db("""
-                SELECT $(replace(_EDGE_COLUMNS,"%DEST%"=>dest)), vl.SequenceID AS SequenceID
+                SELECT $(replace(_EDGE_COLUMNS,"%DEST%"=>dest,"%KIND%"=>kind)), vl.SequenceID AS SequenceID
                 FROM $table x CROSS JOIN Ledger vl ON vl.ID = x.LedgerID AND $pred
                 WHERE x.$column IN $(_marks(length(chunk)))""",(starting,ending,t,t,chunk...)))
         end
@@ -58,9 +63,15 @@ end
 
 _vcat_or(pieces::Vector{DataFrame},empty::DataFrame) = isempty(pieces) ? empty : reduce(vcat,pieces)
 
-_empty_edges() = DataFrame(LedgerID=Int[],Source=Int[],Destination=Union{Missing,Int}[],Quantity=Float64[],Unit=String[],SequenceID=Int[])
+_empty_edges() = DataFrame(LedgerID=Int[],Source=Int[],Destination=Union{Missing,Int}[],Quantity=Float64[],Unit=String[],RowID=Int[],Kind=Int[],SequenceID=Int[])
 
-_edge_key(r) = (r.LedgerID,r.Source,r.Destination,r.Quantity,r.Unit)
+_edge_key(r) = (r.Kind,r.RowID)
+
+# the rows of a closure in replay order: by slot, then ledger entry, then the order they were recorded in
+function _replay_order(rows::DataFrame)
+    isempty(rows) && return rows
+    return rows[sortperm(collect(zip(rows.SequenceID,rows.LedgerID,rows.Kind,rows.RowID))),:]
+end
 
 # the rows of `rows` not seen before, which are added to `seen`
 function _unseen!(seen::Set,rows::DataFrame)
@@ -116,15 +127,14 @@ function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,endi
     end
     x = reduce(vcat,core)
     wells = unique!(Int[x.Source; collect(skipmissing(x.Destination))])
-    in_core = Set{Int}(x.LedgerID)
+    in_core = Set{Tuple{Int,Int}}(zip(x.Kind,x.RowID))
     collateral = _closure_edges(wells,:out,starting,ending,t)
-    collateral = collateral[[!(l in in_core) for l in collateral.LedgerID],:]
+    collateral = collateral[[!((k,r) in in_core) for (k,r) in zip(collateral.Kind,collateral.RowID)],:]
     x[!,:Core] .= 1
     collateral[!,:Core] .= 0
     all_rows = vcat(x,collateral)
-    # one row per ledger entry (a core row wins), oldest first
-    all_rows = all_rows[sortperm(all_rows.SequenceID;alg=MergeSort),:]
-    all_rows = unique(all_rows,:LedgerID)
+    # every transfer of an entry is kept (a row found as core is not repeated as collateral), oldest first
+    all_rows = _replay_order(all_rows)
     return select(all_rows,:LedgerID,:Source,:Destination,:Quantity,:Unit,:Core,:SequenceID)
 end
 
@@ -145,8 +155,8 @@ function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,en
     _use_global(encumbrances,length(locs)) && return _get_transfer_descendents_global(locs,starting,ending,time;encumbrances=encumbrances)
     t = db_time(time)
     raw(column,wells) = _vcat_or(DataFrame[query_db("""
-            SELECT LedgerID, Source, Destination, Quantity, Unit FROM Transfers WHERE $column IN $(_marks(length(chunk)))""",Tuple(chunk))
-        for chunk in Iterators.partition(wells,_id_chunk)],DataFrame(LedgerID=Int[],Source=Int[],Destination=Int[],Quantity=Float64[],Unit=String[]))
+            SELECT LedgerID, Source, Destination, Quantity, Unit, ID AS RowID, 0 AS Kind FROM Transfers WHERE $column IN $(_marks(length(chunk)))""",Tuple(chunk))
+        for chunk in Iterators.partition(wells,_id_chunk)],DataFrame(LedgerID=Int[],Source=Int[],Destination=Int[],Quantity=Float64[],Unit=String[],RowID=Int[],Kind=Int[]))
     seeds = unique(locs)
     seen = Set{Any}()
     found = DataFrame[]
@@ -172,7 +182,6 @@ function get_transfer_descendents(locs::Vector{<:Integer},starting::Integer=0,en
     x[!,:EncumbranceID] .= 0
     out = innerjoin(x,visible;on=:LedgerID=>:ID)
     out[!,:ID] = out.LedgerID
-    out = select(out,:LedgerID,:EncumbranceID,:Source,:Destination,:Quantity,:Unit,:ID,:SequenceID,:Time)
-    out = unique(out)
-    return out[sortperm(out.SequenceID;alg=MergeSort),:]
+    out = _replay_order(out)
+    return select(out,:LedgerID,:EncumbranceID,:Source,:Destination,:Quantity,:Unit,:ID,:SequenceID,:Time)
 end

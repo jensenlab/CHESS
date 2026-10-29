@@ -57,6 +57,7 @@ include("./validation_and_repair/cache_repair.jl")
 include("./validation_and_repair/validation.jl")
 
 # ledger updates
+include("./ticks.jl")
 include("./update_operation.jl")
 include("./location_queries.jl")
 # observations
@@ -100,6 +101,7 @@ export cache , get_location_info
 #reconstruct_location.jl
 export reconstruct_location,reconstruct_location!,ReconstructionReport
 export reconstruct_history, history_value_at
+export upload_tick, update_tick, audit_ticks, check_tick, tick_rule_enforcement!, operation_classes, tick_operations
 #reconstruct_contents.jl
 export reconstruct_contents, reconstruct_contents!
 #reconstruct_parent.jl
@@ -130,6 +132,9 @@ function __init__()
     mode = Symbol(get(ENV,"CHESS_RECONSTRUCTION","local"))
     mode in (:local,:legacy) || error("CHESS_RECONSTRUCTION must be \"local\" or \"legacy\", not \"$mode\"")
     reconstruction_mode[] = mode
+    rule = lowercase(get(ENV,"CHESS_TICK_RULE","on"))
+    rule in ("on","off") || error("CHESS_TICK_RULE must be \"on\" or \"off\", not \"$rule\"")
+    tick_rule_enforced[] = rule == "on"
 end
 
 end # module CHESSDatabase

@@ -75,6 +75,7 @@ function upload(fun::Function,args...;ledger_id::Union{Integer,Nothing}=nothing,
         l_id = isnothing(ledger_id) ? append_ledger() : ledger_id
         fun(args...;instrument=instrument)
         up_fun(args...;ledger_id=l_id,time=time,instrument_id=instrument_id,instrument_time=instrument_time)
+        check_tick(l_id)
         return l_id
     end
     return sql_transaction(upload_transaction)

@@ -22,7 +22,8 @@ any caches it invalidates. Returns the ledger ID the operation was written to.
 
 - `replace=s` records a new revision of the entry at sequence ID `s` (see [`replace_ledger`](@ref)).
   The replacement must be the same kind of operation as the entry it replaces, otherwise an error is
-  thrown.
+  thrown. A slot that holds several operations (see [`upload_tick`](@ref)) is refused: a replacement
+  of one operation would drop the others, so use [`update_tick`](@ref) with the complete set.
 - `insert=s` adds a new entry at sequence ID `s`, moving later entries back by one (see
   [`insert_ledger`](@ref)).
 - With neither, the operation is appended at the end of the ledger.
@@ -52,11 +53,13 @@ function update(fun::Function,args...;replace::Union{Integer,Nothing}=nothing,in
     function update_transaction()
         # allocate the ledger row inside the transaction, so a failure below rolls it back (and, for
         # insert, the renumbering of later entries) instead of leaving an empty revision behind
+        isnothing(replace) || _refuse_multi_operation_slot(replace)
         l_id = !isnothing(replace) ? replace_ledger(replace) :
                !isnothing(insert) ? insert_ledger(insert) :
                isnothing(ledger_id) ? append_ledger() : ledger_id
         fun(args...;instrument=instrument)
         up_fun(args...;ledger_id=l_id, time=time, instrument_id=instrument_id, instrument_time=instrument_time)
+        check_tick(l_id)
         process_update(l_id)
         return l_id
     end
@@ -67,13 +70,14 @@ end
     process_update(ledger_id::Integer)
 
 The checks [`update`](@ref) runs after recording an amendment at `ledger_id`: that a replacement is
-the same kind of operation as the entry it replaces, that the amended history can still be replayed
-(`validate`), and repair of any caches the amendment made stale (`cache_repair`).
+the same kinds of operation as the entry it replaces (an entry can hold several operations, see
+[`upload_tick`](@ref)), that the amended history can still be replayed (`validate`), and repair of any
+caches the amendment made stale (`cache_repair`).
 """
 function process_update(ledger_id::Integer)
         ids=get_all_ledger_ids(get_sequence_id(ledger_id))
         if length(ids) > 1 
-            validate_operation_type(ids[end])==validate_operation_type(ids[end-1]) || error("the new operation is not the same type of operation as the previous one")
+            operation_classes(ids[end])==operation_classes(ids[end-1]) || error("the new operation is not the same type of operation as the previous one")
         end
 
         validate(ledger_id)

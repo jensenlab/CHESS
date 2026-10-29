@@ -36,7 +36,7 @@ The original computes `x`, the least set of rows of `y` that contains the *seeds
 `Source` in `locs`) and, for a row `r` in the set, every row of `y` with `Destination = r.Source`. The
 well set `A` is the sources and destinations of `x`. The *collateral* rows are the rows of `y` with `Source` in
 `A` whose ledger entry is not in `x`. The result is `x` with `Core = 1` and the collateral rows with
-`Core = 0`, one row per ledger entry (a core row wins), ordered by `SequenceID`.
+`Core = 0`, one row per transfer or discard row (rows are identified by table and row ID; a ledger entry can hold several), ordered by `SequenceID`, then ledger entry, then the order recorded.
 
 The rewrite:
 
@@ -45,7 +45,7 @@ The rewrite:
    rows not seen before; repeat until no source is new;
 3. compute `A` from the rows found, fetch `Y(a, out)` for each `a` in `A` and keep the rows whose ledger entry is
    not in `x`;
-4. sort by `SequenceID` and keep one row per ledger entry, a core row before a collateral row.
+4. sort by `SequenceID`, ledger entry and row; a row found as core is not repeated as collateral.
 
 Wells are sent to the database in chunks of 500 (`_id_chunk`).
 
@@ -71,11 +71,11 @@ Wells are sent to the database in chunks of 500 (`_id_chunk`).
   Test: the `Core` split of the ancestors of a well that received from two bottles, passed material on, and
   discarded some.
 - **T5, output.** The original ends with `GROUP BY LedgerID` and `Max(Core)`, so it returns one row per ledger entry
-  with `Core = 1` if any row of the entry is in `x`, ordered by the `SequenceID` of the entry. Step 4 does the same.
-  This assumes that a ledger entry has at most one transfer or discard (a row of `x` and a collateral row of the
-  same entry cannot both be chosen from). That is the assumption of the original and the one the simultaneous ticks
-  of the plan (section 6) revisit.
-  Test: unique ledger IDs, columns, order.
+  with `Core = 1` if any row of the entry is in `x`, ordered by the `SequenceID` of the entry. For an entry with one
+  transfer or discard, step 4 returns the same. The original assumes that an entry has at most one such row; with
+  several (see [ticks](ticks.md)) its `GROUP BY` would drop all but one, so the rewrite and the `:legacy` queries keep
+  every row, identified by table and row ID. The result differs from the original only for such entries.
+  Test: unique rows, columns, order; the multi-row cases of `test_ticks.jl`.
 - **T6, descendants.** The original runs its recursion on all rows of `Transfers`, without the visibility test, and
   joins only the final rows to `ledger_subset`: a transfer that is not visible (outside the window, superseded, or
   written after `time`) still leads to wells whose own visible transfers are returned. The rewrite follows the

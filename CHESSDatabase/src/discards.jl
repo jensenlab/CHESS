@@ -64,17 +64,16 @@ end
 """
 isa_discard(ledger_id::Integer) = nrow(query_db("SELECT 1 FROM Discards WHERE LedgerID = ?",(ledger_id,))) > 0
 
+# the source of every discard recorded under `ledger_id`
 function get_discard_source(ledger_id::Integer)
-    out=query_db("SELECT Source FROM Discards WHERE LedgerID = ?",(ledger_id,))
-    nrow(out)==1 || error("found $(nrow(out)) discard entries for ledger id $ledger_id")
-    return out[1,"Source"]
+    return Vector{Int}(query_db("SELECT Source FROM Discards WHERE LedgerID = ? ORDER BY ID",(ledger_id,)).Source)
 end
 
 function validate_discard(ledger_id::Integer;encumbrances=false)
-    src=get_discard_source(ledger_id)
+    src=unique(get_discard_source(ledger_id))
     seq_id=get_sequence_id(ledger_id)
     # replaying from this entry on fails if the amended history withdraws more than a well holds
-    reconstruct_contents(src,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances)
+    isempty(src) || reconstruct_contents(src,get_last_sequence_id(),Dates.now(),seq_id;encumbrances=encumbrances)
     return nothing
 end
 
@@ -82,6 +81,6 @@ end
 # the wells downstream of them
 function repair_discard_caches(ledger_id::Integer)
     sequence_id=get_sequence_id(ledger_id)
-    sources=unique(get_discard_source.(filter(isa_discard,get_all_ledger_ids(sequence_id))))
+    sources=unique(reduce(vcat,get_discard_source.(get_all_ledger_ids(sequence_id));init=Int[]))
     repair_content_caches(Vector{Int}(sources),sequence_id)
 end

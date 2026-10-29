@@ -33,15 +33,7 @@ function repair_environment_attribute_caches(participants::Vector{<:Integer},seq
 end
 
 
+# the location of every row of EnvironmentAttributes recorded under `ledger_id`
 function get_environment_attribute_participant(ledger_id::Integer)
-        x="SELECT LedgerID,LocationID FROM EnvironmentAttributes WHERE LedgerID = $ledger_id"
-        out=query_db(x) 
-
-        if nrow(out)==1 
-            return out[1,"LocationID"]
-        elseif nrow(out)==0 
-            error("found no environment attribute entries for ledger id $ledger_id ")
-        elseif nrow(out)> 1 
-            error("found multiple environment attribute entries for ledger id $ledger_id")
-        end 
-    end 
+    return Vector{Int}(query_db("SELECT LocationID FROM EnvironmentAttributes WHERE LedgerID = ? ORDER BY ID",(ledger_id,)).LocationID)
+end

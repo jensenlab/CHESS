@@ -44,18 +44,8 @@ end
 
 
 
+# the (source, destination) of every transfer recorded under `ledger_id`, in the order they were recorded
 function get_transfer_participants(ledger_id::Integer)
-    x="SELECT LedgerID,Source,Destination,Quantity,Unit FROM Transfers WHERE LedgerID = $ledger_id"
-    out=query_db(x) 
-    if nrow(out)==1 
-        return out[1,"Source"],out[1,"Destination"]
-    elseif nrow(out)==0 
-        error("found no transfer entries for ledger id $ledger_id ")
-    elseif nrow(out)> 1 
-        error("found multiple transfer entries for ledger id $ledger_id")
-    end 
-end 
-
-
-
-
+    out=query_db("SELECT Source,Destination FROM Transfers WHERE LedgerID = ? ORDER BY ID",(ledger_id,))
+    return Tuple{Int,Int}[(r.Source,r.Destination) for r in eachrow(out)]
+end

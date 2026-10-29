@@ -93,7 +93,7 @@ function trace_contents(location_id::Integer,sequence_id::Integer=get_last_seque
 
     events = vcat([(row.SequenceID,:transfer,row) for row in eachrow(transfers)],
                   [(row.SequenceID,:observation,row) for row in eachrow(observations)])
-    sort!(events;by=first)
+    sort!(events;by=first,alg=MergeSort) # stable: events of one slot keep the order of the closure
     for (_,kind,row) in events
         quant = row.Quantity*_parse_unit(row.Unit)
         if kind === :observation

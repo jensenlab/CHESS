@@ -60,14 +60,8 @@ end
 
 
 
+# the (parent, child) of every movement recorded under `ledger_id` (the parent is `missing` for a removal)
 function get_movement_participants(ledger_id::Integer)
-    x="SELECT LedgerID,Parent,Child FROM Movements WHERE LedgerID = $ledger_id"
-    out=query_db(x) 
-    if nrow(out)==1 
-        return out[1,"Parent"],out[1,"Child"]
-    elseif nrow(out)==0 
-        error("found no movement entries for ledger id $ledger_id ")
-    elseif nrow(out)> 1 
-        error("found multiple movement entries for ledger id $ledger_id")
-    end 
-end 
+    out=query_db("SELECT Parent,Child FROM Movements WHERE LedgerID = ? ORDER BY ID",(ledger_id,))
+    return Tuple{Union{Missing,Int},Int}[(r.Parent,r.Child) for r in eachrow(out)]
+end

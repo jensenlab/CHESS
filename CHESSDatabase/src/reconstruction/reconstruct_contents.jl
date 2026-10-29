@@ -169,6 +169,9 @@ whole ledger's history: the *query* still has to look at every collateral edge (
 correctly zeroing out a core well's balance), but no collateral destination ever triggers its own
 expensive reconstruction.
 """
+# the rows of Transfers and Discards, each with the ID of the row and its table (0 a transfer, 1 a discard)
+const _transfer_rows = "(SELECT LedgerID,Source,Destination,Quantity,Unit,ID AS RowID,0 AS Kind FROM Transfers UNION ALL SELECT LedgerID,Source,NULL AS Destination,Quantity,Unit,ID AS RowID,1 AS Kind FROM Discards)"
+
 function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
@@ -227,33 +230,35 @@ function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Intege
          -- encumbrance branch does: a transfer after `ending` must not pull its source into the
          -- closure, or that source's earlier outgoing transfers come back as collateral rows
          -- for a well that was never bootstrapped.
-         y (LedgerID,Source,Destination,Quantity,Unit)
-        AS(SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit
-            FROM $(transfer_events) t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
+         -- RowID and Kind identify the row itself (a ledger entry can hold several transfers), so that
+         -- the result keeps every row of a tick instead of one per ledger entry
+         y (LedgerID,Source,Destination,Quantity,Unit,RowID,Kind)
+        AS(SELECT t.LedgerID,t.Source,t.Destination,t.Quantity,t.Unit,t.RowID,t.Kind
+            FROM $(_transfer_rows) t INNER JOIN ledger_subset l ON t.LedgerID = l.ID),
 
-         x (LedgerID,Source,Destination,Quantity,Unit)
+         x (LedgerID,Source,Destination,Quantity,Unit,RowID,Kind)
         AS(
-        SELECT y.LedgerID, Source,Destination,y.Quantity,y.Unit
+        SELECT y.LedgerID, Source,Destination,y.Quantity,y.Unit,y.RowID,y.Kind
             FROM y
             WHERE Destination in $entry OR Source in $entry
         UNION
-        SELECT y.LedgerID,y.Source,y.Destination,y.Quantity,y.Unit
+        SELECT y.LedgerID,y.Source,y.Destination,y.Quantity,y.Unit,y.RowID,y.Kind
             FROM y ,x
             WHERE x.Source = y.Destination
         ),
         ancestor_wells (LocationID) AS (
             SELECT Source FROM x UNION SELECT Destination FROM x
         ),
-        full_set (LedgerID,Source,Destination,Quantity,Unit,Core) AS (
+        full_set (LedgerID,Source,Destination,Quantity,Unit,RowID,Kind,Core) AS (
             SELECT *, 1 FROM x
             UNION
-            SELECT y.LedgerID, Source, Destination, y.Quantity, y.Unit, 0
+            SELECT y.LedgerID, Source, Destination, y.Quantity, y.Unit, y.RowID, y.Kind, 0
                 FROM y INNER JOIN ancestor_wells ON y.Source = ancestor_wells.LocationID
-                WHERE NOT EXISTS (SELECT 1 FROM x WHERE x.LedgerID = y.LedgerID)
+                WHERE NOT EXISTS (SELECT 1 FROM x WHERE x.RowID = y.RowID AND x.Kind = y.Kind)
         )
         SELECT full_set.LedgerID,Source,Destination,Quantity,Unit,Max(Core) AS Core,ledger_subset.SequenceID
             FROM full_set INNER JOIN ledger_subset ON full_set.LedgerID = ledger_subset.ID
-            GROUP BY full_set.LedgerID ORDER BY ledger_subset.SequenceID
+            GROUP BY full_set.Kind, full_set.RowID ORDER BY ledger_subset.SequenceID, full_set.LedgerID, full_set.Kind, full_set.RowID
         """
 
     end
@@ -304,17 +309,18 @@ function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Inte
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ) ,
 
-         x (LedgerID,EncumbranceID,Source,Destination,Quantity,Unit)
+         x (LedgerID,EncumbranceID,Source,Destination,Quantity,Unit,RowID)
         AS(
-        SELECT Transfers.LedgerID,0, Source,Destination,Transfers.Quantity,Transfers.Unit
+        SELECT Transfers.LedgerID,0, Source,Destination,Transfers.Quantity,Transfers.Unit,Transfers.ID
             FROM Transfers
             WHERE Destination in $entry OR Source in $entry
         UNION
-        SELECT t.LedgerID,0,t.Source,t.Destination,t.Quantity,t.Unit
+        SELECT t.LedgerID,0,t.Source,t.Destination,t.Quantity,t.Unit,t.ID
             FROM Transfers t  ,x
             WHERE t.Source = x.Destination
         )
-        SELECT DISTINCT  * FROM x INNER JOIN ledger_subset ON x.LedgerID = ledger_subset.ID  ORDER BY SequenceID
+        SELECT x.LedgerID,x.EncumbranceID,x.Source,x.Destination,x.Quantity,x.Unit,ledger_subset.ID,ledger_subset.SequenceID,ledger_subset.Time
+            FROM x INNER JOIN ledger_subset ON x.LedgerID = ledger_subset.ID  ORDER BY ledger_subset.SequenceID, x.LedgerID, x.RowID
         """
 
     end 
@@ -490,22 +496,27 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
     end
 
-    #start simulation: transfers and observations in sequence order. An observation never shares a
-    # SequenceID with a transfer (each is its own ledger entry), so the relative order of equal keys
-    # doesn't matter.
+    #start simulation: transfers and observations in sequence order. A tick holds several transfers only in
+    # data written before the rule of simultaneous ticks (ticks.jl): they are applied one after the other, in the
+    # order the closure returns them (the order they were recorded in), each on the result of the one before, so
+    # none is lost. The sort is stable, so transfers come before the observations of the same slot.
     events=vcat([(row.SequenceID,row) for row in eachrow(transfers)],
                 [(key.SequenceID,rows) for (key,rows) in pairs(groupby(observations,[:LocationID,:SequenceID];sort=false))])
-    sort!(events;by=first)
+    sort!(events;by=first,alg=MergeSort)
 
+    # (location, slot) pairs that an event of this replay has already changed: a later event of the same slot
+    # continues from that state instead of the state before the slot
+    touched=Set{Tuple{Int,Int}}()
     for (_,row) in events
         if !(row isa DataFrameRow)
             isnothing(trace) || (trace[(Int(row[1,:LocationID]),Int(row[1,:SequenceID]))] = ("observe_components",Int(row[1,:LedgerID])))
-            _apply_content_observations!(all_locs,row)
+            _apply_content_observations!(all_locs,row;touched=touched)
             continue
         end
         seq_id=row.SequenceID -1
+        src_seq=(Int(row.Source),Int(row.SequenceID)) in touched ? row.SequenceID : seq_id
         quant= row.Quantity * _parse_unit(row.Unit)
-        src = find_most_recent_location(all_locs,row.Source,seq_id)
+        src = find_most_recent_location(all_locs,row.Source,src_seq)
 
         if row.Core == 0 || ismissing(row.Destination) # a discard has no destination to track
             # Collateral: this row exists only so a *core* location's balance is correctly reduced
@@ -515,14 +526,16 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
             new_src = deepcopy(src)
             withdraw!(new_src,quant)
             push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
+            push!(touched,(Int(row.Source),Int(row.SequenceID)))
             isnothing(trace) || (trace[(Int(row.Source),Int(row.SequenceID))] = (ismissing(row.Destination) ? "discard" : "transfer out",Int(row.LedgerID)))
             continue
         end
 
-        dest = find_most_recent_location(all_locs,row.Destination,seq_id)
+        dest = find_most_recent_location(all_locs,row.Destination,(Int(row.Destination),Int(row.SequenceID)) in touched ? row.SequenceID : seq_id)
         new_src,new_dest=_reconstruction_transfer(src,dest,quant)
         push_location!(all_locs,CHESSCore.location_id(dest),seq_id+1,new_dest)
         push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
+        push!(touched,(Int(row.Destination),Int(row.SequenceID)),(Int(row.Source),Int(row.SequenceID)))
         if !isnothing(trace)
             trace[(Int(row.Destination),Int(row.SequenceID))] = ("transfer in",Int(row.LedgerID))
             trace[(Int(row.Source),Int(row.SequenceID))] = ("transfer out",Int(row.LedgerID))
@@ -596,22 +609,24 @@ function _get_content_observations_global(locs::Vector{<:Integer},starting::Inte
             )
         SELECT o.LedgerID,l.SequenceID,o.LocationID,o.ComponentID,o.Quantity,o.Unit
             FROM ObservedComponents o INNER JOIN ledger_subset l ON o.LedgerID = l.ID WHERE o.LocationID IN $entry
-        ORDER BY SequenceID
+        ORDER BY SequenceID, o.ID
         """)
 end
 
 """
-    _apply_content_observations!(all_locs, rows)
+    _apply_content_observations!(all_locs, rows; touched=nothing)
 
 Replay one location's observations at one sequence point (`rows` share a `LocationID` and
 `SequenceID`) on top of its most recent reconstructed state, and record the result at that sequence
 point. Skipped when that location's state is only known from a point at or after the observation --
-a cache written there already reflects it.
+a cache written there already reflects it. `touched` is the set of `(location, slot)` pairs that earlier events of the
+same replay changed; a location in it continues from the state those left at `seq_id`, not from the state before it.
 """
-function _apply_content_observations!(all_locs,rows)
+function _apply_content_observations!(all_locs,rows;touched=nothing)
     loc_id=rows[1,:LocationID]
     seq_id=rows[1,:SequenceID]
-    entry=find_most_recent_entry(all_locs,loc_id,seq_id-1)
+    after_same_slot = !isnothing(touched) && (Int(loc_id),Int(seq_id)) in touched
+    entry=find_most_recent_entry(all_locs,loc_id,after_same_slot ? seq_id : seq_id-1)
     isnothing(entry) && return nothing
     loc=deepcopy(entry[2])
     for row in eachrow(rows)
@@ -619,5 +634,6 @@ function _apply_content_observations!(all_locs,rows)
         loc.stock=set_component(CHESSCore.stock(loc),get_component(row.ComponentID),quant)
     end
     push_location!(all_locs,loc_id,seq_id,loc)
+    isnothing(touched) || push!(touched,(Int(loc_id),Int(seq_id)))
     return nothing
 end

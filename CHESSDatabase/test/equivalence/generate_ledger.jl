@@ -10,7 +10,8 @@
 # refuses (a locked plate that cannot move, an overfull well) is skipped and recorded as not executed.
 #
 # What it produces: a lab tree (rooms, incubators with shelves, plates, reservoir bottles, a plate reader),
-# environment series, reads sharing a tick, transfers (chains and shared reservoirs, one hub), movements and
+# environment series, reads, environment samples, mixed and observation ticks sharing one tick (written with
+# upload_tick and replaced as a whole with update_tick; the rule of simultaneous ticks holds), transfers (chains and shared reservoirs, one hub), movements and
 # removals, locks, activity, instrument settings, observations, caches, encumbrances, replace amendments
 # (also of old slots) and mid-ledger inserts. Lots and discards are not part of this version of CHESS.
 # Afterwards Ledger.Time (and the Time of cache rows) is rewritten to a synthetic clock, optionally with a
@@ -24,6 +25,7 @@ const EQV_CLOCK_ORIGIN = 1.7e9    # Ledger.Time of row ID 0 on the synthetic clo
 const EQV_OP_WEIGHTS = [
     :setattr=>30, :envtick=>6, :move=>9, :remove=>3, :lock=>4, :activity=>4, :transfer=>20, :readtick=>9,
     :setting=>2, :observe=>5, :discard=>4, :lot=>2, :unparent=>2, :cache=>3, :replace=>8, :insert=>4, :encumber=>3,
+    :mixtick=>5, :obstick=>4,
 ]
 
 """
@@ -54,11 +56,12 @@ mutable struct EqvWorld
     executed::Dict{Int,Int}                     # recipe number => ledger_id (first row)
     replaceable::Vector{Any}                    # single-operation entries that can be amended
     locations::Vector{Int}                      # every location id, in a fixed order, for picking query points
+    byid::Dict{Int,Any}                         # location id => the object of the pools above
 end
 
 function eqv_setup(rng_seed::Integer)
     w = EqvWorld(Location[],Location[],Location[],Location[],Location[],generate_location(PlateReaderModelX,"eqv reader"),
-        Well[],Well[],Dict{Int,Float64}(),Dict{Int,Int}(),0,Any[],Dict{Int,Int}(),Any[],Int[])
+        Well[],Well[],Dict{Int,Float64}(),Dict{Int,Int}(),0,Any[],Dict{Int,Int}(),Any[],Int[],Dict{Int,Any}())
     lab = generate_location(Lab,"eqv lab")
     w.rooms = Location[generate_location(Room,"eqv room $i") for i in 1:3]
     w.incubators = Location[generate_location(Incubator,"eqv incubator $i") for i in 1:2]
@@ -86,11 +89,39 @@ function eqv_setup(rng_seed::Integer)
     w.protocol_id = upload_protocol(exp_id,"eqv protocol")
     w.locations = vcat(location_id.(w.rooms),location_id.(w.incubators),location_id.(w.shelves),location_id.(w.plates),
         location_id.(w.bottles),location_id(lab),location_id(w.reader),location_id.(w.reservoirs),location_id.(w.wells[1:min(end,30)]))
+    for loc in vcat(w.rooms,w.incubators,w.shelves,w.plates,w.bottles,w.reader,w.reservoirs,w.wells)
+        w.byid[location_id(loc)] = loc
+    end
     return w
 end
 
 _eqv_temp(x) = (10 + round(30x;digits=1))*u"°C"
 _eqv_loc_pool(w) = vcat(w.rooms,w.incubators,w.shelves,w.plates)
+
+# The operations of a tick of several operations, as tuples for upload_tick/update_tick, from a spec (the
+# locations, by id) and the random numbers of the recipe operation. The same spec gives the same set of facts, so a
+# replacement states every operation the tick had.
+function _eqv_tick_ops(w::EqvWorld,spec,op)
+    at(id) = w.byid[id]
+    if spec.type === :env
+        return Tuple[(set_attribute!,at(id),Temperature(_eqv_temp(mod(op.x+0.13t,1.0)))) for (t,id) in enumerate(spec.locs)]
+    elseif spec.type === :mix
+        rd = Absorbance((10+round(80op.x;digits=1))*u"percent",Dates.DateTime(2026,1,1) + Dates.Minute(op.k))
+        return Tuple[(set_attribute!,at(spec.room),Temperature(_eqv_temp(op.x))),
+                     (set_attribute!,at(spec.room),Humidity((20 + round(60op.y;digits=1))*u"percent")),
+                     (set_attribute!,at(spec.shelf),Temperature(_eqv_temp(mod(op.x+0.3,1.0)))),
+                     (record_read!,at(spec.well),rd)]
+    elseif spec.type === :obs
+        return Tuple[(observe!,at(spec.well_a),rgt"water",round(5op.x;digits=2)*u"µL"),
+                     (observe!,at(spec.well_b),rgt"water",round(5op.y;digits=2)*u"µL"),
+                     (observe!,at(spec.plate),:locked,op.flag),
+                     (observe!,at(spec.room),Temperature(_eqv_temp(mod(op.x+0.5,1.0))))]
+    else # :reads
+        t0 = Dates.DateTime(2026,1,1) + Dates.Minute(op.k)
+        return Tuple[(record_read!,at(id),op.flag ? Absorbance((10+round(80mod(op.x+0.07c,1.0);digits=1))*u"percent",t0+Dates.Second(c)) :
+                           ColorimetricResult(op.y < 0.5 ? "Positive" : "Negative")) for (c,id) in enumerate(spec.wells)]
+    end
+end
 
 # Run one recipe operation. Returns the ledger id of the (first) entry written, or nothing when the
 # database refused it.
@@ -103,13 +134,22 @@ function eqv_run_op!(w::EqvWorld,op)
         push!(w.replaceable,(; op.n,kind=:setattr,lid,loc=location_id(loc),attrkind=op.flag ? :Temperature : :Humidity))
         return lid
     elseif k === :envtick       # several samples sharing one tick: distinct (location, attribute)
-        lid = append_ledger()
         pool = vcat(w.rooms,w.incubators,w.shelves)
-        n = 2 + op.i % 3
-        for t in 0:n-1
-            loc = pick_from(pool,op.j+t)
-            upload(set_attribute!,loc,Temperature(_eqv_temp(mod(op.x+0.13t,1.0)));ledger_id=lid)
-        end
+        spec = (; type=:env, locs=[location_id(pick_from(pool,op.j+t)) for t in 0:(1+op.i % 3)])
+        lid = upload_tick(_eqv_tick_ops(w,spec,op)...)
+        push!(w.replaceable,(; op.n,kind=:tick,lid,spec))
+        return lid
+    elseif k === :mixtick       # attributes of two kinds, at a room and a shelf, and a read, in one tick
+        spec = (; type=:mix, room=location_id(pick_from(w.rooms,op.i)), shelf=location_id(pick_from(w.shelves,op.j)),
+                well=location_id(pick_from(w.wells,op.k)))
+        lid = upload_tick(_eqv_tick_ops(w,spec,op)...)
+        push!(w.replaceable,(; op.n,kind=:tick,lid,spec))
+        return lid
+    elseif k === :obstick       # observations of different facts in one tick
+        spec = (; type=:obs, well_a=location_id(pick_from(w.wells,op.j)), well_b=location_id(pick_from(w.wells,op.j+1)),
+                plate=location_id(pick_from(w.plates,op.k)), room=location_id(pick_from(w.rooms,op.i)))
+        lid = upload_tick(_eqv_tick_ops(w,spec,op)...)
+        push!(w.replaceable,(; op.n,kind=:tick,lid,spec))
         return lid
     elseif k === :move
         plate = pick_from(w.plates,op.i)
@@ -159,15 +199,10 @@ function eqv_run_op!(w::EqvWorld,op)
         push!(w.replaceable,(; op.n,kind=:read,lid,loc=location_id(well)))
         return lid
     elseif k === :readtick      # several reads on one tick: the wells of a plate
-        lid = append_ledger()
         plate = pick_from(w.plates,op.i)
-        n = 3 + op.j % 6
-        t0 = Dates.DateTime(2026,1,1) + Dates.Minute(op.k)
-        for (c,x) in enumerate(children(plate)[1:n])
-            rd = op.flag ? Absorbance((10+round(80mod(op.x+0.07c,1.0);digits=1))*u"percent",t0+Dates.Second(c)) :
-                           ColorimetricResult(op.y < 0.5 ? "Positive" : "Negative")
-            upload(record_read!,x,rd;ledger_id=lid,instrument=w.reader)
-        end
+        spec = (; type=:reads, wells=location_id.(children(plate)[1:(3 + op.j % 6)]))
+        lid = upload_tick(_eqv_tick_ops(w,spec,op)...;instrument=w.reader)
+        push!(w.replaceable,(; op.n,kind=:tick,lid,spec))
         return lid
     elseif k === :setting
         return upload_instrument_setting(w.reader,op.flag ? "Gain" : "Filter",op.flag ? round(1+3op.x;digits=2) : "F$(op.i % 4)")
@@ -218,14 +253,12 @@ function eqv_run_op!(w::EqvWorld,op)
         elseif r.kind === :activity
             return update(op.flag ? activate! : deactivate!,reconstruct_location(r.loc);replace=slot)
         elseif r.kind === :read
-            # `update` has no validation for reads yet, so the new revision is written at the level below it
             well = reconstruct_location(r.loc)
             rd = Absorbance((10+round(80op.x;digits=1))*u"percent",Dates.DateTime(2026,1,1) + Dates.Minute(op.k))
-            return CHESSDatabase.sql_transaction() do
-                l = CHESSDatabase.replace_ledger(slot)
-                CHESSDatabase.upload_read(well,rd;ledger_id=l,instrument_id=location_id(w.reader))
-                l
-            end
+            return update(record_read!,well,rd;replace=slot,instrument=w.reader)
+        elseif r.kind === :tick     # the complete set of the tick again, with new values
+            ops = _eqv_tick_ops(w,r.spec,op)
+            return update_tick(ops...;replace=slot,instrument=r.spec.type === :reads ? w.reader : nothing)
         elseif r.kind === :discard
             return update(discard!,reconstruct_location(r.src),0.2u"µL"*(0.9+0.2op.x);replace=slot)
         else
