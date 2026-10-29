@@ -43,6 +43,7 @@ include("./reconstruction/reconstruct_lock.jl")
 include("./reconstruction/reconstruct_activity.jl")
 include("./reconstruction/reconstruct_reads.jl")
 include("./reconstruction/reconstruct_location.jl")
+include("./reconstruction/reconstruct_history.jl")
 include("./reconstruction/local_queries.jl")
 include("./reconstruction/local_closure.jl")
 include("./reconstruction/local_series.jl")
@@ -98,6 +99,7 @@ export commit_location!, release_location
 export cache , get_location_info
 #reconstruct_location.jl
 export reconstruct_location,reconstruct_location!,ReconstructionReport
+export reconstruct_history, history_value_at
 #reconstruct_contents.jl
 export reconstruct_contents, reconstruct_contents!
 #reconstruct_parent.jl
