@@ -170,7 +170,11 @@ end
 _same_row(a::_HRow,b::_HRow) = a.ledger == b.ledger && a.rid == b.rid && a.kind === b.kind && a.slot == b.slot
 
 # the timeline of an own facet over `lo..hi`. With `collapse`, a row that does not change value or unit is left out.
-function _own_timeline(facet::Symbol,name::String,loc::Integer,lo::Integer,hi::Integer,time::DateTime;collapse::Bool=true)
+function _own_timeline(facet::Symbol,name::String,loc::Integer,lo::Integer,hi::Integer,time::DateTime;collapse::Bool=true,encumbrances::Bool=false)
+    if encumbrances
+        protocols = _planned_protocols(facet,name,loc)
+        isempty(protocols) || return _planned_timeline(facet,name,loc,lo,hi,time,protocols;collapse=collapse)
+    end
     sources = _history_sources(facet,name,loc)
     st = _HState(nothing,nothing)
     for src in sources
@@ -228,10 +232,11 @@ function _row_in_force(rows::Vector{_HRow},pos::Vector{Int},p::Int)
 end
 
 # the effective value of the attribute `name` of `loc` over `lo..hi`
-function _effective_timeline(name::String,loc::Integer,lo::Integer,hi::Integer,time::DateTime,depth::Integer)
+function _effective_timeline(name::String,loc::Integer,lo::Integer,hi::Integer,time::DateTime,depth::Integer;encumbrances::Bool=false,members=nothing)
     depth > _HISTORY_MAX_DEPTH && throw(ErrorException("the parent chain of location $loc is deeper than $_HISTORY_MAX_DEPTH or has a cycle"))
-    own = _own_timeline(:attribute,name,loc,lo,hi,time)
-    par = _own_timeline(:parent,"",loc,lo,hi,time)
+    members === nothing || push!(members,Int(loc))
+    own = _own_timeline(:attribute,name,loc,lo,hi,time;encumbrances=encumbrances)
+    par = _own_timeline(:parent,"",loc,lo,hi,time;encumbrances=encumbrances)
     ownpos = [max(r.slot,lo) for r in own]
     parpos = [max(r.slot,lo) for r in par]
     subs = Vector{Vector{_HRow}}(undef,length(par))
@@ -243,7 +248,7 @@ function _effective_timeline(name::String,loc::Integer,lo::Integer,hi::Integer,t
         if ismissing(q) || istart > iend
             subs[j] = _HRow[]
         else
-            subs[j] = _effective_timeline(name,Int(q),istart,iend,time,depth + 1)
+            subs[j] = _effective_timeline(name,Int(q),istart,iend,time,depth + 1;encumbrances=encumbrances,members=members)
         end
         subpos[j] = [max(r.slot,istart) for r in subs[j]]
     end
@@ -302,12 +307,15 @@ end
 # once for each stretch that starts at a cache of the well (the newest cache at or before `lo`, then every cache in
 # `(lo, hi]`), because a replay from a cache is what `reconstruct_contents` does for the slots after it. The snapshots the
 # replay records for the well are the rows. A location that is not a well has no contents and no rows.
-function _contents_timeline(loc::Integer,lo::Integer,hi::Integer,time::DateTime;collapse::Bool=true,max_closure=nothing)
+function _contents_timeline(loc::Integer,lo::Integer,hi::Integer,time::DateTime;collapse::Bool=true,max_closure=nothing,encumbrances::Bool=false)
     name,t = get_location_info(loc)
     t(loc,name) isa CHESSCore.Well || return _HRow[_hvirtual(loc)]
     if !isnothing(max_closure)
-        rows = nrow(get_transfer_ancestors([Int(loc)],0,hi,time))
+        rows = nrow(get_transfer_ancestors([Int(loc)],0,hi,time;encumbrances=encumbrances))
         rows > max_closure && throw(ArgumentError("the transfer ancestry of location $loc has $rows rows, more than max_closure=$max_closure"))
+    end
+    if encumbrances && _planned_contents_touch(loc,hi,time)
+        return _planned_contents_timeline(loc,lo,hi,time;collapse=collapse)
     end
     caches = get_content_caches(loc,0,hi,time)
     cache_slots = Int.(caches.SequenceID)
@@ -413,7 +421,11 @@ time of the read.
    a page needs is read.
 6) `collapse`: with `true` (the default) a row is kept only if its `Value`, `Unit` or `Origin` differs from the row
    before it. `false` keeps every event and cache row of an own facet (an effective history is always collapsed).
-7) `encumbrances`: planned operations are not included yet; `true` throws an `ArgumentError`.
+7) `encumbrances`: with `true` the history includes the planned (encumbered) operations of the enforced protocols, as
+   the `reconstruct_*` functions do with `encumbrances=true`. A planned operation takes effect at the slot of the
+   ledger entry that enforces its protocol, and it hides every real change to the same key after that, as in the
+   reconstruction. Rows it produces have an `Event` starting with `planned`. Reads, lots and instrument settings have
+   no planned operations. See `docs/history.md`.
 8) `max_closure`: for `:contents`, throw an `ArgumentError` when the transfer ancestry of the well has more rows than this.
 
 The value at every slot equals the value of the matching `reconstruct_*` at that slot and `time`.
@@ -421,7 +433,6 @@ The value at every slot equals the value of the matching `reconstruct_*` at that
 function reconstruct_history(location_id::Integer,facet;from::Integer=0,to::Union{Integer,Nothing}=nothing,time::DateTime=Dates.now(),
         effective::Union{Bool,Nothing}=nothing,order::Symbol=:asc,limit::Union{Integer,Nothing}=nothing,after=nothing,
         collapse::Bool=true,encumbrances::Bool=false,max_closure::Union{Integer,Nothing}=nothing)
-    encumbrances && throw(ArgumentError("reconstruct_history does not include planned (encumbered) operations yet"))
     order in (:asc,:desc) || throw(ArgumentError("order must be :asc or :desc, got $(repr(order))"))
     isnothing(limit) || limit >= 1 || throw(ArgumentError("limit must be at least 1"))
     kind,name = _resolve_facet(facet)
@@ -431,12 +442,12 @@ function reconstruct_history(location_id::Integer,facet;from::Integer=0,to::Unio
     isnothing(after) || after isa Integer || throw(ArgumentError("after must be a SequenceID"))
     if kind === :contents
         something(effective,false) && throw(ArgumentError("only an attribute has an effective history (effective=false for :contents)"))
-        timeline = (lo,hi) -> _contents_timeline(location_id,lo,hi,time;collapse=collapse,max_closure=max_closure)
+        timeline = (lo,hi) -> _contents_timeline(location_id,lo,hi,time;collapse=collapse,max_closure=max_closure,encumbrances=encumbrances)
         return _history_frame(_history_pages(timeline,from,to,order,limit,after),kind)
     end
     eff = something(effective,kind === :attribute)
     eff && kind !== :attribute && throw(ArgumentError("only an attribute has an effective history (effective=false for :$kind)"))
-    timeline = (lo,hi) -> eff ? _effective_timeline(name,location_id,lo,hi,time,0) : _own_timeline(kind,name,location_id,lo,hi,time;collapse=collapse)
+    timeline = (lo,hi) -> eff ? (encumbrances ? _effective_planned(name,location_id,lo,hi,time) : _effective_timeline(name,location_id,lo,hi,time,0)) : _own_timeline(kind,name,location_id,lo,hi,time;collapse=collapse,encumbrances=encumbrances)
     return _history_frame(_history_pages(timeline,from,to,order,limit,after),kind)
 end
 

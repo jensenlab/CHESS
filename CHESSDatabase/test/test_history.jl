@@ -196,7 +196,8 @@ end
 
 @testset "history: arguments that are refused" begin
     @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:contents;effective=true)
-    @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:Temperature;encumbrances=true)
+    # encumbrances=true is accepted (test_history_encumbrances.jl); nothing planned leaves the history as it is
+    @test isequal(reconstruct_history(hx_id(hx_well),:Temperature;encumbrances=true),reconstruct_history(hx_id(hx_well),:Temperature))
     @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:NoSuchFacet)
     @test_throws ArgumentError reconstruct_history(hx_id(hx_plate),:locked;effective=true)
     @test_throws ArgumentError reconstruct_history(hx_id(hx_well),:Temperature;order=:sideways)

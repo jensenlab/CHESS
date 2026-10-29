@@ -274,6 +274,9 @@ function eqv_run_op!(w::EqvWorld,op)
         else
             return update(op.y < 0.5 ? activate! : deactivate!,loc;insert=slot)
         end
+    elseif k === :enforce       # switch the world's protocol off or on (the planned operations then stop or start to apply)
+        CHESSDatabase.upload_protocol_enforcement(w.protocol_id,op.flag)
+        return get_last_ledger_id()
     elseif k === :encumber
         form = op.i % 4
         pid = w.protocol_id
@@ -310,6 +313,19 @@ function eqv_build(seed::Integer,recipe)
         isnothing(lid) || (w.executed[op.n] = lid; push!(w.log,(op.n,op.kind,lid)))
     end
     return w
+end
+
+"""
+    eqv_planned_recipe(recipe) -> Vector{NamedTuple}
+
+`recipe` with many planned operations: every fifth operation that is a plain write becomes an encumbered one and every
+fourteenth operation switches the enforcement of the world's protocol (`:enforce`, on or off by the operation's `flag`).
+Used by the history checks with planned operations; `eqv_recipe(seed, n)` itself is unchanged, so the ledgers of the
+other checks are the same as before.
+"""
+function eqv_planned_recipe(recipe)
+    return [i % 14 == 0 ? merge(op,(kind=:enforce,)) :
+            (i % 5 == 0 && op.kind in (:setattr,:move,:transfer,:activity,:lock)) ? merge(op,(kind=:encumber,)) : op for (i,op) in enumerate(recipe)]
 end
 
 """

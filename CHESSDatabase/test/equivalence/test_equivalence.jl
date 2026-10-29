@@ -398,6 +398,7 @@ const EQV_HISTORY_SLOTS = get(ENV,"CHESS_EQUIV_HISTORY_SLOTS","2")
 # the fraction of histories that are also read page by page (tiny pages and windows) and without collapse
 const EQV_HISTORY_PAGED = parse(Float64,get(ENV,"CHESS_EQUIV_HISTORY_PAGED","0"))
 const EQV_HISTORY_CONTENTS_SLOTS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_CONTENTS_SLOTS","3"))
+const EQV_HISTORY_ENC = get(ENV,"CHESS_EQUIV_HISTORY_ENC","1") != "0"   # the same property with planned operations (encumbrances=true)
 const EQV_HISTORY_TIMES = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_TIMES","2"))
 const EQV_HISTORY_STATS = Dict{Symbol,Real}(:histories=>0,:rows=>0,:slots=>0,:effective_from_ancestor=>0,:paged=>0,:seconds=>0.0,:build_seconds=>0.0)
 
@@ -427,23 +428,23 @@ function eqv_history_equal(got,unit,want)
 end
 
 # (facet, label, oracle(id, s, time) -> value) for the facets of a location
-function eqv_history_facets(id::Int)
+function eqv_history_facets(id::Int;enc::Bool=false)
     n,t = CHESSDatabase.get_location_info(id)
     blank = t(id,n)
     out = Tuple{Any,String,Function}[]
     for name in ("Temperature","Humidity")
-        push!(out,(Symbol(name),name * " effective",(i,s,tm)->eqv_attr_quantity(CHESSCore.environment(CHESSDatabase.reconstruct_environment(i,s,tm)),name)))
-        push!(out,(Symbol(name),name * " own",(i,s,tm)->eqv_attr_quantity(CHESSCore.attributes(CHESSDatabase.reconstruct_attributes(i,s,tm)),name)))
+        push!(out,(Symbol(name),name * " effective",(i,s,tm)->eqv_attr_quantity(CHESSCore.environment(CHESSDatabase.reconstruct_environment(i,s,tm;encumbrances=enc)),name)))
+        push!(out,(Symbol(name),name * " own",(i,s,tm)->eqv_attr_quantity(CHESSCore.attributes(CHESSDatabase.reconstruct_attributes(i,s,tm;encumbrances=enc)),name)))
     end
-    push!(out,(:parent,"parent",(i,s,tm)->(prt = CHESSCore.parent(CHESSDatabase.reconstruct_parent(i,s,tm)); isnothing(prt) ? missing : location_id(prt))))
-    hasproperty(blank,:is_locked) && push!(out,(:locked,"locked",(i,s,tm)->CHESSCore.is_locked(CHESSDatabase.reconstruct_lock(i,s,tm))))
-    push!(out,(:active,"active",(i,s,tm)->CHESSCore.is_active(CHESSDatabase.reconstruct_activity(i,s,tm))))
+    push!(out,(:parent,"parent",(i,s,tm)->(prt = CHESSCore.parent(CHESSDatabase.reconstruct_parent(i,s,tm;encumbrances=enc)); isnothing(prt) ? missing : location_id(prt))))
+    hasproperty(blank,:is_locked) && push!(out,(:locked,"locked",(i,s,tm)->CHESSCore.is_locked(CHESSDatabase.reconstruct_lock(i,s,tm;encumbrances=enc))))
+    push!(out,(:active,"active",(i,s,tm)->CHESSCore.is_active(CHESSDatabase.reconstruct_activity(i,s,tm;encumbrances=enc))))
     hasproperty(blank,:lot) && push!(out,(:lot,"lot",(i,s,tm)->(l = CHESSDatabase.reconstruct_lot(i,s,tm); isnothing(l) ? missing : "$(l.supplier) $(l.catalog_number) lot $(l.lot)")))
-    blank isa CHESSCore.Well && push!(out,(:contents,"contents",(i,s,tm)->eqv_stock_summary(CHESSCore.stock(CHESSDatabase.reconstruct_contents(i,s,tm)))))
+    blank isa CHESSCore.Well && push!(out,(:contents,"contents",(i,s,tm)->eqv_stock_summary(CHESSCore.stock(CHESSDatabase.reconstruct_contents(i,s,tm;encumbrances=enc)))))
     return out
 end
 
-function eqv_history_setting_facets()
+function eqv_history_setting_facets(;enc::Bool=false)
     names = String.(query_db("SELECT DISTINCT Setting FROM InstrumentSettings").Setting)
     return [((:setting,nm),"setting $nm",(i,s,tm)->(r = CHESSDatabase.get_instrument_settings(i,s,tm); k = findfirst(==(nm),r.Setting); isnothing(k) ? missing : r.Value[k])) for nm in names]
 end
@@ -458,7 +459,21 @@ function eqv_history_slot_sample(rng,h::DataFrame,maxseq::Int)
     return sort!(unique!(filter(s -> 0 <= s <= maxseq,near)))
 end
 
-function eqv_check_history(rng,w::EqvWorld)
+# The locations that planned operations are on: the child of a planned movement, a location with a planned lock, activity
+# or attribute, the destination of a planned transfer, and the wells and plates below them that see the change.
+function eqv_planned_locations(rng,w::EqvWorld)
+    ids = Int[]
+    for (tbl,col) in (("EncumberedMovements","Child"),("EncumberedLocks","LocationID"),("EncumberedActivity","LocationID"),
+                      ("EncumberedEnvironments","LocationID"),("EncumberedTransfers","Destination"))
+        append!(ids,Int.(skipmissing(query_db("SELECT DISTINCT $col AS id FROM $tbl").id)))
+    end
+    # the world's own locations only: the fixture database has planned operations of its own on locations the ledger does not move
+    ids = filter(in(w.locations),unique(ids))
+    n = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_PLANNED","3"))
+    return length(ids) <= n ? ids : rand(rng,ids,n)
+end
+
+function eqv_check_history(rng,w::EqvWorld;enc::Bool=false)
     t_start = time()
     out = EqvHistoryMismatch[]
     maxseq = query_db("SELECT Max(SequenceID) FROM Ledger")[1,1]
@@ -467,22 +482,23 @@ function eqv_check_history(rng,w::EqvWorld)
     ids = Int[location_id(w.wells[1]),location_id(w.shelves[1]),location_id(w.plates[1]),location_id(w.bottles[1])]
     append!(ids,rand(rng,w.locations,max(EQV_HISTORY_LOCS - length(ids),0)))
     !isempty(hot.locations) && push!(ids,rand(rng,hot.locations))
+    enc && append!(ids,eqv_planned_locations(rng,w))
     times = Float64[maxid + 100.0]
     append!(times,isempty(hot.times) ? rand(rng,EQV_HISTORY_TIMES - 1) .* (maxid + 2) : rand(rng,hot.times,EQV_HISTORY_TIMES - 1) .+ rand(rng,(-0.5,0.0,0.5),EQV_HISTORY_TIMES - 1))
     reader = location_id(w.reader)
     for tsec in unique(times)
         tm = eqv_clock_time(tsec)
         for id in unique(ids)
-            for (facet,label,oracle) in eqv_history_facets(id)
+            for (facet,label,oracle) in eqv_history_facets(id;enc=enc)
                 eff = endswith(label,"effective") ? true : (endswith(label,"own") ? false : nothing)
                 t_build = time()
-                h = CHESSDatabase.reconstruct_history(id,facet;from=0,to=maxseq,time=tm,effective=eff)
+                h = CHESSDatabase.reconstruct_history(id,facet;from=0,to=maxseq,time=tm,effective=eff,encumbrances=enc)
                 EQV_HISTORY_STATS[:build_seconds] += time() - t_build
-                eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq)
+                eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq;enc=enc)
                 eff === true && any(!=(id),h.Origin) && (EQV_HISTORY_STATS[:effective_from_ancestor] += 1)
             end
         end
-        for (facet,label,oracle) in eqv_history_setting_facets()
+        enc || for (facet,label,oracle) in eqv_history_setting_facets()   # instrument settings have no planned operations
             h = CHESSDatabase.reconstruct_history(reader,facet;from=0,to=maxseq,time=tm)
             eqv_history_check!(out,rng,h,reader,label,oracle,tm,tsec,maxseq)
         end
@@ -492,13 +508,13 @@ function eqv_check_history(rng,w::EqvWorld)
 end
 
 # all the pages of a history, with windows that start small so that every page spans several of them
-function eqv_history_pages(id,facet,tm,maxseq,eff,order,limit)
+function eqv_history_pages(id,facet,tm,maxseq,eff,order,limit;enc::Bool=false)
     old = (CHESSDatabase._HISTORY_FIRST_WINDOW[],CHESSDatabase._HISTORY_GROWTH[])
     CHESSDatabase._HISTORY_FIRST_WINDOW[] = 3; CHESSDatabase._HISTORY_GROWTH[] = 2
     try
         pages = DataFrame[]; after = nothing
         while true
-            pg = CHESSDatabase.reconstruct_history(id,facet;from=0,to=maxseq,time=tm,effective=eff,order=order,limit=limit,after=after)
+            pg = CHESSDatabase.reconstruct_history(id,facet;from=0,to=maxseq,time=tm,effective=eff,order=order,limit=limit,after=after,encumbrances=enc)
             nrow(pg) == 0 && break
             push!(pages,pg)
             after = pg.SequenceID[end]
@@ -521,7 +537,7 @@ end
 
 eqv_same_frame(a::DataFrame,b::DataFrame) = nrow(a) == nrow(b) && all(isequal(a[!,c],b[!,c]) for c in names(b))
 
-function eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq)
+function eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq;enc::Bool=false)
     EQV_HISTORY_STATS[:histories] += 1
     EQV_HISTORY_STATS[:rows] += nrow(h)
     # a history is ordered, and has at most one row for a slot
@@ -529,14 +545,14 @@ function eqv_history_check!(out,rng,h,id,label,oracle,tm,tsec,maxseq)
     if rand(rng) < EQV_HISTORY_PAGED
         f,eff = facet_of(label)
         for order in (rand(rng,Bool) ? (:asc,) : (:desc,))
-            pages = eqv_history_pages(id,f,tm,maxseq,eff,order,2)
+            pages = eqv_history_pages(id,f,tm,maxseq,eff,order,2;enc=enc)
             whole = order === :asc ? h : h[end:-1:1,:]
             # the first row of a window is the state in force at `from`; it is part of the whole history only when it was recorded
             eqv_same_frame(pages,whole) || push!(out,EqvHistoryMismatch(id,label * " paged $order",-1,tsec,pages,whole))
         end
         EQV_HISTORY_STATS[:paged] += 1
         if eff !== true
-            raw = CHESSDatabase.reconstruct_history(id,f;from=0,to=maxseq,time=tm,effective=eff,collapse=false)
+            raw = CHESSDatabase.reconstruct_history(id,f;from=0,to=maxseq,time=tm,effective=eff,collapse=false,encumbrances=enc)
             for s in eqv_history_slot_sample(rng,h,maxseq)
                 a,b = CHESSDatabase.history_value_at(raw,s),CHESSDatabase.history_value_at(h,s)
                 (ismissing(a) && ismissing(b)) || isequal(a,b) || push!(out,EqvHistoryMismatch(id,label * " collapse=false",s,tsec,a,b))
@@ -679,6 +695,13 @@ end
                     @error "history differs from the reconstruction" seed clock nops=EQV_OPS count=length(hist) first_mismatches=hist[1:min(5,end)]
                 end
                 @test isempty(hist)
+                if EQV_HISTORY_ENC
+                    hist_enc = eqv_check_history(Xoshiro(30_000 + seed),w;enc=true)
+                    if !isempty(hist_enc)
+                        @error "history with planned operations differs from the reconstruction" seed clock nops=EQV_OPS count=length(hist_enc) first_mismatches=hist_enc[1:min(5,end)]
+                    end
+                    @test isempty(hist_enc)
+                end
                 total_points[] += length(points)
                 total_checks[] += length(points) * length(EQV_FUNCTION_CHECKS) + cld(length(points),2) * length(EQV_END_TO_END)
                 vis = eqv_check_visibility(rng,EQV_POINTS)

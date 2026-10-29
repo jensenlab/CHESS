@@ -17,7 +17,8 @@ that value equals the one the matching `reconstruct_*` function gives at that sl
 | a read kind | the reads of that kind, by time of the read | `false` only |
 | `:contents` | the `Stock` of a well | `false` only |
 
-`encumbrances=true` throws an `ArgumentError`.
+`encumbrances=true` adds planned operations (see [Planned operations](#Planned-operations)); it applies to every facet except
+`:lot`, instrument settings and reads, which have no planned operations and are unchanged.
 
 ## Columns
 
@@ -61,6 +62,44 @@ The cost is that of `reconstruct_contents` at `to`: it grows with the transfer a
 cache. `max_closure=n` throws an `ArgumentError` when the ancestry has more than `n` rows. An ancestry too large for the
 indexed queries falls back to the whole-ledger queries, as `reconstruct_contents` does.
 
+## Planned operations
+
+`encumbrances=true` returns the history that `reconstruct_*(...; encumbrances=true)` gives at every slot: for every slot
+`s` and every `time`, `history_value_at(history, s)` equals the matching reconstruction with `encumbrances=true`.
+`encumbrances=false` is unchanged.
+
+How the reconstructions treat planned rows, which the history follows:
+
+- A planned row (`EncumberedMovements`, `Locks`, `Activity`, `Environments`, `Transfers`) belongs to a protocol through its
+  encumbrance. It receives the pseudo-slot `get_last_sequence_id() + EncumbranceID`. The pseudo-slot orders planned rows
+  among themselves (the latest wins) and puts them after every real row; it is not a slot of the ledger.
+- Planned rows are not windowed by `sequence_id`. They apply when the newest visible `ProtocolEnforcement` row of the
+  protocol in the query window has `IsEnforced = 1`, and they replace every real value of the same key, including real
+  events that come later. The effect therefore starts at the slot of the enforcement entry and ends at the slot of an entry
+  that switches enforcement off; it can start again at a later entry.
+- The cache getters read the window `[0, max_cache]`, the event getters `[foot, sequence_id]`, where `foot` is the
+  smallest of the newest cache slots in the batch being reconstructed. A planned row is visible only through the event
+  getters, so a cache written after the enforcement entry hides it, and the result for one location can depend on the
+  other locations reconstructed with it. The effective attribute of a location reconstructs its whole parent chain
+  together, so it depends on the smallest foot of the chain.
+
+In the history:
+
+- A key with planned rows is read at the slots at which its value can change: the rows of its sources, its enforcement
+  entries and the first slot. The value at each is that of the reconstruction. Where it equals the row in force, that row is
+  kept. Otherwise a row is written with the event `planned move`, `planned lock`, `planned activity`,
+  `planned set_attribute` or `planned transfer`, the `LedgerID` of the enforcement entry that switched the protocol on and
+  the slot of that entry. Where a planned row stops applying and the key is blank again, the row has the event
+  `planned ended` and the `LedgerID` of the entry that switched enforcement off.
+- Keys without planned rows (the large majority) take the unchanged path.
+- The effective attribute is taken from the whole chain of the location (parents and attribute owners) and is probed with
+  `reconstruct_environment`, so the origin is the location that owns the value in force.
+- A well whose ancestry holds a planned transfer or a planned cache of contents is probed with `reconstruct_contents`.
+- Rows after the last real slot do not exist as such: the pseudo-slot is not a position in the history. A planned operation
+  enforced after the last real slot is a row at the slot of its enforcement entry, which may be the last slot.
+- `collapse=false` skips the merging of rows that leave the value unchanged.
+- Paging and `order=:desc` work as without planned rows.
+
 ## Cost
 
 Every query goes through the indexes; none scans `Ledger` or builds the `ledger_subset` copy. The window is read by
@@ -71,7 +110,6 @@ the benchmark) therefore costs time proportional to its series length, as `lates
 
 ## Not covered
 
-- Planned operations (`encumbrances`).
 - Effective forms of the facets other than attributes.
 - Ties between two events at the same slot are ordered by row id; the reconstruction functions do not define a
   winner there either.

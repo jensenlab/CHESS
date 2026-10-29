@@ -728,6 +728,7 @@ include("test_reconstruct_contents_order.jl")
 include("test_history.jl")
 include("test_unset_cache.jl")
 include("test_history_contents.jl")
+include("test_history_encumbrances.jl")
 include("test_ticks.jl")
 include("test_bulk.jl")
 
