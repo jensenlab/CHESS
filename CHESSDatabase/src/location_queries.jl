@@ -107,7 +107,14 @@ end
 
 # ---------------------------------------------------------------------------- the filter-first path
 
-const _CANDIDATE_LIMIT = 5000    # more candidates than this and one pass over the ledger is cheaper
+# The filter-first path reads the movement and activity history of every candidate (about 1.5 ms each, more for a
+# location with a long history); the one-pass query costs about 0.33 ms per 1000 ledger entries whatever the filter
+# (33 ms at 100k and 65 ms at 200k entries, measured). So the filter-first path pays only while the candidates number
+# fewer than about 2e-4 per ledger entry.
+const _CANDIDATES_PER_LEDGER_ENTRY = Ref(2e-4)
+const _MIN_CANDIDATES = 10
+
+_candidate_limit() = max(_MIN_CANDIDATES,floor(Int,_CANDIDATES_PER_LEDGER_ENTRY[]*get_last_ledger_id()))
 
 _in_marks(chunk) = "(" * join(fill("?",length(chunk)),",") * ")"
 
@@ -126,19 +133,22 @@ end
 # Location ids that include every location matching the filters, chosen through an index, or `nothing` when no
 # filter names few enough locations.
 function _location_candidates(kind,name,parent,barcode,ignorecase)
+    limit = _candidate_limit()
     if !isnothing(barcode)
-        return Int.(query_db("SELECT LocationID FROM Barcodes WHERE Barcode = ?",(string(barcode),)).LocationID |> skipmissing |> collect)
+        ids = Int.(query_db("SELECT LocationID FROM Barcodes WHERE Barcode = ?",(string(barcode),)).LocationID |> skipmissing |> collect)
+        length(ids) <= limit && return ids
     end
     if !isnothing(name) && !ignorecase
-        return Int.(query_db("SELECT ID FROM Locations WHERE Name = ?",(String(name),)).ID)
+        ids = Int.(query_db("SELECT ID FROM Locations WHERE Name = ?",(String(name),)).ID)
+        length(ids) <= limit && return ids
     end
     if !(parent === nothing || ismissing(parent))
         ids = _children_candidates([Int(parent)])
-        length(ids) <= _CANDIDATE_LIMIT && return ids
+        length(ids) <= limit && return ids
     end
     if !isnothing(kind)
         n = query_db("SELECT COUNT(*) AS n FROM Locations WHERE Type = ?",(_kind_name(kind),)).n[1]
-        n <= _CANDIDATE_LIMIT && return Int.(query_db("SELECT ID FROM Locations WHERE Type = ?",(_kind_name(kind),)).ID)
+        n <= limit && return Int.(query_db("SELECT ID FROM Locations WHERE Type = ?",(_kind_name(kind),)).ID)
     end
     return nothing
 end

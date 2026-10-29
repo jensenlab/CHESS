@@ -65,3 +65,57 @@ end
     @test location_id.(locs) == ids
     @test name.(locs) == name.(reconstruct_location.(ids))
 end
+
+@testset "find_locations: the routing threshold changes the path, not the rows" begin
+    per_entry = CHESSDatabase._CANDIDATES_PER_LEDGER_ENTRY
+    old = per_entry[]
+    upload(deactivate!,lq_b2)
+    for i in 1:12
+        upload(move_into!,lq_bench,generate_location(Bottle1L,"lq many $i"))     # more bottles than the minimum limit of 10
+    end
+    parent = location_id(lq_bench)
+    filters = (
+        (kind=:Bottle1L,),
+        (kind=:Bottle1L,active=true),
+        (kind=:Bottle1L,active=false),
+        (kind=:WP96,),
+        (kind=:Room,),
+        (parent=parent,),
+        (parent=parent,kind=:Bottle1L),
+        (parent=parent,active=true),
+        (parent=nothing,kind=:Room),
+        (name="lq plate",),
+        (name="lq plate",kind=:WP96),
+        (name="lq bottle 1",ignorecase=true),
+        (barcode=barcode(lq_bc),),
+        (kind=:Bottle1L,limit=1),
+        (kind=:Bottle1L,limit=1,offset=1))
+    try
+        for f in filters
+            per_entry[] = 0.0      # the minimum limit of 10 candidates
+            low = find_locations(; f...)
+            per_entry[] = 1.0
+            high = find_locations(; f...)
+            global_rows = CHESSDatabase._find_locations_global(; f...)
+            @test isequal(low,high)
+            @test isequal(low,global_rows)
+        end
+        per_entry[] = 0.0
+        @test CHESSDatabase._candidate_limit() == 10
+        per_entry[] = 1.0
+        @test CHESSDatabase._candidate_limit() > 10
+        # the routing itself: a kind of more than the limit goes to the one-pass query, a smaller one stays filter-first
+        n_bottles = query_db("SELECT COUNT(*) AS n FROM Locations WHERE Type = 'Bottle1L'").n[1]
+        @test n_bottles > 10
+        per_entry[] = 0.0
+        @test CHESSDatabase._location_candidates(:Bottle1L,nothing,missing,nothing,false) === nothing       # over the limit: one pass
+        @test CHESSDatabase._location_candidates(nothing,"lq plate",missing,nothing,false) isa Vector{Int}  # under it: filter first
+        @test CHESSDatabase._location_candidates(nothing,nothing,parent,nothing,false) === nothing           # 14 children of the bench
+        per_entry[] = 1.0
+        @test length(CHESSDatabase._location_candidates(:Bottle1L,nothing,missing,nothing,false)) == n_bottles
+        per_entry[] = (n_bottles - 1) / get_last_ledger_id()
+        @test CHESSDatabase._candidate_limit() == max(10,n_bottles - 1)
+    finally
+        per_entry[] = old
+    end
+end
