@@ -732,3 +732,4 @@ include("test_ticks.jl")
 include("test_bulk.jl")
 
 rm(file)
+include("test_deep_chain_routing.jl")
