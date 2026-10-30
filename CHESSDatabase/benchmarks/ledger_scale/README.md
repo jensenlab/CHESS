@@ -23,8 +23,8 @@ where the databases go (outside the repository), `BENCH_OUT` the results folder,
 `BENCH_TARGETS` (targets per query class).
 
 Variants of one database: `noidx` has none of the `idx_chess_*` indexes, `idx` has the set of
-`src/indexes.jl`, `cover` has the same set with the ledger index on `(SequenceID, ID, Time)` instead of
-`(SequenceID, ID)`, and `ledgeronly` has only `Ledger(SequenceID, ID)`, to separate its cost from that of the
+`src/indexes.jl`, `cover` has the set of `src/indexes.jl` (the ledger index on `(SequenceID, ID, Time)`; since decision D3 this is the default set, and `idx` is the same set with the ledger index on
+`(SequenceID, ID)`), and `ledgeronly` has only `Ledger(SequenceID, ID)`, to separate its cost from that of the
 other indexes (it is measured for size and write costs only: `BENCH_SKIP_QUERIES=1`).
 
 The smoke size is 200,000. The 500,000 and 1,000,000 runs belong to the final measurement, not to routine

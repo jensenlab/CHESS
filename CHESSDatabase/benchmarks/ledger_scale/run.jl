@@ -273,9 +273,9 @@ function prepare_variant(variant,base,path)
     if variant in ("noidx","ledgeronly")
         drop_indexes!()
         variant == "ledgeronly" && execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id ON Ledger(SequenceID, ID)")
-    elseif variant == "cover"
-        execute_db("DROP INDEX idx_chess_ledger_sequenceid_id")
-        execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id_time ON Ledger(SequenceID, ID, Time)")
+    elseif variant == "idx"      # the Ledger index as it was before it carried Time (decision D3); "cover" is the set of src/indexes.jl
+        execute_db("DROP INDEX idx_chess_ledger_sequenceid_id_time")
+        execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id ON Ledger(SequenceID, ID)")
         execute_db("PRAGMA optimize(0x10002)")
     end
 end
