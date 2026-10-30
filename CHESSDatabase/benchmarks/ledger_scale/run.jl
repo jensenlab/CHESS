@@ -275,6 +275,7 @@ function prepare_variant(variant,base,path)
         with_logger(NullLogger()) do; connect_SQLite(path); end
         variant == "ledgeronly" && execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id ON Ledger(SequenceID, ID)")
     else
+        CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = typemax(Int)      # the 1M run must be indexed too: connect_SQLite stops adding them at 1M rows
         connect_SQLite(path)                                  # adds the idx_chess_* set below 1M rows
         if variant == "cover"
             execute_db("DROP INDEX idx_chess_ledger_sequenceid_id")
