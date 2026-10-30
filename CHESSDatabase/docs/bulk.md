@@ -8,7 +8,7 @@ A request for a few locations is answered key first: the rows of each location a
 
 - `rows` is the number of rows the keys own in the tables of `kind`, counted through the indexes. The kinds are `:transfers`, `:environment`, `:observations`, `:movements`, `:locks`, `:activity` and `:reads`. Superseded revisions are counted. For `:transfers` only the transfers of the keys themselves are counted, so the estimate is a lower bound for a closure.
 - `path` is `:global` when `rows` exceeds `fraction` of the number of ledger entries, or when `locs` is empty, and `:local` otherwise.
-- `BULK_FRACTION[]` holds the fraction. The value 0.2 is provisional and is to be calibrated by the large-scale benchmark.
+- `BULK_FRACTION[]` holds the fraction. The value is 0.01. The benchmark at 200k, 500k and 1M ledger rows found that the bulk closure costs about the same whatever the request (0.2 to 2 s), while the key-first closure grows with the rows the keys own; they cross at 0.5% to 1.5% of the ledger rows for the ancestors and 1% to 3% for the descendents. Only the transfer closure was calibrated: the other kinds never reach the key limit with enough rows to compare.
 
 Up to `LOCAL_KEY_LIMIT[]` keys (200) always take the local path. Above it the plan decides. Requests for planned operations (`encumbrances=true`) and `reconstruction_mode[] == :legacy` use the original queries as before.
 

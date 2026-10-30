@@ -44,7 +44,8 @@ bk_l7 = upload(transfer!,bk_w[2],bk_w[1],1u"µL")                          # a c
     end
     @test_throws ArgumentError plan_reconstruction([1];kind=:nonsense)
     # the default fraction and the key limit are what the plan says
-    @test BULK_FRACTION[] == 0.2
+    @test BULK_FRACTION[] == 0.01
+    @test plan_reconstruction([bk_id(bk_w[1])]).path === :global   # 5 rows of a ledger this small are over 1%
 end
 
 @testset "bulk: the bulk transfer closure equals the local closure and the original" begin
@@ -84,8 +85,8 @@ end
     ids = [bk_id(r) for r in rooms]
     now_ = Dates.now(); last_ = get_last_sequence_id()
     # one chunk per key and no fallback to the whole-ledger queries
-    old = LOCAL_KEY_LIMIT[]
-    LOCAL_KEY_LIMIT[] = 1
+    old = (LOCAL_KEY_LIMIT[],BULK_FRACTION[])
+    LOCAL_KEY_LIMIT[] = 1; BULK_FRACTION[] = 1.0     # on a ledger this small every request owns more than the default 1%
     try
         @test bk_canon(get_locks(ids,0,last_,now_)) == bk_canon(_get_locks_global(ids,0,last_,now_))
         @test bk_canon(get_activity(ids,0,last_,now_)) == bk_canon(_get_activity_global(ids,0,last_,now_))
@@ -95,7 +96,7 @@ end
         @test bk_canon(get_content_observations(wells,0,last_,now_)) == bk_canon(_get_content_observations_global(wells,0,last_,now_))
         @test !CHESSDatabase._use_global(false,ids;kind=:locks)
     finally
-        LOCAL_KEY_LIMIT[] = old
+        LOCAL_KEY_LIMIT[],BULK_FRACTION[] = old
     end
 end
 

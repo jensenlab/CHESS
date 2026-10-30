@@ -17,9 +17,11 @@ path; they must get an implementation of their own before the legacy queries are
     BULK_FRACTION
 
 `Ref` holding the fraction of the ledger above which [`plan_reconstruction`](@ref) chooses the global path.
-Provisional (0.2); to be calibrated by the large-scale benchmark.
+0.01, from the benchmark at 200k, 500k and 1M ledger rows: the bulk transfer closure costs about the same for
+any request while the key-first closure grows with the rows the keys own, and the two cross at 0.5% to 1.5% of the
+ledger rows for the ancestors (1% to 3% for the descendents). At 0.01 the bulk path is chosen from there on.
 """
-const BULK_FRACTION = Ref(0.2)
+const BULK_FRACTION = Ref(0.01)
 
 # the (table, column) pairs that hold the rows a key owns, per kind of request
 const _PLAN_KEYS = Dict(
