@@ -269,21 +269,15 @@ end
 
 function prepare_variant(variant,base,path)
     cp(base,path;force=true)
-    saved = CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[]
+    with_logger(NullLogger()) do; connect_SQLite(path); end   # adds the idx_chess_* set at any size
     if variant in ("noidx","ledgeronly")
-        CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = 0          # connect_SQLite must not add them
-        with_logger(NullLogger()) do; connect_SQLite(path); end
+        drop_indexes!()
         variant == "ledgeronly" && execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id ON Ledger(SequenceID, ID)")
-    else
-        CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = typemax(Int)      # the 1M run must be indexed too: connect_SQLite stops adding them at 1M rows
-        connect_SQLite(path)                                  # adds the idx_chess_* set below 1M rows
-        if variant == "cover"
-            execute_db("DROP INDEX idx_chess_ledger_sequenceid_id")
-            execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id_time ON Ledger(SequenceID, ID, Time)")
-            execute_db("PRAGMA optimize(0x10002)")
-        end
+    elseif variant == "cover"
+        execute_db("DROP INDEX idx_chess_ledger_sequenceid_id")
+        execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id_time ON Ledger(SequenceID, ID, Time)")
+        execute_db("PRAGMA optimize(0x10002)")
     end
-    CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = saved
 end
 
 function main()
