@@ -10,7 +10,7 @@
 # and a mutation test plants wrong rules and requires the check to catch each of them.
 #
 # Size: CHESS_EQUIV_SEEDS (default 3) seeds, starting at CHESS_EQUIV_SEED_START (default 1), of
-# CHESS_EQUIV_OPS (default 250) operations and CHESS_EQUIV_POINTS (default 40) query points each, so seed 3 is the
+# CHESS_EQUIV_OPS (default 120) operations and CHESS_EQUIV_POINTS (default 30) query points each, so seed 3 is the
 # one with a backward clock. A seed costs about 15 s to generate and 15 s to check, so the default run takes
 # about 100 s. `find_locations(kind, active)` walks every location of a kind one by one and costs as much as all
 # other checks together; the default run does it at every CHESS_EQUIV_KIND_EVERY-th (default 4) point. The
