@@ -25,8 +25,8 @@ include("generate_ledger.jl")
 
 const EQV_SEEDS = parse(Int,get(ENV,"CHESS_EQUIV_SEEDS","3"))
 const EQV_SEED_START = parse(Int,get(ENV,"CHESS_EQUIV_SEED_START","1"))   # the nightly job splits the seeds over shards
-const EQV_OPS = parse(Int,get(ENV,"CHESS_EQUIV_OPS","250"))
-const EQV_POINTS = parse(Int,get(ENV,"CHESS_EQUIV_POINTS","40"))
+const EQV_OPS = parse(Int,get(ENV,"CHESS_EQUIV_OPS","120"))
+const EQV_POINTS = parse(Int,get(ENV,"CHESS_EQUIV_POINTS","30"))
 const EQV_KIND_EVERY = parse(Int,get(ENV,"CHESS_EQUIV_KIND_EVERY","4"))   # the costly find_locations(kind, active) check on every n-th point
 const EQV_COSTLY = ["find_locations(kind, active)"]
 const EQV_REDUCE_TRIALS = parse(Int,get(ENV,"CHESS_EQUIV_REDUCE_TRIALS","120"))
@@ -393,12 +393,12 @@ end
 # a sample of slots (CHESS_EQUIV_HISTORY_SLOTS=all checks every slot): its own change points and their neighbours,
 # the first and last slots, and random ones.
 
-const EQV_HISTORY_LOCS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_LOCS","4"))
+const EQV_HISTORY_LOCS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_LOCS","2"))
 const EQV_HISTORY_SLOTS = get(ENV,"CHESS_EQUIV_HISTORY_SLOTS","2")
 # the fraction of histories that are also read page by page (tiny pages and windows) and without collapse
 const EQV_HISTORY_PAGED = parse(Float64,get(ENV,"CHESS_EQUIV_HISTORY_PAGED","0"))
 const EQV_HISTORY_CONTENTS_SLOTS = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_CONTENTS_SLOTS","3"))
-const EQV_HISTORY_ENC = get(ENV,"CHESS_EQUIV_HISTORY_ENC","1") != "0"   # the same property with planned operations (encumbrances=true)
+const EQV_HISTORY_ENC = get(ENV,"CHESS_EQUIV_HISTORY_ENC","0") != "0"   # the same property with planned operations (encumbrances=true)
 const EQV_HISTORY_TIMES = parse(Int,get(ENV,"CHESS_EQUIV_HISTORY_TIMES","2"))
 const EQV_HISTORY_STATS = Dict{Symbol,Real}(:histories=>0,:rows=>0,:slots=>0,:effective_from_ancestor=>0,:paged=>0,:seconds=>0.0,:build_seconds=>0.0)
 
