@@ -7,7 +7,7 @@ _plan(sql,params=()) = join(query_db("EXPLAIN QUERY PLAN " * sql,params).detail,
 @testset "indexes: create_db, create_indexes!, drop_indexes!" begin
     with_scratch_db() do path
         names = _chess_index_names()
-        @test "idx_chess_ledger_sequenceid_id" in names
+        @test "idx_chess_ledger_sequenceid_id_time" in names
         @test "idx_chess_transfers_source_ledgerid" in names
         @test "idx_chess_environmentattributes_locationid_attribute_ledgerid" in names
         @test length(names) == length(unique(names)) > 30
@@ -36,7 +36,7 @@ end
     with_scratch_db() do path
         drop_indexes!()
         @test_logs (:warn,r"missing .* CHESS indexes") connect_SQLite(path)
-        @test "idx_chess_ledger_sequenceid_id" in _chess_index_names() # created on connect
+        @test "idx_chess_ledger_sequenceid_id_time" in _chess_index_names() # created on connect
         @test_logs connect_SQLite(path) # nothing missing: silent
 
         # a database past the old 1,000,000-row limit (the largest ledger ID is what counts)
@@ -50,6 +50,17 @@ end
     end
 end
 
+@testset "indexes: a database made before the Ledger index carried Time gets the covering index" begin
+    with_scratch_db() do _
+        drop_indexes!()
+        execute_db("CREATE INDEX idx_chess_ledger_sequenceid_id ON Ledger(SequenceID, ID)")
+        @test "idx_chess_ledger_sequenceid_id_time" in create_indexes!(progress=false)
+        names_now = _chess_index_names()
+        @test "idx_chess_ledger_sequenceid_id_time" in names_now && !("idx_chess_ledger_sequenceid_id" in names_now)
+        @test isempty(create_indexes!(progress=false))
+    end
+end
+
 @testset "ledger helpers use Ledger(SequenceID, ID)" begin
     with_scratch_db() do _
         room = generate_location(Room,"idx room")
@@ -58,7 +69,7 @@ end
         end
         last_seq = get_last_sequence_id()
         @test _plan("SELECT SequenceID FROM Ledger WHERE Time <= ? ORDER BY SequenceID DESC LIMIT 1",(1e12,)) ==
-            "SCAN Ledger USING INDEX idx_chess_ledger_sequenceid_id"
+            "SCAN Ledger USING COVERING INDEX idx_chess_ledger_sequenceid_id_time"
         @test occursin(r"INDEX idx_chess_ledger_sequenceid_id",_plan("SELECT ID FROM Ledger WHERE SequenceID = ? AND Time <= ? ORDER BY ID DESC LIMIT 1",(3,1e12)))
         @test occursin(r"INDEX idx_chess_ledger_sequenceid_id",_plan("SELECT 1 FROM Ledger WHERE SequenceID = ? LIMIT 1",(3,)))
 

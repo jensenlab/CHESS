@@ -10,10 +10,11 @@ hand. Every index is named `idx_chess_<table>_<columns>`; `drop_indexes!` remove
 indexes made by other tools (for example the inventory's `idx_perf_*`) are never touched.
 =#
 
-# (table, columns). `Ledger(SequenceID, ID)` serves `get_last_sequence_id`, `visible_ledger_id` and the
-# `visible_join` probe. A column written with parentheses is an expression (the Reads paging index).
+# (table, columns). `Ledger(SequenceID, ID, Time)` serves `get_last_sequence_id`, `visible_ledger_id` and the
+# `visible_join` probe; it carries `Time` so that the lookup of the last slot before a time (`get_last_sequence_id(time)`)
+# is answered from the index alone (38 ms against 8 ms on a million ledger rows, decision D3). A column written with parentheses is an expression (the Reads paging index).
 const CHESS_INDEXES = Tuple{String,Vector{String}}[
-    ("Ledger",["SequenceID","ID"]),
+    ("Ledger",["SequenceID","ID","Time"]),
 
     ("Transfers",["Source","LedgerID"]),
     ("Transfers",["Destination","LedgerID"]),
@@ -128,6 +129,9 @@ function _missing_indexes(db)
     return todo
 end
 
+# the Ledger index before it carried Time; the covering index replaces it
+const _LEGACY_LEDGER_INDEX = "idx_chess_ledger_sequenceid_id"
+
 function _create_indexes!(db;progress::Bool=false)
     todo = _missing_indexes(db)
     t0 = time()
@@ -135,6 +139,10 @@ function _create_indexes!(db;progress::Bool=false)
         t = time()
         DBInterface.execute(db,_index_sql(table,cols))
         progress && println("[$i/$(length(todo))] $(_index_name(table,cols)) ($(round(time()-t;digits=2)) s)")
+    end
+    if _index_name("Ledger",["SequenceID","ID","Time"]) in [_index_name(t,c) for (t,c) in todo] ||
+       nrow(_rows(db,"SELECT 1 FROM sqlite_master WHERE type='index' AND name='$(_index_name("Ledger",["SequenceID","ID","Time"]))'")) > 0
+        DBInterface.execute(db,"DROP INDEX IF EXISTS $_LEGACY_LEDGER_INDEX")
     end
     if !isempty(todo)
         # the planner needs statistics for the new indexes to prefer them; sampled, so cheap on a large database
