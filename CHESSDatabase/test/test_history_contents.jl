@@ -96,6 +96,7 @@ end
     @test_throws ArgumentError reconstruct_history(hc_w_id,:contents;from=hc_s0,max_closure=0)
     @test nrow(reconstruct_history(hc_w_id,:contents;from=hc_s0,max_closure=1000)) > 0
     @test_throws ArgumentError reconstruct_history(hc_w_id,:contents;effective=true)
-    @test_throws ArgumentError reconstruct_history(hc_w_id,:contents;encumbrances=true)
+    # encumbrances=true is accepted; with nothing planned on the well the history is the plain one (test_history_encumbrances.jl)
+    @test isequal(reconstruct_history(hc_w_id,:contents;from=hc_s0,encumbrances=true),reconstruct_history(hc_w_id,:contents;from=hc_s0))
     @test nrow(reconstruct_history(location_id(hc_room),:contents;from=hc_s0)) == 0
 end

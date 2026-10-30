@@ -731,6 +731,7 @@ include("test_history_contents.jl")
 include("test_history_encumbrances.jl")
 include("test_ticks.jl")
 include("test_bulk.jl")
+# defines a recording query_db for the rest of the run, so it is the last file; it runs on the shared database, before it is removed
+include("test_deep_chain_routing.jl")
 
 rm(file)
-include("test_deep_chain_routing.jl")
