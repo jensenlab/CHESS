@@ -32,24 +32,21 @@ _plan(sql,params=()) = join(query_db("EXPLAIN QUERY PLAN " * sql,params).detail,
     end
 end
 
-@testset "indexes: connect_SQLite adds them to a small database and only warns on a large one" begin
+@testset "indexes: connect_SQLite builds them on a database of any size, with a warning" begin
     with_scratch_db() do path
         drop_indexes!()
-        connect_SQLite(path)
+        @test_logs (:warn,r"missing .* CHESS indexes") connect_SQLite(path)
         @test "idx_chess_ledger_sequenceid_id" in _chess_index_names() # created on connect
+        @test_logs connect_SQLite(path) # nothing missing: silent
 
+        # a database past the old 1,000,000-row limit (the largest ledger ID is what counts)
+        execute_db("INSERT INTO Ledger(ID,SequenceID,Time) VALUES (2000000,1999999,1)")
         drop_indexes!()
-        old = CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[]
-        CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = 0 # pretend this is a large database
-        try
-            empty!(CHESSDatabase._warned_unindexed)
-            @test_logs (:warn,r"missing .* CHESS indexes") connect_SQLite(path)
-            @test isempty(_chess_index_names())
-            @test_logs connect_SQLite(path) # warned once per file
-            @test length(create_indexes!(progress=false)) > 30 # the explicit call builds them
-        finally
-            CHESSDatabase.AUTO_INDEX_LEDGER_ROWS[] = old
-        end
+        @test isempty(_chess_index_names())
+        @test_logs (:warn,r"has 2000000 ledger rows and was missing .* CHESS indexes") connect_SQLite(path)
+        @test length(_chess_index_names()) > 30
+        @test isempty(create_indexes!(progress=false)) # nothing left for the explicit call
+        execute_db("DELETE FROM Ledger WHERE ID = 2000000")
     end
 end
 

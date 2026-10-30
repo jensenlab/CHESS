@@ -5,7 +5,7 @@ operation tables in full, and `get_last_sequence_id` (the default argument of ev
 scans `Ledger`.
 
 The list below is the single definition: `create_db` creates it on a new database, `connect_SQLite`
-adds it to an existing small database, and `create_indexes!` / `drop_indexes!` add or remove it by
+adds it to an existing database that lacks it, and `create_indexes!` / `drop_indexes!` add or remove it by
 hand. Every index is named `idx_chess_<table>_<columns>`; `drop_indexes!` removes only those, so
 indexes made by other tools (for example the inventory's `idx_perf_*`) are never touched.
 =#
@@ -71,10 +71,6 @@ const CHESS_INDEXES = Tuple{String,Vector{String}}[
     ("Locations",["Type"]),
     ("Barcodes",["LocationID"]),
 ]
-
-# Above this many ledger rows `connect_SQLite` does not build indexes by itself (decision D2): building
-# them on a large database takes minutes to hours.
-const AUTO_INDEX_LEDGER_ROWS = Ref(1_000_000) # a Ref so a test can lower it
 
 _is_expression(col::AbstractString) = occursin('(',col)
 
@@ -178,10 +174,8 @@ function drop_indexes!()
     return names
 end
 
-const _warned_unindexed = Set{String}()
-
-# Called by `connect_SQLite`. A small database gets the indexes at once; a large one is only warned about,
-# once per file, because building them can take a long time.
+# Called by `connect_SQLite`. A database that lacks indexes gets them at once, whatever its size (the build is a
+# one-time cost, seconds for a million ledger rows), and a warning says so.
 function _ensure_indexes!()
     db = _require_db()
     _db_table_exists(db,"Ledger") || return nothing   # not a CHESS database (yet): nothing to index
@@ -189,12 +183,8 @@ function _ensure_indexes!()
         todo = _missing_indexes(db)
         isempty(todo) && return nothing
         rows = coalesce(_rows(db,"SELECT Max(ID) AS n FROM Ledger").n[1],0) # rowid: an upper bound on the row count, in O(1)
-        if rows < AUTO_INDEX_LEDGER_ROWS[]
-            _create_indexes!(db)
-        elseif !(db.file in _warned_unindexed)
-            push!(_warned_unindexed,db.file)
-            @warn "This database has $rows ledger rows and is missing $(length(todo)) CHESS indexes, so reconstruction scans the whole ledger. Run create_indexes!() to build them (this can take a long time)."
-        end
+        @warn "This database has $rows ledger rows and was missing $(length(todo)) CHESS indexes, so reconstruction would scan the whole ledger. Building them now; this happens once."
+        _create_indexes!(db)
     catch err
         @warn "Could not check or create the CHESS indexes" exception=err
     end

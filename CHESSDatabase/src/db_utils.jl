@@ -17,9 +17,8 @@ A database created before the `Chemicals` and `CompositionRules` tables became t
 `Dissolutions` tables is still readable only
 after [`migrate_chemistry!`](@ref) is run on it; `connect_SQLite` warns when it finds one.
 
-It also adds the indexes reconstruction relies on (see [`create_indexes!`](@ref)) if they are missing:
-at once for a database with fewer than 1,000,000 ledger rows, otherwise only a warning, because
-building them on a large database takes a long time.
+It also adds the indexes reconstruction relies on (see [`create_indexes!`](@ref)) if they are missing, at
+any size of database, and warns that it did. Building them is a one-time cost.
 """
 function connect_SQLite(path)
     db = SQLite.DB(path)

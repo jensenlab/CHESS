@@ -88,8 +88,8 @@ set, and stock once. See [Caching & Repair](caching-repair.md).
 The ledger and the operation tables are indexed by the location an operation concerns and by its ledger
 entry, so that rebuilding one location does not have to read every row of the ledger. The indexes are
 named `idx_chess_<table>_<columns>`. [`create_db`](@ref) creates them. [`connect_SQLite`](@ref) adds
-them to an existing database that has fewer than 1,000,000 ledger rows, and only warns about a larger
-one, because building them there can take a long time; [`create_indexes!`](@ref) builds them on request.
+them to an existing database that lacks them, whatever its size, and warns that it did; building them is a
+one-time cost. [`create_indexes!`](@ref) builds them on request.
 An index is not created when the database already has one with the same leading columns, whoever made
 it. [`drop_indexes!`](@ref) removes the `idx_chess_*` indexes and no others.
 
