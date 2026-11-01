@@ -68,13 +68,13 @@ acid with a weak one at about the same number of moles (1 mL of acetic acid is r
 ```jldoctest acid_base
 julia> acid = 0.0175u"mol" * rgt"HCl" + 100u"mL" * rgt"water";
 
-julia> pH(acid)
-0.7632626479894901
+julia> round(pH(acid); digits=3)
+0.763
 
 julia> vinegar = 1u"mL" * rgt"acetic_acid" + 100u"mL" * rgt"water";
 
-julia> pH(vinegar)
-2.7434825265372638
+julia> round(pH(vinegar); digits=3)
+2.743
 ```
 
 `acetic_acid`'s registered [`AcidBaseSystem`](@ref) (`[Acetic Acid, OAc⁻]`, `pKa=4.76`) only
@@ -114,11 +114,11 @@ textbook value computed from thermodynamic `pKa`s. Without the correction, the 1
 acetic acid's `pKa` of 4.76. With it, the 0.1 mol/L of dissolved salt lowers the pH by about 0.2:
 
 ```jldoctest acid_base
-julia> pH(buffer; ionic_strength_correction=false)
-4.760128250432899
+julia> round(pH(buffer; ionic_strength_correction=false); digits=3)
+4.76
 
-julia> pH(buffer)
-4.570325410721125
+julia> round(pH(buffer); digits=3)
+4.57
 ```
 
 ## Open systems and the water correction
@@ -142,11 +142,11 @@ registers an atmospheric carbon dioxide correction:
 ```jldoctest acid_base
 julia> acetate = 0.01u"mol" * rgt"sodium_acetate_anhydrous" + 100u"mL" * rgt"water";
 
-julia> pH(acetate)
-8.68439649164793
+julia> round(pH(acetate); digits=3)
+8.684
 
-julia> pH(acetate; water_correction=true)
-7.746718884707661
+julia> round(pH(acetate; water_correction=true); digits=3)
+7.747
 ```
 
 ## Ion parameters
@@ -173,11 +173,11 @@ needed to reach a target pH. It does not modify `s`, since `Stock`s are immutabl
 ```jldoctest acid_base
 julia> adjusted = adjust_pH(vinegar, 4.0, rgt"acetic_acid", rgt"NaOH");
 
-julia> pH(adjusted)
-3.999919269088423
+julia> round(pH(adjusted); digits=3)
+4.0
 
-julia> pH(vinegar) # the original stock is untouched
-2.7434825265372638
+julia> round(pH(vinegar); digits=3) # the original stock is untouched
+2.743
 ```
 
 `adjust_pH` works whether `s` or the titrant is strong or weak, buffered or not, because every

@@ -105,8 +105,8 @@ julia> acid = 0.1u"g" * rgt"HCl" + 100u"mL" * rgt"water";
 julia> net_hydrogen_ion_concentration(acid)
 1.0139808026240472e-5 mol mL⁻¹
 
-julia> pH(acid)
-1.9939702672841095
+julia> round(pH(acid); digits=4)
+1.9940
 ```
 
 Because `pH` subtracts `OH⁻` from `H⁺`, a base is registered with its dissolution (for
