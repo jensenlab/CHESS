@@ -204,3 +204,22 @@ end
         end
     end
 end
+
+@testset "connection: foreign keys are set once on connect, and query_db leaves no statement open" begin
+    with_scratch_db() do path
+        db = CHESSDatabase._require_db()
+        fk() = DBInterface.execute(db,"PRAGMA foreign_keys") |> DataFrame |> df -> df[1,1]
+        @test fk() == 1
+        # a write that breaks a foreign key is refused without any per-statement PRAGMA
+        @test_throws Exception execute_db("INSERT INTO Transfers(Source,Destination,Quantity,LedgerID) VALUES (999999,999998,1,999997)")
+        # statements are finalized when their rows are read, not left for the garbage collector
+        live_statements() = (n = 0; st = SQLite.C.sqlite3_next_stmt(db.handle,C_NULL);
+            while st != C_NULL; n += 1; st = SQLite.C.sqlite3_next_stmt(db.handle,st); end; n)
+        before = live_statements()
+        for _ in 1:200
+            query_db("SELECT 1 AS x")
+            query_db("SELECT ? AS x",(1,))
+        end
+        @test live_statements() - before < 5
+    end
+end

@@ -24,6 +24,9 @@ function connect_SQLite(path)
     db = SQLite.DB(path)
     # wait for another writer instead of failing at once with "database is locked"
     SQLite.busy_timeout(db,10_000)
+    # a connection opens with foreign keys off; it is a setting of the connection, so once is enough
+    # (running it before every statement made each one re-check all statements still alive)
+    DBInterface.execute(db, "PRAGMA foreign_keys = ON;")
     _current_db[] = db
     _warn_if_unmigrated()
     _ensure_lot_tables!()
@@ -48,15 +51,24 @@ _attribute_from_row(kind,value,unit) = ismissing(value) ? kind(missing) : kind(v
 
 Run a SQL statement that changes the connected database (`INSERT`, `UPDATE`, `CREATE`, ...).
 `params` fills the statement's `?` placeholders; prefer it over building SQL with string
-interpolation. Foreign-key constraints are switched on for every call. Throws an error if no
+interpolation. Foreign-key constraints are on for the connection (set by [`connect_SQLite`](@ref)). Throws an error if no
 database is connected (see [`connect_SQLite`](@ref)).
 
 See also: [`query_db`](@ref) for statements that return rows.
 """
 function execute_db(query::String)
     db=_require_db()
-    DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.
     SQLite.execute(db, query)
+end
+
+# Read every row, then finalize the statement now instead of leaving it to the garbage collector.
+function _query_frame(db,query,params)
+    cursor = params === nothing ? DBInterface.execute(db, query) : DBInterface.execute(db, query, params)
+    try
+        return DataFrame(cursor)
+    finally
+        DBInterface.close!(cursor.stmt) # closing the cursor only resets it
+    end
 end
 
 """
@@ -64,27 +76,18 @@ end
     query_db(query::String, params) -> DataFrame
 
 Run a SQL query against the connected database and return the result as a `DataFrame`. `params`
-fills the query's `?` placeholders. Foreign-key constraints are switched on for every call.
+fills the query's `?` placeholders. The statement is closed once its rows are read.
 
 See also: [`execute_db`](@ref).
 """
-function query_db(query::String)
-    db=_require_db()
-    DBInterface.execute(db, "PRAGMA foreign_keys = ON;") # when you open a connection, it defaults to turning foreign key constraints off.
-    return DataFrame(DBInterface.execute(db, query))
-end
+query_db(query::String) = _query_frame(_require_db(), query, nothing)
 
 function execute_db(query::String, params)
     db=_require_db()
-    DBInterface.execute(db, "PRAGMA foreign_keys = ON;")
     SQLite.execute(db, query, params)
 end
 
-function query_db(query::String, params)
-    db=_require_db()
-    DBInterface.execute(db, "PRAGMA foreign_keys = ON;")
-    DataFrame(DBInterface.execute(db, query, params))
-end
+query_db(query::String, params) = _query_frame(_require_db(), query, params)
 
 """
     sql_transaction(f::Function)
