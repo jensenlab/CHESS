@@ -155,16 +155,19 @@ end
 
 function _get_content_caches_global(location_id::Integer, starting::Integer=0, ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
     ledger_time=db_time(time)
+    enforced_through=ending
     if encumbrances
         return query_db("
         WITH ledger_subset (ID,SequenceID,Time)
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ),
+        enforcement_subset (ID,SequenceID)
+        AS(SELECT Max(ID),SequenceID FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $enforced_through GROUP BY SequenceID),
 
                     encumbrance_subset (EncumbranceID)
         AS(SELECT e.ID
-            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN ledger_subset ON ProtocolEnforcement.LedgerID = ledger_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
+            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN enforcement_subset ON ProtocolEnforcement.LedgerID = enforcement_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
 
         ),
         
@@ -217,7 +220,7 @@ expensive reconstruction.
 # the rows of Transfers and Discards, each with the ID of the row and its table (0 a transfer, 1 a discard)
 const _transfer_rows = "(SELECT LedgerID,Source,Destination,Quantity,Unit,ID AS RowID,0 AS Kind FROM Transfers UNION ALL SELECT LedgerID,Source,NULL AS Destination,Quantity,Unit,ID AS RowID,1 AS Kind FROM Discards)"
 
-function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
+function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false,enforced_through::Integer=ending)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
@@ -228,10 +231,12 @@ function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Intege
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ) ,
+        enforcement_subset (ID,SequenceID)
+        AS(SELECT Max(ID),SequenceID FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $enforced_through GROUP BY SequenceID),
 
         encumbrance_subset (EncumbranceID)
         AS(SELECT e.ID
-            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN ledger_subset ON ProtocolEnforcement.LedgerID = ledger_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
+            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN enforcement_subset ON ProtocolEnforcement.LedgerID = enforcement_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
 
         ),
 
@@ -310,7 +315,7 @@ function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Intege
 return query_db(x)
 end
 
-function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
+function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false,enforced_through::Integer=ending)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
@@ -321,10 +326,12 @@ function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Inte
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ) ,
+        enforcement_subset (ID,SequenceID)
+        AS(SELECT Max(ID),SequenceID FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $enforced_through GROUP BY SequenceID),
 
         encumbrance_subset (EncumbranceID)
         AS(SELECT e.ID
-            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN ledger_subset ON ProtocolEnforcement.LedgerID = ledger_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
+            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN enforcement_subset ON ProtocolEnforcement.LedgerID = enforcement_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
 
         ),
 
@@ -441,14 +448,14 @@ The optional arguments work as in [`reconstruct_location!`](@ref): `sequence_id`
 point in history, `max_cache` limits which caches may be used, and `encumbrances=true` includes
 planned future operations.
 """
-function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false)
-    all_locs=_reconstruct_contents_index(location_ids,sequence_id,time,max_cache,loc_index;encumbrances=encumbrances)
+function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false,enforced_through::Integer=sequence_id)
+    all_locs=_reconstruct_contents_index(location_ids,sequence_id,time,max_cache,loc_index;encumbrances=encumbrances,enforced_through=enforced_through)
     return find_most_recent_location.((all_locs,), location_ids)
 end
 
 # The replay behind `reconstruct_contents`: the index of every location it reconstructed, each with one entry per slot at
 # which its state changed. `trace`, when given, receives `(location id, slot) => (event, LedgerID)` for each change to a location.
-function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_id::Integer, time::DateTime, max_cache::Integer, loc_index::Dict{<:Integer,<:Vector};encumbrances=false,trace=nothing)
+function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_id::Integer, time::DateTime, max_cache::Integer, loc_index::Dict{<:Integer,<:Vector};encumbrances=false,trace=nothing,enforced_through::Integer=sequence_id)
     all_locs=deepcopy(loc_index)
     cache_feet=[]
     for loc_id in location_ids
@@ -472,7 +479,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
     if length(cache_feet)>0 
         foot = min(minimum(cache_feet),sequence_id)
     end
-    transfers=get_transfer_ancestors(location_ids,foot+1,sequence_id,time;encumbrances=encumbrances)
+    transfers=get_transfer_ancestors(location_ids,foot+1,sequence_id,time;encumbrances=encumbrances,enforced_through=enforced_through)
 
 
 
@@ -535,7 +542,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
     end
     if length(reconstructions_needed) > 0
-        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs;encumbrances=encumbrances)
+        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs;encumbrances=encumbrances,enforced_through=enforced_through)
         for loc in locs
             push_location!(all_locs,CHESSCore.location_id(loc),foot,loc)
         end

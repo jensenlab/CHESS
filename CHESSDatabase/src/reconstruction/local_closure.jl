@@ -107,10 +107,14 @@ The closure is walked well by well through the indexes on `Transfers` and `Disca
 the transfers of the wells in the closure and not on the length of the ledger. A well that fed many others
 (a shared reservoir) contributes all of its transfers as collateral. The original whole-ledger query is used for
 `encumbrances=true`, and when `reconstruction_mode[]` is `:legacy`. For more than `LOCAL_KEY_LIMIT` locations that own a large part of the ledger the bulk path of `plan_reconstruction` is used.
+
+With `encumbrances=true` a protocol counts as enforced by its latest enforcement entry up to `enforced_through` (default `ending`), whether or
+not that entry lies inside `starting..ending`. A replay that starts from a cache and a bootstrap of an ancestor at an earlier point pass the
+sequence point being reconstructed, so both see the same protocols as enforced.
 """
-function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
+function get_transfer_ancestors(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false,enforced_through::Integer=ending)
     if _use_global(encumbrances,locs;kind=:transfers)
-        (encumbrances || reconstruction_mode[] === :legacy) && return _get_transfer_ancestors_global(locs,starting,ending,time;encumbrances=encumbrances)
+        (encumbrances || reconstruction_mode[] === :legacy) && return _get_transfer_ancestors_global(locs,starting,ending,time;encumbrances=encumbrances,enforced_through=enforced_through)
         return _ancestors_from(_bulk_edges(starting,ending,time),locs)
     end
     t = db_time(time)

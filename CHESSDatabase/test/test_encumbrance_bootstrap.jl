@@ -94,6 +94,11 @@ end
     @test CHESSDatabase.shortfall(err) ≈ 100u"mL"
     msg = sprint(showerror,err)
     @test occursin("Unfilled Draw Error",msg) && occursin("encumbrance $e2",msg) && occursin("well $(location_id(B))",msg) && occursin("well $(location_id(Q))",msg)
+    # the well downstream of the lifted fill sees the same protocols as enforced, wherever its cache lies
+    errq = try; reconstruct_location(location_id(Q);encumbrances=true); nothing; catch e; e; end
+    @test errq isa UnfilledDrawError
+    @test errq.encumbrance_id == e2
+    @test errq.source == location_id(B)
     # reading without encumbrances, and the well that is filled, are unaffected
     @test eb_qty(A) ≈ 1000u"mL"
     @test eb_qty(A;encumbrances=true) ≈ 1000u"mL"
@@ -111,4 +116,14 @@ end
     @test err isa UnfilledDrawError
     @test err.available ≈ 60u"mL"
     @test CHESSDatabase.shortfall(err) ≈ 40u"mL"
+end
+
+@testset "a protocol enforced before a well's newest cache is still seen" begin
+    A,B = eb_chain(1,[(1,2,200u"mL")])
+    Q = eb_bottle("eb late cache sink")
+    eb_protocol("eb early draw",[(B,Q,100u"mL")]) # enforced (and encumbered) ...
+    cache(reconstruct_location(location_id(Q))) # ... before Q's newest cache (a fresh read: encumber changed the in-memory wells), with no enforcement change since
+    @test eb_qty(Q;encumbrances=true) ≈ 100u"mL"
+    @test eb_qty(B;encumbrances=true) ≈ 100u"mL"
+    @test stock(reconstruct_location(location_id(Q))) isa Empty
 end
