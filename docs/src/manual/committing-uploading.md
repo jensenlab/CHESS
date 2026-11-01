@@ -102,7 +102,6 @@ julia> plate = commit_location!(plate);
 julia> ledger_id = upload(transfer!, plate["A1"], plate["A2"], 50u"µL");
 
 julia> update(transfer!, plate["A1"], plate["A2"], 20u"µL"; replace=get_sequence_id(ledger_id));
-caches updated: 0
 
 julia> stock(reconstruct_location(CHESSCore.location_id(plate["A2"])))
 20.0 μL Solution (1 reagent(s))

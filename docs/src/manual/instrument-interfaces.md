@@ -65,13 +65,13 @@ record a free-text note:
 
 ```jldoctest instruments
 julia> upload(record_read!, well, read"Fluorescence"(50u"RFU"); instrument=reader)
-3
+2
 
 julia> @read ReaderNote
 ReadKind(ReaderNote)
 
 julia> upload(record_read!, well, ReaderNote("condensation on lid"); instrument=reader)
-4
+3
 ```
 
 ## Instrument settings
@@ -88,10 +88,10 @@ julia> upload_instrument_setting(reader, "Gain", 2.0);
 
 julia> get_instrument_settings(CHESSCore.location_id(reader))
 1×3 DataFrame
- Row │ Setting  Value   SequenceID
-     │ String   String  Int64
-─────┼─────────────────────────────
-   1 │ Gain     2.0              6
+ Row │ Setting  Value    SequenceID
+     │ String   String?  Int64
+─────┼──────────────────────────────
+   1 │ Gain     2.0               5
 ```
 
 `performable_operations`, `actuatable_attributes`, and `readable_types` are fixed capability data

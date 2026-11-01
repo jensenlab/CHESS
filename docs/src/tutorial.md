@@ -169,7 +169,6 @@ julia> recorded_before_fix = now();
 julia> sleep(1)  # only so that the correction gets a later timestamp in this quick demo
 
 julia> update(transfer!, tube["A1"], plate["A2"], 4u"µL"; replace=get_sequence_id(inoculations[2]));
-caches updated: 0
 ```
 
 `update` also applies the transfer to the in-memory objects it is given, so `plate` and `tube` now

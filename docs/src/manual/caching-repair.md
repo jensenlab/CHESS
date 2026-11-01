@@ -95,7 +95,6 @@ julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE Location
 
 julia> update(transfer!, reconstruct_location(CHESSCore.location_id(committed["A1"])),
               reconstruct_location(a2), 20u"µL"; replace=get_sequence_id(first_transfer));
-caches updated: 1
 
 julia> query_db("SELECT ID, StockID, LedgerID FROM CachedContents WHERE LocationID = $a2")
 3×3 DataFrame
