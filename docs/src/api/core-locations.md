@@ -10,6 +10,7 @@ Pages = ["locations/LocationKind.jl", "locations/Location.jl", "locations/Occupa
          "locations/Lot.jl", "locations/Labware.jl", "locations/Well.jl", "locations/LocationDisplay.jl",
          "locations/build_location.jl", "locations/plotting.jl",
          "operations/capability.jl", "operations/movement.jl", "operations/transfer.jl",
+         "operations/discard.jl",
          "operations/attributes.jl", "operations/reads.jl", "operations/observe.jl",
          "operations/mixing.jl"]
 ```
