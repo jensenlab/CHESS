@@ -50,9 +50,15 @@ Register Truesdell-Jones (extended Debye-Hückel) ion-size (`å`, Ångströms) a
 parameters for this lab's well-characterized inorganic ions -- see `CHESSCore.set_ion_parameters!`.
 Values fetched directly from the raw `wateq4f.dat` PHREEQC thermodynamic database
 (https://raw.githubusercontent.com/usgs-coupled/phreeqc3/master/database/wateq4f.dat, `-gamma å b`
-lines in the `SOLUTION_SPECIES` block for each ion's own reaction), not estimated or guessed. Any ion
-not registered here (e.g. `NH4⁺`, which has no `-gamma` line in that database) falls back to Davies
-(see `CHESSCore.activity_coefficient`'s docstring for that limitation) rather than an invented value.
+lines in the `SOLUTION_SPECIES` block for each ion's own reaction), not estimated or guessed. The
+species a reaction defines is the first one on its right-hand side (e.g. `H+ + PO4-3 = HPO4-2`
+defines `HPO4-2`). Where `wateq4f.dat` and `phreeqc.dat` disagree (`PO4³⁻`: 5.0 vs 4.0 Å; `Zn²⁺`: 6.0
+vs 5.0 Å) the `wateq4f.dat` value is used, for consistency with the rest of this set. The one value
+not taken from `wateq4f.dat` is `NH4⁺`, which has no `-gamma` line there; it comes from `phreeqc.dat`
+(the `NO3- + 10 H+ + 8 e- = NH4+ + 3 H2O` reaction, also `2.5 0` in `minteq.v4.dat`). Any ion not
+registered here (every organic species, plus e.g. `Co²⁺`, `Ni²⁺`, which have no free-ion entry in
+these databases) falls back to Davies (see `CHESSCore.activity_coefficient`'s docstring for that
+limitation) rather than an invented value.
 Wrapped in a function called from `__init__`, matching every other cross-package registration in this
 package (see `_register_electrolyte_dissolutions!`/`_register_acid_base_systems!` for why this can't
 run at plain top-level include time).
@@ -69,5 +75,15 @@ function _register_ion_parameters!()
     CHESSCore.set_ion_parameters!(SO4²⁻,5.0,-0.04)
     CHESSCore.set_ion_parameters!(CO3²⁻,5.4,0.0)
     CHESSCore.set_ion_parameters!(HCO3⁻,5.4,0.0)
+    CHESSCore.set_ion_parameters!(PO4³⁻,5.0,0.0)    # wateq4f.dat (phreeqc.dat: 4.0 0)
+    CHESSCore.set_ion_parameters!(HPO4²⁻,5.0,0.0)
+    CHESSCore.set_ion_parameters!(H2PO4⁻,5.4,0.0)
+    CHESSCore.set_ion_parameters!(HSO4⁻,4.5,0.0)    # wateq4f.dat only
+    CHESSCore.set_ion_parameters!(F⁻,3.5,0.0)
+    CHESSCore.set_ion_parameters!(Al³⁺,9.0,0.0)
+    CHESSCore.set_ion_parameters!(Mn²⁺,6.0,0.0)
+    CHESSCore.set_ion_parameters!(Cu²⁺,6.0,0.0)
+    CHESSCore.set_ion_parameters!(Zn²⁺,6.0,0.0)    # wateq4f.dat (phreeqc.dat: 5.0 0)
+    CHESSCore.set_ion_parameters!(NH4⁺,2.5,0.0)    # phreeqc.dat / minteq.v4.dat; no wateq4f.dat line
     return nothing
 end
