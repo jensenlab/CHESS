@@ -60,6 +60,20 @@ Well Capacity Error: 1000 mL is greater than the well's capacity (400 μL)
 Capacity comes from the well's `LocationKind`; see
 [Wells: Depositing & Transferring Material](wells.md).
 
+### `UnfilledDrawError`
+
+Thrown by the reconstruction functions with `encumbrances=true` when a replayed transfer or
+discard draws more from a well than it holds at that point, usually because the protocol that
+fills an intermediate well is no longer enforced while a protocol that draws from it still is:
+
+```
+Unfilled Draw Error: the planned transfer (encumbrance 16) draws 100.0 mL from well 1295 into well 1297, but that well holds 0.0 mL at that point (short by 100.0 mL). Whatever fills well 1295 is not part of this reconstruction, for example a protocol that is no longer enforced.
+```
+
+The error carries `ledger_id`, `encumbrance_id` (`0` for a recorded transfer), `source`, `destination`
+(`missing` for a discard), `quantity` and `available`. Enforce the protocol that fills the well
+again, or lift the protocol that draws from it. What the database accepts when writing is unchanged.
+
 ### `MixingError`
 
 Thrown by `Stock` subtraction (`-`) when the result would leave a reagent at a negative quantity.

@@ -106,6 +106,7 @@ export reconstruct_history, history_value_at
 export plan_reconstruction
 export upload_tick, update_tick, audit_ticks, check_tick, tick_rule_enforcement!, operation_classes, tick_operations
 #reconstruct_contents.jl
+export UnfilledDrawError
 export reconstruct_contents, reconstruct_contents!
 #reconstruct_parent.jl
 export reconstruct_parent , reconstruct_parent!

@@ -22,6 +22,51 @@ function _reconstruction_transfer(donor,recipient,quantity,configuration::String
 end
 
 """
+    UnfilledDrawError(ledger_id,encumbrance_id,source,destination,quantity,available)
+
+A replay of the ledger drew `quantity` out of the well `source`, which held only `available` at that point. `destination` is
+`missing` for a discard. `encumbrance_id` is the planned transfer being replayed (`0` for a recorded one) and `ledger_id` the
+ledger entry of the transfer or discard. `shortfall` gives the amount missing.
+
+This happens when an operation that fills the source is not in the replay, for example the protocol holding the planned fill
+of an intermediate well is no longer enforced while a protocol that draws from that well still is. It is thrown by the
+reconstruction functions; what the database accepts when writing is unchanged.
+"""
+struct UnfilledDrawError <: Exception
+    ledger_id::Int
+    encumbrance_id::Int
+    source::Int
+    destination::Union{Int,Missing}
+    quantity::Any
+    available::Any
+end
+
+shortfall(e::UnfilledDrawError) = e.quantity - e.available
+
+function Base.showerror(io::IO,e::UnfilledDrawError)
+    what = e.encumbrance_id > 0 ? "planned transfer (encumbrance $(e.encumbrance_id))" : (ismissing(e.destination) ? "discard (ledger entry $(e.ledger_id))" : "transfer (ledger entry $(e.ledger_id))")
+    print(io,"Unfilled Draw Error: the ",what," draws ",e.quantity," from well ",e.source)
+    ismissing(e.destination) || print(io," into well ",e.destination)
+    print(io,", but that well holds ",e.available," at that point (short by ",shortfall(e),"). ",
+          "Whatever fills well ",e.source," is not part of this reconstruction, for example a protocol that is no longer enforced.")
+    nothing
+end
+
+# Throws UnfilledDrawError when `src` holds less than `quant`. A quantity in a different dimension from the well's is left to the
+# transfer itself to report.
+function _check_draw(src,quant,row)
+    avail = CHESSCore.quantity(CHESSCore.stock(src))
+    if ismissing(avail)
+        avail = zero(quant)
+    elseif Unitful.dimension(avail) != Unitful.dimension(quant)
+        return nothing
+    end
+    (avail < quant && !isapprox(avail,quant)) || return nothing
+    throw(UnfilledDrawError(Int(row.LedgerID),hasproperty(row,:EncumbranceID) ? Int(row.EncumbranceID) : 0,Int(row.Source),
+                            ismissing(row.Destination) ? missing : Int(row.Destination),quant,avail))
+end
+
+"""
     get_species(id::Integer)
 
 Reconstruct a bare [`Species`](@ref) from the `Species` table by `ID` -- the direct, standalone
@@ -490,7 +535,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
     end
     if length(reconstructions_needed) > 0
-        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs)
+        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs;encumbrances=encumbrances)
         for loc in locs
             push_location!(all_locs,CHESSCore.location_id(loc),foot,loc)
         end
@@ -523,6 +568,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
             # by whatever it sent elsewhere -- the destination itself is never read back out of this
             # call (see get_transfer_ancestors's docstring), so there's no need to find, deepcopy, or
             # track it at all. Just withdraw from a copy of the source and discard the rest.
+            _check_draw(src,quant,row)
             new_src = deepcopy(src)
             withdraw!(new_src,quant)
             push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
@@ -532,6 +578,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
 
         dest = find_most_recent_location(all_locs,row.Destination,(Int(row.Destination),Int(row.SequenceID)) in touched ? row.SequenceID : seq_id)
+        _check_draw(src,quant,row)
         new_src,new_dest=_reconstruction_transfer(src,dest,quant)
         push_location!(all_locs,CHESSCore.location_id(dest),seq_id+1,new_dest)
         push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
