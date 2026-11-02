@@ -1562,3 +1562,10 @@ end
     @test lot(dict_to_location(location_to_dict(bottle))) == l
     @test !haskey(location_to_dict(build_location(Bottle1L,"plain")),"lot")
 end
+
+@testset "withdraw!: an empty well" begin
+    empty_plate=build_location(WP96)
+    err=try; CHESSCore.withdraw!(empty_plate["A1"],1u"μL"); nothing; catch e; e; end
+    @test err isa ErrorException
+    @test occursin("empty well",err.msg)
+end

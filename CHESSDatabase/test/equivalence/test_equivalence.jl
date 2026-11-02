@@ -237,6 +237,12 @@ end
 #   MethodError (transfer with a missing destination) or reads a wrong snapshot. The intended result is the one the
 #   method below gives: the entry is inserted in order. Tests: "push_location! keeps each history sorted" in
 #   test_reconstruct_contents_order.jl and "reconstruct_contents with a cache at the slot before a transfer" below.
+#   reconstruct_contents, a well downstream of the requested one (found by the nightly deep run): Legacy treats every
+#   destination of a Core=1 row as part of the closure and replays what such a well discarded or sent on, but the closure
+#   holds none of what it received from wells that do not feed the requested one, so the replay finds it empty and throws
+#   (or takes too little). The intended result leaves it out of the closure and skips its collateral rows; the requested
+#   wells' contents are unchanged. legacy_contents_fix.jl is Legacy.reconstruct_contents with just that change. Test:
+#   "reconstruct_contents: a well that only receives from the requested closure" in test_reconstruct_contents_downstream.jl.
 function Legacy.push_location!(index::Dict{<:Integer,<:Vector},location_id::Integer,sequence_id::Integer,loc::Location)
     entries = get!(() -> Tuple{Integer,Location}[], index, location_id)
     if isempty(entries) || entries[end][1] <= sequence_id
@@ -246,6 +252,8 @@ function Legacy.push_location!(index::Dict{<:Integer,<:Vector},location_id::Inte
     end
     return nothing
 end
+
+Base.include(Legacy,joinpath(@__DIR__,"legacy_contents_fix.jl"))
 
 function Legacy.get_reads(location_id::Int,sequence_id::Int,time::DateTime)
     lt = db_time(time)

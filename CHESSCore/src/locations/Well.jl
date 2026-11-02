@@ -160,11 +160,13 @@ Remove `quant` of `donor`'s stock and return it.
 The withdrawn [`Stock`](@ref) is a proportional slice of the well's contents: withdrawing a
 quarter of the total quantity takes a quarter of every reagent and organism. `quant` must have
 the same dimension (volume or mass) as the well's total quantity, otherwise an error is thrown.
+An error is also thrown if the well is empty.
 
 See also: [`deposit!`](@ref), [`transfer!`](@ref).
 """
 function withdraw!(donor::Well,quant::Union{Unitful.Volume,Unitful.Mass})
     st=stock(donor)
+    st isa Empty && error("cannot withdraw $quant from an empty well")
     q_tot=quantity(st)
     Unitful.dimension(q_tot) == Unitful.dimension(quant) || error("the withdrawl quantity dimension must be the same as the well's stock dimension")
     factor=Unitful.uconvert(NoUnits,quant/q_tot)

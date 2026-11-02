@@ -438,12 +438,20 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
     # so they're built as bare Empty() stubs instead, without ever touching the cache tables or
     # recursing. This is what keeps a busy/shared well's reconstruction from cascading into a large,
     # mostly-irrelevant slice of the ledger just because get_transfer_ancestors had to look at it.
-    core_locs=Set{Integer}()
+    # A well that only receives from a requested well is not part of that closure, even though its row is Core=1: nothing
+    # it holds can reach a requested well. The closure is the requested wells and every source that feeds it.
+    core_locs=Set{Integer}(location_ids)
     if nrow(transfers) > 0 && hasproperty(transfers,:Core)
-        for row in eachrow(transfers)
-            if row.Core == 1
-                push!(core_locs,row.Source)
-                ismissing(row.Destination) || push!(core_locs,row.Destination)
+        core_rows=[row for row in eachrow(transfers) if row.Core == 1]
+        grew=true
+        while grew
+            grew=false
+            for row in core_rows
+                row.Source in core_locs && continue
+                if ismissing(row.Destination) || row.Destination in core_locs
+                    push!(core_locs,row.Source)
+                    grew=true
+                end
             end
         end
     end
@@ -513,6 +521,8 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
             _apply_content_observations!(all_locs,row;touched=touched)
             continue
         end
+        # what a well outside the closure sent on (or discarded) is never read back
+        (row.Core == 0 || ismissing(row.Destination)) && !(row.Source in core_locs) && continue
         seq_id=row.SequenceID -1
         src_seq=(Int(row.Source),Int(row.SequenceID)) in touched ? row.SequenceID : seq_id
         quant= row.Quantity * _parse_unit(row.Unit)
