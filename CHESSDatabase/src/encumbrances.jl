@@ -8,6 +8,7 @@ function encumber_operation(fun::Function)
         toggle_lock! => encumber_lock,
         move_into! => encumber_movement,
         transfer! => encumber_transfer,
+        observe! => encumber_observation,
         set_attribute! => encumber_environment_attribute
     )
     return opfun_dict[fun]
@@ -381,6 +382,8 @@ function get_encumbrance_operation(encumbrance_id::Integer)
         return get_encumbered_lock
     elseif isa_encumbered_activity(encumbrance_id)
         return get_encumbered_activity
+    elseif isa_encumbered_observation(encumbrance_id)
+        return get_encumbered_observation
     else
         error("encumbrance operation not supported")
     end 
@@ -452,6 +455,7 @@ const encumbrance_operation_names=Dict(
     get_encumbered_environment_attribute => "Environment Attribute",
     get_encumbered_lock => "Lock",
     get_encumbered_activity => "Activity",
+    get_encumbered_observation => "Observation",
 )
 
 

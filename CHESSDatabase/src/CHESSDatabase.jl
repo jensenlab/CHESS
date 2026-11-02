@@ -28,6 +28,7 @@ include("./experiment_run_queries.jl")
 include("./instrument_settings.jl")
 include("./chess_experiments_interface.jl")
 
+include("./encumbered_observations.jl")
 include("./encumbrances.jl")
 
 # reconstruction
