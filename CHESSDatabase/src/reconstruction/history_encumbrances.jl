@@ -169,7 +169,8 @@ end
 # A well is touched by planned operations when a planned transfer ends in it or in a well that feeds it, or when a planned
 # cache of contents is held for one of them.
 function _planned_contents_touch(loc::Integer,hi::Integer,time::DateTime)
-    nrow(query_db("SELECT 1 FROM EncumberedTransfers LIMIT 1")) + nrow(query_db("SELECT 1 FROM EncumberedCachedContents LIMIT 1")) == 0 && return false
+    nrow(query_db("SELECT 1 FROM EncumberedTransfers LIMIT 1")) + nrow(query_db("SELECT 1 FROM EncumberedCachedContents LIMIT 1")) +
+        nrow(query_db("SELECT 1 FROM EncumberedObservations LIMIT 1")) == 0 && return false
     wells = Set{Int}([Int(loc)])
     for r in eachrow(get_transfer_ancestors([Int(loc)],0,hi,time))
         push!(wells,r.Source)
@@ -180,6 +181,7 @@ function _planned_contents_touch(loc::Integer,hi::Integer,time::DateTime)
         marks = _marks(length(chunk))
         nrow(query_db("SELECT 1 FROM EncumberedTransfers WHERE Destination IN $marks LIMIT 1",Tuple(chunk))) > 0 && return true
         nrow(query_db("SELECT 1 FROM EncumberedCachedContents WHERE LocationID IN $marks LIMIT 1",Tuple(chunk))) > 0 && return true
+        nrow(query_db("SELECT 1 FROM EncumberedObservations WHERE LocationID IN $marks LIMIT 1",Tuple(chunk))) > 0 && return true
     end
     return false
 end
@@ -190,7 +192,8 @@ function _planned_contents_timeline(loc::Integer,lo::Integer,hi::Integer,time::D
     real = _contents_timeline(loc,lo,hi,time;collapse=false)
     realpos = [max(r.slot,lo) for r in real]
     protocols = _protocols_of(vcat(query_db("SELECT EncumbranceID FROM EncumberedTransfers").EncumbranceID,
-                                   query_db("SELECT EncumbranceID FROM EncumberedCachedContents").EncumbranceID))
+                                   query_db("SELECT EncumbranceID FROM EncumberedCachedContents").EncumbranceID,
+                                   query_db("SELECT EncumbranceID FROM EncumberedObservations").EncumbranceID))
     enf = _enforcement_rows(protocols)
     points = Set{Int}([lo])
     anc = get_transfer_ancestors([Int(loc)],0,hi,time;encumbrances=true)
@@ -199,7 +202,7 @@ function _planned_contents_timeline(loc::Integer,lo::Integer,hi::Integer,time::D
         1 <= r.SequenceID && lo < r.SequenceID <= hi && push!(points,r.SequenceID)
         r.Core == 1 && union!(core,ismissing(r.Destination) ? (r.Source,) : (r.Source,r.Destination))
     end
-    for r in eachrow(get_content_observations(collect(core),lo,hi,time))
+    for r in eachrow(get_content_observations(collect(core),lo,hi,time;encumbrances=true))
         lo < r.SequenceID <= hi && push!(points,r.SequenceID)
     end
     for s in get_content_caches(loc,lo,hi,time).SequenceID

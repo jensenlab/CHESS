@@ -503,7 +503,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
     # component observations on every well whose own state this call reads back: the
     # requested wells plus the core ancestor closure. Collateral destinations never need them.
     target_wells=filter(id -> find_most_recent_location(all_locs,id) isa CHESSCore.Well,location_ids)
-    observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time)
+    observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time;encumbrances=encumbrances,enforced_through=enforced_through)
 
     # grab the sequence id of each location we need to complete this set of transfers
     cache_dict=Dict{Integer,Integer}()

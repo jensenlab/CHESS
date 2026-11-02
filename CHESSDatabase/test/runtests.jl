@@ -31,6 +31,8 @@ include("test_reconstruct_encumbrances.jl")
 
 include("test_encumbrance_bootstrap.jl")
 
+include("test_encumbered_observation.jl")
+
 include("test_migrate_chemistry.jl")
 
 include("test_reconstruct_contents_ancestor_closure.jl")
