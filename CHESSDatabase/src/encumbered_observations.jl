@@ -16,8 +16,6 @@ const _encumbered_observation_table_statements = (
         FOREIGN KEY(ComponentID) REFERENCES Components(ID) ON UPDATE CASCADE ON DELETE RESTRICT
     );
     """,
-    "CREATE INDEX IF NOT EXISTS idx_chess_encumberedobservations_encumbranceid ON EncumberedObservations(EncumbranceID);",
-    "CREATE INDEX IF NOT EXISTS idx_chess_encumberedobservations_locationid ON EncumberedObservations(LocationID);",
 )
 
 _create_encumbered_observation_table!(db) = foreach(s->DBInterface.execute(db,s),_encumbered_observation_table_statements)
