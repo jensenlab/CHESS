@@ -5,7 +5,7 @@
 #       [results_csv] [solver_timelimit_seconds]
 #
 # Sweeps n_plates in [1, 2, 5, 10, 20, 30] (384-well WP384 plates), the last point reaching
-# ~230,000 individual reagent transfers. Uses the default "min_cost_flow" scheduling objective (not
+# ~240,000 individual reagent transfers. Uses the default "min_cost_flow" scheduling objective (not
 # one of the MILP objectives -- see docs/src/manual/pourfecto_method.md), but note that Pourfecto's
 # *planning* phase always minimizes a sum-of-squared-slacks objective regardless of the `objective`
 # keyword -- so every pourfecto() call solves a QP, not a plain LP, in that phase. HiGHS solves QPs
@@ -63,6 +63,9 @@ function main()
     solver_timelimit = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 300.0
 
     mkpath(dirname(out_csv))
+
+    # Untimed warm-up solve, so JIT compilation and Gurobi startup don't inflate the first point.
+    run_one(1, solver_timelimit)
 
     sweep = [1, 2, 5, 10, 20, 30]
     rows = NamedTuple[]
