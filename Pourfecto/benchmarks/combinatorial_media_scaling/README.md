@@ -46,8 +46,7 @@ governs the later scheduling phase. In testing, HiGHS's active-set QP solver sca
 at just 1 plate (384 wells, ~8,000 decision variables) it hadn't reached optimality after hitting
 its 60s-per-solve time limit twice, for 255s of wall time and a slightly sub-optimal plan (8,059 of
 8,064 possible transfers active). Gurobi's barrier QP solver solved the identical problem to full
-optimality in ~9s, and scaled sub-linearly in further testing (5x the plates cost only ~1.8x the
-time). This benchmark therefore defaults to `Gurobi.Optimizer` (available here under an academic
+optimality in under 10s (see Results for the current timings). This benchmark therefore defaults to `Gurobi.Optimizer` (available here under an academic
 license). If you don't have a Gurobi license, `HiGHS.Optimizer` is a drop-in substitute in
 `run_benchmark.jl`, but expect it to be much slower and possibly time-limited even at small plate
 counts.
@@ -69,7 +68,8 @@ julia --project=Pourfecto Pourfecto/benchmarks/combinatorial_media_scaling/run_b
 
 The second (optional) argument is the `solver_timelimit` in seconds, applied to both of
 `pourfecto()`'s internal solves (planning and scheduling), so total wall time per sweep point can
-run up to roughly `2 * solver_timelimit` in the worst case.
+run up to roughly `2 * solver_timelimit` in the worst case. The script runs one untimed 1-plate
+solve before the sweep so JIT compilation and solver startup don't count toward the first point.
 
 ## Metrics
 
@@ -83,30 +83,30 @@ run up to roughly `2 * solver_timelimit` in the worst case.
 
 ## Results
 
-Full sweep, `Gurobi.Optimizer`, `solver_timelimit=300` (never hit -- every solve reported "Optimal
-Solution Found" at both priority levels, no time-limit warnings anywhere in the sweep):
+Run on 2026-11-02 from a working tree based on commit `3a1dbf5` plus the untimed warm-up solve added
+to `run_benchmark.jl`; that script is committed in `7948c5b`. Hardware and software: Apple M3
+(8 cores, 16 GB), Julia 1.12.4, Gurobi.jl 1.9.2, `Gurobi.Optimizer`, `solver_timelimit=300`. Every
+solve reached optimality at both priority levels and the time limit was never hit. Raw data is in
+`results/scaling_results.csv` (gitignored) and `examples/tempest_scaling/tempest_scaling_results.csv`.
 
 | n_plates | n_wells | n_transfers | wall_time_s | mean_abs_error_g | max_abs_error_g |
 |---|---|---|---|---|---|
-| 1  | 384    | 8,064   | 7.3  | 2.48e-5 | 5.00e-5 |
-| 2  | 768    | 16,128  | 3.0  | 2.50e-5 | 5.00e-5 |
-| 5  | 1,920  | 40,320  | 8.1  | 2.50e-5 | 5.00e-5 |
-| 10 | 3,840  | 80,640  | 17.9 | 2.50e-5 | 5.00e-5 |
-| 20 | 7,680  | 161,280 | 39.1 | 2.50e-5 | 5.00e-5 |
-| 30 | 11,520 | 241,920 | 61.8 | 2.50e-5 | 5.00e-5 |
-
-A few things stand out:
+| 1  | 384    | 8,064   | 4.7   | 2.48e-5 | 5.00e-5 |
+| 2  | 768    | 16,128  | 9.0   | 2.50e-5 | 5.00e-5 |
+| 5  | 1,920  | 40,320  | 22.0  | 2.50e-5 | 5.00e-5 |
+| 10 | 3,840  | 80,640  | 44.4  | 2.50e-5 | 5.00e-5 |
+| 20 | 7,680  | 161,280 | 92.0  | 2.50e-5 | 5.00e-5 |
+| 30 | 11,520 | 241,920 | 148.0 | 2.50e-5 | 5.00e-5 |
 
 - **Transfer count is exactly dense.** `n_transfers` equals `n_wells * 21` at every sweep point --
   every well needs a nonzero dose of every one of the 20 reagents plus water, and the planner
-  schedules exactly that, no more and no less. The 30-plate point reaches 241,920 transfers, well
-  past the ~200,000 target.
-- **Wall time scales roughly linearly with well count** once past the smallest instance (2 -> 30
-  plates is a 15x increase in wells for a ~20x increase in time -- not the superlinear blowup an
-  active-set QP solver would show, and nowhere near the MILP-objective wall times reported in
-  `rlforlqh_comparison/README.md` at a fraction of this scale). The n_plates=1 point (7.3s) is
-  slower than n_plates=2 (3.0s) purely from one-time JuMP/Gurobi startup overhead, not problem
-  difficulty.
+  schedules exactly that. The 30-plate point reaches 241,920 transfers.
+- **Wall time scales roughly linearly with well count.** From 1 to 30 plates the wells grow 30x and
+  the time about 32x, at 4.5-4.9 s per plate (roughly 12-13 ms per well) from 2 plates upward.
 - **Accuracy is essentially exact and scale-invariant.** Mean and max per-reagent absolute error
-  stay pinned at ~2.5e-5 g and ~5.0e-5 g respectively across the entire sweep -- consistent with
-  solver numerical tolerance, not a systematic planning shortfall, and unaffected by plate count.
+  stay at ~2.5e-5 g and ~5.0e-5 g across the sweep, consistent with solver numerical tolerance
+  rather than a systematic planning shortfall.
+
+An earlier run of this benchmark, made before the warm-up solve was added and before several
+Pourfecto changes, took 62 s at 30 plates (7.3 s at 1 plate, inflated by startup cost). The cause
+of the slowdown between the two runs has not been investigated.
