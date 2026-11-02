@@ -62,6 +62,8 @@ const CHESS_INDEXES = Tuple{String,Vector{String}}[
     ("EncumberedEnvironments",["EncumbranceID"]),
     ("EncumberedLocks",["EncumbranceID"]),
     ("EncumberedActivity",["EncumbranceID"]),
+    ("EncumberedObservations",["EncumbranceID"]),
+    ("EncumberedObservations",["LocationID"]),
     ("EncumberedCachedContents",["EncumbranceID"]),
     ("EncumberedCachedAncestors",["EncumbranceID"]),
     ("EncumberedCachedDescendants",["EncumbranceID"]),

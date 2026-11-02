@@ -22,6 +22,51 @@ function _reconstruction_transfer(donor,recipient,quantity,configuration::String
 end
 
 """
+    UnfilledDrawError(ledger_id,encumbrance_id,source,destination,quantity,available)
+
+A replay of the ledger drew `quantity` out of the well `source`, which held only `available` at that point. `destination` is
+`missing` for a discard. `encumbrance_id` is the planned transfer being replayed (`0` for a recorded one) and `ledger_id` the
+ledger entry of the transfer or discard. `shortfall` gives the amount missing.
+
+This happens when an operation that fills the source is not in the replay, for example the protocol holding the planned fill
+of an intermediate well is no longer enforced while a protocol that draws from that well still is. It is thrown by the
+reconstruction functions; what the database accepts when writing is unchanged.
+"""
+struct UnfilledDrawError <: Exception
+    ledger_id::Int
+    encumbrance_id::Int
+    source::Int
+    destination::Union{Int,Missing}
+    quantity::Any
+    available::Any
+end
+
+shortfall(e::UnfilledDrawError) = e.quantity - e.available
+
+function Base.showerror(io::IO,e::UnfilledDrawError)
+    what = e.encumbrance_id > 0 ? "planned transfer (encumbrance $(e.encumbrance_id))" : (ismissing(e.destination) ? "discard (ledger entry $(e.ledger_id))" : "transfer (ledger entry $(e.ledger_id))")
+    print(io,"Unfilled Draw Error: the ",what," draws ",e.quantity," from well ",e.source)
+    ismissing(e.destination) || print(io," into well ",e.destination)
+    print(io,", but that well holds ",e.available," at that point (short by ",shortfall(e),"). ",
+          "Whatever fills well ",e.source," is not part of this reconstruction, for example a protocol that is no longer enforced.")
+    nothing
+end
+
+# Throws UnfilledDrawError when `src` holds less than `quant`. A quantity in a different dimension from the well's is left to the
+# transfer itself to report.
+function _check_draw(src,quant,row)
+    avail = CHESSCore.quantity(CHESSCore.stock(src))
+    if ismissing(avail)
+        avail = zero(quant)
+    elseif Unitful.dimension(avail) != Unitful.dimension(quant)
+        return nothing
+    end
+    (avail < quant && !isapprox(avail,quant)) || return nothing
+    throw(UnfilledDrawError(Int(row.LedgerID),hasproperty(row,:EncumbranceID) ? Int(row.EncumbranceID) : 0,Int(row.Source),
+                            ismissing(row.Destination) ? missing : Int(row.Destination),quant,avail))
+end
+
+"""
     get_species(id::Integer)
 
 Reconstruct a bare [`Species`](@ref) from the `Species` table by `ID` -- the direct, standalone
@@ -110,16 +155,19 @@ end
 
 function _get_content_caches_global(location_id::Integer, starting::Integer=0, ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)
     ledger_time=db_time(time)
+    enforced_through=ending
     if encumbrances
         return query_db("
         WITH ledger_subset (ID,SequenceID,Time)
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ),
+        enforcement_subset (ID,SequenceID)
+        AS(SELECT Max(ID),SequenceID FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $enforced_through GROUP BY SequenceID),
 
                     encumbrance_subset (EncumbranceID)
         AS(SELECT e.ID
-            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN ledger_subset ON ProtocolEnforcement.LedgerID = ledger_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
+            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN enforcement_subset ON ProtocolEnforcement.LedgerID = enforcement_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
 
         ),
         
@@ -172,7 +220,7 @@ expensive reconstruction.
 # the rows of Transfers and Discards, each with the ID of the row and its table (0 a transfer, 1 a discard)
 const _transfer_rows = "(SELECT LedgerID,Source,Destination,Quantity,Unit,ID AS RowID,0 AS Kind FROM Transfers UNION ALL SELECT LedgerID,Source,NULL AS Destination,Quantity,Unit,ID AS RowID,1 AS Kind FROM Discards)"
 
-function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
+function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false,enforced_through::Integer=ending)  # find all transfers for a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
@@ -183,10 +231,12 @@ function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Intege
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ) ,
+        enforcement_subset (ID,SequenceID)
+        AS(SELECT Max(ID),SequenceID FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $enforced_through GROUP BY SequenceID),
 
         encumbrance_subset (EncumbranceID)
         AS(SELECT e.ID
-            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN ledger_subset ON ProtocolEnforcement.LedgerID = ledger_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
+            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN enforcement_subset ON ProtocolEnforcement.LedgerID = enforcement_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
 
         ),
 
@@ -265,7 +315,7 @@ function _get_transfer_ancestors_global(locs::Vector{<:Integer},starting::Intege
 return query_db(x)
 end
 
-function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
+function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false,enforced_through::Integer=ending)  # find all transfers stemming from a set of locations betweeen `starting` and `ending` ledger ids
     ledger_time= db_time(time)
     entry=query_join_vector(locs)
     x=""
@@ -276,10 +326,12 @@ function _get_transfer_descendents_global(locs::Vector{<:Integer},starting::Inte
         AS(
             SELECT Max(ID),SequenceID,Time FROM Ledger WHERE Time <= $ledger_time AND SequenceID BETWEEN $starting AND $ending GROUP BY SequenceID
             ) ,
+        enforcement_subset (ID,SequenceID)
+        AS(SELECT Max(ID),SequenceID FROM Ledger WHERE Time <= $ledger_time AND SequenceID <= $enforced_through GROUP BY SequenceID),
 
         encumbrance_subset (EncumbranceID)
         AS(SELECT e.ID
-            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN ledger_subset ON ProtocolEnforcement.LedgerID = ledger_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
+            FROM (Select ProtocolID, Max(SequenceID), LedgerID, IsEnforced FROM ProtocolEnforcement INNER JOIN enforcement_subset ON ProtocolEnforcement.LedgerID = enforcement_subset.ID  GROUP BY ProtocolID)  p INNER JOIN Encumbrances e on e.ProtocolID = p.ProtocolID  WHERE IsEnforced = 1
 
         ),
 
@@ -396,14 +448,14 @@ The optional arguments work as in [`reconstruct_location!`](@ref): `sequence_id`
 point in history, `max_cache` limits which caches may be used, and `encumbrances=true` includes
 planned future operations.
 """
-function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false)
-    all_locs=_reconstruct_contents_index(location_ids,sequence_id,time,max_cache,loc_index;encumbrances=encumbrances)
+function reconstruct_contents(location_ids::Vector{<:Integer}, sequence_id::Integer=get_last_sequence_id(),time::DateTime=Dates.now(), max_cache::Integer=sequence_id, loc_index::Dict{<:Integer,<:Vector} = location_reconstruction_index;encumbrances=false,enforced_through::Integer=sequence_id)
+    all_locs=_reconstruct_contents_index(location_ids,sequence_id,time,max_cache,loc_index;encumbrances=encumbrances,enforced_through=enforced_through)
     return find_most_recent_location.((all_locs,), location_ids)
 end
 
 # The replay behind `reconstruct_contents`: the index of every location it reconstructed, each with one entry per slot at
 # which its state changed. `trace`, when given, receives `(location id, slot) => (event, LedgerID)` for each change to a location.
-function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_id::Integer, time::DateTime, max_cache::Integer, loc_index::Dict{<:Integer,<:Vector};encumbrances=false,trace=nothing)
+function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_id::Integer, time::DateTime, max_cache::Integer, loc_index::Dict{<:Integer,<:Vector};encumbrances=false,trace=nothing,enforced_through::Integer=sequence_id)
     all_locs=deepcopy(loc_index)
     cache_feet=[]
     for loc_id in location_ids
@@ -427,7 +479,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
     if length(cache_feet)>0 
         foot = min(minimum(cache_feet),sequence_id)
     end
-    transfers=get_transfer_ancestors(location_ids,foot+1,sequence_id,time;encumbrances=encumbrances)
+    transfers=get_transfer_ancestors(location_ids,foot+1,sequence_id,time;encumbrances=encumbrances,enforced_through=enforced_through)
 
 
 
@@ -459,7 +511,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
     # component observations on every well whose own state this call reads back: the
     # requested wells plus the core ancestor closure. Collateral destinations never need them.
     target_wells=filter(id -> find_most_recent_location(all_locs,id) isa CHESSCore.Well,location_ids)
-    observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time)
+    observations=get_content_observations(collect(union(core_locs,target_wells)),foot+1,sequence_id,time;encumbrances=encumbrances,enforced_through=enforced_through)
 
     # grab the sequence id of each location we need to complete this set of transfers
     cache_dict=Dict{Integer,Integer}()
@@ -498,7 +550,9 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
     end
     if length(reconstructions_needed) > 0
-        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs)
+        # the bootstrap holds recorded history only: every planned operation touching a core well is in `transfers` and
+        # `observations` above and is applied by the replay below, so a bootstrap that applied them too would apply them twice
+        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs;encumbrances=false,enforced_through=enforced_through)
         for loc in locs
             push_location!(all_locs,CHESSCore.location_id(loc),foot,loc)
         end
@@ -533,6 +587,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
             # by whatever it sent elsewhere -- the destination itself is never read back out of this
             # call (see get_transfer_ancestors's docstring), so there's no need to find, deepcopy, or
             # track it at all. Just withdraw from a copy of the source and discard the rest.
+            _check_draw(src,quant,row)
             new_src = deepcopy(src)
             withdraw!(new_src,quant)
             push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)
@@ -542,6 +597,7 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
 
         dest = find_most_recent_location(all_locs,row.Destination,(Int(row.Destination),Int(row.SequenceID)) in touched ? row.SequenceID : seq_id)
+        _check_draw(src,quant,row)
         new_src,new_dest=_reconstruction_transfer(src,dest,quant)
         push_location!(all_locs,CHESSCore.location_id(dest),seq_id+1,new_dest)
         push_location!(all_locs,CHESSCore.location_id(src),seq_id+1,new_src)

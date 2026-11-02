@@ -65,8 +65,21 @@ end
 Every component observation on `locs` between `starting` and `ending` sequence points, ordered by `SequenceID`
 (observations of one slot in the order they were recorded). The columns are `LedgerID`, `SequenceID`, `LocationID`,
 `ComponentID`, `Quantity` and `Unit`.
+
+With `encumbrances=true` the planned observations ([`encumber`](@ref) with `observe!`) of the protocols enforced as of `enforced_through`
+(default `ending`) follow the recorded ones, with `LedgerID` `0` and the `SequenceID` that the planned transfers take, whatever
+`starting` and `ending` are.
 """
-function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now())
+function get_content_observations(locs::Vector{<:Integer},starting::Integer=0,ending::Integer=get_last_sequence_id(),time::DateTime=Dates.now();encumbrances=false,enforced_through::Integer=ending)
+    recorded = _get_recorded_content_observations(locs,starting,ending,time)
+    encumbrances || return recorded
+    planned = get_encumbered_observations(locs,time;enforced_through=enforced_through)
+    nrow(planned) == 0 && return recorded
+    # the planned observations come after every recorded entry, in the order they were encumbered
+    return vcat(recorded,select(planned,Not(:EncumbranceID)))
+end
+
+function _get_recorded_content_observations(locs::Vector{<:Integer},starting::Integer,ending::Integer,time::DateTime)
     isempty(locs) && return _get_content_observations_global(locs,starting,ending,time)
     _use_global(false,locs;kind=:observations) && return _get_content_observations_global(locs,starting,ending,time)
     t = db_time(time)

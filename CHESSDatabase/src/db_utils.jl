@@ -32,6 +32,7 @@ function connect_SQLite(path)
     _ensure_lot_tables!()
     _ensure_containment_table!()
     _ensure_discard_table!()
+    _ensure_encumbered_observation_table!()
     _ensure_indexes!() # last, so the tables above are indexed too
     return nothing
 end

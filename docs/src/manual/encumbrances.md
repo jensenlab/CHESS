@@ -45,7 +45,7 @@ enforcement can be switched on and off over time.
 
 An encumbrance has no type of its own. It is an integer `Encumbrances.ID` that ties a `ProtocolID`
 to one row in an operation-specific table: `EncumberedTransfers`, `EncumberedMovements`,
-`EncumberedEnvironments`, `EncumberedLocks`, or `EncumberedActivity`.
+`EncumberedEnvironments`, `EncumberedLocks`, `EncumberedActivity`, or `EncumberedObservations`.
 
 `encumber` takes `protocol_id, fun, args...`. It runs the `CHESSCore` operation immediately in
 memory and then records the reservation in the matching table. The operation is not deferred or
@@ -76,6 +76,37 @@ true
 
 julia> unlock!(plate2);  # reversing the in-memory lock is manual
 ```
+
+## Encumbering an observation
+
+`encumber(protocol_id, observe!, well, component, amount)` plans that `well` holds `component` at
+exactly `amount`, the way `encumber(protocol_id, transfer!, ...)` plans a transfer. The observation is
+applied to `well` in memory, an encumbrance is recorded, and the row goes to `EncumberedObservations`
+(`EncumbranceID`, `LocationID`, `ComponentID`, `Quantity`, `Unit`). A database made before the table
+existed gains it when it is connected to. Two uses are a planned addition that no transfer accounts
+for (water added to a well) and a container that is ordered but not received, which is a location
+created now with a planned observation that it holds the reagent. The lot is not part of an
+observation.
+
+Reconstruction with `encumbrances=true` applies the observation in encumbrance order together with
+the planned transfers, after every recorded ledger entry:
+
+- the well reads back at the observed amount; every other component is unchanged;
+- a planned transfer out of the well, made by a later encumbrance, draws from the observed state. It
+  succeeds when the amount is there and raises `UnfilledDrawError` when it is not, for example when
+  the protocol holding the observation is no longer enforced;
+- `ProtocolEnforcement` turns the observation on and off like any other encumbrance, as of the
+  sequence point being reconstructed.
+
+A planned observation of a component the well already holds sets the amount, so it can raise or lower
+it. Reading the well back gives the amount only. Lineage is not part of the read-back:
+`trace_contents` follows the ledger and does not see planned observations. When the observation is
+later recorded with `observe`, an increase over a component that came from lots is a real observed
+increase and is credited to the existing lots in proportion (CHESS request 16), not to untraced
+material.
+
+`encumber` changes the object it is given in memory. Caching that object afterwards (`cache(well)`)
+stores the planned state as if it were recorded; cache a freshly reconstructed copy instead.
 
 ## Completing an encumbrance
 
