@@ -158,3 +158,13 @@ end
     @test CHESSDatabase._table_exists("EncumberedObservations")
 end
 
+@testset "a planned transfer out of a well with no usable cache is applied once (ancestor bootstrap)" begin
+    # the source is observed (observations write no cache) before the sink is created, so the sink's cache is newer than
+    # anything of the source and the source is rebuilt as an ancestor
+    w = eo_bottle("eo uncached source")
+    observe(w,rgt"glycerol",100u"mL")
+    sink = eo_bottle("eo late sink")
+    encumber(eo_protocol("eo late draw"),transfer!,w,sink,60u"mL")
+    @test quantity(eo_contents(sink;encumbrances=true)) ≈ 60u"mL"
+    @test quantity(eo_contents(w;encumbrances=true)) ≈ 40u"mL"
+end

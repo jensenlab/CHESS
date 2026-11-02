@@ -542,7 +542,9 @@ function _reconstruct_contents_index(location_ids::Vector{<:Integer}, sequence_i
         end
     end
     if length(reconstructions_needed) > 0
-        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs;encumbrances=encumbrances,enforced_through=enforced_through)
+        # the bootstrap holds recorded history only: every planned operation touching a core well is in `transfers` and
+        # `observations` above and is applied by the replay below, so a bootstrap that applied them too would apply them twice
+        locs=reconstruct_contents(collect(reconstructions_needed),foot,time,max_cache,all_locs;encumbrances=false,enforced_through=enforced_through)
         for loc in locs
             push_location!(all_locs,CHESSCore.location_id(loc),foot,loc)
         end
