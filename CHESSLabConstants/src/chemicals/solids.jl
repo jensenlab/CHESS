@@ -476,6 +476,14 @@
 @reagent sorbitol "D-sorbitol" Solid "C6H14O6" 1.49u"g/mL" 5780
 @reagent_product sorbitol "Sigma-Aldrich" catalog_number="S1876" product_name="D-SORBITOL"
 @reagent spectinomycin "spectinomycin" Solid "C14H24N2O7" missing 15541
+@species Stachyose "Stachyose" 0 "C24H42O21" 439531
+@reagent stachyose_tetrahydrate "stachyose tetrahydrate" Solid (Stachyose+4*H2O) missing missing
+# ^ Thermo AC226085000 is listed as "stachyose hydrate, 97+%", but its SDS (rev. 19-Dec-2025) names it stachyose tetrahydrate.
+# The SDS gives C24H42O21·xH2O with the anhydrous 666.58 g/mol; Karl Fischer water ≤12% fits the tetrahydrate (9.8%).
+# Fisher's IUPAC name on one listing says trihydrate: the vendor does not state x, so check the lot CoA. No density given.
+# Unverified: the tetrahydrate count (4*H2O) rests on the SDS title alone; purity (HPLC ≥97.0%) is not modeled.
+# Neutral non-ionizable sugar: no AcidBaseSystem. No pKa source was looked up for this.
+@reagent_product stachyose_tetrahydrate "Fisher Scientific" catalog_number="AC226085000" product_name="Thermo Scientific Chemicals Stachyose hydrate, 97+%" manufacturer_number="Thermo 226085000"
 @reagent streptomycin "streptomycin" Solid "C21H39N7O12" missing 19649
 @reagent succinic_acid "Succinic Acid" Solid "C4H6O4" 1.572u"g/mL" 1110
 @reagent_product succinic_acid "Sigma-Aldrich" catalog_number="S9512" product_name="SUCCINIC ACID FREE ACID INSECT CELL CULT" notes="Product name is cut off in the stocklist"
